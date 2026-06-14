@@ -41,177 +41,182 @@ principle regardless of deployment shape.
 ## 1. Component overview
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                            User's machine                          │
-│                                                                    │
-│  ┌──────────────┐                                                  │
-│  │  MCP client  │  ── stdio MCP ──┐                                │
-│  │  (Claude /   │                 │                                │
-│  │   Cursor /   │                 │                                │
-│  │   agent)     │                 ▼                                │
-│  └──────────────┘     ┌──────────────────────────────┐             │
-│                       │                              │             │
-│  ┌──────────────┐     │   office-mcp server          │             │
-│  │  MCP client  │ HTTP│   (long-lived process)       │             │
-│  │  (remote)    │ ───▶│                              │             │
-│  └──────────────┘     │  ┌────────────────────────┐  │             │
-│                       │  │ MCP frontend           │  │             │
-│                       │  │  - stdio transport     │  │             │
-│                       │  │  - Streamable HTTP     │  │             │
-│                       │  ├────────────────────────┤  │             │
-│                       │  │ Tool router            │  │             │
-│                       │  ├────────────────────────┤  │             │
-│                       │  │ Session registry       │  │             │
-│                       │  ├────────────────────────┤  │             │
-│                       │  │ Add-in WS backend      │  │             │
-│                       │  │  (ws://127.0.0.1:8765) │  │             │
-│                       │  └────────────────────────┘  │             │
-│                       └────────────▲─────────────────┘             │
-│                                    │                               │
-│                  ┌─────────────────┼─────────────────┐             │
-│                  │                 │                 │             │
-│      WebSocket + JSON-RPC 2.0  ────┴────       ──────┴────         │
-│                  │                                                 │
-│  ┌───────────────▼────────────┐  ┌────────────────────────────┐    │
-│  │  Word.exe (instance A)     │  │  Word.exe (instance B)     │    │
-│  │  ┌──────────────────────┐  │  │  ┌──────────────────────┐  │    │
-│  │  │ office-mcp add-in    │  │  │  │ office-mcp add-in    │  │    │
-│  │  │ (Office.js task-pane)│  │  │  │ (Office.js task-pane)│  │    │
-│  │  └──────────────────────┘  │  │  └──────────────────────┘  │    │
-│  │  Document: report.docx     │  │  Document: contract.docx   │    │
-│  │  Document: notes.docx      │  │  (IRM-protected)           │    │
-│  └────────────────────────────┘  └────────────────────────────┘    │
-└────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│                            User's machine                             │
+│                                                                       │
+│  ┌──────────────┐                                                     │
+│  │  MCP client  │ MCP HTTP (Streamable HTTP), loopback                │
+│  │  (Claude /   │──────────────┐                                      │
+│  │   Cursor /   │              │                                      │
+│  │   agent)     │              ▼                                      │
+│  └──────────────┘    ┌──────────────────────────────┐                 │
+│                      │  office-mcp daemon           │                 │
+│                      │  (singleton, autostart)      │                 │
+│                      │                              │                 │
+│                      │  - MCP HTTP frontend         │                 │
+│                      │  - Tool router               │                 │
+│                      │  - Session registry          │                 │
+│                      │  - Add-in WS backend         │                 │
+│                      └────────────▲─────────────────┘                 │
+│                                   │                                   │
+│              WebSocket + JSON-RPC 2.0  (add-ins dial in)              │
+│                                   │                                   │
+│       ┌───────────────────────────┼──────────────────────┐            │
+│       │                           │                      │            │
+│  ┌────┴────────────────────────┐  │  ┌──────────────────┴────────┐   │
+│  │  Word.exe (instance A)      │  │  │  Word.exe (instance B)    │   │
+│  │   office-mcp add-in         │  │  │   office-mcp add-in       │   │
+│  │   report.docx, notes.docx   │  │  │   contract.docx (IRM)     │   │
+│  └─────────────────────────────┘  │  └───────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 2. Processes and their roles
 
-### 2.1 The MCP server
+### 2.1 The daemon
 
-- **Lifetime**: starts on first need (auto-launched by MCP client over stdio,
-  or manually as a service), continues until killed or idle for `IDLE_SHUTDOWN_SEC`.
-- **Listens**: WebSocket on `127.0.0.1:<port>` for add-ins (loopback only).
-- **Speaks**: MCP (stdio or Streamable HTTP) for clients.
-- **State held**:
-  - Registry of connected add-in sessions (instance ID, host app, document list,
-    capability bitmap, last heartbeat).
-  - Pending request map (MCP call ID → add-in session + add-in request ID).
-  - (Only when non-loopback bind is configured) shared secret loaded from the
-    shared config (see [05-security.md §2](05-security.md)).
-- **State NOT held**:
-  - Document content. Always lives in the add-in / Office.
-  - Undo history. Word owns it.
-  - User credentials. Server never sees them; add-in inherits from Office.
+The daemon is the **single, long-lived office-mcp process** on the machine.
+There is exactly one. Everything below assumes it is already running; how it
+gets started is install-time concern, not runtime concern (see §2.3).
+
+- **Lifetime**: starts at user login (Windows Scheduled Task / macOS launchd
+  agent / Linux systemd `--user` unit). Runs until the user logs out or the
+  service is stopped administratively. No idle shutdown.
+- **Binds two loopback ports**, both from the shared config:
+  - MCP HTTP (Streamable HTTP) for MCP clients.
+  - WebSocket for add-ins.
+- **State**: add-in session registry, in-flight request map. No document
+  content, no undo history, no credentials.
+
+MCP clients that only speak stdio are out of scope. MCP 2026 promoted
+Streamable HTTP to the standard remote transport; if a client needs a
+stdio shim it is a generic MCP-stdio-to-HTTP proxy, decoupled from
+office-mcp, and not part of this project.
 
 ### 2.2 The Office add-in
 
-- **Lifetime**: bound to Office instance. Loads when Office starts (if pinned)
-  or when the user opens the task pane.
-- **Connects to**: `ws://<bind>:<port>` read from the shared config
-  ([07-deployment.md §5](07-deployment.md)).
-- **State held**:
-  - One persistent WS connection back to the server.
-  - Per-document Office.js context handles.
-  - Pending operation queue (Office.js requires batched `context.sync()`).
-- **Responsibilities**:
-  - On load: announce instance + enumerate open documents.
-  - On document open/close: send `session.added` / `session.removed` events.
-  - On server request: execute Office.js calls, return result.
-  - On user save / cursor move / selection change: optionally emit events
-    (rate-limited, opt-in via client capability).
+- **Lifetime**: bound to its Office instance. Loads when Office starts (if
+  pinned) or when the user opens the task pane.
+- **Connects to**: the daemon's WS endpoint, read from the shared config.
+- **State**: WS connection, per-document Office.js context handles, pending
+  operation queue (Office.js requires batched `context.sync()`).
+- **Responsibilities**: announce instance on load, emit `session.added` /
+  `session.removed` as documents open/close, execute tool calls forwarded by
+  the daemon.
 
-### 2.3 The MCP client
+### 2.3 Why the daemon is a singleton, and why nothing auto-spawns it
 
-Just a normal MCP client. Sees a single MCP server. Does not need to know how
-many Office instances are open — that is exposed through MCP resources and the
-`session_id` parameter on tool calls.
+The add-in is the connecting party. It dials a fixed loopback port from a
+fixed config. That model only works if exactly one process is listening on
+that port at a time. Consequences:
+
+- The daemon must be started by something with deterministic lifetime — the
+  OS session start — not by ad-hoc client spawning.
+- Multiple installed versions of office-mcp on the same machine resolve the
+  same way: whichever the user configured to autostart is the one that runs.
+  The other simply isn't running.
+- If the daemon is not running, MCP clients get a connect refused. There is
+  no "auto-spawn on first request" path. Failing loud is the correct
+  behavior; the fix is `office-mcp daemon start` (or fix the autostart).
+
+This is the standard daemon model used by dockerd, pulseaudio, ssh-agent,
+language servers in long-running mode. Nothing exotic.
+
+### 2.4 The MCP client
+
+Sees one MCP server, talks to it over HTTP. Doesn't know how many Office
+instances are open. Document addressing is via `session_id` returned from
+`office.list_sessions`.
 
 ## 3. Transports
 
-### 3.1 Client ↔ Server: MCP
+### 3.1 Client ↔ daemon: MCP Streamable HTTP
 
-| Transport | When to use | Notes |
-|---|---|---|
-| **stdio** | Default for Claude Desktop, Cursor, local agents | Server is spawned as child of client. One client per server process. |
-| **Streamable HTTP** | Multiple clients sharing one server; remote agents | Server runs as a service. Binds `127.0.0.1` by default; cloud bind requires explicit flag. |
+| Aspect | Value |
+|---|---|
+| Transport | MCP Streamable HTTP (per MCP 2026 stateless revision) |
+| Bind | loopback by default; non-loopback requires `api_key` |
+| Multiplexing | Multiple concurrent clients supported |
+| SSE-only | Not supported (deprecated upstream) |
+| stdio | Not supported in-tree; use a generic proxy if needed |
 
-Per the MCP 2026 stateless protocol revision, both transports support multiple concurrent
-sessions. SSE-only transport is **not** supported (deprecated upstream).
+### 3.2 Daemon ↔ add-in: WebSocket + JSON-RPC 2.0
 
-### 3.2 Server ↔ Add-in: WebSocket + JSON-RPC 2.0
+- Bidirectional: daemon can call add-in (`tool.invoke`); add-in can call
+  daemon (`session.added` / `session.removed`).
+- JSON-RPC 2.0 framing, one JSON object per WS message.
+- Heartbeat: daemon pings at `addin_channel.heartbeat_interval_sec` (config
+  default 30s). Add-in must respond within `heartbeat_timeout_sec` (config
+  default 10s).
+- Reconnect: add-in backs off with jitter on disconnect.
 
-- Bidirectional: server can call add-in; add-in can call server (for events).
-- JSON-RPC 2.0 framing (one JSON object per WS message, no batching in v1).
-- Heartbeat: server sends `ping` every 30s; add-in must respond within 10s or
-  the session is marked stale.
-- Reconnect: add-in must back off with jitter (1s, 2s, 5s, 10s, 30s, then 30s cap).
+Why WebSocket and not Named Pipes / Unix Socket:
 
-Why WebSocket and not Named Pipes / Unix Socket?
+- Cross-platform (Office on Web/Mac/Windows).
+- Office.js add-ins are web apps and have `WebSocket` natively.
+- Loopback bind makes it security-equivalent to a pipe.
 
-- **Cross-platform** (Office on Web/Mac/Windows).
-- **Office.js add-ins are web apps** — they have `WebSocket` natively, no extra
-  permissions. Named pipes require a desktop-only bridge.
-- **Loopback-only by default** — security-equivalent to a pipe for v1.
+### 3.3 Why not stdio between daemon and add-in
 
-### 3.3 Why not stdio between server and add-in?
-
-Add-ins are launched by Office, not by the server. Their lifecycle is controlled
-by Office (and the user's task-pane interactions), so the only viable IPC is one
-where the add-in is the connecting party.
+Add-ins are launched by Office, not by the daemon. The only IPC where the
+add-in can be the connecting party is a network socket.
 
 ## 4. Lifecycle scenarios
 
-### 4.1 Cold start (no Office running)
+### 4.1 Cold start
 
-1. MCP client launches the server (or HTTPs in).
-2. Server starts, binds the WS endpoint declared by `[addin_channel]` in the
-   shared config (default `127.0.0.1:8765`). Refuses to start if the bind is
-   non-loopback and no `shared_secret` is set.
-3. Client calls `list_sessions` → server returns `[]` (no add-ins connected).
-4. Any tool call against a host returns
-   `error: { code: -32001, message: "No Office instances connected" }`.
+1. User logs in. OS-level autostart launches the daemon.
+2. Daemon reads shared config, binds both loopback ports, idles waiting.
+3. No add-ins connected → `office.list_sessions` returns `[]`.
 
-### 4.2 User opens Word after server is up
+### 4.2 MCP client starts before any Office
 
-1. Word loads. The pinned `office-mcp` task-pane add-in initializes.
-2. Add-in reads `[addin_channel]` from the shared config to learn the WS URL.
-3. Add-in dials `ws://<bind>:<port>`.
-4. Add-in sends `register` (see [02-registration-protocol.md](02-registration-protocol.md))
-   with its instance ID, host app, and capability bitmap. No auth field is
-   sent unless a non-loopback `shared_secret` is configured.
-5. Server accepts (loopback default) or validates the secret, replies
-   `register.result`, assigns session ID.
-6. Add-in enumerates open documents, sends `session.added` for each.
-7. Server now exposes those documents via MCP resources & tool addressing.
+1. MCP client connects to `http://127.0.0.1:<mcp_http.port>`.
+2. Tool calls against any session return
+   `error: { code: -32001, message: "No Office instances connected" }`
+   until the user opens Office.
 
-### 4.3 User opens a new document in an already-registered Word instance
+### 4.3 User opens Word
 
-1. Add-in's `Word.run` document-change handler fires.
-2. Add-in sends `session.added` with the new document's metadata.
-3. Server updates registry; new document is addressable on next MCP client `list_resources`.
+1. Word loads; pinned add-in initializes.
+2. Add-in reads `[addin_channel]` from shared config.
+3. Add-in dials `ws://bind:port`, sends `register` (no auth field on
+   loopback; `shared_secret` when configured).
+4. Daemon assigns session ID, replies `register.result`.
+5. Add-in enumerates open documents, sends `session.added` for each.
+6. Documents are now addressable by MCP clients.
 
-### 4.4 Office crashes mid-call
+### 4.4 User opens a new document in an already-registered Word
 
-1. WS connection drops.
-2. Server marks all sessions for that instance as `state: stale`.
-3. In-flight MCP requests for those sessions reject with
-   `error: { code: -32002, message: "Document session lost" }`.
-4. Server keeps the session in `stale` state for `STALE_GRACE_SEC` (default 60s)
-   to allow add-in reconnect (Office auto-recovery).
-5. After grace, session is removed; clients see it disappear from `list_resources`.
+1. Add-in's document-change handler fires.
+2. Add-in sends `session.added`.
 
-### 4.5 MCP client disconnects
+### 4.5 Office crashes mid-call
 
-- stdio: server exits after `IDLE_SHUTDOWN_SEC` of no client connection.
-- HTTP: server keeps running. Add-ins stay connected.
-- Document sessions are unaffected by client churn.
+1. WS drops.
+2. Daemon marks affected sessions `stale`; in-flight calls reject with
+   `-32002 SESSION_LOST`.
+3. Session is held in `stale` for `session_grace_sec` (config) to allow
+   Office auto-recovery → add-in reconnect.
+4. On grace timeout, session is removed.
 
-### 4.6 Two clients want to edit the same document
+### 4.6 MCP client disconnects
 
-- v1: **last-write-wins, no locking**. Each MCP call is serialized within the
-  add-in (single Office.js context per document), but no transaction across calls.
-- v2 (deferred): per-document advisory lock via `acquire_edit_lock` /
-  `release_edit_lock` MCP tools.
+- HTTP client just disconnects. Daemon keeps running.
+- Document sessions are independent of client churn.
+
+### 4.7 Daemon crashes
+
+1. All add-ins lose WS, retry on backoff.
+2. All MCP clients see their HTTP connection drop and must reconnect.
+3. OS-level autostart relaunches the daemon (Scheduled Task / launchd /
+   systemd policy). Add-ins reconnect on the next backoff tick.
+
+### 4.8 Two clients edit the same document
+
+v1: last-write-wins, no locking. The daemon serializes calls within one
+add-in (Office.js requires it), but no transaction across calls. v2 may
+introduce advisory `acquire_edit_lock`.
 
 ## 5. Threading and concurrency
 

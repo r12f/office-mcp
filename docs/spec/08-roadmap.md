@@ -12,7 +12,7 @@
 
 End-to-end "agent reads paragraph 0 of an open Word doc":
 
-- [ ] Server: stdio MCP transport, single tool `office.list_sessions`,
+- [ ] Daemon: MCP Streamable HTTP frontend, single tool `office.list_sessions`,
       one resource `office://word/<id>/paragraph/0`
 - [ ] Server: WS listener, register, session.added, ping/pong
 - [ ] Add-in: skeleton task pane with WS reverse-connect

@@ -7,32 +7,13 @@ each other.
 
 | Component | What it is | Where it lives | Updated how |
 |---|---|---|---|
-| `office-mcp-server` | Single binary (~15 MB) | `%LOCALAPPDATA%\office-mcp\office-mcp-server.exe` (Win) / `/usr/local/bin` (Mac) | MSI / Homebrew tap |
-| `office-mcp-addin` | Static web bundle (~2 MB) + `manifest.xml` | Hosted at `https://office-mcp.dev/addin/v1/` (CDN) | Atomic versioned URLs |
-| Manifest | XML / JSON describing the add-in | Sideloaded, AppSource, or M365 centralized deployment | See §3 |
+| `office-mcp` | Single binary (~15 MB) | `%LOCALAPPDATA%\office-mcp\office-mcp.exe` (Win) / `/usr/local/bin/office-mcp` (Mac, Linux) | MSI / Homebrew tap |
+| `office-mcp-addin` | Static web bundle (~2 MB) + manifest | Hosted at `https://office-mcp.dev/addin/v1/` (CDN); a copy is staged into the per-user trusted catalog by the installer | Atomic versioned URLs |
+| Manifest | XML / JSON describing the add-in | Sideloaded via the trusted catalog by the installer; AppSource / M365 admin push for managed deployments | See §3 |
 | Bootstrap installer | MSI / .pkg / shell script | Downloaded from GitHub Releases | Per-release |
 
-## 2. Server installation
-
-### 2.1 Windows (primary target)
-
-`office-mcp-setup-x64.msi` performs:
-
-1. Copies `office-mcp-server.exe` to `%LOCALAPPDATA%\office-mcp\`.
-2. Creates a Start Menu shortcut.
-3. Registers a Scheduled Task `office-mcp` set to run at logon (optional, off by default).
-4. Writes the default config to `%APPDATA%\office-mcp\config.toml`.
-5. Does NOT install the add-in (that happens via manifest sideload, see §3).
-
-### 2.2 macOS
-
-`brew install r12f/tap/office-mcp` installs the binary; the user runs
-`office-mcp install` to set up a launchd plist for autostart.
-
-### 2.3 Linux (developer-only)
-
-`cargo install office-mcp` or pre-built tarball. Mostly for protocol testing;
-no Office host is normally present.
+The actual installation procedure — including daemon autostart and add-in
+catalog registration — is in §6, not here. §1 is just the artifact list.
 
 ## 3. Add-in distribution
 
@@ -137,7 +118,7 @@ base as of 2026).
 
 ## 5. Configuration
 
-`office-mcp` uses a **single config file shared by the server and the add-in**.
+`office-mcp` uses a **single config file shared by the daemon and the add-in**.
 Changing the port (or any other shared value) in one place updates both ends.
 
 Location:
@@ -148,32 +129,27 @@ Location:
 | macOS | `~/Library/Application Support/office-mcp/config.toml` |
 | Linux | `~/.config/office-mcp/config.toml` |
 
-The add-in resolves the same path via `Office.context.requirements` /
-`fetch('app://office-mcp/config')` shim provided by the add-in package; users
-do not maintain two copies.
+The add-in resolves the same path via a small loader in the add-in package;
+users do not maintain two copies.
 
 ```toml
-# ─── shared by server and add-in ─────────────────────────────────────────
+# ─── shared by daemon and add-in ─────────────────────────────────────────
 [addin_channel]
-# WebSocket the server listens on and the add-in dials.
+# WebSocket the daemon listens on and the add-in dials.
 bind = "127.0.0.1"
 port = 8765
 heartbeat_interval_sec = 30
+heartbeat_timeout_sec  = 10
 session_grace_sec = 60
 max_inflight_per_session = 4
-# Only required if `bind` is non-loopback. Empty (default) = no auth, which
-# is safe and correct on a loopback bind. See docs/spec/05-security.md.
+# Only required if `bind` is non-loopback. See docs/spec/05-security.md.
 shared_secret = ""
 
-# ─── server only ─────────────────────────────────────────────────────────
-[mcp_stdio]
-# stdio is always available; nothing to configure here. Listed for clarity.
-enabled = true
-
+# ─── daemon only ─────────────────────────────────────────────────────────
 [mcp_http]
-# Optional HTTP frontend for MCP clients (Streamable HTTP transport).
-enabled = false
-bind = "127.0.0.1:8800"
+# MCP Streamable HTTP frontend the daemon exposes for MCP clients.
+bind = "127.0.0.1"
+port = 8800
 # Only required if `bind` is non-loopback. Empty + non-loopback = startup refusal.
 api_key = ""
 
@@ -181,43 +157,62 @@ api_key = ""
 max_response_bytes = 1048576     # 1 MiB
 default_tool_timeout_ms = 30000
 
-[lifecycle]
-idle_shutdown_sec = 0            # 0 = never auto-shutdown
-
 [audit]
 enabled = false
 path = ""                        # default: %LOCALAPPDATA%\office-mcp\audit.jsonl
 
 [logging]
 level = "info"                   # trace | debug | info | warn | error
-file  = ""                       # default: stderr
+file  = ""                       # default: platform log dir
 ```
 
 Environment variables override config keys, prefixed `OFFICE_MCP_` (e.g.
-`OFFICE_MCP_ADDIN_CHANNEL__PORT=9000`). Add-in honors only the keys under
-`[addin_channel]`; everything else is server-side and silently ignored if
-present in the add-in's view of the config.
+`OFFICE_MCP_ADDIN_CHANNEL__PORT=9000`). The add-in honors only the keys under
+`[addin_channel]`. The daemon honors all keys.
 
-## 6. First-run flow (Windows desktop)
+## 6. Installation and first-run flow
 
-1. User installs `office-mcp-setup-x64.msi`. Reboots not required.
-2. User installs the add-in manifest (sideload or via admin push).
-3. User configures their MCP client to launch office-mcp:
-   ```json
-   {
-     "mcpServers": {
-       "office": {
-         "command": "%LOCALAPPDATA%\\office-mcp\\office-mcp-server.exe",
-         "args": ["--transport", "stdio"]
-       }
-     }
-   }
-   ```
-4. User opens Word. The pinned ribbon button "office-mcp" appears.
-5. User clicks it to open the task pane; the add-in connects to the server.
-   (For pinned-on-load behavior, the add-in declares it in the manifest;
-   then no click is required.)
-6. User asks Claude (or whatever) to do something with the doc.
+Installation has two prerequisites: the daemon must be installed and
+autostarted by the OS, and the add-in must be registered with Office. Both
+are done by the platform installer (MSI / .pkg / brew formula); the user
+should never have to hand-edit autostart entries or sideload from a developer
+console for a production install.
+
+### 6.1 Windows
+
+1. User installs `office-mcp-setup-x64.msi`. The installer:
+   - Drops `office-mcp.exe` to `%LOCALAPPDATA%\office-mcp\`.
+   - Writes a default `config.toml` to `%APPDATA%\office-mcp\`.
+   - Registers a Scheduled Task `office-mcp` set to run at logon
+     (`office-mcp daemon run`).
+   - Registers an add-in trusted catalog folder under
+     `%LOCALAPPDATA%\office-mcp\addin-catalog\` and drops the manifest
+     there.
+   - Runs `office-mcp daemon start` once so the user doesn't have to log
+     out / log in for the daemon to come up.
+
+2. User configures their MCP client to connect to
+   `http://127.0.0.1:8800` (or whatever `mcp_http.port` is in their config).
+
+3. User opens Word. The pinned add-in appears in the ribbon. Pinned-on-load
+   is set in the manifest, so the add-in connects without the user clicking.
+
+4. User asks the MCP client to do something with the doc.
+
+### 6.2 macOS / Linux
+
+Same shape, different mechanism: launchd agent (macOS) or systemd `--user`
+unit (Linux) replaces the Scheduled Task. brew formula / Linux package
+performs the equivalent setup.
+
+### 6.3 Verifying
+
+```
+office-mcp daemon status     # is the daemon up?
+office-mcp daemon stop/start # restart it
+office-mcp config show       # show effective config
+office-mcp sessions          # list connected add-ins (= open Office instances)
+```
 
 ## 7. Versioning & upgrades
 
@@ -246,10 +241,10 @@ The add-in must be removed separately via Office's add-in manager
 
 | File | Purpose |
 |---|---|
-| `office-mcp-server-<ver>-x64.exe` | Standalone Windows binary |
+| `office-mcp-<ver>-x64.exe` | Standalone Windows binary |
 | `office-mcp-setup-<ver>-x64.msi` | Windows MSI installer |
-| `office-mcp-server-<ver>-x64.tar.gz` | Linux/macOS tarball |
-| `office-mcp-server-<ver>-aarch64-darwin.tar.gz` | Apple Silicon |
+| `office-mcp-<ver>-x64.tar.gz` | Linux/macOS tarball |
+| `office-mcp-<ver>-aarch64-darwin.tar.gz` | Apple Silicon |
 | `manifest-<ver>.xml` | XML manifest for sideload |
 | `manifest-<ver>.json` | Unified manifest for sideload |
 | `office-mcp-addin-<ver>.zip` | Add-in static bundle (for self-hosters) |

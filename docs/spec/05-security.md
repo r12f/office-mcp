@@ -123,9 +123,8 @@ For components that share a trust zone, trust must still be **established**
 once at the boundary, even though no auth runs between them afterward. In
 office-mcp the establishment happens implicitly via OS process control:
 
-- The MCP client launches the server (stdio) or connects to it on a
-  user-owned loopback port (HTTP). Either way, the client and server are
-  same-user processes by virtue of how the user wired them together.
+- The MCP client connects to the daemon's loopback HTTP endpoint. The
+  loopback bind makes the daemon reachable only by same-user processes.
 - The Office add-in is loaded by an Office instance the user logged into.
 - The server's loopback bind is reachable only by same-user processes.
 
