@@ -14,19 +14,16 @@ Wire-level spec for the WebSocket channel between Office add-ins and the
 
 ## 2. Handshake
 
-`office-mcp` runs on a single user's local machine. The add-in ↔ server
-channel is **unauthenticated and unencrypted by design** — if your local
-machine is compromised, an attacker can already read your documents from
-disk, log your keystrokes, and impersonate any process running as you. A
-shared secret on a loopback socket would defend against none of that.
-
-The trust anchor is the **loopback bind on a known port**, both ends of which
-the user installs and configures.
+The add-in ↔ server channel runs unauthenticated and unencrypted when the
+server binds a loopback address — see [05-security.md §1](05-security.md)
+for the trust-boundary reasoning. This section defines the wire-level
+mechanics; the security model defines what mechanisms are required (none
+on loopback; `shared_secret` when non-loopback).
 
 ### 2.1 Address discovery
 
-There is no discovery file. The add-in and server share one config file
-(see [07-deployment.md §5](07-deployment.md)) that declares the WS endpoint:
+The add-in and server share one config file (see
+[07-deployment.md §5](07-deployment.md)) that declares the WS endpoint:
 
 ```toml
 [addin_channel]
@@ -39,9 +36,8 @@ port = 8765
 - Defaults: `127.0.0.1:8765`. Users who need to run multiple servers on the
   same machine change the port in the shared config.
 
-If `bind` is anything other than a loopback address (`127.0.0.0/8` or `::1`),
-the server REFUSES to start and prints the rationale: an unauthenticated WS
-on a routable interface would expose the user's documents to the network.
+If `bind` is non-loopback and `shared_secret` is empty, the server REFUSES to
+start. See [05-security.md §2](05-security.md).
 
 ### 2.2 First message from add-in: `register`
 

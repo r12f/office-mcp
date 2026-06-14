@@ -1,5 +1,43 @@
 # 01 — Architecture
 
+## 0. Deployment model: single-user, local-first
+
+This section is **architecture**, not philosophy. The deployment model is a
+concrete design choice that determines where components live, who runs them,
+and what crosses the wire. It is independent of the security model in
+[05-security.md](05-security.md), which applies the same trust-boundary
+principle regardless of deployment shape.
+
+**Default deployment shape**:
+
+- One user identity on one machine.
+- Server, add-ins, MCP client, and Office instances all run as the same OS user.
+- Server binds loopback only.
+- No network exposure outside the user's box.
+
+**Why this shape**:
+
+- It is the deployment the project's killer feature (IRM-aware live editing)
+  is built for — the agent operates as the signed-in Office user, which
+  requires sharing that user's OS session.
+- It eliminates whole categories of design complexity (no service discovery,
+  no transport encryption, no cross-user identity mapping).
+- It composes cleanly with the MCP client ecosystem, which today is
+  overwhelmingly single-user desktop tooling (Claude Desktop, Cursor, local
+  agents).
+
+**Other deployment shapes are supported but not the default**:
+
+- Non-loopback bind for remote MCP clients or shared screens. Requires
+  explicit auth configuration; see [05-security.md §2](05-security.md).
+- Multi-user terminal server. Same binary, each user runs their own server
+  in their own session, addressing isolation comes from the OS.
+
+**What this section does NOT define**:
+
+- What "trusted" means between components. That is the security model.
+- What boundary the loopback bind itself represents. Also security.
+
 ## 1. Component overview
 
 ```

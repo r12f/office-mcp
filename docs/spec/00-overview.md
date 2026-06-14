@@ -52,8 +52,9 @@ existing MCP implementations do not provide together:
    edits batch) lives in the add-in, addressed by stable session IDs.
 4. **Boring transports.** Stdio + Streamable HTTP for MCP; WebSocket + JSON-RPC 2.0 for
    add-in ↔ server. No bespoke binary frames, no SSE-only paths.
-5. **Local-first, zero-config default.** Single Windows-installer, single binary, no
-   cloud component required. Auth tokens stay on the local machine.
+5. **Local-first, single-binary install.** Single Windows installer, single
+   binary, no cloud component required. See
+   [01-architecture.md §0](01-architecture.md) for the full deployment model.
 6. **Graceful degradation.** When no Office instance is running, the server still works
    — clients see "no document sessions available" instead of a crash.
 
