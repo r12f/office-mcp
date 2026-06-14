@@ -5,19 +5,20 @@ What the `office-mcp` server exposes to MCP clients (the AI side).
 ## 1. Naming & namespacing
 
 - Tool names are `<app>.<verb_object>` — e.g. `word.insert_paragraph`,
-  `word.replace_text`, `excel.read_range`. `<app>` is the Office application
-  the tool targets (`word`, `excel`, `outlook`, ...).
+  `word.replace_text`, `excel.read_range`, `outlook.draft_reply`.
+  `<app>` is the Office application the tool targets
+  (`word`, `excel`, `outlook`, ...).
 - A small set of cross-app management tools live under `office.*`:
   `office.list_sessions`, `office.get_session_info`, `office.activate_session`.
-- Resource URIs use a custom scheme: `office://<app>/<session_id>/<path>`.
-  `<app>` occupies the URI authority slot purely as a namespace —
-  there is no network host; the daemon is a local singleton (see
-  [07-deployment.md](07-deployment.md) §0).
-  Example: `office://word/44444444-4444.../document` (whole doc),
-  `office://word/44444444-4444.../paragraph/12` (one paragraph),
-  `office://word/44444444-4444.../comments` (all comments).
-  `office://excel/...` and `office://outlook/...` are reserved for future
-  apps and follow the same shape.
+- Resource URIs use a custom scheme:
+  `office://<app>/<session_id>/<app-specific-path>`.
+  The `<app>` segment is the URI authority — purely a namespace, not a
+  network host (the daemon is a strictly local singleton; see
+  [07-deployment.md](07-deployment.md) §0). Resources under each app are
+  defined by that app's spec — Word resources are listed in §3 below;
+  Excel and Outlook resources will be added in their own capability docs
+  alongside `04-excel-capabilities.md` / `04-outlook-capabilities.md`
+  in M2/M3.
 
 ## 2. Sessions as the unit of addressing
 
@@ -34,17 +35,23 @@ Discovery flow for an MCP client:
 The session ID is stable for the life of the document session and is the
 **same** ID used in the add-in protocol ([02-registration-protocol.md](02-registration-protocol.md)).
 
-## 3. Resources
+## 3. Resources (Word v1)
 
 MCP resources allow clients to read document state declaratively. All resources
 are read-only; mutations happen via tools.
 
+The table below is the **Word v1** resource surface. Excel and Outlook will
+ship their own resource tables in `04-excel-capabilities.md` /
+`04-outlook-capabilities.md` (M2/M3); each app defines its own resource types
+(Excel has `range`, `sheet`, `table`; Outlook has `message`, `folder`,
+`calendar_item` — none of which share a "document" abstraction).
+
 | URI pattern | Returns | Notes |
 |---|---|---|
-| `office://sessions` | List of session descriptors | Roughly `office.list_sessions` as a resource |
-| `office://<app>/<session_id>/document` | Full plain text | Honors IRM: returns 403 if `extract` right denied |
-| `office://<app>/<session_id>/structure` | JSON outline (headings, lists, tables) | Lightweight |
-| `office://<app>/<session_id>/paragraph/<index>` | Single paragraph | |
+| `office://sessions` | List of session descriptors across all apps | Roughly `office.list_sessions` as a resource |
+| `office://word/<session_id>/document` | Full plain text | Honors IRM: returns 403 if `extract` right denied |
+| `office://word/<session_id>/structure` | JSON outline (headings, lists, tables) | Lightweight |
+| `office://word/<session_id>/paragraph/<index>` | Single paragraph | |
 | `office://word/<session_id>/comments` | All comments JSON | |
 | `office://word/<session_id>/track_changes` | Tracked changes JSON | |
 | `office://word/<session_id>/selection` | Currently selected range text + metadata | |
@@ -88,19 +95,20 @@ Args: `{ "session_id": "..." }`. Brings the document to the foreground in its
 Office instance (calls `Office.context.document.bringToFront()` / equivalent).
 Use case: the agent wants the user to look at what it's about to change.
 
-## 5. Word tool catalog — see [04-word-capabilities.md](04-word-capabilities.md)
+## 5. Per-app tool catalogs
 
-This file lists the categories; the per-tool schemas are in `04-word-capabilities.md`.
+This file defines the *cross-cutting* surface (URI scheme, sessions,
+management tools, anchor model, pagination, concurrency, metadata, prompts).
+Per-app tool catalogs and their JSON Schemas live in each app's capability
+doc:
 
-| Category | Tools |
-|---|---|
-| **Read** | `word.get_text`, `word.get_outline`, `word.get_paragraph`, `word.find_text`, `word.get_selection` |
-| **Insert** | `word.insert_paragraph`, `word.insert_heading`, `word.insert_table`, `word.insert_image`, `word.insert_page_break`, `word.insert_list` |
-| **Edit** | `word.replace_text`, `word.update_paragraph`, `word.delete_range`, `word.apply_formatting` |
-| **Tables** | `word.read_table`, `word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell` |
-| **Structure** | `word.set_heading_level`, `word.apply_style`, `word.create_style` |
-| **Review** | `word.add_comment`, `word.resolve_comment`, `word.accept_change`, `word.reject_change` |
-| **Document** | `word.save`, `word.save_as`, `word.export_pdf` |
+- Word: [04-word-capabilities.md](04-word-capabilities.md)
+- Excel: `04-excel-capabilities.md` (M2)
+- Outlook: `04-outlook-capabilities.md` (M3)
+
+Tool names are not re-listed here on purpose — the per-app doc is the single
+source of truth, and any list in this file would drift on the first PR that
+adds or renames a tool.
 
 ## 6. Anchor model
 

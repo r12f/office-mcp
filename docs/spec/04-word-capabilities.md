@@ -3,9 +3,41 @@
 Per-tool JSON Schemas. All tools take a top-level `session_id` (string, UUID, required).
 Common keys (anchor, etc.) are defined in [03-mcp-tool-surface.md §6](03-mcp-tool-surface.md).
 
-## 1. Read
+## 1. Overview
 
-### 1.1 `word.get_text`
+### 1.1 Word tool catalog
+
+The full Word v1 tool surface, grouped by category. The per-tool JSON Schemas
+follow in §2–§8.
+
+| Category | Tools |
+|---|---|
+| **Read** | `word.get_text`, `word.get_outline`, `word.get_paragraph`, `word.find_text`, `word.get_selection` |
+| **Insert** | `word.insert_paragraph`, `word.insert_heading`, `word.insert_table`, `word.insert_image`, `word.insert_page_break`, `word.insert_list` |
+| **Edit** | `word.replace_text`, `word.update_paragraph`, `word.delete_range`, `word.apply_formatting` |
+| **Tables** | `word.read_table`, `word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell` |
+| **Structure** | `word.set_heading_level`, `word.apply_style`, `word.create_style` |
+| **Review** | `word.add_comment`, `word.resolve_comment`, `word.accept_change`, `word.reject_change` |
+| **Document** | `word.save`, `word.save_as`, `word.export_pdf` |
+
+### 1.2 Word resources
+
+Declarative read-only resources (mutations go through tools in §2–§8).
+URI scheme and cross-cutting semantics are defined in
+[03-mcp-tool-surface.md §1–§3](03-mcp-tool-surface.md).
+
+| URI pattern | Returns | Notes |
+|---|---|---|
+| `office://word/<session_id>/document` | Full plain text | Honors IRM: returns 403 if `extract` right denied |
+| `office://word/<session_id>/structure` | JSON outline (headings, lists, tables) | Lightweight |
+| `office://word/<session_id>/paragraph/<index>` | Single paragraph | |
+| `office://word/<session_id>/comments` | All comments JSON | |
+| `office://word/<session_id>/track_changes` | Tracked changes JSON | |
+| `office://word/<session_id>/selection` | Currently selected range text + metadata | |
+
+## 2. Read
+
+### 2.1 `word.get_text`
 
 Return the document's plain text.
 
@@ -46,7 +78,7 @@ When `include_metadata: true`, each paragraph is wrapped:
 
 IRM: requires `extract` right.
 
-### 1.2 `word.get_outline`
+### 2.2 `word.get_outline`
 
 Return headings + structure, no body text.
 
@@ -63,7 +95,7 @@ Return headings + structure, no body text.
 
 Returns nested tree of `{ text, level, paragraph_index, children: [...] }`.
 
-### 1.3 `word.get_paragraph`
+### 2.3 `word.get_paragraph`
 
 ```json
 {
@@ -76,7 +108,7 @@ Returns nested tree of `{ text, level, paragraph_index, children: [...] }`.
 }
 ```
 
-### 1.4 `word.find_text`
+### 2.4 `word.find_text`
 
 ```json
 {
@@ -95,7 +127,7 @@ Returns nested tree of `{ text, level, paragraph_index, children: [...] }`.
 
 Returns matches as `[{ paragraph_index, start_offset, end_offset, snippet }]`.
 
-### 1.5 `word.get_selection`
+### 2.5 `word.get_selection`
 
 ```json
 { "type": "object", "required": ["session_id"], "properties": { "session_id": { "type": "string" } } }
@@ -103,9 +135,9 @@ Returns matches as `[{ paragraph_index, start_offset, end_offset, snippet }]`.
 
 Returns `{ text, paragraph_index, start_offset, end_offset, is_empty }`.
 
-## 2. Insert
+## 3. Insert
 
-### 2.1 `word.insert_paragraph`
+### 3.1 `word.insert_paragraph`
 
 ```json
 {
@@ -121,7 +153,7 @@ Returns `{ text, paragraph_index, start_offset, end_offset, is_empty }`.
 }
 ```
 
-### 2.2 `word.insert_heading`
+### 3.2 `word.insert_heading`
 
 ```json
 {
@@ -136,7 +168,7 @@ Returns `{ text, paragraph_index, start_offset, end_offset, is_empty }`.
 }
 ```
 
-### 2.3 `word.insert_table`
+### 3.3 `word.insert_table`
 
 ```json
 {
@@ -159,7 +191,7 @@ Returns `{ text, paragraph_index, start_offset, end_offset, is_empty }`.
 
 If `data` is provided, its dimensions must match `rows × cols`.
 
-### 2.4 `word.insert_image`
+### 3.4 `word.insert_image`
 
 ```json
 {
@@ -184,13 +216,13 @@ If `data` is provided, its dimensions must match `rows × cols`.
 `url` MUST be `https://` and is fetched server-side (not by the add-in) to avoid
 mixed-content issues in the add-in webview.
 
-### 2.5 `word.insert_page_break` and `word.insert_list`
+### 3.5 `word.insert_page_break` and `word.insert_list`
 
 Schemas in same vein, omitted here for brevity; see reference implementation.
 
-## 3. Edit
+## 4. Edit
 
-### 3.1 `word.replace_text`
+### 4.1 `word.replace_text`
 
 ```json
 {
@@ -221,7 +253,7 @@ Returns `{ replaced_count: N, matches: [...] }`.
 recommended pattern for agents**: dry-run first, present to user, then run again
 without `dry_run`.
 
-### 3.2 `word.update_paragraph`
+### 4.2 `word.update_paragraph`
 
 Replace one paragraph's text wholesale.
 
@@ -238,7 +270,7 @@ Replace one paragraph's text wholesale.
 }
 ```
 
-### 3.3 `word.delete_range`
+### 4.3 `word.delete_range`
 
 ```json
 {
@@ -258,7 +290,7 @@ Replace one paragraph's text wholesale.
 }
 ```
 
-### 3.4 `word.apply_formatting`
+### 4.4 `word.apply_formatting`
 
 ```json
 {
@@ -291,9 +323,9 @@ Replace one paragraph's text wholesale.
 }
 ```
 
-## 4. Tables
+## 5. Tables
 
-### 4.1 `word.read_table`
+### 5.1 `word.read_table`
 
 ```json
 {
@@ -308,7 +340,7 @@ Replace one paragraph's text wholesale.
 
 Returns `{ rows, cols, data: string[][], header_row: boolean }`.
 
-### 4.2 `word.update_cell`
+### 5.2 `word.update_cell`
 
 ```json
 {
@@ -325,25 +357,25 @@ Returns `{ rows, cols, data: string[][], header_row: boolean }`.
 }
 ```
 
-### 4.3 `word.add_row` and `word.add_column`
+### 5.3 `word.add_row` and `word.add_column`
 
 Trivial schemas; add at index or end.
 
-### 4.4 `word.format_cell`
+### 5.4 `word.format_cell`
 
 Background color, padding, alignment, borders, merging. Schema mirrors
 python-docx's table cell API for v1 to ease porting of existing tools.
 
-## 5. Structure
+## 6. Structure
 
-### 5.1 `word.set_heading_level` / `word.apply_style` / `word.create_style`
+### 6.1 `word.set_heading_level` / `word.apply_style` / `word.create_style`
 
 Allow agents to maintain document structure declaratively without touching
 formatting directly.
 
-## 6. Review
+## 7. Review
 
-### 6.1 `word.add_comment`
+### 7.1 `word.add_comment`
 
 ```json
 {
@@ -362,14 +394,14 @@ behalf of the user is the user, in the same way that a macro the user runs is
 the user. No "AI watermark" is added: the value of office-mcp comes from being
 indistinguishable from the user doing it themselves.
 
-### 6.2 `word.resolve_comment` / `word.accept_change` / `word.reject_change`
+### 7.2 `word.resolve_comment` / `word.accept_change` / `word.reject_change`
 
 Standard review-pane operations. Each takes a `comment_id` or `change_id`
 discoverable via the corresponding read resource.
 
-## 7. Document
+## 8. Document
 
-### 7.1 `word.save`
+### 8.1 `word.save`
 
 ```json
 { "type": "object", "required": ["session_id"], "properties": { "session_id": { "type": "string" } } }
@@ -377,7 +409,7 @@ discoverable via the corresponding read resource.
 
 Triggers `Office.context.document.save()`. No-op if already clean.
 
-### 7.2 `word.save_as`
+### 8.2 `word.save_as`
 
 ```json
 {
@@ -395,25 +427,25 @@ Triggers `Office.context.document.save()`. No-op if already clean.
 The add-in MUST refuse paths it cannot validate (no traversal beyond the user's
 documents folder unless explicitly confirmed by the user via Office's file picker).
 
-### 7.3 `word.export_pdf`
+### 8.3 `word.export_pdf`
 
 Convenience wrapper around `save_as` with `format: "pdf"`. Returns the file path.
 
-## 8. Behavior contracts
+## 9. Behavior contracts
 
-### 8.1 Atomicity
+### 9.1 Atomicity
 
 Each tool call corresponds to one Office.js batch (one `context.sync()`).
 Either the entire call's effect lands or none of it does. Within a call, the
 add-in MUST not commit a partial effect on error.
 
-### 8.2 Undo grouping
+### 9.2 Undo grouping
 
 Each tool call creates one undo entry in Word, labeled with the tool name
 (e.g. "Insert paragraph"). The user can `Ctrl+Z` the entire tool call
 in one keystroke.
 
-### 8.3 IRM enforcement
+### 9.3 IRM enforcement
 
 The add-in MUST check the active document's effective rights before executing
 each call. Mapping from tool category to required right:
@@ -431,13 +463,13 @@ each call. Mapping from tool category to required right:
 
 Denied calls return `error.code = -32403` with `data.denied_rights`.
 
-### 8.4 Track-changes interaction
+### 9.4 Track-changes interaction
 
 If the document has Track Changes ON, tools that edit content (`insert_paragraph`,
 `replace_text`, etc.) produce tracked changes, NOT direct edits. The tool result
 includes `tracked_change_ids: [...]` so the agent can refer to them later.
 
-### 8.5 What the tool does NOT do
+### 9.5 What the tool does NOT do
 
 - It does NOT print.
 - It does NOT mail-merge.
