@@ -205,7 +205,7 @@ Same payload shape; only changed fields need be populated, but `session_id` is r
 }
 ```
 
-- `tool` is the fully-qualified tool name (host-prefixed: `word.*`, `excel.*`).
+- `tool` is the fully-qualified tool name (app-prefixed: `word.*`, `excel.*`).
 - `args` schema is the tool-specific JSON Schema, validated by the server before forwarding.
 - `timeout_ms` is server-enforced; if the add-in exceeds it, the server replies
   to the MCP client with timeout and tells the add-in to cancel via `tool.cancel`.

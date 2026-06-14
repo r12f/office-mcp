@@ -4,18 +4,24 @@ What the `office-mcp` server exposes to MCP clients (the AI side).
 
 ## 1. Naming & namespacing
 
-- Tool names are `<host>.<verb_object>` — e.g. `word.insert_paragraph`,
-  `word.replace_text`, `excel.read_range`.
-- A small set of cross-host management tools live under `office.*`:
+- Tool names are `<app>.<verb_object>` — e.g. `word.insert_paragraph`,
+  `word.replace_text`, `excel.read_range`. `<app>` is the Office application
+  the tool targets (`word`, `excel`, `outlook`, ...).
+- A small set of cross-app management tools live under `office.*`:
   `office.list_sessions`, `office.get_session_info`, `office.activate_session`.
-- Resource URIs use a custom scheme: `office://<host>/<session_id>/<path>`.
+- Resource URIs use a custom scheme: `office://<app>/<session_id>/<path>`.
+  `<app>` occupies the URI authority slot purely as a namespace —
+  there is no network host; the daemon is a local singleton (see
+  [07-deployment.md](07-deployment.md) §0).
   Example: `office://word/44444444-4444.../document` (whole doc),
   `office://word/44444444-4444.../paragraph/12` (one paragraph),
   `office://word/44444444-4444.../comments` (all comments).
+  `office://excel/...` and `office://outlook/...` are reserved for future
+  apps and follow the same shape.
 
 ## 2. Sessions as the unit of addressing
 
-Every Office host instance ↔ one or more **document sessions**. A session ID is
+Every Office app instance ↔ one or more **document sessions**. A session ID is
 required for any document-affecting tool call.
 
 Discovery flow for an MCP client:
@@ -36,9 +42,9 @@ are read-only; mutations happen via tools.
 | URI pattern | Returns | Notes |
 |---|---|---|
 | `office://sessions` | List of session descriptors | Roughly `office.list_sessions` as a resource |
-| `office://<host>/<session_id>/document` | Full plain text | Honors IRM: returns 403 if `extract` right denied |
-| `office://<host>/<session_id>/structure` | JSON outline (headings, lists, tables) | Lightweight |
-| `office://<host>/<session_id>/paragraph/<index>` | Single paragraph | |
+| `office://<app>/<session_id>/document` | Full plain text | Honors IRM: returns 403 if `extract` right denied |
+| `office://<app>/<session_id>/structure` | JSON outline (headings, lists, tables) | Lightweight |
+| `office://<app>/<session_id>/paragraph/<index>` | Single paragraph | |
 | `office://word/<session_id>/comments` | All comments JSON | |
 | `office://word/<session_id>/track_changes` | Tracked changes JSON | |
 | `office://word/<session_id>/selection` | Currently selected range text + metadata | |
@@ -55,7 +61,7 @@ No arguments. Returns:
     {
       "session_id": "44444444-...",
       "instance_id": "22222222-...",
-      "host": "word",
+      "app": "word",
       "document": {
         "title": "Q3 Report",
         "url": "C:\\Users\\riff\\Documents\\Q3-Report.docx",

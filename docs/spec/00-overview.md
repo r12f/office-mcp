@@ -34,8 +34,8 @@ existing MCP implementations do not provide together:
 | **MCP client** | The thing that wants tools — Claude Desktop, Cursor, an agent, etc. |
 | **MCP server** | What we build. Speaks MCP outward, JSON-RPC over WebSocket inward. |
 | **Office add-in** | A web app (HTML/JS) hosted inside an Office app via Office.js. Cross-platform (Windows / Mac / Web). |
-| **Host** | Office application: Word, Excel, PowerPoint, Outlook. |
-| **Document session** | One open document (`.docx`, `.xlsx`, etc.) inside one host instance. Unit of addressing. |
+| **App** | Office application: Word, Excel, PowerPoint, Outlook. URI namespace and tool prefix. |
+| **Document session** | One open document (`.docx`, `.xlsx`, etc.) inside one app instance. Unit of addressing. |
 | **Instance** | One running Office process. Holds zero or more document sessions. |
 | **IRM** | Information Rights Management — Microsoft's per-document access control. Also AIP / MIP / Purview. |
 | **Reverse-registration** | Add-in dials out to the server on load (the server does not connect to add-ins). |
