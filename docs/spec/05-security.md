@@ -1,10 +1,29 @@
 # 05 — Security Model
 
+## 0. Design philosophy
+
+`office-mcp` is a **personal, single-user, local-machine** tool. Its threat
+model is closer to "language server" or "VS Code dev container" than to
+"enterprise document gateway". The defaults reflect that:
+
+- **Single user account** is assumed. Multi-user terminal servers are out of
+  scope; if you run it there, you opt in to extra hardening.
+- **Loopback bind** is the trust anchor. Any process running as the same user
+  can already read the user's documents through the filesystem; the WS channel
+  doesn't expand the attack surface for that adversary.
+- **The agent IS the user.** When an MCP client invokes a tool, the resulting
+  Office operation runs with the user's identity — the user's comments, the
+  user's edits, the user's saved versions. This is intentional and matches the
+  user's mental model: "the AI is doing what I would have done."
+
+If your threat model is different (multi-user host, remote network exposure,
+mistrust of co-resident processes), enable the opt-in protections in §3.
+
 ## 1. Trust boundaries
 
 ```
    MCP client  ─[trust: full, user-installed]─▶  office-mcp server
-   office-mcp server  ─[trust: cryptographic handshake]─▶  Office add-in
+   office-mcp server  ─[trust: loopback by default, secret opt-in]─▶  Office add-in
    Office add-in  ─[trust: Office sandbox + user identity]─▶  Office document
 ```
 
@@ -23,17 +42,18 @@ Out of scope for v1: per-tool capability scoping for clients. v2 may add
 
 ### 1.2 Server ↔ add-in
 
-- Mutually unauthenticated TCP is unsafe — any local process could pretend
-  to be an add-in and read document text.
-- Mitigation: handshake bearer token (see [02-registration-protocol.md §2.1](02-registration-protocol.md)).
-- The token file is mode `0600` (POSIX) or NTFS ACL restricted to the
-  current user (Windows). Only processes running as the same user can read it.
-- The server rejects WS connections without a matching token. Three failed
-  attempts from the same socket close it with code 4001 and add the source
-  to a 60s blocklist.
+- Default: **no shared secret**. The server accepts any WS connection on the
+  loopback port. This is safe under the v1 threat model: any local process
+  running as the same user could already read the user's documents from disk;
+  it gains nothing by impersonating an add-in.
+- Opt-in: set `addin.shared_secret` in config. The secret is written to the
+  discovery file (mode `0600`) and required in every `register` call. Three
+  failed attempts close the WS with `4001` and 60s blocklist the source.
+- The handshake file itself is mode `0644` by default (port number is not a
+  secret) and `0600` when a shared secret is present.
 
-Out of scope for v1: certificate-pinned WSS (we're loopback-only). v2 may add
-WSS for remote add-in scenarios (Office on Web via a corporate proxy).
+The opt-in protection is for users who run untrusted other software on the same
+machine, share the box with other users, or want defense-in-depth.
 
 ### 1.3 Add-in ↔ Office document
 
@@ -101,24 +121,37 @@ to the user:
 
 ## 3. Authentication & authorization
 
-### 3.1 Server authentication of add-ins
+### 3.1 Server authentication of add-ins (opt-in)
 
-Bearer token shared via handshake file, as described above.
+By default, **none** — see §1.2. The server accepts any WS connection on the
+loopback port. To enable, set `addin.shared_secret` in config; the secret is
+shared with the add-in through the discovery file and required in `register`.
 
 ### 3.2 Add-in authentication of server
 
 Loopback-only (`127.0.0.1`) is the trust anchor. If the add-in is asked to
-connect to a non-loopback URL, it MUST refuse. (The handshake file lives in
-a per-user location, so only the user's own processes can plant a different
-URL — but the loopback-only check is a defense-in-depth.)
+connect to a non-loopback URL, it MUST refuse. (The discovery file lives in a
+per-user location, so only the user's own processes can plant a different URL
+— but the loopback-only check is a defense-in-depth.)
 
 ### 3.3 Client authentication of server (HTTP transport only)
 
 - Default: loopback bind, no auth (trusts local environment).
 - `--api-key <KEY>`: clients must include `Authorization: Bearer <KEY>` on
   every request. Bind may be non-loopback if `--api-key` is set.
-- Refusal: server REFUSES to bind non-loopback without `--api-key`. No `--allow-no-auth`
-  override. Loud failure is correct.
+- Refusal: server REFUSES to bind non-loopback without `--api-key`. No
+  `--allow-no-auth` override. Loud failure is correct.
+
+### 3.4 What happens with no auth (default)
+
+- Any local process running as the same user can connect over loopback and
+  drive Office through the add-in. This is intentional — that process could
+  already do the same thing through other means (Win32 automation, reading
+  the file directly, sending keystrokes).
+- `office-mcp` does NOT expand the attack surface for the "same-user local
+  attacker" — it just makes the operations more ergonomic.
+- If the same-user attacker is part of your threat model, set
+  `addin.shared_secret`.
 
 ## 4. Prompt injection
 
@@ -147,14 +180,15 @@ macros. Returns `error.code = -32601 "Macro execution not supported"`.
 
 ## 7. Threat scenarios
 
-| Threat | Mitigation |
-|---|---|
-| Malicious local process pretends to be an add-in to siphon docs | Bearer token in 0600 file |
-| Compromised MCP client reads IRM text | Office runtime enforces `extract` right; client may further require user confirmation |
-| Compromised MCP client edits IRM doc | Office runtime enforces `edit` right; add-in pre-check fails fast |
-| Compromised add-in (rogue sideload) | Trust the Office add-in trust system; AppSource / centralized deployment recommended |
-| Token leakage via `ps aux` | Token never appears on command line; only in handshake file |
-| Multi-user terminal server | Each user's server writes to their own `%LOCALAPPDATA%`; cross-user binding is loopback-prevented |
+| Threat | v1 default mitigation | If you need more |
+|---|---|---|
+| Malicious local process (same user) reads docs through office-mcp | None — the process could already read docs directly | Set `addin.shared_secret`; secret file is `0600` |
+| Compromised MCP client reads IRM text | Office runtime enforces `extract` right; client may further require user confirmation | — |
+| Compromised MCP client edits IRM doc | Office runtime enforces `edit` right; add-in pre-check fails fast | — |
+| Compromised add-in (rogue sideload) | Trust the Office add-in trust system; AppSource / centralized deployment recommended | — |
+| Multi-user terminal server | Per-user `%LOCALAPPDATA%` + loopback isolation | Set `addin.shared_secret`; never use HTTP transport without `--api-key` |
+| Non-loopback network exposure | Server refuses to bind non-loopback without `--api-key` | — |
+| `shared_secret` leak via `ps aux` | Secret is never on command line; only in discovery file | — |
 
 ## 8. Supply chain
 

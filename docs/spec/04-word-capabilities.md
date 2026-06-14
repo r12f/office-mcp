@@ -352,15 +352,15 @@ formatting directly.
   "properties": {
     "session_id": { "type": "string" },
     "anchor": { "$ref": "#/definitions/anchor" },
-    "text": { "type": "string" },
-    "author_display_name": { "type": "string" }
+    "text": { "type": "string" }
   }
 }
 ```
 
-If `author_display_name` is omitted, the add-in uses `"AI agent (via office-mcp)"`.
-This is a deliberate UX choice: comments authored by the AI MUST be visually
-distinguishable from user comments. Servers MAY enforce a `[AI]` prefix in v2.
+Comments are authored as the signed-in Office user. The agent operating on
+behalf of the user is the user, in the same way that a macro the user runs is
+the user. No "AI watermark" is added: the value of office-mcp comes from being
+indistinguishable from the user doing it themselves.
 
 ### 6.2 `word.resolve_comment` / `word.accept_change` / `word.reject_change`
 
@@ -410,7 +410,7 @@ add-in MUST not commit a partial effect on error.
 ### 8.2 Undo grouping
 
 Each tool call creates one undo entry in Word, labeled with the tool name
-(e.g. "AI: Insert paragraph"). The user can `Ctrl+Z` the entire tool call
+(e.g. "Insert paragraph"). The user can `Ctrl+Z` the entire tool call
 in one keystroke.
 
 ### 8.3 IRM enforcement

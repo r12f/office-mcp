@@ -14,9 +14,15 @@ Wire-level spec for the WebSocket channel between Office add-ins and the
 
 ## 2. Handshake
 
+`office-mcp` is designed for single-user local use. By default the add-in ↔ server
+channel is unauthenticated — the loopback bind is the trust anchor, matching how
+typical local developer tooling (language servers, dev databases, etc.) operates.
+A shared secret is opt-in for users who want defense-in-depth, and **required**
+when the server binds to a non-loopback address.
+
 ### 2.1 Discovery file
 
-When the server starts, it writes:
+When the server starts, it writes a small file so the add-in can find the port:
 
 ```
 %LOCALAPPDATA%\office-mcp\handshake.json     (Windows)
@@ -24,24 +30,39 @@ When the server starts, it writes:
 ~/.config/office-mcp/handshake.json          (Linux — for cross-platform testing)
 ```
 
-with permissions `0600`:
+**No shared secret configured (default):**
+
+```json
+{
+  "version": 1,
+  "server_pid": 14823,
+  "ws_url": "ws://127.0.0.1:8765"
+}
+```
+
+Permissions: `0644` (port number is not a secret).
+
+**Shared secret configured (`addin.shared_secret` set in config.toml):**
 
 ```json
 {
   "version": 1,
   "server_pid": 14823,
   "ws_url": "ws://127.0.0.1:8765",
-  "bearer_token": "ot_8f3e2c1a9d4b5e6f7a8b9c0d1e2f3a4b",
-  "issued_at": "2026-06-14T01:23:45Z",
-  "expires_at": "2026-06-15T01:23:45Z"
+  "shared_secret": "whatever-the-user-typed"
 }
 ```
 
-- `bearer_token` is a random 32-byte hex with `ot_` prefix.
-- The file is rewritten on every server start (new port may be assigned).
-- The add-in reads this file on its first attempt to connect.
+Permissions: `0600` (POSIX) / NTFS ACL restricted to current user (Windows).
+
+- The file is rewritten on every server start (port may change).
+- The add-in reads this file on its first connection attempt and on every
+  reconnect after `4001` (auth failure).
 
 ### 2.2 First message from add-in: `register`
+
+The `shared_secret` field is **only sent when the discovery file contains one**;
+otherwise it is omitted entirely.
 
 ```json
 {
@@ -49,7 +70,7 @@ with permissions `0600`:
   "id": "11111111-1111-1111-1111-111111111111",
   "method": "register",
   "params": {
-    "bearer_token": "ot_8f3e2c1a9d4b5e6f7a8b9c0d1e2f3a4b",
+    "shared_secret": "whatever-the-user-typed",
     "instance_id": "22222222-2222-2222-2222-222222222222",
     "host": {
       "app": "word",
@@ -86,6 +107,16 @@ with permissions `0600`:
   or, if unavailable, from `Office.context.mailbox.userProfile` (Outlook only)
   or are omitted (Word/Excel without identity).
 
+**Server validation rules:**
+
+| Server config | `shared_secret` in `register` | Result |
+|---|---|---|
+| Not configured (default) | Absent | ✓ accept |
+| Not configured (default) | Present | ✓ accept (ignored) |
+| Configured | Absent | ✗ reject with `-32401` |
+| Configured | Present, matches | ✓ accept |
+| Configured | Present, mismatch | ✗ reject with `-32401` |
+
 ### 2.3 Server reply: `register.result` or `register.error`
 
 Success:
@@ -105,7 +136,7 @@ Success:
 }
 ```
 
-Error (e.g. token mismatch, protocol version skew):
+Error (e.g. shared-secret mismatch when one is configured, or protocol version skew):
 
 ```json
 {
@@ -113,8 +144,8 @@ Error (e.g. token mismatch, protocol version skew):
   "id": "11111111-1111-1111-1111-111111111111",
   "error": {
     "code": -32401,
-    "message": "Invalid bearer token. Restart office-mcp server to refresh handshake.",
-    "data": { "reason": "token_mismatch" }
+    "message": "Shared secret missing or mismatched. Update the add-in by re-reading the discovery file.",
+    "data": { "reason": "shared_secret_mismatch" }
   }
 }
 ```

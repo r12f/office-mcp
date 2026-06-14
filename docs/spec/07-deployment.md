@@ -155,6 +155,11 @@ ws.port = 0                      # 0 = pick free port at startup
 heartbeat_interval_sec = 30
 session_grace_sec = 60
 max_inflight_per_session = 4
+# Optional shared secret. When empty (default), the WS channel is
+# unauthenticated — safe under the single-user, loopback-only threat model.
+# Set this if you share the machine, want defense-in-depth, or are paranoid
+# about other local processes. See docs/spec/05-security.md.
+shared_secret = ""
 
 [limits]
 max_response_bytes = 1048576     # 1 MiB

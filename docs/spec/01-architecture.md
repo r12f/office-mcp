@@ -68,7 +68,8 @@
 
 - **Lifetime**: bound to Office instance. Loads when Office starts (if pinned)
   or when the user opens the task pane.
-- **Connects to**: `ws://127.0.0.1:<port>` with bearer token from local handshake.
+- **Connects to**: `ws://127.0.0.1:<port>` discovered via local handshake file
+  (carries a shared secret if one is configured; otherwise just the URL).
 - **State held**:
   - One persistent WS connection back to the server.
   - Per-document Office.js context handles.
@@ -124,8 +125,8 @@ where the add-in is the connecting party.
 ### 4.1 Cold start (no Office running)
 
 1. MCP client launches the server (or HTTPs in).
-2. Server starts, opens WS listener, writes its port + bearer token to a
-   local handshake file (`%LOCALAPPDATA%\office-mcp\handshake.json`, mode 0600).
+2. Server starts, opens WS listener, writes its port (and shared secret, if
+   configured) to a discovery file in `%LOCALAPPDATA%\office-mcp\handshake.json`.
 3. Client calls `list_sessions` → server returns `[]` (no add-ins connected).
 4. Any tool call against a host returns
    `error: { code: -32001, message: "No Office instances connected" }`.
@@ -133,11 +134,13 @@ where the add-in is the connecting party.
 ### 4.2 User opens Word after server is up
 
 1. Word loads. The pinned `office-mcp` task-pane add-in initializes.
-2. Add-in reads the handshake file, extracts port + token.
+2. Add-in reads the discovery file, extracts port (and shared secret, if present).
 3. Add-in dials `ws://127.0.0.1:<port>`.
 4. Add-in sends `register` (see [02-registration-protocol.md](02-registration-protocol.md))
-   with its instance ID, host app, capability bitmap, and bearer token.
-5. Server validates token, replies `register.ok`, assigns session ID.
+   with its instance ID, host app, capability bitmap, and the shared secret
+   (if one was present in the discovery file).
+5. Server validates (no-op when no secret is configured), replies
+   `register.result`, assigns session ID.
 6. Add-in enumerates open documents, sends `session.added` for each.
 7. Server now exposes those documents via MCP resources & tool addressing.
 
