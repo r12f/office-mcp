@@ -1,0 +1,27 @@
+# Build / IDE
+target/
+build/
+dist/
+node_modules/
+*.pyc
+__pycache__/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local config / secrets
+.env
+.env.local
+*.local
+handshake.json
+
+# Logs / audit
+*.log
+audit.jsonl
+
+# OS
+Thumbs.db
