@@ -14,8 +14,8 @@ application range `-32000` to `-32999`.
 | -32004 | `SESSION_STALE` | Session is in grace period, awaiting reconnect; retry in a few seconds. |
 | -32005 | `HOST_BUSY` | Office is in a modal dialog or other state that blocks add-in calls. |
 | -32006 | `MAX_INFLIGHT_EXCEEDED` | Too many concurrent calls for one session; client should back off. |
-| -32401 | `AUTH_FAILED` | (Add-in registration, only when `addin.shared_secret` is configured.) Shared secret missing or mismatched. |
-| -32402 | `AUTH_KEY_MISSING` | (HTTP transport with `--api-key`.) Client did not present a key. |
+| -32401 | `AUTH_FAILED` | (Add-in registration; only when `shared_secret` is configured for non-loopback bind.) Shared secret missing or mismatched. |
+| -32402 | `AUTH_KEY_MISSING` | (HTTP transport; only when `api_key` is configured for non-loopback bind.) Client did not present a key. |
 | -32403 | `IRM_DENIED` | Requested operation requires a right not granted by the IRM policy. |
 | -32404 | `DOCUMENT_READ_ONLY` | Doc is read-only (file attribute, share lock, or "Mark as Final"). |
 | -32405 | `PROTECTION_BLOCKS` | Restricted Editing / form protection blocks the change. |

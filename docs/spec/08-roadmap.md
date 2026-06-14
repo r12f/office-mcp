@@ -14,7 +14,7 @@ End-to-end "agent reads paragraph 0 of an open Word doc":
 
 - [ ] Server: stdio MCP transport, single tool `office.list_sessions`,
       one resource `office://word/<id>/paragraph/0`
-- [ ] Server: WS listener, handshake, register, session.added, ping/pong
+- [ ] Server: WS listener, register, session.added, ping/pong
 - [ ] Add-in: skeleton task pane with WS reverse-connect
 - [ ] Add-in: implements ONE method — `tool.invoke` for reading paragraph 0
 - [ ] Manual test against Claude Desktop on Windows
@@ -118,10 +118,12 @@ thread, suggest reply.
 3. **Identity binding**: in multi-account Word (one user signed into both work
    and personal Microsoft accounts), how do we tag sessions by identity?
    Probably via `user.upn` + `user.tenant_id` in `session.added`. Test M2.
-4. **Server discovery from add-in when multiple installs exist**: if a user
-   has both office-mcp 0.5 and 0.6 installed and both servers running, which
-   handshake file does the add-in read? Probably the most recent `issued_at`.
-   Document in M2.
+4. **Multiple installed versions on one machine**: if a user has both
+   office-mcp 0.5 and 0.6 installed, both pointing at the shared config and
+   both starting at logon, they'll race for `127.0.0.1:8765`. Probably
+   acceptable (whichever starts second fails loudly with "address already in
+   use"); but a better answer might be: registered servers post their version
+   to the WS handshake, second one defers. Investigate M2.
 5. **Idle add-in**: if the user opens Word but never opens the task pane, the
    add-in doesn't connect. Is that fine, or should we use Office's
    "[automatically open task pane on document open]" feature so it auto-connects?

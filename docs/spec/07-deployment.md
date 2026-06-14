@@ -137,29 +137,45 @@ base as of 2026).
 
 ## 5. Configuration
 
-`%APPDATA%\office-mcp\config.toml` (Win) / `~/Library/Application Support/office-mcp/config.toml` (Mac):
+`office-mcp` uses a **single config file shared by the server and the add-in**.
+Changing the port (or any other shared value) in one place updates both ends.
+
+Location:
+
+| OS | Path |
+|---|---|
+| Windows | `%APPDATA%\office-mcp\config.toml` |
+| macOS | `~/Library/Application Support/office-mcp/config.toml` |
+| Linux | `~/.config/office-mcp/config.toml` |
+
+The add-in resolves the same path via `Office.context.requirements` /
+`fetch('app://office-mcp/config')` shim provided by the add-in package; users
+do not maintain two copies.
 
 ```toml
-[server]
-# Transport: "stdio" (default), "http", or "both"
-transport = "stdio"
-
-# When transport = "http"
-http.bind = "127.0.0.1:8800"
-http.api_key = ""                # required if bind is non-loopback
-
-[addin]
-# Loopback WS for add-ins
-ws.bind = "127.0.0.1"
-ws.port = 0                      # 0 = pick free port at startup
+# ─── shared by server and add-in ─────────────────────────────────────────
+[addin_channel]
+# WebSocket the server listens on and the add-in dials.
+bind = "127.0.0.1"
+port = 8765
 heartbeat_interval_sec = 30
 session_grace_sec = 60
 max_inflight_per_session = 4
-# Optional shared secret. When empty (default), the WS channel is
-# unauthenticated — safe under the single-user, loopback-only threat model.
-# Set this if you share the machine, want defense-in-depth, or are paranoid
-# about other local processes. See docs/spec/05-security.md.
+# Only required if `bind` is non-loopback. Empty (default) = no auth, which
+# is safe and correct on a loopback bind. See docs/spec/05-security.md.
 shared_secret = ""
+
+# ─── server only ─────────────────────────────────────────────────────────
+[mcp_stdio]
+# stdio is always available; nothing to configure here. Listed for clarity.
+enabled = true
+
+[mcp_http]
+# Optional HTTP frontend for MCP clients (Streamable HTTP transport).
+enabled = false
+bind = "127.0.0.1:8800"
+# Only required if `bind` is non-loopback. Empty + non-loopback = startup refusal.
+api_key = ""
 
 [limits]
 max_response_bytes = 1048576     # 1 MiB
@@ -178,7 +194,9 @@ file  = ""                       # default: stderr
 ```
 
 Environment variables override config keys, prefixed `OFFICE_MCP_` (e.g.
-`OFFICE_MCP_HTTP_BIND=127.0.0.1:9000`).
+`OFFICE_MCP_ADDIN_CHANNEL__PORT=9000`). Add-in honors only the keys under
+`[addin_channel]`; everything else is server-side and silently ignored if
+present in the add-in's view of the config.
 
 ## 6. First-run flow (Windows desktop)
 
@@ -218,7 +236,7 @@ Environment variables override config keys, prefixed `OFFICE_MCP_` (e.g.
 
 - Binaries
 - Scheduled task / launchd plist
-- `%LOCALAPPDATA%\office-mcp\` (including handshake file, audit log, sideload catalog)
+- `%LOCALAPPDATA%\office-mcp\` (audit log, sideload catalog)
 - `%APPDATA%\office-mcp\` (config) — only with `--purge`
 
 The add-in must be removed separately via Office's add-in manager

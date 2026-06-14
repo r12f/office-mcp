@@ -14,55 +14,36 @@ Wire-level spec for the WebSocket channel between Office add-ins and the
 
 ## 2. Handshake
 
-`office-mcp` is designed for single-user local use. By default the add-in ↔ server
-channel is unauthenticated — the loopback bind is the trust anchor, matching how
-typical local developer tooling (language servers, dev databases, etc.) operates.
-A shared secret is opt-in for users who want defense-in-depth, and **required**
-when the server binds to a non-loopback address.
+`office-mcp` runs on a single user's local machine. The add-in ↔ server
+channel is **unauthenticated and unencrypted by design** — if your local
+machine is compromised, an attacker can already read your documents from
+disk, log your keystrokes, and impersonate any process running as you. A
+shared secret on a loopback socket would defend against none of that.
 
-### 2.1 Discovery file
+The trust anchor is the **loopback bind on a known port**, both ends of which
+the user installs and configures.
 
-When the server starts, it writes a small file so the add-in can find the port:
+### 2.1 Address discovery
 
-```
-%LOCALAPPDATA%\office-mcp\handshake.json     (Windows)
-~/Library/Application Support/office-mcp/handshake.json  (macOS)
-~/.config/office-mcp/handshake.json          (Linux — for cross-platform testing)
-```
+There is no discovery file. The add-in and server share one config file
+(see [07-deployment.md §5](07-deployment.md)) that declares the WS endpoint:
 
-**No shared secret configured (default):**
-
-```json
-{
-  "version": 1,
-  "server_pid": 14823,
-  "ws_url": "ws://127.0.0.1:8765"
-}
+```toml
+[addin_channel]
+bind = "127.0.0.1"
+port = 8765
 ```
 
-Permissions: `0644` (port number is not a secret).
+- The server binds `bind:port`.
+- The add-in dials `ws://bind:port`.
+- Defaults: `127.0.0.1:8765`. Users who need to run multiple servers on the
+  same machine change the port in the shared config.
 
-**Shared secret configured (`addin.shared_secret` set in config.toml):**
-
-```json
-{
-  "version": 1,
-  "server_pid": 14823,
-  "ws_url": "ws://127.0.0.1:8765",
-  "shared_secret": "whatever-the-user-typed"
-}
-```
-
-Permissions: `0600` (POSIX) / NTFS ACL restricted to current user (Windows).
-
-- The file is rewritten on every server start (port may change).
-- The add-in reads this file on its first connection attempt and on every
-  reconnect after `4001` (auth failure).
+If `bind` is anything other than a loopback address (`127.0.0.0/8` or `::1`),
+the server REFUSES to start and prints the rationale: an unauthenticated WS
+on a routable interface would expose the user's documents to the network.
 
 ### 2.2 First message from add-in: `register`
-
-The `shared_secret` field is **only sent when the discovery file contains one**;
-otherwise it is omitted entirely.
 
 ```json
 {
@@ -70,7 +51,6 @@ otherwise it is omitted entirely.
   "id": "11111111-1111-1111-1111-111111111111",
   "method": "register",
   "params": {
-    "shared_secret": "whatever-the-user-typed",
     "instance_id": "22222222-2222-2222-2222-222222222222",
     "host": {
       "app": "word",
@@ -106,16 +86,8 @@ otherwise it is omitted entirely.
 - `user.upn` and `user.tenant_id` come from `Office.context.auth.getAccessToken`
   or, if unavailable, from `Office.context.mailbox.userProfile` (Outlook only)
   or are omitted (Word/Excel without identity).
-
-**Server validation rules:**
-
-| Server config | `shared_secret` in `register` | Result |
-|---|---|---|
-| Not configured (default) | Absent | ✓ accept |
-| Not configured (default) | Present | ✓ accept (ignored) |
-| Configured | Absent | ✗ reject with `-32401` |
-| Configured | Present, matches | ✓ accept |
-| Configured | Present, mismatch | ✗ reject with `-32401` |
+- No `shared_secret`, no bearer token, no auth field. The server accepts any
+  well-formed `register` from a loopback peer.
 
 ### 2.3 Server reply: `register.result` or `register.error`
 
@@ -136,21 +108,21 @@ Success:
 }
 ```
 
-Error (e.g. shared-secret mismatch when one is configured, or protocol version skew):
+Error (e.g. protocol version skew, malformed register):
 
 ```json
 {
   "jsonrpc": "2.0",
   "id": "11111111-1111-1111-1111-111111111111",
   "error": {
-    "code": -32401,
-    "message": "Shared secret missing or mismatched. Update the add-in by re-reading the discovery file.",
-    "data": { "reason": "shared_secret_mismatch" }
+    "code": -32701,
+    "message": "Protocol version mismatch: server supports 1.x, add-in offered 2.0.",
+    "data": { "reason": "protocol_version_mismatch", "server_protocol": "1.0" }
   }
 }
 ```
 
-After a fatal error the server MUST close the WS with code 4001.
+After a fatal error the server MUST close the WS with code 4003.
 
 ## 3. Session events (add-in → server)
 
@@ -337,7 +309,6 @@ events are NOT emitted by default.
 |---|---|---|
 | 1000 | Normal | both |
 | 1001 | Office shutting down | add-in |
-| 4001 | Auth failure | server |
 | 4002 | Heartbeat timeout | server |
 | 4003 | Protocol version mismatch | server |
 | 4004 | Server shutting down (graceful) | server |
@@ -346,9 +317,9 @@ events are NOT emitted by default.
 ## 9. Example full session
 
 ```
-T+0.000  Server starts, writes handshake.json
+T+0.000  Server starts, binds ws://127.0.0.1:8765 (from shared config)
 T+1.200  User launches Word; pinned add-in loads
-T+1.350  Add-in reads handshake.json, opens WS
+T+1.350  Add-in reads ws_url from shared config, opens WS
 T+1.360  Add-in → register
 T+1.370  Server → register.result
 T+1.400  Add-in → session.added (Q3-Report.docx)
