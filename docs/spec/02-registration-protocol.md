@@ -1,6 +1,6 @@
 # 02 — Add-in ↔ Server Registration Protocol
 
-Wire-level spec for the WebSocket channel between Office add-ins and the
+Wire-level spec for the secure WebSocket channel between Office add-ins and the
 `office-mcp` server. JSON-RPC 2.0, one JSON object per WS text frame, UTF-8.
 
 ## 1. Conventions
@@ -14,16 +14,15 @@ Wire-level spec for the WebSocket channel between Office add-ins and the
 
 ## 2. Handshake
 
-The add-in ↔ server channel runs unauthenticated and unencrypted when the
-server binds a loopback address — see [05-security.md §1](05-security.md)
-for the trust-boundary reasoning. This section defines the wire-level
-mechanics; the security model defines what mechanisms are required (none
-on loopback; `shared_secret` when non-loopback).
+The production add-in ↔ server channel uses WSS, including on loopback,
+because the add-in itself is loaded from an HTTPS origin. Authentication is
+optional on loopback and required on non-loopback; see
+[05-security.md §1](05-security.md).
 
 ### 2.1 Address discovery
 
-The add-in and server share one config file (see
-[07-deployment.md §5](07-deployment.md)) that declares the WS endpoint:
+Office add-ins run in a browser/webview sandbox and cannot read the daemon's
+native config file. The v1 add-in therefore uses the compiled default endpoint:
 
 ```toml
 [addin_channel]
@@ -31,10 +30,18 @@ bind = "127.0.0.1"
 port = 8765
 ```
 
-- The server binds `bind:port`.
-- The add-in dials `ws://bind:port`.
-- Defaults: `127.0.0.1:8765`. Users who need to run multiple servers on the
-  same machine change the port in the shared config.
+- The daemon defaults to `127.0.0.1:8765`.
+- The add-in defaults to `wss://127.0.0.1:8765`.
+- A user may override the add-in endpoint in its settings UI. The override is
+  stored in partitioned browser storage and must match the daemon config.
+- Installer-managed deployments may build a manifest/bundle with a different
+  default endpoint.
+- The installer provisions a per-install local certificate trusted by the
+  current user. Its SANs cover `localhost`, `127.0.0.1`, and `::1`. The daemon
+  serves both the static add-in bundle and WSS from this origin.
+- The daemon accepts a WebSocket upgrade only when its `Origin` header exactly
+  matches the configured add-in HTTPS origin. For the default endpoint that is
+  `https://127.0.0.1:8765`.
 
 If `bind` is non-loopback and `shared_secret` is empty, the server REFUSES to
 start. See [05-security.md §2](05-security.md).
@@ -57,33 +64,43 @@ start. See [05-security.md §2](05-security.md).
     "add_in": {
       "version": "0.1.0",
       "protocol_version": "1.0",
+      "requirement_sets": {
+        "WordApi": "1.6",
+        "WordApiDesktop": null
+      },
       "supported_features": [
         "doc.read",
         "doc.write",
         "doc.tables",
         "doc.comments",
-        "doc.selection_events",
-        "doc.irm_metadata"
+        "doc.tracked_changes"
       ]
     },
-    "user": {
-      "display_name": "Riff",
-      "upn": "riff@contoso.com",
-      "tenant_id": "33333333-3333-3333-3333-333333333333"
+    "auth": {
+      "shared_secret": "present-only-when-configured"
     }
   }
 }
 ```
 
-- `instance_id` MUST be stable for the lifetime of the Office instance and
-  unique across instances. Generated on first add-in load, stored in
-  `Office.context.document.settings` (persists for the document) or in
-  `localStorage` (persists for the user on this Office install).
-- `user.upn` and `user.tenant_id` come from `Office.context.auth.getAccessToken`
-  or, if unavailable, from `Office.context.mailbox.userProfile` (Outlook only)
-  or are omitted (Word/Excel without identity).
-- No `shared_secret`, no bearer token, no auth field. The server accepts any
-  well-formed `register` from a loopback peer.
+- `instance_id` identifies this document-scoped add-in runtime, not the whole
+  Office process. It MUST be stable across WebSocket reconnects for the
+  lifetime of the runtime and unique across concurrent runtimes. Generate it
+  on add-in initialization and keep it in memory plus `sessionStorage`.
+- `requirement_sets` contains the highest versions confirmed at runtime with
+  `Office.context.requirements.isSetSupported`. A missing or `null` set is not
+  supported. Compile-time Office.js types are not capability evidence.
+- `supported_features` is derived from those checks and any successful
+  host-specific probes. The daemon never infers a feature from the Office
+  build number.
+- `user` is optional in v1. It is populated only by deployments that configure
+  and validate Office SSO; the base local manifest does not request identity
+  tokens and must not infer a UPN from the OS account.
+- On the default loopback endpoint with no configured secret, `auth` is
+  omitted and the server accepts any well-formed local `register`.
+- When `shared_secret` is configured, `auth.shared_secret` is required and is
+  checked before registration succeeds. Non-loopback bind without a configured
+  secret is rejected at daemon startup.
 
 ### 2.3 Server reply: `register.result` or `register.error`
 
@@ -98,7 +115,7 @@ Success:
     "protocol_version": "1.0",
     "session_grace_sec": 60,
     "heartbeat_interval_sec": 30,
-    "max_inflight_per_session": 4,
+    "max_pending_per_session": 4,
     "assigned_instance_id": "22222222-2222-2222-2222-222222222222"
   }
 }
@@ -111,9 +128,12 @@ Error (e.g. protocol version skew, malformed register):
   "jsonrpc": "2.0",
   "id": "11111111-1111-1111-1111-111111111111",
   "error": {
-    "code": -32701,
+    "code": -32000,
     "message": "Protocol version mismatch: server supports 1.x, add-in offered 2.0.",
-    "data": { "reason": "protocol_version_mismatch", "server_protocol": "1.0" }
+    "data": {
+      "office_mcp_code": "PROTOCOL_VERSION_MISMATCH",
+      "server_protocol": "1.0"
+    }
   }
 }
 ```
@@ -124,7 +144,8 @@ After a fatal error the server MUST close the WS with code 4003.
 
 ### 3.1 `session.added`
 
-Emitted when a document opens in the registered instance.
+Emitted after the document-scoped add-in runtime registers and has inspected
+its current document.
 
 ```json
 {
@@ -138,31 +159,78 @@ Emitted when a document opens in the registered instance.
       "url": "C:\\Users\\riff\\Documents\\Q3-Report.docx",
       "filename": "Q3-Report.docx",
       "is_dirty": false,
-      "is_read_only": false,
-      "is_protected": true,
+      "is_read_only": null,
+      "is_protected": null,
       "protection": {
         "kind": "irm",
-        "rights": ["view", "edit", "extract"],
-        "policy_id": "..."
+        "rights": null,
+        "rights_source": "unavailable"
       },
-      "word_count": 2417,
-      "page_count": 8,
       "opened_at": "2026-06-14T01:25:01Z"
-    }
+    },
+    "available_tools": [
+      "word.get_text",
+      "word.get_outline",
+      "word.get_paragraph",
+      "word.find_text",
+      "word.get_selection",
+      "word.insert_paragraph",
+      "word.insert_heading",
+      "word.insert_table",
+      "word.insert_image",
+      "word.insert_page_break",
+      "word.insert_list",
+      "word.replace_text",
+      "word.update_paragraph",
+      "word.delete_range",
+      "word.apply_formatting",
+      "word.read_table",
+      "word.update_cell",
+      "word.add_row",
+      "word.add_column",
+      "word.format_cell",
+      "word.set_heading_level",
+      "word.apply_style",
+      "word.add_comment",
+      "word.resolve_comment",
+      "word.accept_change",
+      "word.reject_change",
+      "word.save"
+    ],
+    "is_active": null
   }
 }
 ```
 
 - `protection.kind` ∈ `none | password | restricted_editing | irm | signed`.
-- `protection.rights` for IRM mirrors the user's effective rights, NOT the policy's
-  full set. If `extract` is absent, `tool.invoke` calls that read document text
-  MUST be rejected by the add-in with `error.code = -32403`.
+- `is_dirty` is derived from `Word.Document.saved` and is available in the
+  core tier. `url`, `is_read_only`, `is_protected`, and `is_active` are
+  nullable because their portable equivalents are not available on every
+  supported host. Unknown MUST remain `null`, not a guessed value.
+- `available_tools` is authoritative for this session. The daemon returns
+  `HOST_CAPABILITY_UNAVAILABLE` before dispatch when a tool is absent.
+- A v1 WebSocket connection owns exactly one document session. The
+  `session_id` is generated by the add-in, retained in `sessionStorage`, and
+  reused when that runtime reconnects. Reopening the file later creates a new
+  runtime and a new session ID.
+- The daemon binds `session_id` to its registered `instance_id`. Reconnect may
+  replace the prior socket only when both IDs match. A different runtime that
+  presents an active or grace-period session ID is rejected; it cannot steal
+  or merge that session.
+- `protection.rights` is optional. When a stable host API exposes effective
+  rights, it contains only the current user's effective rights and
+  `rights_source` identifies that API. Otherwise it is `null` with
+  `rights_source: "unavailable"`.
+- When rights are unavailable, the add-in attempts the Office.js operation and
+  maps the host's access-denied failure to `IRM_DENIED`; it MUST NOT infer rights
+  that the host did not report.
 
 Notifications (no `id` field) per JSON-RPC 2.0.
 
 ### 3.2 `session.updated`
 
-Sent when metadata changes (e.g. user pressed Save → `is_dirty: false`).
+Sent when observable metadata changes (e.g. Word reports `saved: true`, so
+`is_dirty` becomes `false`).
 Same payload shape; only changed fields need be populated, but `session_id` is required.
 
 ### 3.3 `session.removed`
@@ -208,7 +276,8 @@ Same payload shape; only changed fields need be populated, but `session_id` is r
 - `tool` is the fully-qualified tool name (app-prefixed: `word.*`, `excel.*`).
 - `args` schema is the tool-specific JSON Schema, validated by the server before forwarding.
 - `timeout_ms` is server-enforced; if the add-in exceeds it, the server replies
-  to the MCP client with timeout and tells the add-in to cancel via `tool.cancel`.
+  to the MCP client with timeout and tells the add-in to cancel via
+  `tool.cancel`. Only one `tool.invoke` is dispatched to a session at a time.
 - `client_meta.user_intent` is the natural-language string from the client (when
   available) — purely for diagnostic logging in the add-in. It MUST NOT change behavior.
 
@@ -223,27 +292,29 @@ Success:
   "result": {
     "ok": true,
     "data": {
-      "inserted_paragraph_index": 13,
-      "new_word_count": 2423
+      "inserted_paragraph_index": 13
     },
     "elapsed_ms": 147
   }
 }
 ```
 
-Error:
+Operational failure:
 
 ```json
 {
   "jsonrpc": "2.0",
   "id": "55555555-5555-5555-5555-555555555555",
-  "error": {
-    "code": -32403,
-    "message": "Document IRM policy denies edit; only 'view' and 'extract' are granted.",
-    "data": {
+  "result": {
+    "ok": false,
+    "error": {
+      "office_mcp_code": "IRM_DENIED",
+      "message": "Word denied the requested edit.",
       "tool": "word.insert_paragraph",
-      "denied_rights": ["edit"]
-    }
+      "retriable": false,
+      "partial_effect": "none"
+    },
+    "elapsed_ms": 18
   }
 }
 ```
@@ -252,7 +323,8 @@ Error codes are defined in [06-error-model.md](06-error-model.md).
 
 ### 4.2 Cancellation: `tool.cancel`
 
-If the MCP client cancels (or the server times out), the server sends:
+If the MCP client sends an explicit MCP cancellation notification (or the
+server deadline expires), the server sends:
 
 ```json
 {
@@ -260,15 +332,20 @@ If the MCP client cancels (or the server times out), the server sends:
   "method": "tool.cancel",
   "params": {
     "request_id": "55555555-5555-5555-5555-555555555555",
-    "reason": "client_disconnected"
+    "reason": "cancelled_notification"
   }
 }
 ```
 
-Notification, no reply expected. The add-in SHOULD abort the operation if
-possible (e.g. before next `context.sync()`). If already committed, the add-in
-SHOULD attempt an undo and reply to the original `tool.invoke` with
-`error.code = -32604` ("Cancelled; undo applied" or "Cancelled; undo failed").
+Notification, no reply expected. The add-in SHOULD abort the operation before
+the next `context.sync()` when possible. Once a sync has started or completed,
+rollback is not guaranteed. The original invocation returns `CANCELLED` with
+`partial_effect` set to `none`, `possible`, or `unknown`; a daemon deadline
+returns `TIMEOUT` with the same field.
+
+Loss of an HTTP/SSE connection is not cancellation under Streamable HTTP. The
+daemon continues the call unless it receives the explicit notification or the
+deadline expires.
 
 ## 5. Streaming partial results (deferred)
 
@@ -313,9 +390,9 @@ events are NOT emitted by default.
 ## 9. Example full session
 
 ```
-T+0.000  Server starts, binds ws://127.0.0.1:8765 (from shared config)
-T+1.200  User launches Word; pinned add-in loads
-T+1.350  Add-in reads ws_url from shared config, opens WS
+T+0.000  Server starts, binds wss://127.0.0.1:8765 (from daemon config)
+T+1.200  User launches Word and activates the add-in
+T+1.350  Add-in loads its endpoint setting, opens WS
 T+1.360  Add-in → register
 T+1.370  Server → register.result
 T+1.400  Add-in → session.added (Q3-Report.docx)
@@ -328,8 +405,8 @@ T+12.200 Add-in → result
 T+12.210 Server → MCP client returns tool result
 T+30.000 Server → ping
 T+30.040 Add-in → pong
-T+60.000 User closes Q3-Report; add-in detects DocumentClose
-T+60.030 Add-in → session.removed
+T+60.000 User closes Q3-Report; add-in unloads
+T+60.030 Add-in → session.removed when unload permits, otherwise WS closes
 T+90.000 User quits Word; add-in unload → WS close (1001)
 T+90.030 Server marks session stale (none currently; nothing to clean)
 ```

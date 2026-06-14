@@ -8,9 +8,10 @@ existing MCP implementations do not provide together:
 
 1. **Operates on the user's live, open document.** No "save, close, re-open" round trips.
    The AI sees what the user sees and edits in place.
-2. **Works on Information Rights Management (IRM / AIP / Purview) protected content.**
+2. **Targets Information Rights Management (IRM / AIP / Purview) protected content.**
    Because the add-in runs inside the Office process, it inherits the user's already-validated
-   rights — no MIP SDK integration, no separate authentication.
+   Office context — no MIP SDK integration or separate document authentication.
+   Exact supported operations remain host-dependent and are an M0 validation gate.
 3. **Survives the "every Office window is a different process" problem.** A single
    long-lived MCP server holds the client-facing endpoint; Office add-ins reverse-connect
    to it when each instance loads, and disconnect cleanly when the instance dies.
@@ -32,11 +33,11 @@ existing MCP implementations do not provide together:
 |---|---|
 | **MCP** | Model Context Protocol. Open standard for AI ↔ tools (Anthropic-led, multi-vendor). |
 | **MCP client** | The thing that wants tools — Claude Desktop, Cursor, an agent, etc. |
-| **MCP server** | What we build. Speaks MCP outward, JSON-RPC over WebSocket inward. |
-| **Office add-in** | A web app (HTML/JS) hosted inside an Office app via Office.js. Cross-platform (Windows / Mac / Web). |
+| **MCP server** | What we build. Speaks MCP outward, JSON-RPC over WSS inward. |
+| **Office add-in** | A web app (HTML/JS) hosted inside an Office app via Office.js. v1 targets Word desktop on Windows; macOS and Office on the web are later validation targets. |
 | **App** | Office application: Word, Excel, PowerPoint, Outlook. URI namespace and tool prefix. |
 | **Document session** | One open document (`.docx`, `.xlsx`, etc.) inside one app instance. Unit of addressing. |
-| **Instance** | One running Office process. Holds zero or more document sessions. |
+| **Add-in runtime** | One document-scoped web runtime. It owns one WebSocket connection and one document session in v1. |
 | **IRM** | Information Rights Management — Microsoft's per-document access control. Also AIP / MIP / Purview. |
 | **Reverse-registration** | Add-in dials out to the server on load (the server does not connect to add-ins). |
 | **Selection-anchored operation** | Tool call whose target is "wherever the user's cursor is now" rather than an explicit range. |
@@ -48,12 +49,14 @@ existing MCP implementations do not provide together:
    because the current options are unreliable.
 2. **Stateless clients.** A client should be able to disconnect and reconnect without
    losing track of which documents are addressable. State lives in the server.
-3. **Stateful documents.** Per-document state (open undo scope, last selection, pending
-   edits batch) lives in the add-in, addressed by stable session IDs.
-4. **Boring transports.** Stdio + Streamable HTTP for MCP; WebSocket + JSON-RPC 2.0 for
-   add-in ↔ server. No bespoke binary frames, no SSE-only paths.
-5. **Local-first, single-binary install.** Single Windows installer, single
-   binary, no cloud component required. See
+3. **Stateful documents.** Per-document state (last selection and pending operation
+   queue) lives in the document-scoped add-in runtime, addressed by stable session IDs.
+4. **Boring transports.** Streamable HTTP for MCP; WSS + JSON-RPC 2.0 for
+   add-in ↔ server. No bespoke binary frames, no SSE-only paths. Stdio-only clients
+   use a generic external stdio-to-HTTP proxy.
+5. **Local-first install.** Single Windows installer and no project-operated
+   cloud service. Marketplace builds load the production Office.js library
+   from Microsoft's CDN, so fully offline operation is not a v1 promise. See
    [01-architecture.md §0](01-architecture.md) for the full deployment model.
 6. **Graceful degradation.** When no Office instance is running, the server still works
    — clients see "no document sessions available" instead of a crash.

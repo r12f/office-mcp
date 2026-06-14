@@ -5,6 +5,9 @@
 ### M0 — Spec & scaffolding (this PR)
 
 - [x] Architecture & protocol specs
+- [x] Automated feasibility harness: protocol, MCP transport, WSS, manifest,
+      stable API types, requirement-set boundaries, and save behavior
+- [ ] Consented Word runtime smoke test plus representative IRM rights matrix
 - [ ] Repository scaffolding (server crate + add-in scaffold)
 - [ ] CI matrix (Win x64, macOS arm64, Linux x64 for the server; lint+typecheck for the add-in)
 
@@ -14,8 +17,8 @@ End-to-end "agent reads paragraph 0 of an open Word doc":
 
 - [ ] Daemon: MCP Streamable HTTP frontend, single tool `office.list_sessions`,
       one resource `office://word/<id>/paragraph/0`
-- [ ] Server: WS listener, register, session.added, ping/pong
-- [ ] Add-in: skeleton task pane with WS reverse-connect
+- [ ] Server: local HTTPS/WSS listener, register, session.added, ping/pong
+- [ ] Add-in: skeleton task pane with WSS reverse-connect
 - [ ] Add-in: implements ONE method — `tool.invoke` for reading paragraph 0
 - [ ] Manual test against Claude Desktop on Windows
 
@@ -28,8 +31,8 @@ End-to-end "agent reads paragraph 0 of an open Word doc":
       `word.get_selection`
 - [ ] `word.insert_paragraph`, `word.insert_heading`, `word.insert_table`,
       `word.insert_page_break`
-- [ ] IRM rights surfacing in `session.added`
-- [ ] IRM pre-check in add-in
+- [ ] IRM/protection metadata surfacing in `session.added`
+- [ ] Access-denied mapping and optional rights pre-check when host APIs expose it
 - [ ] Selection-anchored operations
 - [ ] Reconnect + grace period
 
@@ -57,9 +60,11 @@ review the result like a normal collaborator's edits.
 
 ### M5 — Document IO
 
-- [ ] `word.save`, `word.save_as`, `word.export_pdf`
-- [ ] HTTP transport for the MCP frontend
-- [ ] Streamable HTTP per 2026 MCP revision
+- [ ] `word.save`
+- [ ] Re-evaluate `word.save_as` / `word.export_pdf` only if a stable Office.js
+      API can produce bytes or a user-approved destination without native
+      filesystem access from the add-in
+- [ ] Large-result and long-running-operation hardening for Streamable HTTP
 
 ### M6 — Distribution
 
@@ -94,7 +99,7 @@ thread, suggest reply.
 | `tool.progress` streaming partials | v1 keeps protocol simple | First user request for >10s tool calls where partial results matter |
 | Per-document `acquire_edit_lock` | Single-client usage is dominant | First report of two-client clobbering |
 | Server-issued events back to MCP client (selection-change, etc.) | Most clients don't consume them | MCP gains widely-implemented subscription primitive |
-| WSS for non-loopback add-ins | Office on Web behind corp proxy needs it | Production user report from enterprise |
+| Publicly trusted WSS endpoint | Office on Web cannot rely on a user-installed localhost certificate | First supported Office on Web deployment |
 | Macro execution | Security risk too large | Never, except via explicit allowlist + signed origin |
 | Server-side LLM summary tools (`word.summarize`) | Out of scope; that's the client's job | Never |
 | Multi-tenant SaaS hosting | Not the project's model | Never |
@@ -108,24 +113,18 @@ thread, suggest reply.
 
 ## Open questions
 
-1. **Add-in pinning UX**: how do we get the task pane to auto-load without
-   the user clicking the ribbon every time? Office requires an `IncludePersistent`
-   declaration in the manifest, but support varies by Office channel. Investigate
-   M3.
-2. **Office on Web**: WS to localhost from a browser-hosted Office add-in
-   requires the browser to allow it. Defer to M5; may require WSS + a
-   per-user reverse tunnel for the loopback.
+1. **Add-in activation UX**: auto-open is available only for supported
+   sideloaded or centrally deployed scenarios and is document-specific. Define
+   the default opt-in UI and fallback ribbon flow in M2.
+2. **Office on Web**: browser private-network policy and certificate trust make
+   localhost access materially different from desktop Office. It is not a v1
+   target; a future deployment may require a publicly trusted per-user relay.
 3. **Identity binding**: in multi-account Word (one user signed into both work
    and personal Microsoft accounts), how do we tag sessions by identity?
    Probably via `user.upn` + `user.tenant_id` in `session.added`. Test M2.
 4. **Multiple installed versions on one machine**: if a user has both
-   office-mcp 0.5 and 0.6 installed, both pointing at the shared config and
+   office-mcp 0.5 and 0.6 installed, both using the default endpoint and
    both starting at logon, they'll race for `127.0.0.1:8765`. Probably
    acceptable (whichever starts second fails loudly with "address already in
    use"); but a better answer might be: registered servers post their version
    to the WS handshake, second one defers. Investigate M2.
-5. **Idle add-in**: if the user opens Word but never opens the task pane, the
-   add-in doesn't connect. Is that fine, or should we use Office's
-   "[automatically open task pane on document open]" feature so it auto-connects?
-   Trade-off: convenience vs. user surprise. Default to NOT auto-open; provide
-   a setting.

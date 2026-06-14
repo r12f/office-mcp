@@ -3,6 +3,46 @@
 Per-tool JSON Schemas. All tools take a top-level `session_id` (string, UUID, required).
 Common keys (anchor, etc.) are defined in [03-mcp-tool-surface.md §6](03-mcp-tool-surface.md).
 
+The canonical generated tool schemas use JSON Schema 2020-12 and set
+`"additionalProperties": false` on argument objects. The fragments below are
+assembled with these shared definitions:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": {
+      "oneOf": [
+        { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "selection" } }, "additionalProperties": false },
+        { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["start_of_document", "end_of_document"] } }, "additionalProperties": false },
+        { "type": "object", "required": ["kind", "index"], "properties": { "kind": { "enum": ["paragraph_index", "before_paragraph_index", "after_paragraph_index"] }, "index": { "type": "integer", "minimum": 0 } }, "additionalProperties": false },
+        { "type": "object", "required": ["kind", "text"], "properties": { "kind": { "enum": ["after_text", "before_text"] }, "text": { "type": "string", "minLength": 1 }, "occurrence": { "type": "integer", "minimum": 1, "default": 1 } }, "additionalProperties": false },
+        { "type": "object", "required": ["kind", "text"], "properties": { "kind": { "const": "heading" }, "text": { "type": "string", "minLength": 1 }, "level": { "type": "integer", "minimum": 1, "maximum": 9 } }, "additionalProperties": false },
+        { "type": "object", "required": ["kind", "name"], "properties": { "kind": { "const": "bookmark" }, "name": { "type": "string", "minLength": 1 } }, "additionalProperties": false }
+      ]
+    },
+    "extent": { "enum": ["paragraph", "sentence", "selection"] },
+    "run_formatting": {
+      "type": "object",
+      "properties": {
+        "bold": { "type": "boolean" },
+        "italic": { "type": "boolean" },
+        "underline": { "type": "boolean" },
+        "strikethrough": { "type": "boolean" },
+        "font_name": { "type": "string", "minLength": 1 },
+        "font_size_pt": { "type": "number", "exclusiveMinimum": 0 },
+        "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "highlight": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+The `$ref` values below refer to these shared definitions.
+
 ## 1. Overview
 
 ### 1.1 Word tool catalog
@@ -16,11 +56,26 @@ follow in §2–§8.
 | **Insert** | `word.insert_paragraph`, `word.insert_heading`, `word.insert_table`, `word.insert_image`, `word.insert_page_break`, `word.insert_list` |
 | **Edit** | `word.replace_text`, `word.update_paragraph`, `word.delete_range`, `word.apply_formatting` |
 | **Tables** | `word.read_table`, `word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell` |
-| **Structure** | `word.set_heading_level`, `word.apply_style`, `word.create_style` |
+| **Structure** | `word.set_heading_level`, `word.apply_style` |
 | **Review** | `word.add_comment`, `word.resolve_comment`, `word.accept_change`, `word.reject_change` |
-| **Document** | `word.save`, `word.save_as`, `word.export_pdf` |
+| **Document** | `word.save` |
 
-### 1.2 Word resources
+### 1.2 Runtime capability tiers
+
+The base manifest requires `WordApi 1.3`. The add-in probes higher sets at
+runtime and advertises only tools whose complete implementation is supported:
+
+| Tier | Requirement | Additional tools/features |
+|---|---|---|
+| Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection |
+| Review | `WordApi 1.4` | comments, bookmark anchors |
+| Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
+| Host-specific | explicit successful probe | active-window and protection metadata |
+
+`word.save` uses the production `WordApi 1.1` API and is available whenever
+the core tier is available. Preview APIs are excluded from v1.
+
+### 1.3 Word resources
 
 Declarative read-only resources (mutations go through tools in §2–§8).
 URI scheme and cross-cutting semantics are defined in
@@ -28,7 +83,7 @@ URI scheme and cross-cutting semantics are defined in
 
 | URI pattern | Returns | Notes |
 |---|---|---|
-| `office://word/<session_id>/document` | Full plain text | Honors IRM: returns 403 if `extract` right denied |
+| `office://word/<session_id>/document?offset=0&limit=200` | Paginated plain text | Honors IRM; denial carries `IRM_DENIED` |
 | `office://word/<session_id>/structure` | JSON outline (headings, lists, tables) | Lightweight |
 | `office://word/<session_id>/paragraph/<index>` | Single paragraph | |
 | `office://word/<session_id>/comments` | All comments JSON | |
@@ -119,13 +174,17 @@ Returns nested tree of `{ text, level, paragraph_index, children: [...] }`.
     "query": { "type": "string" },
     "match_case": { "type": "boolean", "default": false },
     "whole_word": { "type": "boolean", "default": false },
-    "regex": { "type": "boolean", "default": false },
+    "wildcards": { "type": "boolean", "default": false },
     "limit": { "type": "integer", "default": 50 }
   }
 }
 ```
 
-Returns matches as `[{ paragraph_index, start_offset, end_offset, snippet }]`.
+`wildcards` selects Word's wildcard syntax; it is not JavaScript regular
+expression syntax. Returns matches as
+`[{ paragraph_index, occurrence_in_paragraph, text, snippet }]`. Paragraph
+location is computed by searching paragraph ranges; character offsets are not
+promised because Word does not expose portable document offsets.
 
 ### 2.5 `word.get_selection`
 
@@ -133,7 +192,8 @@ Returns matches as `[{ paragraph_index, start_offset, end_offset, snippet }]`.
 { "type": "object", "required": ["session_id"], "properties": { "session_id": { "type": "string" } } }
 ```
 
-Returns `{ text, paragraph_index, start_offset, end_offset, is_empty }`.
+Returns `{ text, paragraph_count, is_empty }`. A selection may span multiple
+paragraphs; portable character offsets are intentionally not exposed.
 
 ## 3. Insert
 
@@ -146,9 +206,9 @@ Returns `{ text, paragraph_index, start_offset, end_offset, is_empty }`.
   "properties": {
     "session_id": { "type": "string" },
     "text": { "type": "string" },
-    "anchor": { "$ref": "#/definitions/anchor" },
+    "anchor": { "$ref": "#/$defs/anchor" },
     "style": { "type": "string", "default": "Normal" },
-    "formatting": { "$ref": "#/definitions/run_formatting" }
+    "formatting": { "$ref": "#/$defs/run_formatting" }
   }
 }
 ```
@@ -163,7 +223,7 @@ Returns `{ text, paragraph_index, start_offset, end_offset, is_empty }`.
     "session_id": { "type": "string" },
     "text": { "type": "string" },
     "level": { "type": "integer", "minimum": 1, "maximum": 9 },
-    "anchor": { "$ref": "#/definitions/anchor" }
+    "anchor": { "$ref": "#/$defs/anchor" }
   }
 }
 ```
@@ -176,7 +236,7 @@ Returns `{ text, paragraph_index, start_offset, end_offset, is_empty }`.
   "required": ["session_id", "anchor", "rows", "cols"],
   "properties": {
     "session_id": { "type": "string" },
-    "anchor": { "$ref": "#/definitions/anchor" },
+    "anchor": { "$ref": "#/$defs/anchor" },
     "rows": { "type": "integer", "minimum": 1 },
     "cols": { "type": "integer", "minimum": 1 },
     "data": {
@@ -199,7 +259,7 @@ If `data` is provided, its dimensions must match `rows × cols`.
   "required": ["session_id", "anchor", "image"],
   "properties": {
     "session_id": { "type": "string" },
-    "anchor": { "$ref": "#/definitions/anchor" },
+    "anchor": { "$ref": "#/$defs/anchor" },
     "image": {
       "oneOf": [
         { "type": "object", "required": ["base64"], "properties": { "base64": { "type": "string" } } },
@@ -214,11 +274,43 @@ If `data` is provided, its dimensions must match `rows × cols`.
 ```
 
 `url` MUST be `https://` and is fetched server-side (not by the add-in) to avoid
-mixed-content issues in the add-in webview.
+mixed-content issues in the add-in webview. The daemon applies the fetch policy
+in [05-security.md §6.1](05-security.md): no credentials, private addresses,
+unvalidated redirects, oversized bodies, or non-image payloads. Base64 input
+is subject to the same decoded-byte and image-format limits.
 
-### 3.5 `word.insert_page_break` and `word.insert_list`
+### 3.5 `word.insert_page_break`
 
-Schemas in same vein, omitted here for brevity; see reference implementation.
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" }
+  }
+}
+```
+
+### 3.6 `word.insert_list`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor", "items"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "kind": { "enum": ["bulleted", "numbered"], "default": "bulleted" },
+    "level": { "type": "integer", "minimum": 0, "maximum": 8, "default": 0 }
+  }
+}
+```
 
 ## 4. Edit
 
@@ -234,7 +326,7 @@ Schemas in same vein, omitted here for brevity; see reference implementation.
     "replace": { "type": "string" },
     "match_case": { "type": "boolean", "default": false },
     "whole_word": { "type": "boolean", "default": false },
-    "regex": { "type": "boolean", "default": false },
+    "wildcards": { "type": "boolean", "default": false },
     "scope": {
       "type": "object",
       "properties": {
@@ -242,12 +334,15 @@ Schemas in same vein, omitted here for brevity; see reference implementation.
         "selection_only":  { "type": "boolean", "default": false }
       }
     },
-    "dry_run": { "type": "boolean", "default": false }
+    "dry_run": { "type": "boolean", "default": false },
+    "partial_ok": { "type": "boolean", "default": false }
   }
 }
 ```
 
 Returns `{ replaced_count: N, matches: [...] }`.
+
+`wildcards` uses Word wildcard syntax, not JavaScript regular expressions.
 
 `dry_run: true` returns matches without modifying the document. **Highly
 recommended pattern for agents**: dry-run first, present to user, then run again
@@ -264,11 +359,13 @@ Replace one paragraph's text wholesale.
   "properties": {
     "session_id": { "type": "string" },
     "index": { "type": "integer" },
-    "text": { "type": "string" },
-    "preserve_formatting": { "type": "boolean", "default": true }
+    "text": { "type": "string" }
   }
 }
 ```
+
+Replacing paragraph text preserves paragraph-level style but does not promise
+to preserve mixed character-run formatting inside the old text.
 
 ### 4.3 `word.delete_range`
 
@@ -278,14 +375,8 @@ Replace one paragraph's text wholesale.
   "required": ["session_id", "anchor"],
   "properties": {
     "session_id": { "type": "string" },
-    "anchor": { "$ref": "#/definitions/anchor" },
-    "extent": {
-      "oneOf": [
-        { "const": "paragraph" },
-        { "const": "sentence" },
-        { "type": "object", "required": ["chars"], "properties": { "chars": { "type": "integer" } } }
-      ]
-    }
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "extent": { "enum": ["paragraph", "sentence", "selection"] }
   }
 }
 ```
@@ -298,9 +389,9 @@ Replace one paragraph's text wholesale.
   "required": ["session_id", "anchor", "formatting"],
   "properties": {
     "session_id": { "type": "string" },
-    "anchor": { "$ref": "#/definitions/anchor" },
-    "extent": { "$ref": "#/definitions/extent" },
-    "formatting": { "$ref": "#/definitions/run_formatting" }
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "extent": { "$ref": "#/$defs/extent" },
+    "formatting": { "$ref": "#/$defs/run_formatting" }
   }
 }
 ```
@@ -352,26 +443,108 @@ Returns `{ rows, cols, data: string[][], header_row: boolean }`.
     "row": { "type": "integer" },
     "col": { "type": "integer" },
     "text": { "type": "string" },
-    "formatting": { "$ref": "#/definitions/run_formatting" }
+    "formatting": { "$ref": "#/$defs/run_formatting" }
   }
 }
 ```
 
-### 5.3 `word.add_row` and `word.add_column`
+### 5.3 `word.add_row`
 
-Trivial schemas; add at index or end.
+```json
+{
+  "type": "object",
+  "required": ["session_id", "table_index"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "table_index": { "type": "integer", "minimum": 0 },
+    "index": { "type": "integer", "minimum": 0 },
+    "values": { "type": "array", "items": { "type": "string" } }
+  }
+}
+```
 
-### 5.4 `word.format_cell`
+Omitting `index` appends the row. An interior insertion uses
+`TableCell.insertRows("Before", ...)`; non-uniform tables that cannot satisfy
+that API return `HOST_CAPABILITY_UNAVAILABLE`. If `values` is provided, its
+length must equal the table's current column count.
 
-Background color, padding, alignment, borders, merging. Schema mirrors
-python-docx's table cell API for v1 to ease porting of existing tools.
+### 5.4 `word.add_column`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "table_index"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "table_index": { "type": "integer", "minimum": 0 },
+    "index": { "type": "integer", "minimum": 0 },
+    "values": { "type": "array", "items": { "type": "string" } }
+  }
+}
+```
+
+Omitting `index` appends the column. An interior insertion uses
+`TableCell.insertColumns("Before", ...)`; non-uniform tables that cannot
+satisfy that API return `HOST_CAPABILITY_UNAVAILABLE`. If `values` is
+provided, its length must equal the table's current row count.
+
+### 5.5 `word.format_cell`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "table_index", "row", "col"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "table_index": { "type": "integer", "minimum": 0 },
+    "row": { "type": "integer", "minimum": 0 },
+    "col": { "type": "integer", "minimum": 0 },
+    "background_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "horizontal_alignment": { "enum": ["left", "center", "right"] },
+    "vertical_alignment": { "enum": ["top", "center", "bottom"] },
+    "padding_pt": { "type": "number", "minimum": 0 },
+    "formatting": { "$ref": "#/$defs/run_formatting" }
+  }
+}
+```
+
+Cell merging and arbitrary border editing are deferred until their
+cross-platform Office.js behavior is verified.
 
 ## 6. Structure
 
-### 6.1 `word.set_heading_level` / `word.apply_style` / `word.create_style`
+### 6.1 `word.set_heading_level`
 
-Allow agents to maintain document structure declaratively without touching
-formatting directly.
+```json
+{
+  "type": "object",
+  "required": ["session_id", "index", "level"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "index": { "type": "integer", "minimum": 0 },
+    "level": { "type": "integer", "minimum": 0, "maximum": 9 }
+  }
+}
+```
+
+Level `0` converts the paragraph to body text.
+
+### 6.2 `word.apply_style`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor", "style"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "style": { "type": "string", "minLength": 1 }
+  }
+}
+```
+
+`word.create_style` is reserved for a future capability set after its
+cross-platform Office.js behavior is verified.
 
 ## 7. Review
 
@@ -383,7 +556,7 @@ formatting directly.
   "required": ["session_id", "anchor", "text"],
   "properties": {
     "session_id": { "type": "string" },
-    "anchor": { "$ref": "#/definitions/anchor" },
+    "anchor": { "$ref": "#/$defs/anchor" },
     "text": { "type": "string" }
   }
 }
@@ -394,10 +567,43 @@ behalf of the user is the user, in the same way that a macro the user runs is
 the user. No "AI watermark" is added: the value of office-mcp comes from being
 indistinguishable from the user doing it themselves.
 
-### 7.2 `word.resolve_comment` / `word.accept_change` / `word.reject_change`
+### 7.2 `word.resolve_comment`
 
-Standard review-pane operations. Each takes a `comment_id` or `change_id`
-discoverable via the corresponding read resource.
+```json
+{
+  "type": "object",
+  "required": ["session_id", "comment_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "comment_id": { "type": "string", "minLength": 1 }
+  }
+}
+```
+
+### 7.3 `word.accept_change` and `word.reject_change`
+
+Stable Office.js tracked-change objects do not expose an ID. The tracked
+changes resource therefore returns each item as
+`{ index, author, date, type, text, fingerprint }`, where `index` is the
+current collection index and `fingerprint` is a daemon-defined hash of the
+loaded fields.
+
+Each tool uses:
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "change_index", "expected_fingerprint"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "change_index": { "type": "integer", "minimum": 0 },
+    "expected_fingerprint": { "type": "string", "minLength": 1 }
+  }
+}
+```
+
+The add-in reloads the collection immediately before mutation. An index or
+fingerprint mismatch returns `STALE_INDEX`; clients must re-read the resource.
 
 ## 8. Document
 
@@ -407,48 +613,39 @@ discoverable via the corresponding read resource.
 { "type": "object", "required": ["session_id"], "properties": { "session_id": { "type": "string" } } }
 ```
 
-Triggers `Office.context.document.save()`. No-op if already clean.
+Calls `Word.Document.save(Word.SaveBehavior.save)`. `Word.Document.saved`
+provides the before/after dirty-state signal in the core tier.
 
-### 8.2 `word.save_as`
-
-```json
-{
-  "type": "object",
-  "required": ["session_id", "path"],
-  "properties": {
-    "session_id": { "type": "string" },
-    "path": { "type": "string" },
-    "format": { "enum": ["docx", "pdf", "rtf", "txt", "html"], "default": "docx" }
-  }
-}
-```
-
-`path` is on the user's machine, NOT a server path. The add-in resolves it.
-The add-in MUST refuse paths it cannot validate (no traversal beyond the user's
-documents folder unless explicitly confirmed by the user via Office's file picker).
-
-### 8.3 `word.export_pdf`
-
-Convenience wrapper around `save_as` with `format: "pdf"`. Returns the file path.
+`word.save_as` and `word.export_pdf` are not v1 tools. Stable Office.js can
+prompt/save the current document and can name a new document, but it does not
+provide a portable arbitrary-path Save As or Word-to-PDF byte export. These
+names remain reserved for a future API-backed design.
 
 ## 9. Behavior contracts
 
-### 9.1 Atomicity
+### 9.1 Mutation consistency
 
-Each tool call corresponds to one Office.js batch (one `context.sync()`).
-Either the entire call's effect lands or none of it does. Within a call, the
-add-in MUST not commit a partial effect on error.
+Office.js batches queued operations at `context.sync()`, but does not provide a
+general transaction or rollback guarantee. A mutating tool MUST:
+
+1. Resolve anchors and preflight known permissions, indices, and constraints.
+2. Queue related writes together where the API permits.
+3. Minimize the number of `context.sync()` calls after the first write.
+4. Report `data.partial_effect` as `none`, `possible`, or `unknown` on failure.
+
+Tools MUST NOT claim atomicity unless the specific Office.js API used documents
+that guarantee.
 
 ### 9.2 Undo grouping
 
-Each tool call creates one undo entry in Word, labeled with the tool name
-(e.g. "Insert paragraph"). The user can `Ctrl+Z` the entire tool call
-in one keystroke.
+The add-in does not control Word's undo stack or custom undo labels through a
+portable Office.js API. Implementations SHOULD group writes into as few sync
+boundaries as possible, but the number and labels of undo entries are
+host-defined. Tool results do not promise one-keystroke rollback.
 
 ### 9.3 IRM enforcement
 
-The add-in MUST check the active document's effective rights before executing
-each call. Mapping from tool category to required right:
+The following table describes the conceptual right required by each category:
 
 | Category | Required right |
 |---|---|
@@ -458,22 +655,26 @@ each call. Mapping from tool category to required right:
 | Tables | `edit` |
 | Structure | `edit` |
 | Review | `comment` (or `edit` if `comment` not granted by policy) |
-| Document.save_as PDF | `export` |
-| Document.save_as DOCX (different path) | `extract` + `edit` |
+| Document.save | `edit` |
 
-Denied calls return `error.code = -32403` with `data.denied_rights`.
+If the host exposes effective rights, the add-in SHOULD fail fast. Production
+Word APIs do not currently guarantee a complete effective-rights enumeration,
+so the add-in otherwise attempts the operation and maps a host access-denied
+failure to `IRM_DENIED`. `denied_rights` and `granted_rights` are included
+only when known; clients MUST tolerate their absence.
 
 ### 9.4 Track-changes interaction
 
-If the document has Track Changes ON, tools that edit content (`insert_paragraph`,
-`replace_text`, etc.) produce tracked changes, NOT direct edits. The tool result
-includes `tracked_change_ids: [...]` so the agent can refer to them later.
+If the document has Track Changes ON, Word decides how edits are recorded.
+When `WordApi 1.6` is available, the add-in may re-read tracked changes after
+the edit and return current indices and fingerprints it can correlate
+reliably. Tool success does not depend on producing revision references.
 
 ### 9.5 What the tool does NOT do
 
 - It does NOT print.
 - It does NOT mail-merge.
-- It does NOT execute VBA macros (refused with `-32601`).
+- It does NOT expose a VBA execution tool.
 - It does NOT change document protection settings.
 - It does NOT bypass IRM.
 

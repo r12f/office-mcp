@@ -9,7 +9,7 @@ What the `office-mcp` server exposes to MCP clients (the AI side).
   `<app>` is the Office application the tool targets
   (`word`, `excel`, `outlook`, ...).
 - A small set of cross-app management tools live under `office.*`:
-  `office.list_sessions`, `office.get_session_info`, `office.activate_session`.
+  `office.list_sessions`, `office.get_session_info`.
 - Resource URIs use a custom scheme:
   `office://<app>/<session_id>/<app-specific-path>`.
   The `<app>` segment is the URI authority — purely a namespace, not a
@@ -28,8 +28,8 @@ required for any document-affecting tool call.
 Discovery flow for an MCP client:
 
 1. Call `office.list_sessions` → get back an array of session descriptors.
-2. Pick one (typically the user's foreground document, identifiable via
-   `is_active: true`).
+2. Pick one. `is_active` may help on hosts that expose active-window state,
+   but it is nullable; clients must ask the user when selection is ambiguous.
 3. Pass that `session_id` to subsequent tool calls.
 
 The session ID is stable for the life of the document session and is the
@@ -49,7 +49,7 @@ ship their own resource tables in `04-excel-capabilities.md` /
 | URI pattern | Returns | Notes |
 |---|---|---|
 | `office://sessions` | List of session descriptors across all apps | Roughly `office.list_sessions` as a resource |
-| `office://word/<session_id>/document` | Full plain text | Honors IRM: returns 403 if `extract` right denied |
+| `office://word/<session_id>/document?offset=0&limit=200` | Paginated plain text | Honors IRM; denial is an MCP resource error carrying `IRM_DENIED` |
 | `office://word/<session_id>/structure` | JSON outline (headings, lists, tables) | Lightweight |
 | `office://word/<session_id>/paragraph/<index>` | Single paragraph | |
 | `office://word/<session_id>/comments` | All comments JSON | |
@@ -75,9 +75,12 @@ No arguments. Returns:
         "is_dirty": false,
         "is_protected": true,
         "protection_kind": "irm",
-        "rights": ["view", "edit", "extract"]
+        "rights": null,
+        "rights_source": "unavailable"
       },
-      "is_active": true,
+      "is_active": null,
+      "capability_tiers": ["core", "review", "tracked_changes"],
+      "available_tool_count": 27,
       "registered_at": "2026-06-14T01:25:01Z"
     }
   ]
@@ -86,14 +89,16 @@ No arguments. Returns:
 
 ### 4.2 `office.get_session_info`
 
-Args: `{ "session_id": "..." }`. Returns the same descriptor shape, useful when
-the client only kept the ID.
+Args: `{ "session_id": "..." }`. Returns the descriptor plus the full
+`available_tools` array, useful when the client only kept the ID or needs to
+plan around host capabilities.
 
 ### 4.3 `office.activate_session`
 
-Args: `{ "session_id": "..." }`. Brings the document to the foreground in its
-Office instance (calls `Office.context.document.bringToFront()` / equivalent).
-Use case: the agent wants the user to look at what it's about to change.
+Deferred from v1. Office.js does not provide a portable API that reliably
+brings an arbitrary document window to the foreground. Clients may use
+`word.select_range` in a future capability set to make a location visible
+inside an already-active document.
 
 ## 5. Per-app tool catalogs
 
@@ -115,7 +120,7 @@ adds or renames a tool.
 Many tools take an `anchor` argument that describes *where* in the document to act.
 Anchor variants:
 
-```json
+```jsonc
 { "kind": "selection" }
 { "kind": "start_of_document" }
 { "kind": "end_of_document" }
@@ -125,7 +130,7 @@ Anchor variants:
 { "kind": "after_text", "text": "Introduction", "occurrence": 1 }
 { "kind": "before_text", "text": "Conclusion", "occurrence": 1 }
 { "kind": "heading", "text": "Methodology", "level": 2 }
-{ "kind": "named_range", "name": "ResultsSection" }
+{ "kind": "bookmark", "name": "ResultsSection" }
 ```
 
 Paragraph indices are 0-based and refer to the *current* document state at the
@@ -135,13 +140,14 @@ moment the tool call is processed. Clients must not cache indices across edits.
 
 - `occurrence: 1` = first match, scanning top-to-bottom.
 - Case-insensitive by default; pass `match_case: true` in the surrounding tool args.
-- Returns error `-32422` if no match.
-- If `occurrence > 1` and fewer matches exist, returns error `-32422`.
+- Returns `ANCHOR_NOT_FOUND` if no match.
+- If `occurrence > 1` and fewer matches exist, returns `ANCHOR_NOT_FOUND`.
 
 ## 7. Concurrent calls and ordering
 
-- Calls to the same `session_id` are serialized inside the add-in (Office.js
-  requires single-threaded batched access).
+- Calls to the same `session_id` are serialized by the daemon. One call is
+  dispatched and up to `MAX_PENDING_PER_SESSION` additional calls wait in a
+  FIFO queue.
 - Calls to different sessions run in parallel.
 - The MCP client can issue parallel calls to one session; the server enqueues
   them in arrival order. There is no transaction; intermediate state may be
@@ -159,26 +165,38 @@ Read operations that may return large bodies (`word.get_text`,
 - `offset` (paragraph offset, 0-based)
 - `limit` (max paragraphs, default 200)
 
+Tools carry these as arguments. Resources carry them as URI query parameters.
+There is no unbounded "read the entire document" response.
+
 The server enforces a hard cap of `MAX_RESPONSE_BYTES` (default 1 MiB);
-exceeding it returns `error.code = -32600` with `data.max_response_bytes`.
+exceeding it returns `MAX_RESPONSE_SIZE` with `max_response_bytes`.
 
 ## 9. Tool metadata
 
-Each tool's MCP metadata includes:
+Each tool's project metadata is carried under MCP `_meta` so the standard tool
+shape remains valid:
 
-```json
+```jsonc
 {
-  "since": "0.1.0",
-  "side_effects": "edit" | "read" | "save",
-  "irm_rights_required": ["edit"],
-  "estimated_duration_ms": 200,
-  "user_visible_change": true
+  "_meta": {
+    "com.office-mcp/since": "0.1.0",
+    "com.office-mcp/side_effects": "edit",
+    "com.office-mcp/irm_rights_required": ["edit"],
+    "com.office-mcp/minimum_requirement_sets": { "WordApi": "1.3" },
+    "com.office-mcp/estimated_duration_ms": 200
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false
+  }
 }
 ```
 
-`user_visible_change: true` means the tool will produce a flash on the
-user's screen (the document changes). MCP clients are encouraged to surface this
-in their UI ("Word document will be modified").
+The daemon lists the stable server-wide catalog. Session-specific support is
+reported by `available_tools`; invoking a listed tool against an incompatible
+session yields a tool execution error, not a protocol error.
 
 ## 10. Prompts (templated, optional)
 
@@ -186,8 +204,8 @@ The server exposes a small set of MCP prompts that demonstrate idiomatic use:
 
 | Prompt | Args | Body sketch |
 |---|---|---|
-| `summarize_active_document` | (none) | "Read the active Word session via `office://.../document`, summarize in 200 words, post the summary as a comment via `word.add_comment` on paragraph 0." |
-| `polish_section` | `heading: string` | "Find heading, polish prose, present changes for user accept before applying." |
-| `extract_action_items` | (none) | "Read document, extract action items, return as JSON; do not modify the doc." |
+| `summarize_document` | `session_id: string` | "Read the selected Word session via `office://.../document`, summarize in 200 words, post the summary as a comment via `word.add_comment` on paragraph 0." |
+| `polish_section` | `session_id: string, heading: string` | "Find heading, polish prose, present changes for user accept before applying." |
+| `extract_action_items` | `session_id: string` | "Read document, extract action items, return as JSON; do not modify the doc." |
 
 Prompts are optional sugar; everything they do is achievable via raw tool calls.

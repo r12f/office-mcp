@@ -20,18 +20,18 @@ principle regardless of deployment shape.
 - It is the deployment the project's killer feature (IRM-aware live editing)
   is built for — the agent operates as the signed-in Office user, which
   requires sharing that user's OS session.
-- It eliminates whole categories of design complexity (no service discovery,
-  no transport encryption, no cross-user identity mapping).
+- It eliminates whole categories of design complexity (no remote service
+  discovery and no cross-user identity mapping).
 - It composes cleanly with the MCP client ecosystem, which today is
   overwhelmingly single-user desktop tooling (Claude Desktop, Cursor, local
   agents).
 
-**Other deployment shapes are supported but not the default**:
+**Other deployment shapes are future work, not v1 defaults**:
 
 - Non-loopback bind for remote MCP clients or shared screens. Requires
   explicit auth configuration; see [05-security.md §2](05-security.md).
-- Multi-user terminal server. Same binary, each user runs their own server
-  in their own session, addressing isolation comes from the OS.
+- Multi-user terminal server requires per-user network isolation or a pairing
+  protocol; plain TCP loopback does not identify the connecting OS user.
 
 **What this section does NOT define**:
 
@@ -56,17 +56,17 @@ principle regardless of deployment shape.
 │                      │  - MCP HTTP frontend         │                 │
 │                      │  - Tool router               │                 │
 │                      │  - Session registry          │                 │
-│                      │  - Add-in WS backend         │                 │
+│                      │  - Add-in HTTPS/WSS backend  │                 │
 │                      └────────────▲─────────────────┘                 │
 │                                   │                                   │
-│              WebSocket + JSON-RPC 2.0  (add-ins dial in)              │
+│                 WSS + JSON-RPC 2.0  (add-ins dial in)                 │
 │                                   │                                   │
 │       ┌───────────────────────────┼──────────────────────┐            │
 │       │                           │                      │            │
 │  ┌────┴────────────────────────┐  │  ┌──────────────────┴────────┐   │
 │  │  Word.exe (instance A)      │  │  │  Word.exe (instance B)    │   │
 │  │   office-mcp add-in         │  │  │   office-mcp add-in       │   │
-│  │   report.docx, notes.docx   │  │  │   contract.docx (IRM)     │   │
+│  │   report.docx runtime       │  │  │   contract.docx runtime   │   │
 │  └─────────────────────────────┘  │  └───────────────────────────┘   │
 └───────────────────────────────────────────────────────────────────────┘
 ```
@@ -82,33 +82,37 @@ gets started is install-time concern, not runtime concern (see §2.3).
 - **Lifetime**: starts at user login (Windows Scheduled Task / macOS launchd
   agent / Linux systemd `--user` unit). Runs until the user logs out or the
   service is stopped administratively. No idle shutdown.
-- **Binds two loopback ports**, both from the shared config:
-  - MCP HTTP (Streamable HTTP) for MCP clients.
-  - WebSocket for add-ins.
-- **State**: add-in session registry, in-flight request map. No document
-  content, no undo history, no credentials.
+- **Binds two loopback ports**, both from the daemon config:
+  - MCP HTTP (Streamable HTTP) at a single `/mcp` endpoint for MCP clients.
+  - Local HTTPS/WSS for the add-in bundle and add-in channel.
+- **State**: add-in session registry and in-flight request map. No document
+  content or undo history. TLS keys and optional transport secrets are loaded
+  from ACL-restricted configuration.
 
-MCP clients that only speak stdio are out of scope. MCP 2026 promoted
-Streamable HTTP to the standard remote transport; if a client needs a
-stdio shim it is a generic MCP-stdio-to-HTTP proxy, decoupled from
-office-mcp, and not part of this project.
+MCP clients that only speak stdio are out of scope. Streamable HTTP is the
+standard independent-process transport in the current MCP specification; if a
+client needs a stdio shim it uses a generic MCP-stdio-to-HTTP proxy, decoupled
+from office-mcp and not part of this project.
 
 ### 2.2 The Office add-in
 
-- **Lifetime**: bound to its Office instance. Loads when Office starts (if
-  pinned) or when the user opens the task pane.
-- **Connects to**: the daemon's WS endpoint, read from the shared config.
-- **State**: WS connection, per-document Office.js context handles, pending
-  operation queue (Office.js requires batched `context.sync()`).
-- **Responsibilities**: announce instance on load, emit `session.added` /
-  `session.removed` as documents open/close, execute tool calls forwarded by
-  the daemon.
+- **Lifetime**: bound to its current document runtime. Loads when the user
+  opens the task pane or when a supported deployment activates it.
+- **Connects to**: the daemon's WSS endpoint, using the add-in's compiled
+  default or browser-storage override.
+- **Scope**: one add-in runtime is attached to one Office document. v1 does not
+  enumerate or control other documents from that runtime.
+- **State**: WS connection, the current document's Office.js context, and a
+  pending operation queue.
+- **Responsibilities**: register the runtime, announce its one document with
+  `session.added`, emit `session.updated` / `session.removed`, and execute tool
+  calls forwarded by the daemon.
 
 ### 2.3 Why the daemon is a singleton, and why nothing auto-spawns it
 
-The add-in is the connecting party. It dials a fixed loopback port from a
-fixed config. That model only works if exactly one process is listening on
-that port at a time. Consequences:
+The add-in is the connecting party. It dials a fixed default loopback port,
+optionally overridden in add-in settings. That model only works if exactly one
+process is listening on that port at a time. Consequences:
 
 - The daemon must be started by something with deterministic lifetime — the
   OS session start — not by ad-hoc client spawning.
@@ -134,17 +138,29 @@ instances are open. Document addressing is via `session_id` returned from
 
 | Aspect | Value |
 |---|---|
-| Transport | MCP Streamable HTTP (per MCP 2026 stateless revision) |
+| Transport | MCP Streamable HTTP |
+| Endpoint | `http://127.0.0.1:<port>/mcp` by default |
 | Bind | loopback by default; non-loopback requires `api_key` |
 | Multiplexing | Multiple concurrent clients supported |
 | SSE-only | Not supported (deprecated upstream) |
 | stdio | Not supported in-tree; use a generic proxy if needed |
 
-### 3.2 Daemon ↔ add-in: WebSocket + JSON-RPC 2.0
+The implementation follows the negotiated MCP protocol version, including
+`Origin` validation, `Accept` handling, `MCP-Protocol-Version`, optional
+`MCP-Session-Id`, and POST/GET/DELETE semantics. Invalid browser origins are
+rejected with HTTP 403 to prevent DNS rebinding.
+
+### 3.2 Daemon ↔ add-in: WSS + JSON-RPC 2.0
 
 - Bidirectional: daemon can call add-in (`tool.invoke`); add-in can call
   daemon (`session.added` / `session.removed`).
 - JSON-RPC 2.0 framing, one JSON object per WS message.
+- Production manifests load the local add-in bundle from the daemon over
+  HTTPS, and the channel uses `wss://` on the same trusted local origin.
+  Plain `ws://` is allowed only in explicit development configurations.
+- The WSS upgrade requires an exact configured `Origin` match to the local
+  add-in HTTPS origin. Missing or foreign browser origins are rejected before
+  JSON-RPC registration.
 - Heartbeat: daemon pings at `addin_channel.heartbeat_interval_sec` (config
   default 30s). Add-in must respond within `heartbeat_timeout_sec` (config
   default 10s).
@@ -152,9 +168,9 @@ instances are open. Document addressing is via `session_id` returned from
 
 Why WebSocket and not Named Pipes / Unix Socket:
 
-- Cross-platform (Office on Web/Mac/Windows).
+- Available in the browser/webview runtime used by Office add-ins.
 - Office.js add-ins are web apps and have `WebSocket` natively.
-- Loopback bind makes it security-equivalent to a pipe.
+- Loopback limits network exposure but does not provide peer identity.
 
 ### 3.3 Why not stdio between daemon and add-in
 
@@ -166,39 +182,44 @@ add-in can be the connecting party is a network socket.
 ### 4.1 Cold start
 
 1. User logs in. OS-level autostart launches the daemon.
-2. Daemon reads shared config, binds both loopback ports, idles waiting.
+2. Daemon reads its config, binds MCP HTTP plus local HTTPS/WSS, and idles.
 3. No add-ins connected → `office.list_sessions` returns `[]`.
 
 ### 4.2 MCP client starts before any Office
 
 1. MCP client connects to `http://127.0.0.1:<mcp_http.port>`.
-2. Tool calls against any session return
-   `error: { code: -32001, message: "No Office instances connected" }`
-   until the user opens Office.
+2. Tool calls against any session return an MCP tool error with
+   `office_mcp_code: "NO_SESSIONS"` until the user activates the add-in.
 
 ### 4.3 User opens Word
 
-1. Word loads; pinned add-in initializes.
-2. Add-in reads `[addin_channel]` from shared config.
-3. Add-in dials `ws://bind:port`, sends `register` (no auth field on
+1. Word loads and the user or deployment policy activates the add-in.
+2. Add-in loads its compiled endpoint or browser-storage override.
+3. Add-in dials the configured WSS endpoint, sends `register` (no auth field on
    loopback; `shared_secret` when configured).
-4. Daemon assigns session ID, replies `register.result`.
-5. Add-in enumerates open documents, sends `session.added` for each.
+4. Daemon accepts the runtime and replies `register.result`.
+5. Add-in sends one `session.added` for its current document. The add-in
+   generates the session ID and retains it across WebSocket reconnects for
+   the lifetime of that runtime.
 6. Documents are now addressable by MCP clients.
 
 ### 4.4 User opens a new document in an already-registered Word
 
-1. Add-in's document-change handler fires.
-2. Add-in sends `session.added`.
+Each document has its own add-in runtime. Activating the add-in in another
+document starts another runtime, which independently registers and sends its
+own `session.added`.
 
 ### 4.5 Office crashes mid-call
 
 1. WS drops.
 2. Daemon marks affected sessions `stale`; in-flight calls reject with
-   `-32002 SESSION_LOST`.
-3. Session is held in `stale` for `session_grace_sec` (config) to allow
-   Office auto-recovery → add-in reconnect.
+   `SESSION_LOST`.
+3. Session is held in `stale` for `session_grace_sec` (config) to allow a
+   transient channel failure in the same runtime to reconnect.
 4. On grace timeout, session is removed.
+
+If Office restarts or reopens the document in a new runtime, it receives a new
+session ID; it does not reclaim the stale session.
 
 ### 4.6 MCP client disconnects
 
@@ -214,25 +235,26 @@ add-in can be the connecting party is a network socket.
 
 ### 4.8 Two clients edit the same document
 
-v1: last-write-wins, no locking. The daemon serializes calls within one
-add-in (Office.js requires it), but no transaction across calls. v2 may
-introduce advisory `acquire_edit_lock`.
+v1: last-write-wins, no locking. The daemon dispatches only one call at a
+time to a session and keeps a bounded FIFO queue. There is no transaction
+across calls. v2 may introduce advisory `acquire_edit_lock`.
 
 ## 5. Threading and concurrency
 
 | Boundary | Concurrency model |
 |---|---|
 | MCP client → server | Per-request async. Server handles N requests in parallel. |
-| Server → add-in | At most `MAX_INFLIGHT_PER_SESSION` (default 4) concurrent calls per session. |
-| Inside add-in | Office.js requires single-threaded batched access. Add-in queues calls into a worker, calls `context.sync()` per batch. |
+| Server → add-in | Exactly one dispatched call per session; at most `MAX_PENDING_PER_SESSION` (default 4) additional queued calls. |
+| Inside add-in | Add-in executes the dispatched call through `Word.run` and one or more required `context.sync()` operations. |
 
 Tool calls are stamped with a request ID by the server. The add-in echoes the ID
 back so the server can correlate even with out-of-order responses.
 
 ## 6. Versioning
 
-- **MCP protocol**: server declares MCP version it supports (currently 2026-XX,
-  the stateless revision).
+- **MCP protocol**: server negotiates a published MCP protocol version. The
+  first implementation targets `2025-11-25`; upgrades require conformance
+  tests against the selected version.
 - **Add-in ↔ server protocol**: independent `protocol_version` field exchanged in
   `register`. Semver: major bump = incompatible; minor = backward-compatible add.
 - **Tool surface**: each tool carries `since: "X.Y"` in its metadata. Clients

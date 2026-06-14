@@ -8,7 +8,7 @@ each other.
 | Component | What it is | Where it lives | Updated how |
 |---|---|---|---|
 | `office-mcp` | Single binary (~15 MB) | `%LOCALAPPDATA%\office-mcp\office-mcp.exe` (Win) / `/usr/local/bin/office-mcp` (Mac, Linux) | MSI / Homebrew tap |
-| `office-mcp-addin` | Static web bundle (~2 MB) + manifest | Hosted at `https://office-mcp.dev/addin/v1/` (CDN); a copy is staged into the per-user trusted catalog by the installer | Atomic versioned URLs |
+| `office-mcp-addin` | Static web bundle (~2 MB) + manifest | Installed beside the daemon and served from its trusted local HTTPS origin | Installer / atomic local replacement |
 | Manifest | XML / JSON describing the add-in | Sideloaded via the trusted catalog by the installer; AppSource / M365 admin push for managed deployments | See §3 |
 | Bootstrap installer | MSI / .pkg / shell script | Downloaded from GitHub Releases | Per-release |
 
@@ -17,8 +17,9 @@ catalog registration — is in §6, not here. §1 is just the artifact list.
 
 ## 3. Add-in distribution
 
-Office add-ins can be deployed three ways. office-mcp publishes the same
-manifest for all three.
+Office add-ins can be deployed three ways. They share one add-in ID and
+capability model, but deployment-specific manifest variants may use different
+source URLs and activation settings.
 
 ### 3.1 Sideload (developer / individual user)
 
@@ -49,77 +50,45 @@ Tracked in [08-roadmap.md](08-roadmap.md); not blocking v1.
 ### 3.3 Centralized deployment (enterprise)
 
 M365 admins deploy via Microsoft 365 admin center → Settings → Integrated apps.
-Users get the add-in automatically. Same manifest, different distribution.
+Users get the add-in automatically through a centrally managed manifest
+variant.
 
 ## 4. Manifest
 
-Unified manifest (JSON, the recommended format for 2026+):
+v1 ships an **add-in-only XML manifest**. Microsoft's unified manifest support
+for Excel, PowerPoint, and Word remains preview and is not a production basis
+for this project.
 
-```jsonc
-// manifest.json — abridged
-{
-  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
-  "manifestVersion": "1.17",
-  "version": "0.1.0",
-  "id": "11111111-aaaa-bbbb-cccc-222222222222",
-  "developer": {
-    "name": "office-mcp project",
-    "websiteUrl": "https://github.com/r12f/office-mcp",
-    "privacyUrl": "https://github.com/r12f/office-mcp/blob/main/PRIVACY.md",
-    "termsOfUseUrl": "https://github.com/r12f/office-mcp/blob/main/LICENSE"
-  },
-  "name": { "short": "office-mcp", "full": "office-mcp — AI bridge for Word" },
-  "description": {
-    "short": "Lets AI agents read and edit your Word documents",
-    "full": "Exposes Word as MCP tools so AI assistants (Claude, Cursor, agents) can read and edit the document you're working on, including IRM-protected files."
-  },
-  "icons": { "outline": "icon-32.png", "color": "icon-192.png" },
-  "accentColor": "#0078d4",
-  "extensions": [
-    {
-      "requirements": {
-        "scopes": ["document"],
-        "capabilities": [{ "name": "WordApi", "minVersion": "1.3" }]
-      },
-      "ribbons": [
-        {
-          "contexts": ["default"],
-          "tabs": [
-            {
-              "builtInTabId": "TabHome",
-              "groups": [
-                {
-                  "id": "officeMcpGroup",
-                  "label": "AI",
-                  "controls": [
-                    {
-                      "id": "openOfficeMcp",
-                      "type": "button",
-                      "label": "office-mcp",
-                      "actionId": "showTaskpane"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    }
-  ],
-  "validDomains": [],
-  "webApplicationInfo": { "id": "00000000-...", "resource": "..." }
-}
-```
+The production XML manifest:
 
-XML-format equivalent is shipped alongside for compatibility with Office
-versions that don't yet support the unified manifest (still ~30% of installed
-base as of 2026).
+- Declares a Word task-pane add-in with `ReadWriteDocument`.
+- Requires `WordApi 1.3` for activation.
+- Uses `VersionOverridesV1_0` and `AddinCommands 1.1` for the ribbon command.
+- Loads `https://127.0.0.1:8765/taskpane.html` in local sideloaded builds.
+- Loads production Office.js from Microsoft's CDN from within that page.
+- Probes `WordApi 1.4`, `WordApi 1.6`, and desktop-only sets at runtime.
+
+The checked feasibility manifest is
+`feasibility/manifest.xml`; `npm run check:manifest` validates it against the
+current Office add-in schemas. The release build substitutes the real add-in
+ID, version, icon assets, and support URL. The XML manifest's four-part version
+starts at `1.0.0.0` because Office rejects values below 1.0; it is mapped to,
+but not textually identical with, the add-in package semver.
+
+Although the XML schema permits other Word platforms, the v1 task pane checks
+`Office.onReady()` and displays an unsupported-platform message unless the host
+is Word desktop on Windows. Store submission is deferred until every platform
+implied by its manifest requirements is supported.
+
+An AppSource build cannot use a loopback `SourceLocation`. It requires a
+publicly hosted HTTPS task pane and separate validation that the Office webview
+may connect from that origin to the local WSS daemon. AppSource is therefore a
+future deployment track, not a packaging variant promised by v1.
 
 ## 5. Configuration
 
-`office-mcp` uses a **single config file shared by the daemon and the add-in**.
-Changing the port (or any other shared value) in one place updates both ends.
+`office-mcp` uses a native TOML config file for the daemon. The Office add-in
+cannot read this file because it runs in a browser/webview sandbox.
 
 Location:
 
@@ -129,21 +98,29 @@ Location:
 | macOS | `~/Library/Application Support/office-mcp/config.toml` |
 | Linux | `~/.config/office-mcp/config.toml` |
 
-The add-in resolves the same path via a small loader in the add-in package;
-users do not maintain two copies.
+The add-in defaults to `wss://127.0.0.1:8765`. An endpoint override is stored
+in the add-in's partitioned browser storage through its settings UI.
+Installer-managed builds may compile a different default into the add-in
+bundle. The daemon CLI prints the endpoint value that should be entered:
+
+```
+office-mcp config addin-endpoint
+```
 
 ```toml
-# ─── shared by daemon and add-in ─────────────────────────────────────────
+# ─── daemon configuration; endpoint values are mirrored in add-in settings ──
 [addin_channel]
-# WebSocket the daemon listens on and the add-in dials.
+# HTTPS/WSS origin the daemon serves and the add-in dials.
 bind = "127.0.0.1"
 port = 8765
 heartbeat_interval_sec = 30
 heartbeat_timeout_sec  = 10
 session_grace_sec = 60
-max_inflight_per_session = 4
+max_pending_per_session = 4
 # Only required if `bind` is non-loopback. See docs/spec/05-security.md.
 shared_secret = ""
+certificate_path = ""            # installer-managed default
+private_key_path = ""            # ACL restricted to the current user
 
 # ─── daemon only ─────────────────────────────────────────────────────────
 [mcp_http]
@@ -155,7 +132,10 @@ api_key = ""
 
 [limits]
 max_response_bytes = 1048576     # 1 MiB
+max_request_bytes = 16777216      # 16 MiB; supports a 10 MiB base64 image
+max_ws_frame_bytes = 16777216
 default_tool_timeout_ms = 30000
+requests_per_minute = 120
 
 [audit]
 enabled = false
@@ -166,9 +146,9 @@ level = "info"                   # trace | debug | info | warn | error
 file  = ""                       # default: platform log dir
 ```
 
-Environment variables override config keys, prefixed `OFFICE_MCP_` (e.g.
-`OFFICE_MCP_ADDIN_CHANNEL__PORT=9000`). The add-in honors only the keys under
-`[addin_channel]`. The daemon honors all keys.
+Environment variables override daemon config keys, prefixed `OFFICE_MCP_`
+(e.g. `OFFICE_MCP_ADDIN_CHANNEL__PORT=9000`). They are not visible to the
+web add-in.
 
 ## 6. Installation and first-run flow
 
@@ -182,6 +162,9 @@ console for a production install.
 
 1. User installs `office-mcp-setup-x64.msi`. The installer:
    - Drops `office-mcp.exe` to `%LOCALAPPDATA%\office-mcp\`.
+   - Installs the static add-in bundle beside the daemon.
+   - Provisions a current-user trusted localhost certificate and restricts the
+     private-key ACL to that user.
    - Writes a default `config.toml` to `%APPDATA%\office-mcp\`.
    - Registers a Scheduled Task `office-mcp` set to run at logon
      (`office-mcp daemon run`).
@@ -194,8 +177,9 @@ console for a production install.
 2. User configures their MCP client to connect to
    `http://127.0.0.1:8800` (or whatever `mcp_http.port` is in their config).
 
-3. User opens Word. The pinned add-in appears in the ribbon. Pinned-on-load
-   is set in the manifest, so the add-in connects without the user clicking.
+3. User opens Word and launches the add-in from the ribbon. Auto-open is an
+   opt-in document setting for sideloaded or centrally deployed builds; it is
+   not assumed to work for Marketplace distribution.
 
 4. User asks the MCP client to do something with the doc.
 
@@ -211,7 +195,7 @@ performs the equivalent setup.
 office-mcp daemon status     # is the daemon up?
 office-mcp daemon stop/start # restart it
 office-mcp config show       # show effective config
-office-mcp sessions          # list connected add-ins (= open Office instances)
+office-mcp sessions          # list documents with a connected add-in runtime
 ```
 
 ## 7. Versioning & upgrades
@@ -222,8 +206,9 @@ office-mcp sessions          # list connected add-ins (= open Office instances)
   [01-architecture.md §6](01-architecture.md)).
 - Auto-update:
   - Server: opt-in update check at startup (GitHub Releases API; can be disabled).
-  - Add-in: Office handles add-in updates automatically when manifest changes
-    on the trusted catalog or AppSource.
+  - Sideloaded add-in: updated atomically by the platform installer.
+  - Marketplace / centrally deployed add-in: updated through that deployment
+    channel.
 
 ## 8. Uninstall
 
@@ -231,6 +216,7 @@ office-mcp sessions          # list connected add-ins (= open Office instances)
 
 - Binaries
 - Scheduled task / launchd plist
+- Local certificate and private key created by the installer
 - `%LOCALAPPDATA%\office-mcp\` (audit log, sideload catalog)
 - `%APPDATA%\office-mcp\` (config) — only with `--purge`
 
@@ -246,7 +232,6 @@ The add-in must be removed separately via Office's add-in manager
 | `office-mcp-<ver>-x64.tar.gz` | Linux/macOS tarball |
 | `office-mcp-<ver>-aarch64-darwin.tar.gz` | Apple Silicon |
 | `manifest-<ver>.xml` | XML manifest for sideload |
-| `manifest-<ver>.json` | Unified manifest for sideload |
 | `office-mcp-addin-<ver>.zip` | Add-in static bundle (for self-hosters) |
 | `SHA256SUMS` | Checksums |
 | `SHA256SUMS.asc` | GPG signature (release key) |

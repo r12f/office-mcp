@@ -10,30 +10,30 @@ process, which multiplexes MCP clients across all running Office windows.
 
 | Problem | python-docx / COM | office-mcp |
 |---|---|---|
-| IRM / RMS protected documents | ❌ Cannot open | ✅ Add-in runs inside Office, inherits user rights |
+| IRM / RMS protected documents | ❌ Cannot open | Design target: host-enforced access; M0 validation required |
 | Live editing in user's open document | ❌ File must be closed | ✅ Operates on the live document |
 | Office instance exclusive-access errors | ❌ Common with COM | ✅ Each Office instance has its own add-in |
 | Add-in install / discovery | n/a | ✅ Add-in self-registers on Office start |
 | MCP client config churn | ❌ Per-doc subprocess | ✅ One persistent server endpoint |
-| Cross-platform (Mac, Web) | ❌ Windows only | ✅ Office.js add-ins work everywhere |
+| Platform path | ❌ Windows only | Windows desktop v1; Mac planned; Web requires a different deployment |
 
 ## Architecture (one diagram)
 
 ```
 ┌─────────────┐       ┌───────────────────────┐       ┌────────────────────────────┐
 │ MCP Client  │◀─────▶│  office-mcp server    │◀─────▶│ Word instance A (add-in)   │
-│ (Claude,    │ stdio │  (long-lived process) │  WS   ├────────────────────────────┤
-│  Cursor,    │  or   │                       │       │ Word instance B (add-in)   │
+│ (Claude,    │ HTTP  │  (long-lived process) │  WS   ├────────────────────────────┤
+│  Cursor,    │       │                       │       │ Word instance B (add-in)   │
 │  agent)     │ HTTP  │  - tool router        │       ├────────────────────────────┤
 └─────────────┘       │  - session registry   │       │ Excel instance C (add-in)  │
                       │  - capability negotiation │   └────────────────────────────┘
                       └───────────────────────┘
 ```
 
-- **MCP server** is a single long-running process. It speaks MCP (stdio or Streamable HTTP)
-  to clients and a custom JSON-RPC over WebSocket to add-ins.
-- **Office add-ins** are Office.js task-pane add-ins (one per Office app type). When Office
-  loads them, they dial out to the server and register the host document(s) they can drive.
+- **MCP server** is a single long-running process. It speaks MCP Streamable HTTP
+  to clients and JSON-RPC over a local secure WebSocket to add-ins.
+- **Office add-ins** are Office.js task-pane add-ins (one per Office app type). Each loaded
+  runtime dials out to the server and registers the current host document it can drive.
 - **Clients** see a uniform MCP tool surface; the server routes each call to the add-in that
   owns the target document.
 
@@ -52,6 +52,7 @@ Spec phase. See [docs/spec/](docs/spec/) for the full design.
 | [06-error-model.md](docs/spec/06-error-model.md) | Error codes, retry, partial-failure semantics |
 | [07-deployment.md](docs/spec/07-deployment.md) | Installation, sideloading, distribution |
 | [08-roadmap.md](docs/spec/08-roadmap.md) | Milestones, Excel/PPT/Outlook follow-on |
+| [09-feasibility.md](docs/spec/09-feasibility.md) | Evidence, probes, and remaining host validation gates |
 
 ## License
 

@@ -1,147 +1,168 @@
-# 06 — Error Model
+# 06 - Error Model
 
-JSON-RPC 2.0 errors. Codes < -32000 are reserved by JSON-RPC; we use the
-application range `-32000` to `-32999`.
+office-mcp has two error layers. Numeric JSON-RPC codes describe protocol
+failures. Stable symbolic `office_mcp_code` values describe operational
+failures that an agent can act on.
 
-## 1. Code table
+## 1. Symbolic code table
 
-| Code | Name | Meaning |
-|---|---|---|
-| -32000 | `GENERIC_FAILURE` | Catch-all server-side failure. Use sparingly. |
-| -32001 | `NO_SESSIONS` | No Office instances connected. |
-| -32002 | `SESSION_LOST` | The session was alive but is now gone (Office crashed, document closed mid-call). |
-| -32003 | `SESSION_NOT_FOUND` | The `session_id` was never known to the server. |
-| -32004 | `SESSION_STALE` | Session is in grace period, awaiting reconnect; retry in a few seconds. |
-| -32005 | `HOST_BUSY` | Office is in a modal dialog or other state that blocks add-in calls. |
-| -32006 | `MAX_INFLIGHT_EXCEEDED` | Too many concurrent calls for one session; client should back off. |
-| -32401 | `AUTH_FAILED` | (Add-in registration; only when `shared_secret` is configured for non-loopback bind.) Shared secret missing or mismatched. |
-| -32402 | `AUTH_KEY_MISSING` | (HTTP transport; only when `api_key` is configured for non-loopback bind.) Client did not present a key. |
-| -32403 | `IRM_DENIED` | Requested operation requires a right not granted by the IRM policy. |
-| -32404 | `DOCUMENT_READ_ONLY` | Doc is read-only (file attribute, share lock, or "Mark as Final"). |
-| -32405 | `PROTECTION_BLOCKS` | Restricted Editing / form protection blocks the change. |
-| -32421 | `ANCHOR_NOT_FOUND` | `anchor.kind = after_text` and the text isn't there. |
-| -32422 | `NO_MATCHES` | `find_text` / `replace_text` found zero matches but caller required at least one. |
-| -32423 | `INDEX_OUT_OF_RANGE` | Paragraph / table index does not exist in current document state. |
-| -32424 | `STALE_INDEX` | Index was valid when call started but the document changed concurrently. |
-| -32501 | `INVALID_ARGUMENT` | Tool arguments failed JSON Schema validation. |
-| -32502 | `UNSUPPORTED_FORMAT` | E.g. `save_as` requested a format the add-in cannot produce on this Office version. |
-| -32503 | `PATH_REFUSED` | `save_as` path was rejected by add-in policy (traversal, sensitive dir). |
-| -32504 | `IMAGE_FETCH_FAILED` | `insert_image` with URL: server could not fetch. |
-| -32601 | `METHOD_NOT_FOUND` | Tool name unknown OR explicitly disabled (e.g. macro execution). |
-| -32604 | `CANCELLED` | Operation was cancelled (client disconnect, timeout). `data.undo_applied: boolean` indicates whether changes were rolled back. |
-| -32605 | `TIMEOUT` | Server-side timeout (`tool.timeout_ms`) exceeded. |
-| -32606 | `MAX_RESPONSE_SIZE` | Read result exceeds `MAX_RESPONSE_BYTES`. `data.max_response_bytes` echoes the limit; client should retry with `offset` / `limit`. |
-| -32701 | `PROTOCOL_VERSION_MISMATCH` | Add-in's `protocol_version` major differs from server's. |
-| -32702 | `HEARTBEAT_MISSED` | Add-in stopped responding to pings. |
-| -32801 | `CLIENT_DISCONNECTED` | Inflight call's MCP client went away; equivalent to cancellation. |
-| -32999 | `INTERNAL_BUG` | Unrecoverable internal error. Should never appear; if it does, file an issue. |
+| Code | Meaning |
+|---|---|
+| `GENERIC_FAILURE` | Catch-all execution failure. Use sparingly. |
+| `NO_SESSIONS` | No Office document sessions are connected. |
+| `SESSION_LOST` | The session disappeared during a call. |
+| `SESSION_NOT_FOUND` | The `session_id` was never known or has expired. |
+| `SESSION_STALE` | Session is in its reconnect grace period. |
+| `HOST_BUSY` | Office is blocked by a modal dialog or equivalent state. |
+| `MAX_PENDING_EXCEEDED` | The per-session FIFO queue is full. |
+| `AUTH_FAILED` | A configured add-in-channel secret is missing or wrong. |
+| `IRM_DENIED` | The document policy denied the requested operation. |
+| `DOCUMENT_READ_ONLY` | The document cannot be edited. |
+| `PROTECTION_BLOCKS` | Word protection blocked the operation. |
+| `ANCHOR_NOT_FOUND` | The requested anchor could not be resolved. |
+| `NO_MATCHES` | Search or replacement found no required match. |
+| `INDEX_OUT_OF_RANGE` | A paragraph, table, row, or column index is invalid. |
+| `STALE_INDEX` | The document changed after an index precondition was read. |
+| `INVALID_ARGUMENT` | Tool arguments violate the tool schema or a cross-field rule. |
+| `UNSUPPORTED_FORMAT` | The selected host cannot produce the requested format. |
+| `PATH_REFUSED` | A daemon-side file destination violates path policy. |
+| `IMAGE_FETCH_FAILED` | The daemon could not fetch or validate an image URL. |
+| `HOST_CAPABILITY_UNAVAILABLE` | The session lacks a required API set or verified host capability. |
+| `CANCELLED` | The client or daemon cancelled the operation. |
+| `TIMEOUT` | The operation exceeded its deadline. |
+| `MAX_RESPONSE_SIZE` | The result exceeded `MAX_RESPONSE_BYTES`. |
+| `PROTOCOL_VERSION_MISMATCH` | Add-in protocol major versions differ. |
+| `HEARTBEAT_MISSED` | The add-in missed the heartbeat threshold. |
+| `INTERNAL_BUG` | An invariant failed. |
 
-## 2. Error envelope
+## 2. MCP mapping
+
+Unknown MCP methods/tools, malformed MCP requests, and internal protocol
+failures use standard JSON-RPC errors such as `-32601`, `-32602`, and
+`-32603`.
+
+Expected tool execution failures are MCP tool results:
 
 ```json
 {
   "jsonrpc": "2.0",
-  "id": "...",
-  "error": {
-    "code": -32403,
-    "message": "Document IRM policy denies edit; only 'view' and 'extract' are granted.",
-    "data": {
-      "tool": "word.replace_text",
-      "denied_rights": ["edit"],
-      "granted_rights": ["view", "extract"],
-      "session_id": "...",
-      "retriable": false
-    }
+  "id": 4,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "The selected Word session does not support tracked changes."
+      }
+    ],
+    "structuredContent": {
+      "ok": false,
+      "error": {
+        "office_mcp_code": "HOST_CAPABILITY_UNAVAILABLE",
+        "session_id": "44444444-...",
+        "tool": "word.accept_change",
+        "retriable": false,
+        "required_requirement_sets": { "WordApi": "1.6" }
+      }
+    },
+    "isError": true
   }
 }
 ```
 
-- `message` is human-readable English. Localization is out of scope for v1.
-- `data.retriable` is the **single most important field for agents**:
-  - `true` → client may retry after the suggested delay (`data.retry_after_ms`).
-  - `false` → no retry will succeed; alter the request or give up.
+For backwards compatibility with clients that ignore `structuredContent`, the
+text content must summarize the same failure. If an `outputSchema` is declared,
+the error result must conform to it.
 
-## 3. Partial-success semantics
+`resources/read` does not return a tool result. An operational resource failure
+uses JSON-RPC `-32000` with `error.data.office_mcp_code` and the same structured
+fields. HTTP authentication and origin failures use their normal HTTP status
+codes before MCP dispatch.
 
-Some tools can do partial work — e.g. `word.replace_text` with multiple matches
-where one match is in a read-only section. Policy:
+## 3. Add-in protocol mapping
 
-- **Default**: atomic. If any match would fail, abort, return error, no edits land.
-- **Opt-in best-effort**: pass `tool args { "partial_ok": true }` to allow
-  successful matches to land. Response carries:
-  ```json
-  {
-    "ok": true,
-    "data": {
-      "replaced_count": 3,
-      "skipped": [
-        { "paragraph_index": 17, "reason": "read_only_section" }
-      ]
-    }
+Malformed or unknown add-in JSON-RPC messages use standard JSON-RPC errors.
+Registration rejection uses JSON-RPC `-32000` with a symbolic code in
+`error.data.office_mcp_code`.
+
+An accepted `tool.invoke` always receives a JSON-RPC result. Operational
+failure is represented as:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "55555555-...",
+  "result": {
+    "ok": false,
+    "error": {
+      "office_mcp_code": "IRM_DENIED",
+      "message": "Word denied the requested edit.",
+      "session_id": "44444444-...",
+      "tool": "word.replace_text",
+      "retriable": false,
+      "partial_effect": "none"
+    },
+    "elapsed_ms": 18
   }
-  ```
-  with overall `ok: true` if at least one match succeeded; otherwise `ok: false`
-  and a `-32000` family error.
+}
+```
 
-## 4. Failure modes by scenario
+`retriable` is required. When retrying is useful, include
+`retry_after_ms`. Mutation failures also include `partial_effect` as `none`,
+`possible`, or `unknown`.
 
-### 4.1 Office is killed mid-operation
+## 4. Partial-success semantics
 
-- The WS connection drops while a `tool.invoke` is in flight.
-- Server replies to the MCP client with `-32002 SESSION_LOST`.
-- `data.partial_effect: "unknown"` because we cannot ask Office anymore.
-- Session enters `stale` state. After grace period, removed.
+The default is to preflight every known target before mutation. Office.js does
+not provide a general transaction, so a host failure during `context.sync()`
+can still leave `partial_effect: "unknown"`.
 
-Recovery: agent should call `office.list_sessions` to discover the user's
-current state. If the user reopened the document, a *new* session ID will
-be assigned; the agent must NOT assume the old session ID is now valid.
+Tools that explicitly support `partial_ok: true` may return `ok: true` with a
+`skipped` array when at least one target succeeds. If none succeeds, return the
+most actionable symbolic failure.
 
-### 4.2 User closes the document mid-operation
+## 5. Failure modes
 
-- The add-in's `DocumentClose` handler fires.
-- Add-in sends `session.removed` with `reason: "closed"`.
-- The in-flight `tool.invoke` reply is `-32002`.
+### 5.1 Office is killed mid-operation
 
-### 4.3 Office shows a modal dialog (e.g. unsaved changes prompt on Save)
+- The WebSocket drops while `tool.invoke` is in flight.
+- The daemon returns an MCP tool error with `SESSION_LOST`.
+- `partial_effect` is `unknown`.
+- The session remains stale through the reconnect grace period, then expires.
 
-- Office.js calls block until the modal is dismissed.
-- The add-in detects this via call duration and replies with `-32005 HOST_BUSY`.
-- `data.retry_after_ms: 5000` and `data.user_action_required: true`.
+The client must call `office.list_sessions`; a reopened document has a new
+session ID.
 
-### 4.4 Document is in Track Changes mode and edit would conflict
+### 5.2 User closes the document mid-operation
 
-- The add-in adds the change as a tracked revision instead of committing.
-- Response is `ok: true` with `data.tracked_change_ids: [...]`.
-- No error is raised — Track Changes is the user's chosen workflow.
+Word does not expose a portable document-close event to task-pane add-ins.
+The daemon detects WebSocket loss or heartbeat failure. A best-effort page
+unload notification may accelerate cleanup but is not authoritative. The
+in-flight call returns `SESSION_LOST`.
 
-### 4.5 Two clients edit the same paragraph in parallel
+### 5.3 Office shows a modal dialog
 
-- The add-in serializes them; second call sees the first's effect.
-- If the second call had a `STALE_INDEX` precondition (rare; only some tools
-  validate), it returns `-32424` with `data.actual_state` describing what
-  the add-in observed.
+Office.js work may stall until the user dismisses the dialog. The daemon
+deadline expires and returns `HOST_BUSY` when host-blocking evidence is known,
+otherwise `TIMEOUT`. Both include `user_action_required` when appropriate.
 
-## 5. Retry guidance
+### 5.4 Two clients edit the same paragraph
 
-| Code | Retry? | When | Backoff |
-|---|---|---|---|
-| `-32001 NO_SESSIONS` | No | (Wait for user to open Office) | — |
-| `-32002 SESSION_LOST` | No (session is gone) | Call `list_sessions` first | — |
-| `-32004 SESSION_STALE` | Yes | Up to grace period | 2s, 5s, 10s |
-| `-32005 HOST_BUSY` | Yes | After user dismisses modal | `retry_after_ms` |
-| `-32006 MAX_INFLIGHT_EXCEEDED` | Yes | After server signals capacity | 100ms, 500ms, 1s |
-| `-32403 IRM_DENIED` | No | — | — |
-| `-32421 ANCHOR_NOT_FOUND` | No | Alter args | — |
-| `-32424 STALE_INDEX` | Yes | After re-reading current state | Immediate, max 1 retry |
-| `-32605 TIMEOUT` | Yes | Increase `timeout_ms` | Backoff per request |
+The add-in serializes calls. The second call sees the first call's effects.
+Tools with an explicit state precondition may return `STALE_INDEX`.
 
-## 6. Surfacing errors to humans
+## 6. Retry guidance
 
-The MCP protocol gives clients little guidance on how to display errors.
-This project recommends:
+| Code | Retry guidance |
+|---|---|
+| `NO_SESSIONS` | Wait for the user to activate the add-in. |
+| `SESSION_LOST` | Do not retry the old ID; list sessions. |
+| `SESSION_STALE` | Retry during the grace period with 2s, 5s, 10s backoff. |
+| `HOST_BUSY` | Retry after `retry_after_ms` and user action. |
+| `MAX_PENDING_EXCEEDED` | Back off briefly. |
+| `IRM_DENIED` | Do not retry unchanged. |
+| `ANCHOR_NOT_FOUND` | Re-read and alter arguments. |
+| `STALE_INDEX` | Re-read state; retry at most once automatically. |
+| `TIMEOUT` | Retry only when the operation is known idempotent or after re-reading state. |
 
-- Distinguish **user-actionable** (`-3240*`, `-3242*`, `-3250*`) from
-  **infrastructure** (`-32001`, `-3270*`).
-- Always show `data.session_id` so the user can find the right Office window.
-- For IRM denials, surface `data.granted_rights` so the user knows what IS
-  possible.
+Humans should see the symbolic code, session ID, and actionable message.
+Effective IRM rights are included only when Word actually reports them.
