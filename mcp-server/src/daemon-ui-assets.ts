@@ -139,11 +139,11 @@ export const DAEMON_CONSOLE_JS = String.raw`(() => {
   }
   function documentRow(doc) {
     const id = 'document:' + doc.session_id;
-    return '<button class="row ' + esc(doc.app) + selected(id) + '" type="button" data-select="' + attr(id) + '"><span>' + esc(doc.document.title || doc.document.filename || 'Untitled') + '</span><small>' + esc(doc.status) + ' - ' + shortId(doc.session_id) + ' - ' + nf.format(doc.available_tool_count) + ' tools</small></button>';
+    return '<button class="row ' + esc(doc.app) + selected(id) + '" type="button" data-select="' + attr(id) + '"><span>' + esc(doc.document.title || doc.document.filename || 'Untitled') + '</span><small>' + sessionStatusText(doc.status) + ' - ' + shortId(doc.session_id) + ' - ' + nf.format(doc.available_tool_count) + ' tools</small></button>';
   }
   function commandRow(command) {
     const id = 'command:' + command.command_id;
-    return '<tr><td><button class="table-select" type="button" data-select="' + attr(id) + '">' + esc(command.tool) + '</button></td><td>' + esc(shortId(command.session_id || '-')) + '</td><td>' + esc(command.client_name || command.client_id || '-') + '</td><td class="num">' + elapsed(command) + '</td><td><span class="badge ' + tone(command.status) + '">' + statusText(command.status) + '</span></td></tr>';
+    return '<tr><td><button class="table-select" type="button" data-select="' + attr(id) + '">' + esc(command.tool) + '</button></td><td>' + esc(shortId(command.session_id || '-')) + '</td><td>' + esc(command.client_name || command.client_id || '-') + '</td><td class="num">' + elapsed(command) + '</td><td><span class="badge ' + tone(command.status) + '">' + statusText(command.status) + '</span>' + errorCode(command) + '</td></tr>';
   }
   function clientRow(client) {
     const id = 'client:' + client.client_id;
@@ -163,7 +163,7 @@ export const DAEMON_CONSOLE_JS = String.raw`(() => {
     const doc = Object.values(ui.snapshot.documents || {}).flat().find((item) => item.session_id === sessionId);
     if (!doc) { el('inspector').innerHTML = '<p class="empty">Document disconnected.</p>'; return; }
     const items = ui.snapshot.document_command_history?.[sessionId] || [];
-    el('inspector').innerHTML = '<dl class="details"><dt>Title</dt><dd>' + esc(doc.document.title || '-') + '</dd><dt>Session</dt><dd><code>' + esc(doc.session_id) + '</code></dd><dt>Host</dt><dd>' + esc([doc.host?.app, doc.host?.version, doc.host?.platform].filter(Boolean).join(' - ') || '-') + '</dd><dt>Protection</dt><dd>' + esc(doc.document.protection_kind || 'unknown') + '</dd><dt>Dirty / Read-only</dt><dd>' + bool(doc.document.is_dirty) + ' / ' + bool(doc.document.is_read_only) + '</dd><dt>Queue Depth</dt><dd>' + nf.format(doc.queue_depth || 0) + '</dd></dl><h3>Latest 10 Commands</h3>' + (items.length ? table(['Tool', 'Duration', 'Result'], items.map((cmd) => '<tr><td>' + esc(cmd.tool) + '</td><td class="num">' + elapsed(cmd) + '</td><td>' + statusText(cmd.status) + '</td></tr>')) : '<p class="empty">No commands have completed for this document.</p>');
+    el('inspector').innerHTML = '<dl class="details"><dt>Title</dt><dd>' + esc(doc.document.title || '-') + '</dd><dt>Status</dt><dd>' + sessionStatusText(doc.status) + '</dd><dt>Session</dt><dd><code>' + esc(doc.session_id) + '</code></dd><dt>Host</dt><dd>' + esc([doc.host?.app, doc.host?.version, doc.host?.platform].filter(Boolean).join(' - ') || '-') + '</dd><dt>Protection</dt><dd>' + esc(doc.document.protection_kind || 'unknown') + '</dd><dt>Dirty / Read-only</dt><dd>' + bool(doc.document.is_dirty) + ' / ' + bool(doc.document.is_read_only) + '</dd><dt>Queue Depth</dt><dd>' + nf.format(doc.queue_depth || 0) + '</dd></dl><h3>Latest 10 Commands</h3>' + (items.length ? table(['Tool', 'Duration', 'Result'], items.map((cmd) => '<tr><td>' + esc(cmd.tool) + '</td><td class="num">' + elapsed(cmd) + '</td><td>' + statusText(cmd.status) + '</td></tr>')) : '<p class="empty">No commands have completed for this document.</p>');
   }
   function renderJsonInspector(label, value) { el('inspector').innerHTML = value ? '<h3>' + esc(label) + '</h3><pre>' + esc(JSON.stringify(value, null, 2)) + '</pre>' : '<p class="empty">Selection is no longer available.</p>'; }
   function table(headings, rows) { return '<table><thead><tr>' + headings.map((heading) => '<th scope="col">' + esc(heading) + '</th>').join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>'; }
@@ -174,6 +174,8 @@ export const DAEMON_CONSOLE_JS = String.raw`(() => {
   function title(value) { return String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()); }
   function tone(value) { return value === 'up' || value === 'success' ? 'success' : value === 'degraded' || value === 'running' || value === 'timeout' ? 'warning' : value === 'down' || value === 'failure' ? 'danger' : 'neutral'; }
   function statusText(value) { return value === 'success' ? 'Succeeded' : value === 'failure' ? 'Failed' : value === 'timeout' ? 'Timed Out' : value === 'cancelled' ? 'Cancelled' : title(value); }
+  function sessionStatusText(value) { return value === 'stale' ? 'Reconnecting' : title(value); }
+  function errorCode(command) { return command.error?.office_mcp_code ? '<small class="error-code">' + esc(command.error.office_mcp_code) + '</small>' : ''; }
   function elapsed(command) { return df.format(((command.elapsed_ms ?? (command.started_at ? Date.now() - Date.parse(command.started_at) : 0)) || 0) / 1000) + 's'; }
   function uptime(ms) { const seconds = Math.max(0, Math.round(ms / 1000)); if (seconds < 60) return rtf.format(-seconds, 'second'); const minutes = Math.round(seconds / 60); if (minutes < 60) return rtf.format(-minutes, 'minute'); return rtf.format(-Math.round(minutes / 60), 'hour'); }
   function time(value) { return value ? tf.format(new Date(value)) : '-'; }

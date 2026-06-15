@@ -40,8 +40,14 @@ async function main(): Promise<void> {
     await setViewport(cdp, 1366, 768, false);
     await cdp.send('Page.navigate', { url: `${config.addin.origin}/ui/` });
     await waitFor(cdp, 'document.querySelectorAll("table").length >= 2');
+    await assertEval(cdp, 'document.querySelector("#health").textContent.includes("Degraded")', 'degraded health badge renders');
+    await assertEval(cdp, 'document.querySelector("#lastError").textContent.includes("Certificate reload failed")', 'degraded last error renders');
     await assertEval(cdp, 'document.querySelector("#clients table") !== null', 'client table renders');
     await assertEval(cdp, 'document.querySelector("#documents .row.word") !== null', 'word document row renders');
+    await assertEval(cdp, 'document.querySelector("#documents").textContent.includes("Excel") && document.querySelector("#documents .row.excel") !== null', 'excel document group renders');
+    await assertEval(cdp, 'document.querySelector("#documents").textContent.includes("Reconnecting")', 'stale document renders as reconnecting');
+    await assertEval(cdp, 'document.querySelector("#currentTasks").textContent.includes("Running") && document.querySelector("#taskCount").textContent.includes("1 Running")', 'running task state renders');
+    await assertEval(cdp, 'document.querySelector("#history").textContent.includes("Succeeded") && document.querySelector("#history").textContent.includes("Failed") && document.querySelector("#history").textContent.includes("Timed Out") && document.querySelector("#history").textContent.includes("Cancelled")', 'history renders success failure timeout and cancelled states');
     await assertEval(cdp, 'document.querySelector("#daemonVersion").textContent.trim().length > 0 && document.querySelector("#daemonUptime").textContent.trim().length > 0', 'daemon details show version and uptime');
     await assertEval(cdp, 'document.querySelector("#stdioBridgeCommand").textContent.includes("office-mcp stdio") && [...document.querySelectorAll("button")].some((button) => button.getAttribute("aria-label") === "Copy Stdio Bridge Command")', 'daemon details expose stdio bridge command copy control');
     await assertEval(cdp, 'document.querySelector("#lastError").textContent.trim().length > 0', 'daemon details show last error state');
@@ -51,6 +57,11 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'location.search.includes("selected=document")', 'selected row is reflected in URL');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#resultFilter").value = "failure"; document.querySelector("#resultFilter").dispatchEvent(new Event("change"))' });
     await waitFor(cdp, 'location.search.includes("result=failure")');
+    await assertEval(cdp, 'document.querySelector("#history").textContent.includes("IRM_DENIED")', 'failure details expose office_mcp_code');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#resultFilter").value = "timeout"; document.querySelector("#resultFilter").dispatchEvent(new Event("change"))' });
+    await waitFor(cdp, 'location.search.includes("result=timeout") && document.querySelector("#history").textContent.includes("Timed Out")');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#resultFilter").value = "cancelled"; document.querySelector("#resultFilter").dispatchEvent(new Event("change"))' });
+    await waitFor(cdp, 'location.search.includes("result=cancelled") && document.querySelector("#history").textContent.includes("Cancelled")');
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
     await assertEval(cdp, 'document.activeElement !== document.body', 'keyboard tab reaches a focusable control');
@@ -95,7 +106,7 @@ async function main(): Promise<void> {
 }
 
 function seedUiState(daemon: Awaited<ReturnType<typeof startDaemon>>): void {
-  const connection = fakeConnection();
+  const connection = fakeConnection('22222222-2222-4222-8222-222222222222', 'word');
   daemon.registry.registerRuntime(connection, connection.runtime);
   daemon.registry.addSession(connection, {
     session_id: '11111111-1111-4111-8111-111111111111',
@@ -105,21 +116,39 @@ function seedUiState(daemon: Awaited<ReturnType<typeof startDaemon>>): void {
     is_active: true
   });
   const uiState = daemon.uiState;
+  uiState.setHealth('degraded', 'Certificate reload failed. Check the configured local PFX path.');
   const clientId = uiState.registerClient({ client_id: 'client-1', transport: 'http', name: 'copilot-cli/1.0' });
-  for (let index = 0; index < 3; index += 1) {
-    const commandId = uiState.startCommand({ client_id: clientId, client_name: 'copilot-cli/1.0', session_id: '11111111-1111-4111-8111-111111111111', host_app: 'word', tool: index === 1 ? 'word.insert_paragraph' : 'word.get_text', user_intent: 'high-level smoke task', timeout_ms: 30000 });
-    uiState.finishCommand(commandId, index === 2 ? { ok: false, error: { office_mcp_code: 'IRM_DENIED', message: 'The document blocked the edit.', tool: 'word.insert_paragraph', retriable: false, partial_effect: 'none' } } : { ok: true, data: { redacted: true } });
+  const excelConnection = fakeConnection('44444444-4444-4444-8444-444444444444', 'excel');
+  daemon.registry.registerRuntime(excelConnection, excelConnection.runtime);
+  daemon.registry.addSession(excelConnection, {
+    session_id: '33333333-3333-4333-8333-333333333333',
+    instance_id: excelConnection.runtime.instance_id,
+    document: { title: 'Budget.xlsx', filename: 'Budget.xlsx', is_dirty: true, is_read_only: false, protection: { kind: null, rights: null, rights_source: 'unavailable' } },
+    available_tools: ['excel.get_range'],
+    is_active: false
+  });
+  daemon.registry.markSessionStale('33333333-3333-4333-8333-333333333333');
+  uiState.startCommand({ client_id: clientId, client_name: 'copilot-cli/1.0', session_id: '11111111-1111-4111-8111-111111111111', host_app: 'word', tool: 'word.insert_paragraph', user_intent: 'running smoke task', timeout_ms: 30000 });
+  const outcomes = [
+    { tool: 'word.get_text', result: { ok: true, data: { redacted: true } } },
+    { tool: 'word.insert_paragraph', result: { ok: false, error: { office_mcp_code: 'IRM_DENIED', message: 'The document blocked the edit.', tool: 'word.insert_paragraph', retriable: false, partial_effect: 'none' } } },
+    { tool: 'word.get_text', result: { ok: false, error: { office_mcp_code: 'TIMEOUT', message: 'The add-in did not respond before the deadline.', tool: 'word.get_text', retriable: true, partial_effect: 'unknown' } } },
+    { tool: 'word.insert_paragraph', result: { ok: false, error: { office_mcp_code: 'CANCELLED', message: 'The client cancelled the command.', tool: 'word.insert_paragraph', retriable: true, partial_effect: 'unknown' } } }
+  ] as const;
+  for (const outcome of outcomes) {
+    const commandId = uiState.startCommand({ client_id: clientId, client_name: 'copilot-cli/1.0', session_id: '11111111-1111-4111-8111-111111111111', host_app: 'word', tool: outcome.tool, user_intent: 'high-level smoke task', timeout_ms: 30000 });
+    uiState.finishCommand(commandId, outcome.result);
   }
 }
 
-function fakeConnection(): AddinConnection {
+function fakeConnection(instanceId: string, hostApp: string): AddinConnection {
   const socket = new EventEmitter() as AddinConnection['socket'];
   Object.assign(socket, { OPEN: 1, readyState: 1, close() {} });
   return {
     socket,
     runtime: {
-      instance_id: '22222222-2222-4222-8222-222222222222',
-      host: { app: 'word', version: '16.0', platform: 'pc', build: 'Desktop' },
+      instance_id: instanceId,
+      host: { app: hostApp, version: '16.0', platform: 'pc', build: 'Desktop' },
       add_in: { version: '0.1.5', protocol_version: '1.0' },
       registered_at: new Date().toISOString()
     },
