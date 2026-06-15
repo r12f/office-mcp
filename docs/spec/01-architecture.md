@@ -57,6 +57,7 @@ principle regardless of deployment shape.
 │                      │  - Tool router               │                 │
 │                      │  - Session registry          │                 │
 │                      │  - Add-in HTTPS/WSS backend  │                 │
+│                      │  - Tray + local UI backend   │                 │
 │                      └────────────▲─────────────────┘                 │
 │                                   │                                   │
 │                 WSS + JSON-RPC 2.0  (add-ins dial in)                 │
@@ -88,6 +89,10 @@ gets started is install-time concern, not runtime concern (see §2.3).
 - **State**: add-in session registry and in-flight request map. No document
   content or undo history. TLS keys and optional transport secrets are loaded
   from ACL-restricted configuration.
+- **User interface**: a desktop tray icon plus main diagnostic window. The UI
+  observes daemon state, connected MCP clients, document sessions, in-flight
+  commands, and bounded redacted command history. It does not expose document
+  body content. Full UI requirements are in [09-ui.md](09-ui.md).
 
 The canonical client transport is Streamable HTTP. MCP clients that only speak
 stdio use the bundled `office-mcp stdio` shim, which is a thin protocol bridge
@@ -103,10 +108,14 @@ add-ins; it only adapts process-spawned clients to the long-lived daemon.
 - **Scope**: one add-in runtime is attached to one Office document. v1 does not
   enumerate or control other documents from that runtime.
 - **State**: WS connection, the current document's Office.js context, and a
-  pending operation queue.
+  pending operation queue. The task pane also keeps the current command and a
+  bounded redacted local command history for display.
 - **Responsibilities**: register the runtime, announce its one document with
   `session.added`, emit `session.updated` / `session.removed`, and execute tool
   calls forwarded by the daemon.
+- **User interface**: a modern task pane showing daemon connection state,
+  current document session metadata, the current command, and recent command
+  history. See [09-ui.md §5](09-ui.md).
 
 ### 2.3 Why the daemon is a singleton, and why nothing auto-spawns it
 
@@ -177,13 +186,22 @@ Why WebSocket and not Named Pipes / Unix Socket:
 Add-ins are launched by Office, not by the daemon. The only IPC where the
 add-in can be the connecting party is a network socket.
 
+### 3.4 Daemon UI backend
+
+The daemon UI backend is local-only and not part of the MCP tool surface. It
+serves redacted status snapshots to the tray controller and main window. It MAY
+share the add-in HTTPS origin or use an internal desktop bridge, but it MUST
+preserve the same privacy boundary: no document body text, no unredacted tool
+arguments, and no secrets in UI state.
+
 ## 4. Lifecycle scenarios
 
 ### 4.1 Cold start
 
 1. User logs in. OS-level autostart launches the daemon.
 2. Daemon reads its config, binds MCP HTTP plus local HTTPS/WSS, and idles.
-3. No add-ins connected → `office.list_sessions` returns `[]`.
+3. Daemon tray icon appears and reports `Up` once listeners are ready.
+4. No add-ins connected → `office.list_sessions` returns `[]`.
 
 ### 4.2 MCP client starts before any Office
 

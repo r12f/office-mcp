@@ -91,6 +91,7 @@ under `artifacts/`, not as parallel source packages at the root.
 | [06-error-model.md](docs/spec/06-error-model.md) | Error codes, retry, partial-failure semantics |
 | [07-deployment.md](docs/spec/07-deployment.md) | Installation, sideloading, distribution |
 | [08-roadmap.md](docs/spec/08-roadmap.md) | Milestones, Excel/PPT/Outlook follow-on |
+| [09-ui.md](docs/spec/09-ui.md) | Daemon tray/main window and add-in task pane UI |
 
 ## Run the MVP locally
 

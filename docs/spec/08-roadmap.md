@@ -93,6 +93,27 @@ review the result like a normal collaborator's edits.
       bundle, checksums, and checklist. Partner Center submission and Microsoft
       validation review remain external gates.
 
+### M6.5 — Product UI
+
+- [ ] Daemon tray icon with right-click status menu: Up/Down, client count,
+      document count, separator, Show office-mcp, Quit.
+- [ ] Daemon main window with status, endpoints, connected MCP clients, grouped
+      document sessions, current tasks, and recent command history.
+- [ ] Per-document detail expansion showing the most recent 10 commands and
+      success/failure details.
+- [ ] Add-in task pane rebuilt as a modern TypeScript frontend showing daemon
+      connection, current document session, current task, and latest 20 task
+      history entries.
+- [ ] Redacted UI state API and tests proving document body content, inserted
+      text, image data, and secrets do not appear in UI snapshots.
+- [ ] Automated UI coverage for empty, connected, degraded, in-flight, success,
+      failure, timeout, and reconnect states.
+
+**Exit criterion**: A non-technical user can open the tray menu and main window
+to understand whether office-mcp is running, which clients and documents are
+connected, what task is currently executing, and why the last relevant command
+failed, without inspecting terminal output or logs.
+
 ### M7 — Excel
 
 A separate add-in (Excel.js) connects to the same server. Server gains a

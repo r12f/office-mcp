@@ -8,6 +8,7 @@ each other.
 | Component | What it is | Where it lives | Updated how |
 |---|---|---|---|
 | `office-mcp` | Long-running daemon package; current Windows MSI ships `node.exe`, compiled Node.js files, and production dependencies. A native `office-mcp.exe` wrapper is future hardening. | `%LOCALAPPDATA%\office-mcp\` (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | MSI / Homebrew tap |
+| `office-mcp-ui` | Desktop tray controller and daemon main window bundle. It may be packaged into a native wrapper or shipped beside the Node daemon during the transition period. | Installed beside the daemon | MSI / Homebrew tap |
 | `office-mcp-addin` | Static web bundle (~2 MB) + manifest | Installed beside the daemon and served from its trusted local HTTPS origin | Installer / atomic local replacement |
 | Manifest | XML / JSON describing the add-in | Sideloaded via the trusted catalog by the installer; AppSource / M365 admin push for managed deployments | See §3 |
 | Bootstrap installer | MSI / .pkg / shell script | Downloaded from GitHub Releases | Per-release |
@@ -214,8 +215,8 @@ powershell -ExecutionPolicy Bypass -File .\packaging\windows\uninstall-windows.p
 
 The current MSI build is a user-scoped installer for the Node-based daemon
 package. It installs `node.exe`, the compiled server, production Node
-dependencies, add-in bundle, catalog manifest, default `config.toml`, and
-launcher scripts under `%LOCALAPPDATA%\office-mcp\`. The launchers set
+dependencies, daemon UI bundle, add-in bundle, catalog manifest, default
+`config.toml`, and launcher scripts under `%LOCALAPPDATA%\office-mcp\`. The launchers set
 `OFFICE_MCP_CONFIG_PATH` to that installed config. It also registers the Word
 trusted catalog and an HKCU `Run` entry that starts the daemon launcher at
 logon. A later production packaging pass may replace the PowerShell launcher
@@ -227,6 +228,7 @@ The production MSI remains the release packaging target:
 1. User installs `office-mcp-setup-x64.msi`. The installer:
    - Drops the runnable daemon package and local `node.exe` to
      `%LOCALAPPDATA%\office-mcp\`.
+   - Installs the tray icon and main-window UI assets.
    - Installs the static add-in bundle beside the daemon.
    - Exports a current-user trusted localhost certificate on first daemon start;
      it does not import root certificates.
@@ -238,6 +240,8 @@ The production MSI remains the release packaging target:
      there.
    - Future production builds should start the daemon once so the user does not
      have to log out / log in for the daemon to come up.
+   - Future production builds should make the tray icon visible immediately
+     after install and expose the main window from that tray menu.
 
 2. User configures their MCP client to connect to
    `http://127.0.0.1:8800` (or whatever `mcp_http.port` is in their config).
@@ -272,9 +276,14 @@ steps; the formula does not silently mutate those trust stores.
 ```
 office-mcp daemon status     # are the MCP and add-in listener ports up?
 office-mcp daemon stop/start # start or stop the Windows autostart integration
+office-mcp ui                # open or focus the daemon main window
 office-mcp config show       # show effective config
 office-mcp sessions          # list documents with a connected add-in runtime
 ```
+
+The tray icon and main window are part of production verification, not optional
+developer diagnostics. UI behavior and state redaction are specified in
+[09-ui.md](09-ui.md).
 
 ## 7. Versioning & upgrades
 

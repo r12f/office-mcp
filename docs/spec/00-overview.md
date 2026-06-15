@@ -35,6 +35,8 @@ existing MCP implementations do not provide together:
 | **MCP client** | The thing that wants tools — Claude Desktop, Cursor, an agent, etc. |
 | **MCP server** | What we build. Speaks MCP outward, JSON-RPC over WSS inward. |
 | **Office add-in** | A web app (HTML/JS) hosted inside an Office app via Office.js. v1 targets Word desktop on Windows; macOS and Office on the web are later validation targets. |
+| **Daemon UI** | The desktop tray icon and main window for monitoring the long-running `office-mcp` process. |
+| **Task pane UI** | The Office add-in's document-local UI, hosted in the Office webview. |
 | **App** | Office application: Word, Excel, PowerPoint, Outlook. URI namespace and tool prefix. |
 | **Document session** | One open document (`.docx`, `.xlsx`, etc.) inside one app instance. Unit of addressing. |
 | **Add-in runtime** | One document-scoped web runtime. It owns one WebSocket connection and one document session in v1. |
@@ -58,7 +60,11 @@ existing MCP implementations do not provide together:
    cloud service. Marketplace builds load the production Office.js library
    from Microsoft's CDN, so fully offline operation is not a v1 promise. See
    [01-architecture.md §0](01-architecture.md) for the full deployment model.
-6. **Graceful degradation.** When no Office instance is running, the server still works
+6. **Observable by default.** The daemon exposes a tray icon and main window,
+   and the add-in task pane exposes document-local connection and task status.
+   Users should not need a terminal to answer basic support questions. See
+   [09-ui.md](09-ui.md).
+7. **Graceful degradation.** When no Office instance is running, the server still works
    — clients see "no document sessions available" instead of a crash.
 
 ## 5. Comparison with existing MCPs
@@ -77,3 +83,4 @@ existing MCP implementations do not provide together:
 | What does the add-in send when it first dials in? | [02-registration-protocol.md §2](02-registration-protocol.md) |
 | What happens when Office is killed mid-operation? | [06-error-model.md §4](06-error-model.md) |
 | Distribution: sideload vs AppSource vs centralized deployment? | [07-deployment.md §3](07-deployment.md) |
+| What should users see in the tray, daemon window, and add-in task pane? | [09-ui.md](09-ui.md) |
