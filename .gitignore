@@ -2,8 +2,9 @@
 target/
 build/
 dist/
-feasibility/
+artifacts/
 node_modules/
+addin-catalog/
 *.pyc
 __pycache__/
 
@@ -19,6 +20,7 @@ __pycache__/
 .env.local
 *.local
 handshake.json
+.office-mcp-localhost.pfx
 
 # Logs / audit
 *.log

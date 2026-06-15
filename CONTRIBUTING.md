@@ -1,13 +1,23 @@
 # Contributing
 
-Thanks for your interest! `office-mcp` is in the spec phase. Most useful
-contributions right now are reviews of the documents under [docs/spec/](docs/spec/).
+Thanks for your interest! `office-mcp` is in an implementation phase with the
+design contract kept under [docs/spec/](docs/spec/).
 
 ## How to review the spec
 
 1. Read [docs/spec/00-overview.md](docs/spec/00-overview.md) first.
 2. Open issues against specific files — quote the section you're commenting on.
 3. For meaningful changes, open a PR against the spec file directly.
+
+## Repository layout
+
+- `mcp-server/` is the long-running daemon package. Run server build, test,
+  CLI, smoke, and runtime-evidence commands from this directory.
+- `addin/` is the Word add-in package. Run manifest validation and task pane
+  checks from this directory.
+- `packaging/` contains cross-component installers and release packaging.
+- Generated artifacts and historical feasibility evidence belong under
+  `artifacts/`, not as additional root-level source packages.
 
 ## What we want feedback on (M0)
 
@@ -20,8 +30,9 @@ contributions right now are reviews of the documents under [docs/spec/](docs/spe
 
 ## What we don't want yet
 
-- Code PRs implementing the spec. Hold off until M0 ships; we want to nail
-  the contract first.
+- New root-level application packages. Keep long-lived runtime code in
+  `mcp-server/`, add-in runtime code in `addin/`, and installer glue in
+  `packaging/`.
 - Excel / PowerPoint / Outlook tool catalogs. Those are M7+.
 
 ## Discussion

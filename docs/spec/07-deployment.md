@@ -7,7 +7,7 @@ each other.
 
 | Component | What it is | Where it lives | Updated how |
 |---|---|---|---|
-| `office-mcp` | Single binary (~15 MB) | `%LOCALAPPDATA%\office-mcp\office-mcp.exe` (Win) / `/usr/local/bin/office-mcp` (Mac, Linux) | MSI / Homebrew tap |
+| `office-mcp` | Long-running daemon package; current Windows MSI ships `node.exe`, compiled Node.js files, and production dependencies. A native `office-mcp.exe` wrapper is future hardening. | `%LOCALAPPDATA%\office-mcp\` (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | MSI / Homebrew tap |
 | `office-mcp-addin` | Static web bundle (~2 MB) + manifest | Installed beside the daemon and served from its trusted local HTTPS origin | Installer / atomic local replacement |
 | Manifest | XML / JSON describing the add-in | Sideloaded via the trusted catalog by the installer; AppSource / M365 admin push for managed deployments | See §3 |
 | Bootstrap installer | MSI / .pkg / shell script | Downloaded from GitHub Releases | Per-release |
@@ -45,7 +45,22 @@ install with one click from Office's Add-ins picker. Requires:
 - AppSource validation review
 - Hosted manifest URL (HTTPS, public)
 
-Tracked in [08-roadmap.md](08-roadmap.md); not blocking v1.
+The repository can generate the pre-submission artifact set, but it cannot
+complete the external Partner Center submission or Microsoft's validation
+review:
+
+```
+powershell -ExecutionPolicy Bypass -File .\addin\scripts\build-appsource-package.ps1 `
+  -Version <package-version> `
+  -BaseUrl https://office-mcp.dev `
+  -AddinId <release-guid> `
+  -AddinVersion <office-four-part-version>
+```
+
+The generated package contains the hosted manifest, add-in static bundle,
+checksums, and a submission checklist. The checklist explicitly records the
+remaining external gates: public hosting, Office webview validation from the
+hosted origin, Partner Center listing metadata, and AppSource review.
 
 ### 3.3 Centralized deployment (enterprise)
 
@@ -64,16 +79,32 @@ The production XML manifest:
 - Declares a Word task-pane add-in with `ReadWriteDocument`.
 - Requires `WordApi 1.3` for activation.
 - Uses `VersionOverridesV1_0` and `AddinCommands 1.1` for the ribbon command.
-- Loads `https://127.0.0.1:8765/taskpane.html` in local sideloaded builds.
+- Loads `https://localhost:8765/taskpane.html` in local sideloaded builds.
 - Loads production Office.js from Microsoft's CDN from within that page.
 - Probes `WordApi 1.4`, `WordApi 1.6`, and desktop-only sets at runtime.
 
-The checked feasibility manifest is
-`feasibility/manifest.xml`; `npm run check:manifest` validates it against the
-current Office add-in schemas. The release build substitutes the real add-in
+The checked developer manifest is `addin/manifest.xml`; running `npm run check`
+from `addin/` validates it against the current Office add-in schemas and checks
+the task pane JavaScript syntax. The release build substitutes the real add-in
 ID, version, icon assets, and support URL. The XML manifest's four-part version
 starts at `1.0.0.0` because Office rejects values below 1.0; it is mapped to,
 but not textually identical with, the add-in package semver.
+
+The hosted manifest is rendered from the checked developer manifest rather than
+maintained as a second XML file:
+
+```
+powershell -ExecutionPolicy Bypass -File .\addin\scripts\render-hosted-manifest.ps1 `
+  -BaseUrl https://office-mcp.dev `
+  -AddinId <release-guid> `
+  -AddinVersion <office-four-part-version> `
+  -AssetVersion <package-version>
+```
+
+The renderer refuses non-HTTPS and loopback origins, replaces task-pane and icon
+URLs with the public base URL, and fails if any loopback URL remains in the
+output. Publishing `https://office-mcp.dev/manifest.xml` is still a release
+hosting task; the checked renderer provides the reproducible artifact.
 
 Although the XML schema permits other Word platforms, the v1 task pane checks
 `Office.onReady()` and displays an unsupported-platform message unless the host
@@ -98,20 +129,22 @@ Location:
 | macOS | `~/Library/Application Support/office-mcp/config.toml` |
 | Linux | `~/.config/office-mcp/config.toml` |
 
-The add-in defaults to `wss://127.0.0.1:8765`. An endpoint override is stored
-in the add-in's partitioned browser storage through its settings UI.
-Installer-managed builds may compile a different default into the add-in
-bundle. The daemon CLI prints the endpoint value that should be entered:
+The add-in derives its WSS endpoint from the HTTPS origin that loaded the task
+pane. The checked developer manifest loads from `https://localhost:8765`, so it
+connects to `wss://localhost:8765/addin`. An endpoint override may be stored in
+the add-in's partitioned browser storage through its settings UI.
+Installer-managed builds may compile a different manifest origin. The daemon
+CLI prints the endpoint values that should be entered:
 
 ```
-office-mcp config addin-endpoint
+office-mcp config endpoints
 ```
 
 ```toml
 # ─── daemon configuration; endpoint values are mirrored in add-in settings ──
 [addin_channel]
 # HTTPS/WSS origin the daemon serves and the add-in dials.
-bind = "127.0.0.1"
+bind = "localhost"
 port = 8765
 heartbeat_interval_sec = 30
 heartbeat_timeout_sec  = 10
@@ -148,7 +181,9 @@ file  = ""                       # default: platform log dir
 
 Environment variables override daemon config keys, prefixed `OFFICE_MCP_`
 (e.g. `OFFICE_MCP_ADDIN_CHANNEL__PORT=9000`). They are not visible to the
-web add-in.
+web add-in. The section-style names matching the TOML structure are canonical;
+legacy flat names such as `OFFICE_MCP_ADDIN_PORT` remain accepted for existing
+developer scripts.
 
 ## 6. Installation and first-run flow
 
@@ -160,19 +195,49 @@ console for a production install.
 
 ### 6.1 Windows
 
+The repository includes a developer bootstrap script that performs the same
+user-scoped installation shape without building an MSI:
+
+```
+powershell -ExecutionPolicy Bypass -File .\packaging\windows\install-windows.ps1
+```
+
+It validates the server and manifest, exports an already trusted localhost
+certificate to `%LOCALAPPDATA%\office-mcp\`, registers the Word trusted catalog,
+and creates a logon Scheduled Task that runs the daemon from the checked-out
+`mcp-server/` package. It does not import root certificates. It can be removed
+with:
+
+```
+powershell -ExecutionPolicy Bypass -File .\packaging\windows\uninstall-windows.ps1
+```
+
+The current MSI build is a user-scoped installer for the Node-based daemon
+package. It installs `node.exe`, the compiled server, production Node
+dependencies, add-in bundle, catalog manifest, default `config.toml`, and
+launcher scripts under `%LOCALAPPDATA%\office-mcp\`. The launchers set
+`OFFICE_MCP_CONFIG_PATH` to that installed config. It also registers the Word
+trusted catalog and an HKCU `Run` entry that starts the daemon launcher at
+logon. A later production packaging pass may replace the PowerShell launcher
+with a native `office-mcp.exe`, move mutable config to `%APPDATA%\office-mcp\`,
+and replace the `Run` entry with a Scheduled Task or service wrapper.
+
+The production MSI remains the release packaging target:
+
 1. User installs `office-mcp-setup-x64.msi`. The installer:
-   - Drops `office-mcp.exe` to `%LOCALAPPDATA%\office-mcp\`.
+   - Drops the runnable daemon package and local `node.exe` to
+     `%LOCALAPPDATA%\office-mcp\`.
    - Installs the static add-in bundle beside the daemon.
-   - Provisions a current-user trusted localhost certificate and restricts the
-     private-key ACL to that user.
-   - Writes a default `config.toml` to `%APPDATA%\office-mcp\`.
-   - Registers a Scheduled Task `office-mcp` set to run at logon
-     (`office-mcp daemon run`).
+   - Exports a current-user trusted localhost certificate on first daemon start;
+     it does not import root certificates.
+   - Writes a default `config.toml` and points the launcher at it with
+     `OFFICE_MCP_CONFIG_PATH`.
+   - Registers an autostart entry for the daemon launcher.
    - Registers an add-in trusted catalog folder under
      `%LOCALAPPDATA%\office-mcp\addin-catalog\` and drops the manifest
      there.
-   - Runs `office-mcp daemon start` once so the user doesn't have to log
-     out / log in for the daemon to come up.
+   - Future production builds should start the daemon once so the user does not
+     have to log out / log in for the daemon to come up.
 
 2. User configures their MCP client to connect to
    `http://127.0.0.1:8800` (or whatever `mcp_http.port` is in their config).
@@ -189,11 +254,24 @@ Same shape, different mechanism: launchd agent (macOS) or systemd `--user`
 unit (Linux) replaces the Scheduled Task. brew formula / Linux package
 performs the equivalent setup.
 
+The checked Homebrew packaging assets live under `packaging/homebrew/`:
+
+- `Formula/office-mcp.rb.in` is the formula template for a release tarball.
+- `render-formula.ps1` renders the formula with the release tarball URL and
+  SHA-256 digest.
+
+The formula installs the release tarball under Homebrew `libexec`, writes an
+`office-mcp` wrapper that sets `OFFICE_MCP_INSTALL_ROOT` and
+`OFFICE_MCP_CONFIG_PATH`, and defines a `brew services` daemon running
+`office-mcp daemon run`. macOS Office trusted-catalog registration and
+localhost certificate trust remain explicit first-run or enterprise deployment
+steps; the formula does not silently mutate those trust stores.
+
 ### 6.3 Verifying
 
 ```
-office-mcp daemon status     # is the daemon up?
-office-mcp daemon stop/start # restart it
+office-mcp daemon status     # are the MCP and add-in listener ports up?
+office-mcp daemon stop/start # start or stop the Windows autostart integration
 office-mcp config show       # show effective config
 office-mcp sessions          # list documents with a connected add-in runtime
 ```

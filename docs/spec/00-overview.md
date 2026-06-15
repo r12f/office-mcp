@@ -52,8 +52,8 @@ existing MCP implementations do not provide together:
 3. **Stateful documents.** Per-document state (last selection and pending operation
    queue) lives in the document-scoped add-in runtime, addressed by stable session IDs.
 4. **Boring transports.** Streamable HTTP for MCP; WSS + JSON-RPC 2.0 for
-   add-in ↔ server. No bespoke binary frames, no SSE-only paths. Stdio-only clients
-   use a generic external stdio-to-HTTP proxy.
+   add-in ↔ server. No bespoke binary frames, no SSE-only paths. Stdio-only
+   clients use the bundled stdio-to-daemon bridge.
 5. **Local-first install.** Single Windows installer and no project-operated
    cloud service. Marketplace builds load the production Office.js library
    from Microsoft's CDN, so fully offline operation is not a v1 promise. See

@@ -26,22 +26,24 @@ native config file. The v1 add-in therefore uses the compiled default endpoint:
 
 ```toml
 [addin_channel]
-bind = "127.0.0.1"
+bind = "localhost"
 port = 8765
 ```
 
-- The daemon defaults to `127.0.0.1:8765`.
-- The add-in defaults to `wss://127.0.0.1:8765`.
+- The daemon defaults to `localhost:8765` for the HTTPS/WSS add-in origin.
+- The add-in derives its WSS endpoint from the manifest-loaded task pane origin,
+  so the default developer manifest connects to `wss://localhost:8765/addin`.
 - A user may override the add-in endpoint in its settings UI. The override is
   stored in partitioned browser storage and must match the daemon config.
 - Installer-managed deployments may build a manifest/bundle with a different
   default endpoint.
 - The installer provisions a per-install local certificate trusted by the
-  current user. Its SANs cover `localhost`, `127.0.0.1`, and `::1`. The daemon
-  serves both the static add-in bundle and WSS from this origin.
+  current user. Its SANs cover the configured local origin. The developer
+  manifest uses `localhost`, so the daemon serves both the static add-in bundle
+  and WSS from `https://localhost:8765` by default.
 - The daemon accepts a WebSocket upgrade only when its `Origin` header exactly
   matches the configured add-in HTTPS origin. For the default endpoint that is
-  `https://127.0.0.1:8765`.
+  `https://localhost:8765`.
 
 If `bind` is non-loopback and `shared_secret` is empty, the server REFUSES to
 start. See [05-security.md §2](05-security.md).
@@ -390,7 +392,7 @@ events are NOT emitted by default.
 ## 9. Example full session
 
 ```
-T+0.000  Server starts, binds wss://127.0.0.1:8765 (from daemon config)
+T+0.000  Server starts, binds wss://localhost:8765/addin (from daemon config)
 T+1.200  User launches Word and activates the add-in
 T+1.350  Add-in loads its endpoint setting, opens WS
 T+1.360  Add-in → register

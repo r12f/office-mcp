@@ -1,0 +1,45 @@
+class OfficeMcp < Formula
+  desc "Local MCP bridge for live Microsoft Office documents"
+  homepage "https://github.com/office-mcp/office-mcp"
+  url "{{TARBALL_URL}}"
+  sha256 "{{TARBALL_SHA256}}"
+  license "MIT"
+
+  depends_on "node@22"
+
+  def install
+    libexec.install Dir["*"]
+    (bin/"office-mcp").write <<~EOS
+      #!/bin/bash
+      export OFFICE_MCP_INSTALL_ROOT="#{libexec}"
+      export OFFICE_MCP_CONFIG_PATH="${OFFICE_MCP_CONFIG_PATH:-#{etc}/office-mcp/config.toml}"
+      exec "#{Formula["node@22"].opt_bin}/node" "#{libexec}/mcp-server/dist/src/cli.js" "$@"
+    EOS
+  end
+
+  def caveats
+    <<~EOS
+      office-mcp runs as a long-lived per-user daemon. Start it with:
+        brew services start office-mcp
+
+      The Word add-in bundle is installed at:
+        #{libexec}/addin
+
+      macOS Office trusted catalog registration and localhost certificate trust
+      remain explicit first-run steps for the user or an enterprise deployment tool.
+    EOS
+  end
+
+  service do
+    run [opt_bin/"office-mcp", "daemon", "run"]
+    keep_alive true
+    log_path var/"log/office-mcp.log"
+    error_log_path var/"log/office-mcp.log"
+    environment_variables OFFICE_MCP_INSTALL_ROOT: opt_libexec,
+                          OFFICE_MCP_CONFIG_PATH: etc/"office-mcp/config.toml"
+  end
+
+  test do
+    assert_match "http://127.0.0.1:8800/mcp", shell_output("#{bin}/office-mcp config endpoints")
+  end
+end

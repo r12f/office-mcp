@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    name: Server (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            mcp-server/package-lock.json
+            addin/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: mcp-server
+        run: npm ci
+
+      - name: Build and test server
+        working-directory: mcp-server
+        run: npm run check
+
+  addin:
+    name: Add-in validation
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: addin/package-lock.json
+
+      - name: Install add-in dependencies
+        working-directory: addin
+        run: npm ci
+
+      - name: Validate Word add-in
+        working-directory: addin
+        run: npm run check
+
+      - name: Check Windows bootstrap scripts syntax
+        shell: pwsh
+        run: |
+          $paths = @('packaging/windows/install-windows.ps1', 'packaging/windows/uninstall-windows.ps1', 'packaging/windows/build-windows-msi.ps1', 'packaging/homebrew/render-formula.ps1', 'addin/scripts/render-hosted-manifest.ps1', 'addin/scripts/build-appsource-package.ps1')
+          foreach ($path in $paths) {
+            $errors = $null
+            [System.Management.Automation.PSParser]::Tokenize((Get-Content -Raw $path), [ref]$errors) | Out-Null
+            if ($errors) {
+              $errors | Format-List | Out-String | Write-Error
+              exit 1
+            }
+          }
+
+  windows-msi:
+    name: Windows MSI packaging
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: mcp-server
+        run: npm ci
+
+      - name: Install add-in dependencies
+        working-directory: addin
+        run: npm ci
+
+      - name: Build MSI
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-msi.ps1 -SkipNpmInstall
+
+      - name: Verify MSI artifact
+        shell: pwsh
+        run: |
+          $msi = Get-Item .\artifacts\office-mcp-setup-0.1.0-x64.msi
+          if ($msi.Length -lt 1000000) {
+            throw "MSI artifact is unexpectedly small: $($msi.Length) bytes"
+          }
+          Write-Output "Built $($msi.FullName) ($($msi.Length) bytes)"

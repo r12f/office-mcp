@@ -89,10 +89,10 @@ gets started is install-time concern, not runtime concern (see §2.3).
   content or undo history. TLS keys and optional transport secrets are loaded
   from ACL-restricted configuration.
 
-MCP clients that only speak stdio are out of scope. Streamable HTTP is the
-standard independent-process transport in the current MCP specification; if a
-client needs a stdio shim it uses a generic MCP-stdio-to-HTTP proxy, decoupled
-from office-mcp and not part of this project.
+The canonical client transport is Streamable HTTP. MCP clients that only speak
+stdio use the bundled `office-mcp stdio` shim, which is a thin protocol bridge
+to the already-running daemon. The shim does not own Office sessions or spawn
+add-ins; it only adapts process-spawned clients to the long-lived daemon.
 
 ### 2.2 The Office add-in
 
@@ -143,7 +143,7 @@ instances are open. Document addressing is via `session_id` returned from
 | Bind | loopback by default; non-loopback requires `api_key` |
 | Multiplexing | Multiple concurrent clients supported |
 | SSE-only | Not supported (deprecated upstream) |
-| stdio | Not supported in-tree; use a generic proxy if needed |
+| stdio | Supported only as `office-mcp stdio`, a thin bridge to the daemon |
 
 The implementation follows the negotiated MCP protocol version, including
 `Origin` validation, `Accept` handling, `MCP-Protocol-Version`, optional
