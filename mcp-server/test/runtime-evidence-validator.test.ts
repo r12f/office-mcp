@@ -119,7 +119,9 @@ test('runtime evidence validator can require agent client evidence', () => {
     const result = runValidator(path, '--require-agent-client-prompt');
     assert.equal(result.status, 0, outputText(result.stderr));
   });
-});test('runtime evidence validator can require mutation evidence', () => {
+});
+
+test('runtime evidence validator can require mutation evidence', () => {
   const broken = report('passed');
   broken.gates = broken.gates.filter((gate) => gate.name !== 'word.runtime_mutation_smoke');
 
@@ -132,6 +134,22 @@ test('runtime evidence validator can require agent client evidence', () => {
     const result = runValidator(path, '--require-mutation');
     assert.notEqual(result.status, 0);
     assert.match(outputText(result.stdout), /Missing required gate: word\.runtime_mutation_smoke/);
+  });
+});
+
+test('runtime evidence validator accepts UI runtime evidence gates', () => {
+  const ui = uiReport();
+  withEvidenceFile(ui, (path) => {
+    const result = runValidator(path, '--ui');
+    assert.equal(result.status, 0, outputText(result.stderr));
+    assert.equal(JSON.parse(outputText(result.stdout)).ok, true);
+  });
+
+  ui.gates = ui.gates.filter((item) => item.name !== 'ui.tray_probe');
+  withEvidenceFile(ui, (path) => {
+    const result = runValidator(path, '--ui');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /Missing required gate: ui\.tray_probe/);
   });
 });
 
@@ -188,6 +206,22 @@ function report(irmStatus: 'passed' | 'skipped') {
 function gate(name: string, status: 'passed' | 'skipped', details: Record<string, unknown> = {}) {
   const now = new Date().toISOString();
   return { name, status, started_at: now, finished_at: now, details };
+}
+
+function uiReport() {
+  const now = new Date().toISOString();
+  return {
+    schema_version: 1,
+    generated_at: now,
+    kind: 'ui_runtime_evidence',
+    gates: [
+      gate('ui.daemon_runtime_file', 'passed'),
+      gate('ui.state_api_auth_redaction', 'passed'),
+      gate('ui.events_stream', 'passed'),
+      gate('ui.tray_probe', 'passed'),
+      gate('ui.browser_smoke', 'passed')
+    ]
+  };
 }
 
 

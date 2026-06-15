@@ -12,12 +12,14 @@ type EvidenceGate = {
 type EvidenceReport = {
   schema_version: number;
   generated_at: string;
+  kind?: string;
   endpoint: string;
   session_id?: string;
   gates: EvidenceGate[];
 };
 
 const evidencePath = resolve(readOption('--input') ?? '../artifacts/runtime-evidence.json');
+const validateUi = hasFlag('--ui');
 const requireIrm = hasFlag('--require-irm');
 const requireFullWordSmoke = hasFlag('--require-full-word-smoke');
 const requireComTrackedChanges = hasFlag('--require-com-tracked-changes');
@@ -49,6 +51,12 @@ const comTrackedChangeGates = [
 const failures: string[] = [];
 
 if (report.schema_version !== 1) failures.push(`Unsupported schema_version: ${report.schema_version}`);
+
+if (validateUi) {
+  validateUiEvidence();
+  emitSummary();
+}
+
 if (!report.session_id) failures.push('Missing session_id.');
 
 for (const name of requiredPassed) {
@@ -105,6 +113,34 @@ const summary = {
 
 console.log(JSON.stringify(summary, null, 2));
 if (failures.length > 0) process.exit(1);
+
+function validateUiEvidence(): never {
+  if (report.kind !== 'ui_runtime_evidence') failures.push(`Unsupported UI evidence kind: ${report.kind ?? 'missing'}`);
+  for (const name of [
+    'ui.daemon_runtime_file',
+    'ui.state_api_auth_redaction',
+    'ui.events_stream',
+    'ui.tray_probe',
+    'ui.browser_smoke'
+  ]) {
+    requirePassedGate(name);
+  }
+  emitSummary();
+}
+
+function emitSummary(): never {
+  console.log(JSON.stringify({
+    ok: failures.length === 0,
+    ui: validateUi,
+    generated_at: report.generated_at,
+    kind: report.kind,
+    endpoint: report.endpoint,
+    session_id: report.session_id,
+    gates: Object.fromEntries(report.gates.map((gate) => [gate.name, gate.status])),
+    failures
+  }, null, 2));
+  process.exit(failures.length > 0 ? 1 : 0);
+}
 
 function gateByName(name: string): EvidenceGate | undefined {
   return report.gates.find((gate) => gate.name === name);
