@@ -96,7 +96,7 @@ review the result like a normal collaborator's edits.
 ### M6.5 — Product UI
 
 - [ ] Daemon tray icon with right-click status menu: Up/Down, client count,
-      document count, separator, Show office-mcp, Quit.
+      document count, separator, Show Office MCP, Quit Office MCP.
 - [ ] Daemon main window with status, endpoints, connected MCP clients, grouped
       document sessions, current tasks, and recent command history.
 - [ ] Per-document detail expansion showing the most recent 10 commands and

@@ -115,7 +115,7 @@ add-ins; it only adapts process-spawned clients to the long-lived daemon.
   calls forwarded by the daemon.
 - **User interface**: a modern task pane showing daemon connection state,
   current document session metadata, the current command, and recent command
-  history. See [09-ui.md §5](09-ui.md).
+  history. See [09-ui.md §6](09-ui.md).
 
 ### 2.3 Why the daemon is a singleton, and why nothing auto-spawns it
 
