@@ -58,14 +58,23 @@ test('daemon UI state endpoint requires UI token and rejects foreign origins', a
     assert.equal(shell.status, 200);
     assert.match(shell.body, /Office MCP/);
     assert.match(shell.body, /__OFFICE_MCP_UI__/);
+    assert.match(shell.body, /id="clients"/);
+    assert.match(shell.body, /data-copy="mcpEndpoint"/);
+    assert.match(shell.body, /id="resultFilter"/);
 
     const script = await httpsJson(`${config.addin.origin}/ui/app.js`);
     assert.equal(script.status, 200);
     assert.match(script.body, /fetch\(boot\.stateUrl/);
+    assert.match(script.body, /streamEvents/);
+    assert.match(script.body, /x-office-mcp-ui-token/);
+    assert.match(script.body, /document_command_history/);
+    assert.match(script.body, /history\.replaceState/);
 
     const css = await httpsJson(`${config.addin.origin}/ui/app.css`);
     assert.equal(css.status, 200);
     assert.match(css.body, /prefers-reduced-motion/);
+    assert.match(css.body, /prefers-color-scheme:dark/);
+    assert.match(css.body, /forced-colors:active/);
 
     const unauthorized = await httpsJson(endpoint);
     assert.equal(unauthorized.status, 401);
@@ -78,6 +87,14 @@ test('daemon UI state endpoint requires UI token and rejects foreign origins', a
     const body = JSON.parse(ok.body) as { daemon?: { status?: string }; documents?: Record<string, unknown[]> };
     assert.equal(body.daemon?.status, 'up');
     assert.deepEqual(body.documents?.word, []);
+
+    const eventsUnauthorized = await httpsJson(`${config.addin.origin}/ui/events`);
+    assert.equal(eventsUnauthorized.status, 401);
+
+    const events = await httpsFirstChunk(`${config.addin.origin}/ui/events`, { 'x-office-mcp-ui-token': daemon.uiToken });
+    assert.equal(events.status, 200);
+    assert.match(events.body, /event: snapshot/);
+    assert.match(events.body, /"recent_commands"/);
   } finally {
     await daemon.close();
     assert.equal(existsSync(runtimePath), false);
@@ -137,6 +154,28 @@ function httpsJson(url: string, headers: Record<string, string> = {}): Promise<{
       res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }));
     });
     req.on('error', reject);
+    req.end();
+  });
+}
+
+function httpsFirstChunk(url: string, headers: Record<string, string> = {}): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = httpsRequest(url, { method: 'GET', headers, rejectUnauthorized: false }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => {
+        chunks.push(Buffer.from(chunk));
+        const body = Buffer.concat(chunks).toString('utf8');
+        if (body.includes('\n\n')) {
+          req.destroy();
+          resolve({ status: res.statusCode ?? 0, body });
+        }
+      });
+      res.once('end', () => resolve({ status: res.statusCode ?? 0, body: '' }));
+    });
+    req.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ECONNRESET') return;
+      reject(error);
+    });
     req.end();
   });
 }

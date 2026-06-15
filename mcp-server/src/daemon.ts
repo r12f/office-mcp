@@ -10,6 +10,7 @@ import { McpFrontend } from './mcp-server.js';
 import { SessionRegistry } from './session-registry.js';
 import { createLogger } from './logger.js';
 import { authorizeUiRequest, createUiToken, defaultUiRuntimePath, removeUiRuntimeFile, UiStateStore, writeUiRuntimeFile } from './ui-state.js';
+import { DAEMON_CONSOLE_CSS, DAEMON_CONSOLE_JS, renderDaemonConsoleShell } from './daemon-ui-assets.js';
 import { SERVER_VERSION } from './types.js';
 
 const PUBLIC_DIR = resolveAddinPublicDir();
@@ -32,6 +33,7 @@ export type RunningDaemon = {
 
 export async function startDaemon(config: DaemonConfig): Promise<RunningDaemon> {
   assertHttpsConfig(config);
+  assertLoopbackUiConfig(config);
   const logger = createLogger(config);
   const uiToken = createUiToken();
   let registry: SessionRegistry;
@@ -114,31 +116,63 @@ function handleUiRequest(req: IncomingMessage, res: ServerResponse, uiState: UiS
   const url = new URL(req.url ?? '/', config.addin.origin);
   if (url.pathname === '/ui' || url.pathname === '/ui/') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(renderDaemonUiShell(config, uiToken));
+    res.end(renderDaemonConsoleShell(config, uiToken));
     return true;
   }
   if (url.pathname === '/ui/app.js') {
     res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(DAEMON_UI_JS);
+    res.end(DAEMON_CONSOLE_JS);
     return true;
   }
   if (url.pathname === '/ui/app.css') {
     res.writeHead(200, { 'content-type': 'text/css; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(DAEMON_UI_CSS);
+    res.end(DAEMON_CONSOLE_CSS);
+    return true;
+  }
+  if (url.pathname === '/ui/events') {
+    if (!authorizeBrowserUiRequest(req, res, uiToken, config)) return true;
+    serveUiEvents(req, res, uiState);
     return true;
   }
   if (url.pathname !== '/ui/state') return false;
+  if (!authorizeBrowserUiRequest(req, res, uiToken, config)) return true;
+  json(res, 200, uiState.snapshot());
+  return true;
+}
+
+function authorizeBrowserUiRequest(req: IncomingMessage, res: ServerResponse, uiToken: string, config: DaemonConfig): boolean {
   const origin = req.headers.origin;
   if (origin && origin !== config.addin.origin) {
     res.writeHead(403).end('Forbidden origin');
-    return true;
+    return false;
   }
   if (!authorizeUiRequest(req.headers, uiToken)) {
     res.writeHead(401, { 'WWW-Authenticate': 'Bearer' }).end('Unauthorized');
-    return true;
+    return false;
   }
-  json(res, 200, uiState.snapshot());
   return true;
+}
+
+function serveUiEvents(req: IncomingMessage, res: ServerResponse, uiState: UiStateStore): void {
+  res.writeHead(200, {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-store',
+    connection: 'keep-alive'
+  });
+  const send = (snapshot: unknown) => {
+    res.write(`event: snapshot\n`);
+    res.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+  };
+  send(uiState.snapshot());
+  const unsubscribe = uiState.subscribe(send);
+  req.on('close', unsubscribe);
+}
+
+function assertLoopbackUiConfig(config: DaemonConfig): void {
+  const host = config.addin.host.toLowerCase();
+  if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
+    throw new Error('UI API requires a loopback add-in bind host.');
+  }
 }
 
 function renderDaemonUiShell(config: DaemonConfig, uiToken: string): string {
@@ -150,20 +184,21 @@ function renderDaemonUiShell(config: DaemonConfig, uiToken: string): string {
     <meta name="theme-color" content="#F7F8FA" />
     <title>Office MCP</title>
     <link rel="stylesheet" href="/ui/app.css" />
-    <script>window.__OFFICE_MCP_UI__ = ${JSON.stringify({ token: uiToken, stateUrl: `${config.addin.origin}/ui/state` })};</script>
+    <script>window.__OFFICE_MCP_UI__ = ${JSON.stringify({ token: uiToken, stateUrl: `${config.addin.origin}/ui/state`, eventsUrl: `${config.addin.origin}/ui/events` })};</script>
     <script defer src="/ui/app.js"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to Activity</a>
     <main id="main" class="shell">
       <header class="status-strip" aria-label="Daemon Status">
-        <div><span id="health" class="badge neutral">Loading…</span><h1>Office MCP</h1></div>
-        <div class="strip-metrics"><span id="clientCount">0 Clients</span><span id="documentCount">0 Documents</span><span id="taskCount">0 Running</span></div>
+        <div class="brand-lockup"><span id="health" class="badge neutral">Loading…</span><h1>Office MCP</h1></div>
+        <div class="strip-metrics" aria-label="Live Counts"><span id="clientCount">0 Clients</span><span id="documentCount">0 Documents</span><span id="taskCount">0 Running</span></div>
+        <div class="endpoint-strip" aria-label="Endpoints"><span><code id="mcpEndpoint">-</code><button class="icon-button" type="button" data-copy="mcpEndpoint" aria-label="Copy MCP Endpoint">Copy</button></span><span><code id="addinEndpoint">-</code><button class="icon-button" type="button" data-copy="addinEndpoint" aria-label="Copy Add-in Endpoint">Copy</button></span></div>
       </header>
       <section class="layout">
-        <nav class="panel" aria-labelledby="documentsHeading"><h2 id="documentsHeading">Documents</h2><div id="documents"></div></nav>
-        <section class="panel activity" aria-labelledby="activityHeading"><h2 id="activityHeading">Activity</h2><h3>Current Tasks</h3><div id="currentTasks"></div><h3>Recent Command History</h3><div id="history"></div></section>
-        <aside class="panel inspector" aria-labelledby="inspectorHeading"><h2 id="inspectorHeading">Inspector</h2><pre id="inspector">Select an item.</pre></aside>
+        <nav class="panel navigation" aria-labelledby="navigationHeading"><div class="section-heading"><h2 id="navigationHeading">Connections</h2><span id="filterLabel" class="meta-pill">All Apps</span></div><label class="search-label" for="searchInput">Search</label><input id="searchInput" name="search" type="search" autocomplete="off" spellcheck="false" placeholder="session, tool, client…" /><div id="documents" class="document-groups"></div><section aria-labelledby="clientsHeading"><h3 id="clientsHeading">Clients</h3><div id="clients"></div></section></nav>
+        <section class="panel activity" aria-labelledby="activityHeading"><div class="section-heading"><h2 id="activityHeading">Activity</h2><select id="resultFilter" name="resultFilter" aria-label="Filter Command Results"><option value="all">All Results</option><option value="success">Succeeded</option><option value="failure">Failed</option><option value="timeout">Timed Out</option><option value="cancelled">Cancelled</option></select></div><h3>Current Tasks</h3><div id="currentTasks"></div><h3>Recent Command History</h3><div id="history"></div></section>
+        <aside class="panel inspector" aria-labelledby="inspectorHeading"><div class="section-heading"><h2 id="inspectorHeading">Inspector</h2><button id="closeInspector" class="icon-button" type="button" aria-label="Close Inspector">Close</button></div><div id="inspector">Select a row.</div></aside>
       </section>
       <div id="announcer" class="sr-only" aria-live="polite"></div>
     </main>

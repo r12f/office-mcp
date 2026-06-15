@@ -100,11 +100,18 @@ export type SessionDescriptor = {
   session_id: string;
   instance_id: string;
   app: string;
+  host: {
+    app: string;
+    version: string | null;
+    platform: string | null;
+    build: string | null;
+  };
   document: {
     title: string | null;
     url: string | null;
     filename: string | null;
     is_dirty: boolean | null;
+    is_read_only: boolean | null;
     is_protected: boolean | null;
     protection_kind: string | null;
     rights: string[] | null;
@@ -113,6 +120,7 @@ export type SessionDescriptor = {
   is_active: boolean | null;
   capability_tiers: string[];
   available_tool_count: number;
+  queue_depth: number;
   registered_at: string;
   status: 'active' | 'stale';
 };

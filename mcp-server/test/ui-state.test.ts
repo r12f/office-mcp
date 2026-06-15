@@ -35,12 +35,50 @@ test('UI state snapshots redact secrets and cap recent command history', () => {
 
   const snapshot = store.snapshot();
   assert.equal(snapshot.recent_commands.length, 10);
+  assert.equal(snapshot.document_command_history['11111111-1111-4111-8111-111111111111'].length, 10);
   assert.equal(snapshot.current_tasks.length, 0);
   const serialized = JSON.stringify(snapshot);
   assert.doesNotMatch(serialized, /secret-11/);
   assert.doesNotMatch(serialized, /shared_secret=secret/);
   assert.match(serialized, /shared_secret=\[redacted\]/);
   assert.match(serialized, /token=\[redacted\]/);
+});
+
+test('UI state snapshots expose grouped document metadata needed by the console', () => {
+  const store = new UiStateStore({
+    version: '0.1.0',
+    mcpEndpoint: 'http://127.0.0.1:8800/mcp',
+    addinEndpoint: 'https://localhost:8765/addin',
+    sessions: () => [{
+      session_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      instance_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      app: 'excel',
+      host: { app: 'excel', version: '16.0', platform: 'pc', build: 'Desktop' },
+      document: {
+        title: 'Budget.xlsx',
+        url: null,
+        filename: 'Budget.xlsx',
+        is_dirty: true,
+        is_read_only: false,
+        is_protected: false,
+        protection_kind: null,
+        rights: null,
+        rights_source: 'unavailable'
+      },
+      is_active: true,
+      capability_tiers: ['core'],
+      available_tool_count: 3,
+      queue_depth: 1,
+      registered_at: '2026-01-01T00:00:00.000Z',
+      status: 'active'
+    }]
+  });
+
+  const snapshot = store.snapshot();
+  assert.equal(snapshot.documents.excel.length, 1);
+  assert.equal(snapshot.documents.excel[0].host.version, '16.0');
+  assert.equal(snapshot.documents.excel[0].document.is_read_only, false);
+  assert.equal(snapshot.documents.excel[0].queue_depth, 1);
 });
 
 test('UI token accepts bearer or explicit UI token header only', () => {

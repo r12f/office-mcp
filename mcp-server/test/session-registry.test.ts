@@ -114,7 +114,30 @@ test('records UI command history for forwarded tool calls without document body 
   assert.equal(snapshot.recent_commands.length, 1);
   assert.equal(snapshot.recent_commands[0].tool, 'word.get_text');
   assert.equal(snapshot.recent_commands[0].status, 'success');
+  assert.equal(snapshot.recent_commands[0].timeout_ms, 1000);
+  assert.equal(snapshot.document_command_history['77777777-7777-4777-8777-777777777777'].length, 1);
   assert.doesNotMatch(JSON.stringify(snapshot.recent_commands), /document body/);
+});
+
+test('session descriptors include host metadata and queue depth for the daemon UI', () => {
+  const registry = new SessionRegistry();
+  const connection = fakeConnection(async () => ({ ok: true, data: {} }));
+  connection.pending.set('pending-1', {} as never);
+  connection.runtime.host = { app: 'excel', version: '16.0', platform: 'pc', build: 'Desktop' };
+  registry.registerRuntime(connection, connection.runtime);
+  registry.addSession(connection, {
+    session_id: '88888888-8888-4888-8888-888888888888',
+    instance_id: connection.runtime.instance_id,
+    document: { title: 'Budget.xlsx', is_dirty: true, is_read_only: false },
+    available_tools: ['excel.get_range'],
+    is_active: true
+  });
+
+  const session = registry.listSessions()[0];
+  assert.equal(session.app, 'excel');
+  assert.equal(session.host.version, '16.0');
+  assert.equal(session.document.is_read_only, false);
+  assert.equal(session.queue_depth, 1);
 });
 
 function fakeConnection(invokeTool: AddinConnection['invokeTool']): AddinConnection {

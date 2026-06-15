@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { AddinToolResult, OfficeMcpCode, RuntimeInfo, SessionDescriptor, ToolFailure } from './types.js';
@@ -26,6 +27,8 @@ export type UiCommandRecord = {
   user_intent?: string;
   status: UiCommandStatus;
   started_at: string;
+  deadline_at?: string;
+  timeout_ms?: number;
   completed_at?: string;
   elapsed_ms?: number;
   error: UiCommandError | null;
@@ -54,6 +57,7 @@ export type UiSnapshot = {
   documents: Record<string, SessionDescriptor[]>;
   current_tasks: UiCommandRecord[];
   recent_commands: UiCommandRecord[];
+  document_command_history: Record<string, UiCommandRecord[]>;
 };
 
 export type UiStateOptions = {
@@ -76,9 +80,11 @@ export type UiRuntimeInfo = {
 };
 
 export class UiStateStore {
+  private readonly events = new EventEmitter();
   private readonly clients = new Map<string, UiClientRecord>();
   private readonly currentTasks = new Map<string, UiCommandRecord>();
   private readonly recentCommands: UiCommandRecord[] = [];
+  private readonly commandsBySession = new Map<string, UiCommandRecord[]>();
   private readonly startedAt: number;
   private health: UiHealth = 'up';
   private lastError: string | null = null;
@@ -90,6 +96,7 @@ export class UiStateStore {
   setHealth(status: UiHealth, lastError: string | null = null): void {
     this.health = status;
     this.lastError = redactText(lastError);
+    this.emitSnapshot();
   }
 
   registerClient(input: { client_id?: string; transport: UiClientRecord['transport']; name?: string | null }): string {
@@ -103,17 +110,20 @@ export class UiStateStore {
       last_activity_at: now,
       in_flight_request_count: 0
     });
+    this.emitSnapshot();
     return clientId;
   }
 
   unregisterClient(clientId: string): void {
     this.clients.delete(clientId);
+    this.emitSnapshot();
   }
 
   touchClient(clientId: string): void {
     const client = this.clients.get(clientId);
     if (!client) return;
     client.last_activity_at = this.timestamp();
+    this.emitSnapshot();
   }
 
   startCommand(input: {
@@ -125,8 +135,10 @@ export class UiStateStore {
     host_app?: string;
     tool: string;
     user_intent?: string;
+    timeout_ms?: number;
   }): string {
     const commandId = input.command_id ?? randomUUID();
+    const startedAt = this.timestamp();
     const command: UiCommandRecord = {
       command_id: commandId,
       mcp_request_id: redactText(input.mcp_request_id) ?? undefined,
@@ -137,11 +149,14 @@ export class UiStateStore {
       tool: input.tool,
       user_intent: redactText(input.user_intent) ?? undefined,
       status: 'running',
-      started_at: this.timestamp(),
+      started_at: startedAt,
+      timeout_ms: input.timeout_ms,
+      deadline_at: input.timeout_ms ? new Date(Date.parse(startedAt) + input.timeout_ms).toISOString() : undefined,
       error: null
     };
     this.currentTasks.set(commandId, command);
     if (input.client_id) this.incrementClient(input.client_id, 1);
+    this.emitSnapshot();
     return commandId;
   }
 
@@ -161,6 +176,22 @@ export class UiStateStore {
     };
     this.recentCommands.unshift(finished);
     this.recentCommands.splice(10);
+    if (finished.session_id) {
+      const sessionCommands = this.commandsBySession.get(finished.session_id) ?? [];
+      sessionCommands.unshift(finished);
+      sessionCommands.splice(10);
+      this.commandsBySession.set(finished.session_id, sessionCommands);
+    }
+    this.emitSnapshot();
+  }
+
+  subscribe(listener: (snapshot: UiSnapshot) => void): () => void {
+    this.events.on('snapshot', listener);
+    return () => this.events.off('snapshot', listener);
+  }
+
+  notifyChanged(): void {
+    this.emitSnapshot();
   }
 
   snapshot(): UiSnapshot {
@@ -179,7 +210,8 @@ export class UiStateStore {
       clients: [...this.clients.values()].map((client) => ({ ...client })),
       documents: groupSessionsByApp(sessions),
       current_tasks: [...this.currentTasks.values()].map(cloneCommand),
-      recent_commands: this.recentCommands.map(cloneCommand)
+      recent_commands: this.recentCommands.map(cloneCommand),
+      document_command_history: Object.fromEntries([...this.commandsBySession.entries()].map(([sessionId, commands]) => [sessionId, commands.map(cloneCommand)]))
     };
   }
 
@@ -188,6 +220,10 @@ export class UiStateStore {
     if (!client) return;
     client.in_flight_request_count = Math.max(0, client.in_flight_request_count + delta);
     client.last_activity_at = this.timestamp();
+  }
+
+  private emitSnapshot(): void {
+    this.events.emit('snapshot', this.snapshot());
   }
 
   private timestamp(): string {

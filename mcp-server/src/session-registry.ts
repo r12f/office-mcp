@@ -25,6 +25,7 @@ export class SessionRegistry {
     }
     connection.runtime = runtime;
     this.connectionsByInstance.set(runtime.instance_id, connection);
+    this.uiState?.notifyChanged();
   }
 
   addSession(connection: AddinConnection, session: Omit<SessionInfo, 'status' | 'registered_at'>): SessionInfo {
@@ -36,6 +37,7 @@ export class SessionRegistry {
     connection.session = full;
     this.sessionsById.set(full.session_id, full);
     this.connectionsBySession.set(full.session_id, connection);
+    this.uiState?.notifyChanged();
     return full;
   }
 
@@ -43,6 +45,7 @@ export class SessionRegistry {
     const existing = this.sessionsById.get(sessionId);
     if (!existing) return;
     this.sessionsById.set(sessionId, { ...existing, ...patch });
+    this.uiState?.notifyChanged();
   }
 
   removeSession(sessionId: string): void {
@@ -52,6 +55,7 @@ export class SessionRegistry {
     }
     this.sessionsById.delete(sessionId);
     this.connectionsBySession.delete(sessionId);
+    this.uiState?.notifyChanged();
   }
 
   removeConnection(connection: AddinConnection): void {
@@ -59,6 +63,7 @@ export class SessionRegistry {
       this.markSessionStale(connection.session.session_id);
     }
     this.connectionsByInstance.delete(connection.runtime.instance_id);
+    this.uiState?.notifyChanged();
   }
 
   markConnectionStale(connection: AddinConnection): void {
@@ -72,6 +77,7 @@ export class SessionRegistry {
     if (!session || session.status === 'stale') return;
     const stale = { ...session, status: 'stale' as const, stale_since: new Date().toISOString() };
     this.sessionsById.set(sessionId, stale);
+    this.uiState?.notifyChanged();
   }
 
   pruneStaleSessions(graceSec: number): void {
@@ -168,7 +174,8 @@ export class SessionRegistry {
       session_id: sessionId,
       host_app: connection.runtime.host.app || session.available_tools[0]?.split('.')[0] || 'word',
       tool,
-      user_intent: readUserIntent(args)
+      user_intent: readUserIntent(args),
+      timeout_ms: timeoutMs
     });
     const run = async () => {
       try {
@@ -187,15 +194,24 @@ export class SessionRegistry {
 
   private describe(session: SessionInfo): SessionDescriptor {
     const doc = session.document;
+    const connection = this.connectionsBySession.get(session.session_id);
+    const host = connection?.runtime.host;
     return {
       session_id: session.session_id,
       instance_id: session.instance_id,
-      app: 'word',
+      app: normalizeHostApp(host?.app),
+      host: {
+        app: normalizeHostApp(host?.app),
+        version: host?.version ?? null,
+        platform: host?.platform ?? null,
+        build: host?.build ?? null
+      },
       document: {
         title: doc.title ?? doc.filename ?? null,
         url: doc.url ?? null,
         filename: doc.filename ?? null,
         is_dirty: doc.is_dirty ?? null,
+        is_read_only: doc.is_read_only ?? null,
         is_protected: doc.is_protected ?? null,
         protection_kind: doc.protection?.kind ?? null,
         rights: doc.protection?.rights ?? null,
@@ -204,10 +220,16 @@ export class SessionRegistry {
       is_active: session.is_active ?? null,
       capability_tiers: inferCapabilityTiers(session.available_tools),
       available_tool_count: session.available_tools.length,
+      queue_depth: connection?.pending.size ?? 0,
       registered_at: session.registered_at,
       status: session.status
     };
   }
+}
+
+function normalizeHostApp(app: string | undefined): string {
+  const value = String(app || 'other').toLowerCase();
+  return ['word', 'excel', 'powerpoint', 'outlook'].includes(value) ? value : 'other';
 }
 
 function inferCapabilityTiers(tools: string[]): string[] {
