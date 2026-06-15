@@ -3,22 +3,69 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>office-mcp</title>
+    <meta name="theme-color" content="#F7F8FA" />
+    <title>Office MCP</title>
     <link rel="stylesheet" href="/taskpane.css?v=0.1.5" />
     <script defer src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script defer src="/taskpane.js?v=0.1.5"></script>
   </head>
   <body>
-    <main>
-      <h1>office-mcp</h1>
-      <p id="status">Starting...</p>
-      <dl>
-        <dt>Session</dt>
-        <dd id="session">-</dd>
-        <dt>Daemon</dt>
-        <dd id="daemon">-</dd>
-      </dl>
+    <a class="skip-link" href="#main">Skip to Status</a>
+    <main id="main" class="taskpane-shell">
+      <header class="topbar" aria-label="Daemon connection">
+        <div class="identity">
+          <span id="connectionBadge" class="status-badge status-neutral" aria-live="polite">Connecting…</span>
+          <h1>Office MCP</h1>
+        </div>
+        <button id="settingsToggle" class="icon-button" type="button" aria-label="Open Settings" aria-expanded="false" aria-controls="settingsPanel">⚙</button>
+      </header>
+
+      <section class="panel document-panel" aria-labelledby="documentHeading">
+        <div class="section-heading">
+          <h2 id="documentHeading">Document</h2>
+          <span id="toolCount" class="meta-pill">0 Tools</span>
+        </div>
+        <dl class="metadata-grid">
+          <dt>Title</dt>
+          <dd id="documentTitle">Unknown Word Document</dd>
+          <dt>Session</dt>
+          <dd><code id="session">-</code></dd>
+          <dt>Daemon</dt>
+          <dd><code id="daemon">-</code></dd>
+          <dt>Protection</dt>
+          <dd id="protection">Unknown</dd>
+        </dl>
+      </section>
+
+      <section class="panel current-task-panel" aria-labelledby="currentTaskHeading">
+        <div class="section-heading">
+          <h2 id="currentTaskHeading">Current Task</h2>
+          <span id="currentTaskState" class="meta-pill">Idle</span>
+        </div>
+        <div id="currentTask" class="empty-state">No command is running.</div>
+      </section>
+
+      <section class="panel history-panel" aria-labelledby="historyHeading">
+        <div class="section-heading">
+          <h2 id="historyHeading">Recent Tasks</h2>
+          <span id="historyCount" class="meta-pill">0 / 20</span>
+        </div>
+        <ol id="historyList" class="history-list" aria-live="polite"></ol>
+      </section>
+
+      <section id="settingsPanel" class="panel settings-panel" aria-labelledby="settingsHeading" hidden>
+        <h2 id="settingsHeading">Settings</h2>
+        <form id="settingsForm" novalidate>
+          <label for="endpointInput">Daemon Endpoint</label>
+          <div class="input-row">
+            <input id="endpointInput" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="wss://localhost:8765/addin…" />
+            <button id="saveEndpoint" type="submit">Save Endpoint</button>
+          </div>
+          <p id="endpointError" class="field-error" role="alert"></p>
+        </form>
+      </section>
+
+      <div id="announcer" class="sr-only" aria-live="polite"></div>
     </main>
   </body>
 </html>
-

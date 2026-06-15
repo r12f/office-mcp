@@ -1,4 +1,5 @@
 import type { AddinConnection, AddinToolResult, RuntimeInfo, SessionDescriptor, SessionInfo, ToolFailure } from './types.js';
+import type { UiStateStore } from './ui-state.js';
 
 export class ToolInvocationError extends Error {
   readonly failure: ToolFailure;
@@ -14,7 +15,7 @@ export class SessionRegistry {
   private readonly sessionsById = new Map<string, SessionInfo>();
   private readonly connectionsBySession = new Map<string, AddinConnection>();
 
-  constructor(private readonly maxPendingPerSession = 4) {}
+  constructor(private readonly maxPendingPerSession = 4, private readonly uiState?: UiStateStore) {}
 
   registerRuntime(connection: AddinConnection, runtime: RuntimeInfo): void {
     const existing = this.connectionsByInstance.get(runtime.instance_id);
@@ -163,7 +164,22 @@ export class SessionRegistry {
       });
     }
 
-    const run = () => connection.invokeTool(sessionId, tool, args, timeoutMs);
+    const commandId = this.uiState?.startCommand({
+      session_id: sessionId,
+      host_app: connection.runtime.host.app || session.available_tools[0]?.split('.')[0] || 'word',
+      tool,
+      user_intent: readUserIntent(args)
+    });
+    const run = async () => {
+      try {
+        const result = await connection.invokeTool(sessionId, tool, args, timeoutMs);
+        if (commandId) this.uiState?.finishCommand(commandId, result);
+        return result;
+      } catch (error) {
+        if (commandId) this.uiState?.finishCommand(commandId, error instanceof ToolInvocationError ? error.failure : error instanceof Error ? error : new Error(String(error)));
+        throw error;
+      }
+    };
     const result = connection.queue.then(run, run);
     connection.queue = result.catch(() => undefined);
     return result;
@@ -199,6 +215,13 @@ function inferCapabilityTiers(tools: string[]): string[] {
   if (tools.includes('word.add_comment')) tiers.push('review');
   if (tools.includes('word.accept_change')) tiers.push('tracked_changes');
   return tiers;
+}
+
+function readUserIntent(args: Record<string, unknown>): string | undefined {
+  const clientMeta = args.client_meta;
+  if (typeof clientMeta !== 'object' || clientMeta === null) return undefined;
+  const intent = (clientMeta as { user_intent?: unknown }).user_intent;
+  return typeof intent === 'string' ? intent : undefined;
 }
 
 

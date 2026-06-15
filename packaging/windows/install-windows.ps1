@@ -40,6 +40,8 @@ try {
 }
 
 Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination (Join-Path $catalogPath "manifest.xml")
+$trayLauncherPath = Join-Path $InstallRoot "office-mcp-tray.ps1"
+Copy-Item -Force -Path (Join-Path $repoRoot "packaging\windows\office-mcp-tray.ps1") -Destination $trayLauncherPath
 
 $catalogKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp"
 New-Item -Path $catalogKey -Force | Out-Null
@@ -70,7 +72,7 @@ npm run daemon
 "@ | Set-Content -Encoding ASCII -Path $launcherPath
 
 if (-not $SkipScheduledTask) {
-  $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$launcherPath`""
+  $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$trayLauncherPath`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn
   $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel LeastPrivilege
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
@@ -82,4 +84,5 @@ Write-Output "Install root: $InstallRoot"
 Write-Output "Config script: $configPath"
 Write-Output "Catalog URL: $catalogPath"
 Write-Output "Daemon launcher: $launcherPath"
+Write-Output "Tray launcher: $trayLauncherPath"
 if (-not $SkipScheduledTask) { Write-Output "Scheduled task: $TaskName" }

@@ -11,6 +11,7 @@ import { SessionRegistry, ToolInvocationError } from './session-registry.js';
 import type { AddinToolResult, ToolFailure } from './types.js';
 import { SERVER_VERSION } from './types.js';
 import { constantTimeEquals } from './security.js';
+import type { UiStateStore } from './ui-state.js';
 
 type TransportMap = Record<string, StreamableHTTPServerTransport>;
 
@@ -18,7 +19,7 @@ export class McpFrontend {
   private readonly transports: TransportMap = {};
   private readonly rateLimits = new Map<string, { windowStarted: number; count: number }>();
 
-  constructor(private readonly config: DaemonConfig, private readonly registry: SessionRegistry) {}
+  constructor(private readonly config: DaemonConfig, private readonly registry: SessionRegistry, private readonly uiState?: UiStateStore) {}
 
   async handle(req: IncomingMessage, res: ServerResponse, body?: unknown): Promise<void> {
     if (!this.checkOrigin(req, res) || !this.checkAuth(req, res) || !this.checkRateLimit(req, res)) return;
@@ -43,11 +44,19 @@ export class McpFrontend {
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (newSessionId) => {
             this.transports[newSessionId] = transport!;
+            this.uiState?.registerClient({
+              client_id: newSessionId,
+              transport: 'http',
+              name: clientName(req)
+            });
           }
         });
         transport.onclose = () => {
           const closedSessionId = transport?.sessionId;
-          if (closedSessionId) delete this.transports[closedSessionId];
+          if (closedSessionId) {
+            delete this.transports[closedSessionId];
+            this.uiState?.unregisterClient(closedSessionId);
+          }
         };
         await createMcpServer(this.config, this.registry).connect(transport);
       } else {
@@ -59,6 +68,7 @@ export class McpFrontend {
         json(res, 404, { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Unknown MCP session ID.' } });
         return;
       }
+      if (transport.sessionId) this.uiState?.touchClient(transport.sessionId);
       await transport.handleRequest(req, res, body);
     } catch (error) {
       if (!res.headersSent) {
@@ -73,6 +83,7 @@ export class McpFrontend {
       res.writeHead(400).end('Invalid or missing MCP session ID');
       return;
     }
+    this.uiState?.touchClient(sessionId);
     await this.transports[sessionId].handleRequest(req, res);
   }
 
@@ -110,6 +121,13 @@ export class McpFrontend {
     res.writeHead(429, { 'Retry-After': '60' }).end('Rate limit exceeded');
     return false;
   }
+}
+
+function clientName(req: IncomingMessage): string | null {
+  const explicit = header(req, 'x-office-mcp-client');
+  if (explicit) return explicit;
+  const userAgent = req.headers['user-agent'];
+  return Array.isArray(userAgent) ? userAgent[0] : userAgent ?? null;
 }
 
 export function createMcpServer(config: DaemonConfig, registry: SessionRegistry): McpServer {

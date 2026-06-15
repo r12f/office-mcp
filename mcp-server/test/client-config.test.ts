@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { join } from 'node:path';
 import { buildClaudeDesktopConfig } from '../src/client-config.js';
+import { readFileSync } from 'node:fs';
 
 test('builds Claude Desktop config for a source checkout', () => {
   const config = buildClaudeDesktopConfig({ mode: 'dev', cwd: 'C:\\Code\\office-mcp\\mcp-server' });
@@ -53,4 +54,11 @@ test('uses OFFICE_MCP_INSTALL_ROOT for installed Claude Desktop config by defaul
       process.env.OFFICE_MCP_INSTALL_ROOT = previousInstallRoot;
     }
   }
+});
+
+test('CLI exposes daemon UI command in usage text', () => {
+  const source = readFileSync(join(process.cwd(), 'src', 'cli.ts'), 'utf8');
+
+  assert.match(source, /command\[0\] === 'ui'/);
+  assert.match(source, /office-mcp ui/);
 });

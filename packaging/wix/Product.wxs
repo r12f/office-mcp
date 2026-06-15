@@ -47,7 +47,7 @@
           Key="Software\Microsoft\Windows\CurrentVersion\Run"
           Name="office-mcp"
           Type="string"
-          Value="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]office-mcp-daemon.ps1&quot;" />
+          Value="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]office-mcp-tray.ps1&quot;" />
       </Component>
     </DirectoryRef>
   </Fragment>

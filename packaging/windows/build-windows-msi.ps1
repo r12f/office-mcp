@@ -109,6 +109,7 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
     "office-mcp-env.ps1",
     "config.toml",
     "office-mcp-daemon.ps1",
+    "office-mcp-tray.ps1",
     "office-mcp.ps1"
   )
 
@@ -127,6 +128,11 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
   $cliLauncher = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp.ps1")
   if ($cliLauncher -notmatch "office-mcp-env\.ps1" -or $cliLauncher -notmatch "node\\node\.exe" -or $cliLauncher -notmatch "@args") {
     throw "CLI launcher must use the packaged node.exe and forward arguments."
+  }
+
+  $trayLauncher = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-tray.ps1")
+  if ($trayLauncher -notmatch "NotifyIcon" -or $trayLauncher -notmatch "Show Office MCP" -or $trayLauncher -notmatch "Quit Office MCP") {
+    throw "Tray launcher must expose the required notification-area menu."
   }
 
   $generatedWxs = Get-Content -Raw -LiteralPath $GeneratedWxsPath
@@ -223,6 +229,7 @@ try {
 Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination $stageAddinRoot
 Copy-Item -Recurse -Force -Path (Join-Path $addinRoot "public") -Destination $stageAddinRoot
 Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination (Join-Path $stageCatalogRoot "manifest.xml")
+Copy-Item -Force -Path (Join-Path $repoRoot "packaging\windows\office-mcp-tray.ps1") -Destination (Join-Path $stageRoot "office-mcp-tray.ps1")
 
 @'
 [addin_channel]

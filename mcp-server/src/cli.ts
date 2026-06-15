@@ -3,6 +3,7 @@ import { startDaemon } from './daemon.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { connect } from 'node:net';
+import { execFile } from 'node:child_process';
 import { startStdioBridge } from './stdio-bridge.js';
 import { buildClaudeDesktopConfig, type ClaudeDesktopMode } from './client-config.js';
 import { runDaemonControl } from './daemon-control.js';
@@ -35,6 +36,11 @@ if (command[0] === 'daemon' && command[1] === 'run') {
 } else if (command[0] === 'stdio') {
   const config = loadConfig();
   await startStdioBridge(new URL(`http://${config.mcp.host}:${config.mcp.port}/mcp`));
+} else if (command[0] === 'ui') {
+  const config = loadConfig();
+  const uiUrl = `${config.addin.origin}/ui/`;
+  console.log(JSON.stringify({ ui: uiUrl }, null, 2));
+  await openUrl(uiUrl);
 } else if (command[0] === 'config' && (command[1] === 'endpoints' || command[1] === 'show')) {
   const config = loadConfig();
   const endpoints = {
@@ -63,12 +69,24 @@ if (command[0] === 'daemon' && command[1] === 'run') {
   console.log('  office-mcp daemon run');
   console.log('  office-mcp daemon status');
   console.log('  office-mcp daemon start|stop   # Windows autostart integration');
+  console.log('  office-mcp ui                  # open the daemon main window in a browser');
   console.log('  office-mcp stdio               # bridge stdio-only MCP clients to the daemon');
   console.log('  office-mcp config endpoints');
   console.log('  office-mcp config show');
   console.log('  office-mcp config claude-desktop [--installed] [--install-root <path>]');
   console.log('  office-mcp sessions');
   process.exit(command.length === 0 ? 0 : 1);
+}
+
+function openUrl(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const commandLine = process.platform === 'win32'
+      ? { file: 'powershell.exe', args: ['-NoProfile', '-Command', 'Start-Process', url] }
+      : process.platform === 'darwin'
+        ? { file: 'open', args: [url] }
+        : { file: 'xdg-open', args: [url] };
+    execFile(commandLine.file, commandLine.args, { windowsHide: true }, () => resolve());
+  });
 }
 
 function readOption(args: string[], name: string): string | undefined {

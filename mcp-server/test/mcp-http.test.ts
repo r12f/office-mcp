@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpFrontend } from '../src/mcp-server.js';
@@ -63,6 +64,14 @@ test('rate limits MCP HTTP requests per source', async () => {
 
   assert.equal(second.statusCode, 429);
   assert.equal(second.headers['Retry-After'], '60');
+});
+
+test('MCP frontend wires HTTP session lifecycle into UI client tracking', () => {
+  const source = readFileSync('src/mcp-server.ts', 'utf8');
+
+  assert.match(source, /uiState\?\.registerClient/);
+  assert.match(source, /uiState\?\.unregisterClient/);
+  assert.match(source, /uiState\?\.touchClient/);
 });
 
 function fakeRequest(headers: Record<string, string> = {}): IncomingMessage {

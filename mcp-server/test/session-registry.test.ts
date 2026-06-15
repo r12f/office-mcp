@@ -3,6 +3,7 @@ import test from 'node:test';
 import { EventEmitter } from 'node:events';
 import { SessionRegistry, ToolInvocationError } from '../src/session-registry.js';
 import type { AddinConnection } from '../src/types.js';
+import { UiStateStore } from '../src/ui-state.js';
 
 test('lists sessions and returns full session info', () => {
   const registry = new SessionRegistry();
@@ -86,6 +87,34 @@ test('forwards supported tool calls to the owning add-in connection', async () =
   const result = await registry.invoke('33333333-3333-4333-8333-333333333333', 'word.get_text', { session_id: '33333333-3333-4333-8333-333333333333' }, 1000);
   assert.deepEqual(result, { ok: true, data: { text: 'hello' } });
   assert.equal(seen.length, 1);
+});
+
+test('records UI command history for forwarded tool calls without document body data', async () => {
+  let registry: SessionRegistry;
+  const uiState = new UiStateStore({
+    version: '0.1.0',
+    mcpEndpoint: 'http://127.0.0.1:8800/mcp',
+    addinEndpoint: 'https://localhost:8765/addin',
+    sessions: () => registry.listSessions()
+  });
+  registry = new SessionRegistry(4, uiState);
+  const connection = fakeConnection(async () => ({ ok: true, data: { text: 'document body must not enter UI history' } }));
+  registry.registerRuntime(connection, connection.runtime);
+  registry.addSession(connection, {
+    session_id: '77777777-7777-4777-8777-777777777777',
+    instance_id: connection.runtime.instance_id,
+    document: { title: 'Ui.docx' },
+    available_tools: ['word.get_text'],
+    is_active: null
+  });
+
+  await registry.invoke('77777777-7777-4777-8777-777777777777', 'word.get_text', { session_id: '77777777-7777-4777-8777-777777777777' }, 1000);
+
+  const snapshot = uiState.snapshot();
+  assert.equal(snapshot.recent_commands.length, 1);
+  assert.equal(snapshot.recent_commands[0].tool, 'word.get_text');
+  assert.equal(snapshot.recent_commands[0].status, 'success');
+  assert.doesNotMatch(JSON.stringify(snapshot.recent_commands), /document body/);
 });
 
 function fakeConnection(invokeTool: AddinConnection['invokeTool']): AddinConnection {

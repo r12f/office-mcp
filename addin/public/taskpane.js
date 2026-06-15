@@ -34,13 +34,37 @@
   let socket;
   let instanceId = sessionStorage.getItem('office-mcp.instance-id') || crypto.randomUUID();
   let sessionId = sessionStorage.getItem('office-mcp.session-id') || crypto.randomUUID();
+  let documentInfo = null;
+  let reconnectTimer;
+  let reconnectAttempt = 0;
+  let currentTask = null;
+  const taskHistory = [];
   const cancelledRequests = new Set();
   sessionStorage.setItem('office-mcp.instance-id', instanceId);
   sessionStorage.setItem('office-mcp.session-id', sessionId);
 
-  const statusEl = document.getElementById('status');
+  const connectionBadgeEl = document.getElementById('connectionBadge');
   const sessionEl = document.getElementById('session');
   const daemonEl = document.getElementById('daemon');
+  const documentTitleEl = document.getElementById('documentTitle');
+  const protectionEl = document.getElementById('protection');
+  const toolCountEl = document.getElementById('toolCount');
+  const currentTaskEl = document.getElementById('currentTask');
+  const currentTaskStateEl = document.getElementById('currentTaskState');
+  const historyListEl = document.getElementById('historyList');
+  const historyCountEl = document.getElementById('historyCount');
+  const settingsToggleEl = document.getElementById('settingsToggle');
+  const settingsPanelEl = document.getElementById('settingsPanel');
+  const settingsFormEl = document.getElementById('settingsForm');
+  const endpointInputEl = document.getElementById('endpointInput');
+  const endpointErrorEl = document.getElementById('endpointError');
+  const saveEndpointEl = document.getElementById('saveEndpoint');
+  const announcerEl = document.getElementById('announcer');
+
+  settingsToggleEl.addEventListener('click', toggleSettings);
+  settingsFormEl.addEventListener('submit', saveEndpointOverride);
+  endpointInputEl.value = configuredEndpoint();
+  renderStaticState();
 
   Office.onReady(async (info) => {
     if (info.host !== Office.HostType.Word) {
@@ -51,26 +75,29 @@
       setStatus('Unsupported platform');
       return;
     }
-    setStatus('Connecting');
+    setConnectionState('connecting', 'Connecting…');
     connect();
   });
 
   function connect() {
-    const endpoint = `${location.origin.replace('https://', 'wss://')}/addin`;
+    clearTimeout(reconnectTimer);
+    const endpoint = configuredEndpoint();
     daemonEl.textContent = endpoint;
+    endpointInputEl.value = endpoint;
+    setConnectionState('connecting', 'Connecting…');
     socket = new WebSocket(endpoint);
     socket.addEventListener('open', () => register());
     socket.addEventListener('message', (event) => handleMessage(event.data));
     socket.addEventListener('close', () => {
       console.warn('office-mcp websocket closed');
-      setStatus('Disconnected; retrying');
-      setTimeout(connect, 1000 + Math.floor(Math.random() * 1500));
+      scheduleReconnect();
     });
-    socket.addEventListener('error', () => setStatus('Connection error'));
+    socket.addEventListener('error', () => setConnectionState('failed', 'Failed'));
   }
 
   function register() {
-    setStatus('Registering');
+    reconnectAttempt = 0;
+    setConnectionState('connecting', 'Registering…');
     send({
       jsonrpc: '2.0',
       id: crypto.randomUUID(),
@@ -96,6 +123,7 @@
 
   async function announceSession() {
     const document = await getDocumentInfo();
+    documentInfo = document;
     await enableDocumentAutoOpen();
     console.log('office-mcp session.added', { sessionId, document });
     send({
@@ -110,7 +138,8 @@
       }
     });
     sessionEl.textContent = sessionId;
-    setStatus('Connected');
+    renderDocumentState();
+    setConnectionState('connected', 'Connected');
   }
 
   function enableDocumentAutoOpen() {
@@ -147,104 +176,113 @@
   async function invokeTool(message) {
     const started = performance.now();
     const { tool, args } = message.params;
+    startTask(message.id, tool, args, message.params.timeout_ms);
     let data;
-    if (cancelledRequests.has(message.id)) throw cancelledError(tool);
-    switch (tool) {
-      case 'word.get_text':
-        data = await getText(args);
-        break;
-      case 'word.get_paragraph':
-        data = await getParagraph(args);
-        break;
-      case 'word.get_outline':
-        data = await getOutline(args);
-        break;
-      case 'word.find_text':
-        data = await findText(args);
-        break;
-      case 'word.get_selection':
-        data = await getSelection(args);
-        break;
-      case 'word.insert_paragraph':
-        data = await insertParagraph(args);
-        break;
-      case 'word.insert_heading':
-        data = await insertHeading(args);
-        break;
-      case 'word.insert_table':
-        data = await insertTable(args);
-        break;
-      case 'word.insert_image':
-        data = await insertImage(args);
-        break;
-      case 'word.insert_page_break':
-        data = await insertPageBreak(args);
-        break;
-      case 'word.insert_list':
-        data = await insertList(args);
-        break;
-      case 'word.replace_text':
-        data = await replaceText(args);
-        break;
-      case 'word.update_paragraph':
-        data = await updateParagraph(args);
-        break;
-      case 'word.delete_range':
-        data = await deleteRange(args);
-        break;
-      case 'word.apply_formatting':
-        data = await applyFormatting(args);
-        break;
-      case 'word.read_table':
-        data = await readTable(args);
-        break;
-      case 'word.update_cell':
-        data = await updateCell(args);
-        break;
-      case 'word.add_row':
-        data = await addRow(args);
-        break;
-      case 'word.add_column':
-        data = await addColumn(args);
-        break;
-      case 'word.format_cell':
-        data = await formatCell(args);
-        break;
-      case 'word.set_heading_level':
-        data = await setHeadingLevel(args);
-        break;
-      case 'word.apply_style':
-        data = await applyStyle(args);
-        break;
-      case 'word.add_comment':
-        data = await addComment(args);
-        break;
-      case 'word.resolve_comment':
-        data = await resolveComment(args);
-        break;
-      case 'word.accept_change':
-        data = await mutateTrackedChange(args, 'accept');
-        break;
-      case 'word.reject_change':
-        data = await mutateTrackedChange(args, 'reject');
-        break;
-      case 'word._get_comments':
-        data = await getComments(args);
-        break;
-      case 'word._get_tracked_changes':
-        data = await getTrackedChanges(args);
-        break;
-      case 'word._get_structure':
-        data = await getStructure(args);
-        break;
-      case 'word.save':
-        data = await saveDocument(args);
-        break;
-      default:
-        throw Object.assign(new Error(`Unsupported tool ${tool}`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE' });
+    try {
+      if (cancelledRequests.has(message.id)) throw cancelledError(tool);
+      switch (tool) {
+        case 'word.get_text':
+          data = await getText(args);
+          break;
+        case 'word.get_paragraph':
+          data = await getParagraph(args);
+          break;
+        case 'word.get_outline':
+          data = await getOutline(args);
+          break;
+        case 'word.find_text':
+          data = await findText(args);
+          break;
+        case 'word.get_selection':
+          data = await getSelection(args);
+          break;
+        case 'word.insert_paragraph':
+          data = await insertParagraph(args);
+          break;
+        case 'word.insert_heading':
+          data = await insertHeading(args);
+          break;
+        case 'word.insert_table':
+          data = await insertTable(args);
+          break;
+        case 'word.insert_image':
+          data = await insertImage(args);
+          break;
+        case 'word.insert_page_break':
+          data = await insertPageBreak(args);
+          break;
+        case 'word.insert_list':
+          data = await insertList(args);
+          break;
+        case 'word.replace_text':
+          data = await replaceText(args);
+          break;
+        case 'word.update_paragraph':
+          data = await updateParagraph(args);
+          break;
+        case 'word.delete_range':
+          data = await deleteRange(args);
+          break;
+        case 'word.apply_formatting':
+          data = await applyFormatting(args);
+          break;
+        case 'word.read_table':
+          data = await readTable(args);
+          break;
+        case 'word.update_cell':
+          data = await updateCell(args);
+          break;
+        case 'word.add_row':
+          data = await addRow(args);
+          break;
+        case 'word.add_column':
+          data = await addColumn(args);
+          break;
+        case 'word.format_cell':
+          data = await formatCell(args);
+          break;
+        case 'word.set_heading_level':
+          data = await setHeadingLevel(args);
+          break;
+        case 'word.apply_style':
+          data = await applyStyle(args);
+          break;
+        case 'word.add_comment':
+          data = await addComment(args);
+          break;
+        case 'word.resolve_comment':
+          data = await resolveComment(args);
+          break;
+        case 'word.accept_change':
+          data = await mutateTrackedChange(args, 'accept');
+          break;
+        case 'word.reject_change':
+          data = await mutateTrackedChange(args, 'reject');
+          break;
+        case 'word._get_comments':
+          data = await getComments(args);
+          break;
+        case 'word._get_tracked_changes':
+          data = await getTrackedChanges(args);
+          break;
+        case 'word._get_structure':
+          data = await getStructure(args);
+          break;
+        case 'word.save':
+          data = await saveDocument(args);
+          break;
+        default:
+          throw Object.assign(new Error(`Unsupported tool ${tool}`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE' });
+      }
+      if (cancelledRequests.delete(message.id)) throw cancelledError(tool);
+      const elapsedMs = Math.round(performance.now() - started);
+      finishTask(message.id, 'success', elapsedMs);
+      reply(message.id, { ok: true, data, elapsed_ms: elapsedMs });
+    } catch (error) {
+      const mapped = mapError(error, tool);
+      finishTask(message.id, mapped.office_mcp_code === 'CANCELLED' ? 'cancelled' : 'failure', Math.round(performance.now() - started), mapped);
+      throw error;
     }
-    if (cancelledRequests.delete(message.id)) throw cancelledError(tool);
-    reply(message.id, { ok: true, data, elapsed_ms: Math.round(performance.now() - started) });
   }
 
   function cancelledError(tool) {
@@ -1086,8 +1124,175 @@
     if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
   }
 
-  function setStatus(text) {
-    statusEl.textContent = text;
+  function configuredEndpoint() {
+    return localStorage.getItem('office-mcp.addin-endpoint') || `${location.origin.replace('https://', 'wss://')}/addin`;
+  }
+
+  function scheduleReconnect() {
+    reconnectAttempt += 1;
+    const delay = Math.min(10000, 1000 + reconnectAttempt * 500 + Math.floor(Math.random() * 500));
+    const seconds = Math.ceil(delay / 1000);
+    setConnectionState('reconnecting', `Reconnecting in ${seconds}s`);
+    reconnectTimer = setTimeout(connect, delay);
+  }
+
+  function setConnectionState(state, label) {
+    connectionBadgeEl.textContent = label;
+    connectionBadgeEl.className = `status-badge ${statusClass(state)}`;
+    announce(label);
+  }
+
+  function statusClass(state) {
+    if (state === 'connected' || state === 'success') return 'status-success';
+    if (state === 'reconnecting' || state === 'connecting') return 'status-warning';
+    if (state === 'failed' || state === 'disconnected' || state === 'failure') return 'status-danger';
+    return 'status-neutral';
+  }
+
+  function renderStaticState() {
+    sessionEl.textContent = sessionId;
+    daemonEl.textContent = configuredEndpoint();
+    toolCountEl.textContent = `${AVAILABLE_TOOLS.length} Tools`;
+    renderHistory();
+  }
+
+  function renderDocumentState() {
+    if (!documentInfo) return;
+    documentTitleEl.textContent = documentInfo.title || documentInfo.filename || 'Word Document';
+    protectionEl.textContent = documentInfo.protection?.kind || 'Unknown';
+  }
+
+  function startTask(requestId, tool, args, timeoutMs) {
+    currentTask = {
+      requestId,
+      tool,
+      userIntent: args?.client_meta?.user_intent || '',
+      startedAt: Date.now(),
+      timeoutMs: timeoutMs || null
+    };
+    renderCurrentTask();
+  }
+
+  function finishTask(requestId, status, elapsedMs, error) {
+    if (!currentTask || currentTask.requestId !== requestId) return;
+    taskHistory.unshift({
+      tool: currentTask.tool,
+      userIntent: currentTask.userIntent,
+      status,
+      elapsedMs,
+      error: error ? sanitizeError(error) : null,
+      completedAt: new Date().toISOString()
+    });
+    taskHistory.splice(20);
+    currentTask = null;
+    renderCurrentTask();
+    renderHistory();
+    announce(`${taskHistory[0].tool} ${status}`);
+  }
+
+  function renderCurrentTask() {
+    if (!currentTask) {
+      currentTaskStateEl.textContent = 'Idle';
+      currentTaskEl.className = 'empty-state';
+      currentTaskEl.textContent = 'No command is running.';
+      return;
+    }
+    currentTaskStateEl.textContent = 'Running';
+    currentTaskEl.className = 'task-card';
+    const elapsed = Math.max(0, Date.now() - currentTask.startedAt);
+    currentTaskEl.innerHTML = taskMarkup({
+      tool: currentTask.tool,
+      status: 'running',
+      elapsedMs: elapsed,
+      userIntent: currentTask.userIntent,
+      error: null
+    });
+  }
+
+  function renderHistory() {
+    historyCountEl.textContent = `${taskHistory.length} / 20`;
+    historyListEl.textContent = '';
+    for (const task of taskHistory) {
+      const item = document.createElement('li');
+      item.innerHTML = `<article class="task-card">${taskMarkup(task)}</article>`;
+      historyListEl.appendChild(item);
+    }
+  }
+
+  function taskMarkup(task) {
+    const tone = task.status === 'success' ? 'status-success' : task.status === 'running' ? 'status-warning' : 'status-danger';
+    const error = task.error ? `<div class="task-meta">${escapeHtml(task.error.office_mcp_code)}: ${escapeHtml(task.error.message)}</div>` : '';
+    const intent = task.userIntent ? `<div class="task-meta">${escapeHtml(redactText(task.userIntent))}</div>` : '';
+    return [
+      '<div class="task-title">',
+      `<span>${escapeHtml(task.tool)}</span>`,
+      `<span class="status-badge ${tone}">${escapeHtml(titleCase(task.status))}</span>`,
+      '</div>',
+      `<div class="task-meta">${formatDuration(task.elapsedMs)}</div>`,
+      intent,
+      error
+    ].join('');
+  }
+
+  function toggleSettings() {
+    const opening = settingsPanelEl.hidden;
+    settingsPanelEl.hidden = !opening;
+    settingsToggleEl.setAttribute('aria-expanded', String(opening));
+    settingsToggleEl.setAttribute('aria-label', opening ? 'Close Settings' : 'Open Settings');
+    if (opening) endpointInputEl.focus();
+  }
+
+  function saveEndpointOverride(event) {
+    event.preventDefault();
+    endpointErrorEl.textContent = '';
+    const value = endpointInputEl.value.trim();
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol !== 'wss:') throw new Error('Use a wss:// endpoint, for example wss://localhost:8765/addin.');
+      localStorage.setItem('office-mcp.addin-endpoint', value);
+      saveEndpointEl.textContent = 'Saving…';
+      setTimeout(() => {
+        saveEndpointEl.textContent = 'Save Endpoint';
+        if (socket) socket.close(1000, 'Endpoint changed');
+        connect();
+      }, 0);
+    } catch (error) {
+      endpointErrorEl.textContent = error.message || 'Enter a valid wss:// endpoint.';
+      endpointInputEl.focus();
+    }
+  }
+
+  function sanitizeError(error) {
+    return {
+      office_mcp_code: error.office_mcp_code || 'GENERIC_FAILURE',
+      message: redactText(error.message || 'Command failed.'),
+      retriable: Boolean(error.retriable),
+      partial_effect: error.partial_effect || 'unknown'
+    };
+  }
+
+  function redactText(text) {
+    return String(text || '')
+      .replace(/Bearer\s+[A-Za-z0-9._~+\/-]+=*/gi, 'Bearer [redacted]')
+      .replace(/(api[_-]?key|shared[_-]?secret|password|passphrase|token)=([^\s&]+)/gi, '$1=[redacted]')
+      .replace(/base64,[A-Za-z0-9+/=]+/g, 'base64,[redacted]')
+      .slice(0, 300);
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]);
+  }
+
+  function formatDuration(ms) {
+    return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(ms / 1000)}s`;
+  }
+
+  function titleCase(value) {
+    return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  function announce(text) {
+    announcerEl.textContent = text;
   }
 
   function fileName(path) {
