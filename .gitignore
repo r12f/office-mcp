@@ -2,6 +2,7 @@
 target/
 build/
 dist/
+feasibility/
 node_modules/
 *.pyc
 __pycache__/
