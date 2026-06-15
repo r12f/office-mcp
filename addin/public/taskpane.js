@@ -35,9 +35,11 @@
   let instanceId = sessionStorage.getItem('office-mcp.instance-id') || crypto.randomUUID();
   let sessionId = sessionStorage.getItem('office-mcp.session-id') || crypto.randomUUID();
   let documentInfo = null;
+  let serverInfo = { serverVersion: 'Unknown', protocolVersion: PROTOCOL_VERSION };
   let reconnectTimer;
   let reconnectAttempt = 0;
   let currentTask = null;
+  let endpointDirty = false;
   const taskHistory = [];
   const cancelledRequests = new Set();
   sessionStorage.setItem('office-mcp.instance-id', instanceId);
@@ -46,8 +48,13 @@
   const connectionBadgeEl = document.getElementById('connectionBadge');
   const sessionEl = document.getElementById('session');
   const daemonEl = document.getElementById('daemon');
+  const serverVersionEl = document.getElementById('serverVersion');
+  const protocolVersionEl = document.getElementById('protocolVersion');
+  const hostPlatformEl = document.getElementById('hostPlatform');
   const documentTitleEl = document.getElementById('documentTitle');
   const protectionEl = document.getElementById('protection');
+  const documentStateEl = document.getElementById('documentState');
+  const connectionDetailEl = document.getElementById('connectionDetail');
   const toolCountEl = document.getElementById('toolCount');
   const currentTaskEl = document.getElementById('currentTask');
   const currentTaskStateEl = document.getElementById('currentTaskState');
@@ -63,6 +70,14 @@
 
   settingsToggleEl.addEventListener('click', toggleSettings);
   settingsFormEl.addEventListener('submit', saveEndpointOverride);
+  endpointInputEl.addEventListener('input', () => {
+    endpointDirty = endpointInputEl.value.trim() !== configuredEndpoint();
+  });
+  window.addEventListener('beforeunload', (event) => {
+    if (!endpointDirty) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
   endpointInputEl.value = configuredEndpoint();
   renderStaticState();
 
@@ -84,6 +99,7 @@
     const endpoint = configuredEndpoint();
     daemonEl.textContent = endpoint;
     endpointInputEl.value = endpoint;
+    endpointDirty = false;
     setConnectionState('connecting', 'Connecting…');
     socket = new WebSocket(endpoint);
     socket.addEventListener('open', () => register());
@@ -92,15 +108,19 @@
       console.warn('office-mcp websocket closed');
       scheduleReconnect();
     });
-    socket.addEventListener('error', () => setConnectionState('failed', 'Failed'));
+    socket.addEventListener('error', () => {
+      connectionDetailEl.textContent = 'Connection failed. Check that the local daemon is running and the endpoint uses wss://localhost.';
+      setConnectionState('failed', 'Failed');
+    });
   }
 
   function register() {
     reconnectAttempt = 0;
     setConnectionState('connecting', 'Registering…');
+    const requestId = crypto.randomUUID();
     send({
       jsonrpc: '2.0',
-      id: crypto.randomUUID(),
+      id: requestId,
       method: 'register',
       params: {
         instance_id: instanceId,
@@ -118,6 +138,7 @@
         }
       }
     });
+    sessionStorage.setItem('office-mcp.register-request-id', requestId);
     announceSession();
   }
 
@@ -160,6 +181,10 @@
     } catch {
       return;
     }
+    if (message.id && sessionStorage.getItem('office-mcp.register-request-id') === String(message.id)) {
+      handleRegisterResponse(message);
+      return;
+    }
     if (message.method === 'tool.invoke') {
       invokeTool(message).catch((error) => reply(message.id, {
         ok: false,
@@ -170,7 +195,26 @@
       reply(message.id, { ts: new Date().toISOString() });
     } else if (message.method === 'tool.cancel' && message.params?.request_id) {
       cancelledRequests.add(message.params.request_id);
+      if (currentTask?.requestId === message.params.request_id) {
+        currentTask.cancelRequested = true;
+        renderCurrentTask();
+      }
     }
+  }
+
+  function handleRegisterResponse(message) {
+    sessionStorage.removeItem('office-mcp.register-request-id');
+    if (message.error) {
+      const error = message.error.data || message.error;
+      connectionDetailEl.textContent = error.message || message.error.message || 'Registration failed. Check the daemon endpoint and protocol version.';
+      setConnectionState('failed', 'Failed');
+      return;
+    }
+    serverInfo = {
+      serverVersion: message.result?.server_version || 'Unknown',
+      protocolVersion: message.result?.protocol_version || PROTOCOL_VERSION
+    };
+    renderStaticState();
   }
 
   async function invokeTool(message) {
@@ -1132,6 +1176,7 @@
     reconnectAttempt += 1;
     const delay = Math.min(10000, 1000 + reconnectAttempt * 500 + Math.floor(Math.random() * 500));
     const seconds = Math.ceil(delay / 1000);
+    connectionDetailEl.textContent = `Retrying in ${seconds}s.`;
     setConnectionState('reconnecting', `Reconnecting in ${seconds}s`);
     reconnectTimer = setTimeout(connect, delay);
   }
@@ -1139,7 +1184,13 @@
   function setConnectionState(state, label) {
     connectionBadgeEl.textContent = label;
     connectionBadgeEl.className = `status-badge ${statusClass(state)}`;
+    if (state === 'connected') connectionDetailEl.textContent = 'None';
     announce(label);
+  }
+
+  function setStatus(label) {
+    connectionDetailEl.textContent = label;
+    setConnectionState('failed', label);
   }
 
   function statusClass(state) {
@@ -1152,6 +1203,9 @@
   function renderStaticState() {
     sessionEl.textContent = sessionId;
     daemonEl.textContent = configuredEndpoint();
+    serverVersionEl.textContent = serverInfo.serverVersion;
+    protocolVersionEl.textContent = serverInfo.protocolVersion;
+    hostPlatformEl.textContent = hostSummary();
     toolCountEl.textContent = `${AVAILABLE_TOOLS.length} Tools`;
     renderHistory();
   }
@@ -1160,6 +1214,7 @@
     if (!documentInfo) return;
     documentTitleEl.textContent = documentInfo.title || documentInfo.filename || 'Word Document';
     protectionEl.textContent = documentInfo.protection?.kind || 'Unknown';
+    documentStateEl.textContent = `Dirty: ${boolLabel(documentInfo.is_dirty)} / Read-only: ${boolLabel(documentInfo.is_read_only)}`;
   }
 
   function startTask(requestId, tool, args, timeoutMs) {
@@ -1168,7 +1223,9 @@
       tool,
       userIntent: args?.client_meta?.user_intent || '',
       startedAt: Date.now(),
-      timeoutMs: timeoutMs || null
+      timeoutMs: timeoutMs || null,
+      deadlineAt: timeoutMs ? Date.now() + timeoutMs : null,
+      cancelRequested: cancelledRequests.has(requestId)
     };
     renderCurrentTask();
   }
@@ -1205,6 +1262,8 @@
       status: 'running',
       elapsedMs: elapsed,
       userIntent: currentTask.userIntent,
+      deadlineAt: currentTask.deadlineAt,
+      cancelRequested: currentTask.cancelRequested,
       error: null
     });
   }
@@ -1220,15 +1279,19 @@
   }
 
   function taskMarkup(task) {
-    const tone = task.status === 'success' ? 'status-success' : task.status === 'running' ? 'status-warning' : 'status-danger';
-    const error = task.error ? `<div class="task-meta">${escapeHtml(task.error.office_mcp_code)}: ${escapeHtml(task.error.message)}</div>` : '';
+    const tone = task.status === 'success' ? 'status-success' : task.status === 'running' ? 'status-warning' : task.status === 'cancelled' ? 'status-neutral' : 'status-danger';
+    const error = task.error ? `<div class="task-meta">${escapeHtml(task.error.office_mcp_code)}: ${escapeHtml(task.error.message)} · Retriable: ${boolLabel(task.error.retriable)} · Partial effect: ${escapeHtml(task.error.partial_effect || 'unknown')}</div>` : '';
     const intent = task.userIntent ? `<div class="task-meta">${escapeHtml(redactText(task.userIntent))}</div>` : '';
+    const deadline = task.deadlineAt ? `<div class="task-meta">Deadline ${escapeHtml(formatTime(task.deadlineAt))}</div>` : '';
+    const cancel = task.cancelRequested ? '<div class="task-meta">Cancel requested</div>' : '';
     return [
       '<div class="task-title">',
       `<span>${escapeHtml(task.tool)}</span>`,
       `<span class="status-badge ${tone}">${escapeHtml(titleCase(task.status))}</span>`,
       '</div>',
       `<div class="task-meta">${formatDuration(task.elapsedMs)}</div>`,
+      deadline,
+      cancel,
       intent,
       error
     ].join('');
@@ -1236,10 +1299,18 @@
 
   function toggleSettings() {
     const opening = settingsPanelEl.hidden;
+    if (!opening && endpointDirty && !confirm('Discard unsaved endpoint changes?')) {
+      endpointInputEl.focus();
+      return;
+    }
     settingsPanelEl.hidden = !opening;
     settingsToggleEl.setAttribute('aria-expanded', String(opening));
     settingsToggleEl.setAttribute('aria-label', opening ? 'Close Settings' : 'Open Settings');
     if (opening) endpointInputEl.focus();
+    else {
+      endpointInputEl.value = configuredEndpoint();
+      endpointDirty = false;
+    }
   }
 
   function saveEndpointOverride(event) {
@@ -1248,10 +1319,13 @@
     const value = endpointInputEl.value.trim();
     try {
       const parsed = new URL(value);
-      if (parsed.protocol !== 'wss:') throw new Error('Use a wss:// endpoint, for example wss://localhost:8765/addin.');
+      if (parsed.protocol !== 'wss:' || parsed.hostname !== 'localhost') throw new Error('Use a wss://localhost endpoint, for example wss://localhost:8765/addin.');
       localStorage.setItem('office-mcp.addin-endpoint', value);
+      endpointDirty = false;
+      saveEndpointEl.disabled = true;
       saveEndpointEl.textContent = 'Saving…';
       setTimeout(() => {
+        saveEndpointEl.disabled = false;
         saveEndpointEl.textContent = 'Save Endpoint';
         if (socket) socket.close(1000, 'Endpoint changed');
         connect();
@@ -1285,6 +1359,22 @@
 
   function formatDuration(ms) {
     return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(ms / 1000)}s`;
+  }
+
+  function formatTime(value) {
+    return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(value));
+  }
+
+  function boolLabel(value) {
+    return value === true ? 'yes' : value === false ? 'no' : 'unknown';
+  }
+
+  function hostSummary() {
+    const diagnostics = Office.context.diagnostics || {};
+    const host = diagnostics.host || 'Word';
+    const version = diagnostics.version || 'unknown';
+    const platform = Office.context.platform || 'unknown';
+    return `${host} ${version} / ${platform}`;
   }
 
   function titleCase(value) {

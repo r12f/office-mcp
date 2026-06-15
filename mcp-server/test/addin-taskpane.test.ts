@@ -29,6 +29,11 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   const js = readFileSync(join(process.cwd(), '..', 'addin', 'public', 'taskpane.js'), 'utf8');
 
   assert.match(html, /id="connectionBadge"/);
+  assert.match(html, /id="serverVersion"/);
+  assert.match(html, /id="protocolVersion"/);
+  assert.match(html, /id="hostPlatform"/);
+  assert.match(html, /id="documentState"/);
+  assert.match(html, /id="connectionDetail"/);
   assert.match(html, /id="currentTask"/);
   assert.match(html, /id="historyList"/);
   assert.match(html, /aria-live="polite"/);
@@ -39,5 +44,10 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(css, /forced-colors: active/);
   assert.match(js, /taskHistory\.splice\(20\)/);
   assert.match(js, /localStorage\.setItem\('office-mcp\.addin-endpoint'/);
+  assert.match(js, /server_version/);
+  assert.match(js, /protocol_version/);
+  assert.match(js, /beforeunload/);
+  assert.match(js, /Cancel requested/);
+  assert.match(js, /Deadline/);
   assert.match(js, /redactText/);
 });

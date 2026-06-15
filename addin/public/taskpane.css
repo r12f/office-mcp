@@ -203,6 +203,11 @@ dd {
   overflow-wrap: anywhere;
 }
 
+dd,
+.task-meta {
+  text-wrap: pretty;
+}
+
 code,
 .mono {
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;

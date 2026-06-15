@@ -71,6 +71,13 @@ async function main(): Promise<void> {
     await waitFor(cdp, 'document.querySelector(".taskpane-shell") !== null');
     await assertEval(cdp, 'document.documentElement.scrollWidth <= 320', 'taskpane 320px viewport has no horizontal overflow');
     await assertEval(cdp, 'document.querySelector("#settingsToggle").getAttribute("aria-label") === "Open Settings"', 'taskpane settings button is named');
+    await assertEval(cdp, 'document.querySelector("#serverVersion") !== null && document.querySelector("#protocolVersion").textContent.trim().length > 0', 'taskpane exposes server and protocol fields');
+    await assertEval(cdp, 'document.querySelector("#hostPlatform") !== null && document.querySelector("#documentState") !== null && document.querySelector("#connectionDetail") !== null', 'taskpane exposes host document and connection detail fields');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#settingsToggle").click()' });
+    await waitFor(cdp, '!document.querySelector("#settingsPanel").hidden');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#endpointInput").value = "http://localhost:8765/addin"; document.querySelector("#settingsForm").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))' });
+    await waitFor(cdp, 'document.querySelector("#endpointError").textContent.includes("wss://localhost")');
+    await assertEval(cdp, 'document.activeElement === document.querySelector("#endpointInput")', 'taskpane invalid endpoint focuses endpoint field');
     const taskpaneScreenshot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
     if (taskpaneScreenshot.data.length < 1000) throw new Error('UI smoke failed: taskpane screenshot is unexpectedly small');
     console.log(JSON.stringify({ ok: true, url: `${config.addin.origin}/ui/` }));
