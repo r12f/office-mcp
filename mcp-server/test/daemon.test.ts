@@ -59,6 +59,11 @@ test('daemon UI state endpoint requires UI token and rejects foreign origins', a
     assert.match(shell.body, /Office MCP/);
     assert.match(shell.body, /__OFFICE_MCP_UI__/);
     assert.match(shell.body, /id="clients"/);
+    assert.match(shell.body, /id="daemonDetailsHeading"/);
+    assert.match(shell.body, /id="daemonVersion"/);
+    assert.match(shell.body, /id="daemonUptime"/);
+    assert.match(shell.body, /id="stdioBridgeCommand"/);
+    assert.match(shell.body, /aria-label="Copy Stdio Bridge Command"/);
     assert.match(shell.body, /data-copy="mcpEndpoint"/);
     assert.match(shell.body, /id="resultFilter"/);
 
@@ -69,12 +74,16 @@ test('daemon UI state endpoint requires UI token and rejects foreign origins', a
     assert.match(script.body, /x-office-mcp-ui-token/);
     assert.match(script.body, /document_command_history/);
     assert.match(script.body, /history\.replaceState/);
+    assert.match(script.body, /RelativeTimeFormat/);
+    assert.match(script.body, /config_path/);
+    assert.match(script.body, /last_error/);
 
     const css = await httpsJson(`${config.addin.origin}/ui/app.css`);
     assert.equal(css.status, 200);
     assert.match(css.body, /prefers-reduced-motion/);
     assert.match(css.body, /prefers-color-scheme:dark/);
     assert.match(css.body, /forced-colors:active/);
+    assert.match(css.body, /daemon-details/);
 
     const unauthorized = await httpsJson(endpoint);
     assert.equal(unauthorized.status, 401);

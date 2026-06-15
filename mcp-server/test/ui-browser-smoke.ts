@@ -42,6 +42,9 @@ async function main(): Promise<void> {
     await waitFor(cdp, 'document.querySelectorAll("table").length >= 2');
     await assertEval(cdp, 'document.querySelector("#clients table") !== null', 'client table renders');
     await assertEval(cdp, 'document.querySelector("#documents .row.word") !== null', 'word document row renders');
+    await assertEval(cdp, 'document.querySelector("#daemonVersion").textContent.trim().length > 0 && document.querySelector("#daemonUptime").textContent.trim().length > 0', 'daemon details show version and uptime');
+    await assertEval(cdp, 'document.querySelector("#stdioBridgeCommand").textContent.includes("office-mcp stdio") && [...document.querySelectorAll("button")].some((button) => button.getAttribute("aria-label") === "Copy Stdio Bridge Command")', 'daemon details expose stdio bridge command copy control');
+    await assertEval(cdp, 'document.querySelector("#lastError").textContent.trim().length > 0', 'daemon details show last error state');
     await assertEval(cdp, 'getComputedStyle(document.querySelector(".layout")).gridTemplateColumns.split(" ").length >= 3', 'desktop layout uses three columns');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#documents .row.word").click()' });
     await waitFor(cdp, 'document.querySelector("#inspector").textContent.includes("Latest 10 Commands")');
@@ -55,6 +58,7 @@ async function main(): Promise<void> {
     await setViewport(cdp, 320, 720, true);
     await assertEval(cdp, 'document.documentElement.scrollWidth <= 320', '320px viewport has no horizontal overflow');
     await assertEval(cdp, 'getComputedStyle(document.querySelector(".layout")).gridTemplateColumns.split(" ").length === 1', 'narrow layout stacks columns');
+    await assertEval(cdp, 'getComputedStyle(document.querySelector(".daemon-details dl")).gridTemplateColumns.split(" ").length === 2', 'daemon details stack as label-value rows on narrow layout');
     console.error('theme assertions');
     await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
     await assertEval(cdp, 'getComputedStyle(document.documentElement).colorScheme.includes("dark")', 'dark mode color scheme applies');
