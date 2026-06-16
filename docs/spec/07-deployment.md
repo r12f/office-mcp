@@ -7,8 +7,8 @@ each other.
 
 | Component | What it is | Where it lives | Updated how |
 |---|---|---|---|
-| `office-mcp` | Native Rust long-running daemon from `src/office-mcp`. During migration, the existing Node daemon may ship as the reference/fallback package. | `%LOCALAPPDATA%\office-mcp\` (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | MSI / Homebrew tap |
-| `office-mcp-ui` | Tray controller and daemon main window served or bridged by the daemon. | Installed beside the daemon | MSI / Homebrew tap |
+| `office-mcp` | Native Rust long-running daemon from `src/office-mcp/daemon`. During migration, the existing Node daemon may ship as the reference/fallback package. | `%LOCALAPPDATA%\office-mcp\` (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | MSI / Homebrew tap |
+| `office-mcp-ui` | Web UI assets from `src/office-mcp/ui`, opened from the tray and served or bridged by the daemon. | Installed beside the daemon | MSI / Homebrew tap |
 | `office-ctl` | Office add-in bundles from `src/office-ctl`: shared `common` code plus host entries such as `word` and `excel`. | Installed beside the daemon and served from its trusted local HTTPS origin | Installer / atomic local replacement |
 | Manifest | XML / JSON describing the add-in | Sideloaded via the trusted catalog by the installer; AppSource / M365 admin push for managed deployments | See §3 |
 | Bootstrap installer | MSI / .pkg / shell script | Downloaded from GitHub Releases | Per-release |
@@ -18,7 +18,9 @@ The target source tree is:
 ```text
 doc/                 # Specifications and design documentation.
 src/office-ctl/      # TypeScript Office add-ins: common, word, excel.
-src/office-mcp/      # Rust daemon service.
+src/office-mcp/
+  daemon/            # Rust daemon service and daemon-owned state/API.
+  ui/                # Web UI assets for the tray-opened daemon console.
 packaging/           # Installers and release assembly.
 ```
 
@@ -26,11 +28,12 @@ The actual installation procedure — including daemon autostart and add-in
 catalog registration — is in §6, not here. §1 is just the artifact list.
 
 The target production daemon is the native Rust executable built from
-`src/office-mcp`. During migration, the Node/TypeScript daemon package remains
-the reference implementation and release fallback. Installers MUST NOT switch
-the default daemon binary to Rust until the Rust build passes the existing
-protocol, runtime, UI, tray, redaction, and packaging evidence gates with the
-same report schemas used by the Node daemon.
+`src/office-mcp/daemon`. Its main-window web assets are built from
+`src/office-mcp/ui` and packaged beside the daemon. During migration, the
+Node/TypeScript daemon package remains the reference implementation and release
+fallback. Installers MUST NOT switch the default daemon binary to Rust until the
+Rust build passes the existing protocol, runtime, UI, tray, redaction, and
+packaging evidence gates with the same report schemas used by the Node daemon.
 
 ## 3. Add-in distribution
 
@@ -228,8 +231,8 @@ It validates the server and manifest, exports an already trusted localhost
 certificate to `%LOCALAPPDATA%\office-mcp\`, registers the Word trusted catalog,
 and creates a logon Scheduled Task that runs the daemon from the checked-out
 daemon package. During migration this may still be the reference Node package;
-the target is `src/office-mcp`. It does not import root certificates. It can be
-removed with:
+the target is `src/office-mcp/daemon` plus web assets from `src/office-mcp/ui`.
+It does not import root certificates. It can be removed with:
 
 ```
 powershell -ExecutionPolicy Bypass -File .\packaging\windows\uninstall-windows.ps1

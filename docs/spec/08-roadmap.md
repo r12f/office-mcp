@@ -118,11 +118,14 @@ failed, without inspecting terminal output or logs.
 
 - [ ] Normalize the source tree to the target layout: `doc/` for specs,
       `src/office-ctl/{common,word,excel}` for TypeScript Office add-ins,
-      `src/office-mcp` for the Rust daemon service, and `packaging/` for
-      installers and release assembly.
-- [ ] Add the Rust daemon under `src/office-mcp` while keeping the current
-      Node/TypeScript daemon as the reference implementation until parity is
-      proven.
+      `src/office-mcp/{daemon,ui}` for the Rust daemon service and its web
+      console, and `packaging/` for installers and release assembly.
+- [ ] Add the Rust daemon under `src/office-mcp/daemon` while keeping the
+      current Node/TypeScript daemon as the reference implementation until
+      parity is proven.
+- [ ] Move the daemon web console source under `src/office-mcp/ui`; it may only
+      consume redacted daemon status APIs and must not own protocol routing,
+      session mutation, or Office command execution.
 - [ ] Port the daemon behind explicit domain objects: `OfficeMcpDaemon`,
       `DaemonConfigService`, `McpHttpFrontend`, `AddinChannelServer`,
       `SessionRegistry`, `CommandRouter`, `UiStateStore`, `TrayController`,
