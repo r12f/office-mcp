@@ -12,7 +12,7 @@
       --include-com-tracked-changes` generates structured full Word runtime
       evidence; `npm run evidence:irm` plus `--require-irm-preflight` and
       `--require-irm` validates the representative protected document)
-- [x] Repository scaffolding (long-running `mcp-server/` package + Word `addin/` scaffold)
+- [x] Repository scaffolding (legacy long-running `mcp-server/` package + Word `addin/` scaffold)
 - [x] CI matrix (Win x64, macOS arm64, Linux x64 for the server; manifest + task pane syntax check for the add-in)
 
 ### M1 — Walking skeleton
@@ -113,6 +113,36 @@ review the result like a normal collaborator's edits.
 to understand whether office-mcp is running, which clients and documents are
 connected, what task is currently executing, and why the last relevant command
 failed, without inspecting terminal output or logs.
+
+### M6.6 — Rust native daemon migration
+
+- [ ] Normalize the source tree to the target layout: `doc/` for specs,
+      `src/office-ctl/{common,word,excel}` for TypeScript Office add-ins,
+      `src/office-mcp` for the Rust daemon service, and `packaging/` for
+      installers and release assembly.
+- [ ] Add the Rust daemon under `src/office-mcp` while keeping the current
+      Node/TypeScript daemon as the reference implementation until parity is
+      proven.
+- [ ] Port the daemon behind explicit domain objects: `OfficeMcpDaemon`,
+      `DaemonConfigService`, `McpHttpFrontend`, `AddinChannelServer`,
+      `SessionRegistry`, `CommandRouter`, `UiStateStore`, `TrayController`,
+      `AuditLog`, and `Logger`.
+- [ ] Reuse or mirror the existing protocol and runtime evidence tests as
+      Rust parity gates. The rewrite MUST preserve MCP transport semantics,
+      add-in JSON-RPC registration, Word tool behavior, error shapes, UI
+      redaction, and tray/menu UI evidence before Node removal is allowed.
+- [ ] Move Windows tray, macOS menu-bar, and Linux tray/status-notifier support
+      into native Rust platform adapters behind `TrayController` traits.
+- [ ] Replace Node packaging only after Rust passes the full parity suite on
+      Windows and the supported non-Windows packaging smoke gates.
+- [ ] Split Office add-in code into `src/office-ctl/common`,
+      `src/office-ctl/word`, and `src/office-ctl/excel` before adding Excel
+      host behavior, so shared channel/config/logging code is not duplicated.
+
+**Exit criterion**: The Rust daemon can replace the Node daemon without changing
+the add-in protocol, MCP client behavior, evidence report schema, UI state
+redaction guarantees, user-visible tray/main-window behavior, or the host add-in
+contract shared by Word and Excel.
 
 ### M7 — Excel
 

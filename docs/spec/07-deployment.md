@@ -7,14 +7,30 @@ each other.
 
 | Component | What it is | Where it lives | Updated how |
 |---|---|---|---|
-| `office-mcp` | Long-running daemon package; current Windows MSI ships `node.exe`, compiled Node.js files, and production dependencies. A native `office-mcp.exe` wrapper is future hardening. | `%LOCALAPPDATA%\office-mcp\` (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | MSI / Homebrew tap |
-| `office-mcp-ui` | Desktop tray controller and daemon main window bundle. It may be packaged into a native wrapper or shipped beside the Node daemon during the transition period. | Installed beside the daemon | MSI / Homebrew tap |
-| `office-mcp-addin` | Static web bundle (~2 MB) + manifest | Installed beside the daemon and served from its trusted local HTTPS origin | Installer / atomic local replacement |
+| `office-mcp` | Native Rust long-running daemon from `src/office-mcp`. During migration, the existing Node daemon may ship as the reference/fallback package. | `%LOCALAPPDATA%\office-mcp\` (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | MSI / Homebrew tap |
+| `office-mcp-ui` | Tray controller and daemon main window served or bridged by the daemon. | Installed beside the daemon | MSI / Homebrew tap |
+| `office-ctl` | Office add-in bundles from `src/office-ctl`: shared `common` code plus host entries such as `word` and `excel`. | Installed beside the daemon and served from its trusted local HTTPS origin | Installer / atomic local replacement |
 | Manifest | XML / JSON describing the add-in | Sideloaded via the trusted catalog by the installer; AppSource / M365 admin push for managed deployments | See §3 |
 | Bootstrap installer | MSI / .pkg / shell script | Downloaded from GitHub Releases | Per-release |
 
+The target source tree is:
+
+```text
+doc/                 # Specifications and design documentation.
+src/office-ctl/      # TypeScript Office add-ins: common, word, excel.
+src/office-mcp/      # Rust daemon service.
+packaging/           # Installers and release assembly.
+```
+
 The actual installation procedure — including daemon autostart and add-in
 catalog registration — is in §6, not here. §1 is just the artifact list.
+
+The target production daemon is the native Rust executable built from
+`src/office-mcp`. During migration, the Node/TypeScript daemon package remains
+the reference implementation and release fallback. Installers MUST NOT switch
+the default daemon binary to Rust until the Rust build passes the existing
+protocol, runtime, UI, tray, redaction, and packaging evidence gates with the
+same report schemas used by the Node daemon.
 
 ## 3. Add-in distribution
 
@@ -84,12 +100,13 @@ The production XML manifest:
 - Loads production Office.js from Microsoft's CDN from within that page.
 - Probes `WordApi 1.4`, `WordApi 1.6`, and desktop-only sets at runtime.
 
-The checked developer manifest is `addin/manifest.xml`; running `npm run check`
-from `addin/` validates it against the current Office add-in schemas and checks
-the task pane JavaScript syntax. The release build substitutes the real add-in
-ID, version, icon assets, and support URL. The XML manifest's four-part version
-starts at `1.0.0.0` because Office rejects values below 1.0; it is mapped to,
-but not textually identical with, the add-in package semver.
+The checked developer manifests live under `src/office-ctl/<host>/`, such as
+`src/office-ctl/word/manifest.xml`. Running the host add-in check validates the
+manifest against the current Office add-in schemas and checks the task pane
+TypeScript bundle. The release build substitutes the real add-in ID, version,
+icon assets, and support URL. The XML manifest's four-part version starts at
+`1.0.0.0` because Office rejects values below 1.0; it is mapped to, but not
+textually identical with, the add-in package semver.
 
 The hosted manifest is rendered from the checked developer manifest rather than
 maintained as a second XML file:
@@ -101,6 +118,10 @@ powershell -ExecutionPolicy Bypass -File .\addin\scripts\render-hosted-manifest.
   -AddinVersion <office-four-part-version> `
   -AssetVersion <package-version>
 ```
+
+During the source-layout migration, legacy script paths may remain as wrappers,
+but the target home for add-in build and manifest scripts is
+`src/office-ctl/<host>/scripts/`.
 
 The renderer refuses non-HTTPS and loopback origins, replaces task-pane and icon
 URLs with the public base URL, and fails if any loopback URL remains in the
@@ -206,8 +227,9 @@ powershell -ExecutionPolicy Bypass -File .\packaging\windows\install-windows.ps1
 It validates the server and manifest, exports an already trusted localhost
 certificate to `%LOCALAPPDATA%\office-mcp\`, registers the Word trusted catalog,
 and creates a logon Scheduled Task that runs the daemon from the checked-out
-`mcp-server/` package. It does not import root certificates. It can be removed
-with:
+daemon package. During migration this may still be the reference Node package;
+the target is `src/office-mcp`. It does not import root certificates. It can be
+removed with:
 
 ```
 powershell -ExecutionPolicy Bypass -File .\packaging\windows\uninstall-windows.ps1

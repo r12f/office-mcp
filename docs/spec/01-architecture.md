@@ -40,6 +40,35 @@ principle regardless of deployment shape.
 
 ## 1. Component overview
 
+Target repository layout:
+
+```text
+doc/
+  spec/                         # Product, protocol, security, deployment, UI specs.
+src/
+  office-ctl/                   # Office add-ins, written in TypeScript.
+    common/                     # Shared config, logging, channel, protocol, UI helpers.
+    word/                       # Word entry point, initialization, and Word commands.
+    excel/                      # Excel entry point, initialization, and Excel commands.
+  office-mcp/                   # Native office-mcp product runtime.
+    daemon/                     # Rust daemon service and daemon-owned state.
+    ui/                         # Web UI assets for tray-opened daemon console.
+packaging/                      # Installers, release packaging, catalog/bootstrap scripts.
+```
+
+`src/office-ctl` owns code that runs inside Office webview runtimes. Host-specific
+folders such as `word` and `excel` may depend on `common`, but `common` MUST NOT
+depend on a specific Office host. `src/office-mcp/daemon` owns the local daemon
+process and all server-side session management. `src/office-mcp/ui` owns the
+daemon web interface shown from the tray and served or bridged by the daemon.
+The UI may consume only redacted daemon status APIs; it must not own protocol
+routing, session mutation, or Office command execution. `packaging` owns
+installation and release assembly only; it must not become a runtime code owner.
+
+The current repository may keep legacy `mcp-server/`, `addin/`, `docs/`, and
+`rust-daemon/` paths during migration. Those paths are transitional staging
+areas, not the target ownership model.
+
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
 │                            User's machine                             │
@@ -80,6 +109,40 @@ The daemon is the **single, long-lived office-mcp process** on the machine.
 There is exactly one. Everything below assumes it is already running; how it
 gets started is install-time concern, not runtime concern (see §2.3).
 
+The target production daemon implementation is the native Rust application in
+`src/office-mcp/daemon`. Its web console assets live in `src/office-mcp/ui` and
+are served or bridged by the daemon. The current Node/TypeScript daemon remains
+the reference implementation until the Rust daemon passes protocol and runtime
+parity gates. Existing MCP transport behavior, add-in JSON-RPC registration,
+Word tool routing, UI state redaction, and evidence harnesses are contract tests
+for the Rust port; they MUST NOT be deleted or weakened during the rewrite.
+
+Rust code is expected to use explicit domain objects and ownership boundaries,
+not C-style procedural modules with global state. The minimum daemon object
+model is:
+
+- `OfficeMcpDaemon`: owns process lifetime, startup/shutdown, and component
+  wiring.
+- `DaemonConfigService`: loads, validates, redacts, and watches daemon config.
+- `McpHttpFrontend`: owns the Streamable HTTP server, request validation,
+  MCP session/client tracking, and MCP error translation.
+- `AddinChannelServer`: owns local HTTPS/WSS serving, origin checks,
+  JSON-RPC framing, heartbeat, and registration.
+- `SessionRegistry`: owns Office runtime/session identity, stale-session grace,
+  capability metadata, and queue depth.
+- `CommandRouter`: owns tool dispatch, per-session serialization, timeouts,
+  cancellation, and result/error mapping.
+- `UiStateStore`: owns redacted daemon UI snapshots, current tasks, bounded
+  command history, and UI subscriptions.
+- `TrayController`: owns native tray/menu-bar integration, status menu updates,
+  show-UI action, and graceful quit confirmation.
+- `AuditLog` and `Logger`: own optional audit records and operational logs with
+  redaction at the boundary.
+
+These objects may use traits for platform-specific adapters, such as tray
+integration and certificate stores, but protocol/domain state should remain in
+portable core types.
+
 - **Lifetime**: starts at user login (Windows Scheduled Task / macOS launchd
   agent / Linux systemd `--user` unit). Runs until the user logs out or the
   service is stopped administratively. No idle shutdown.
@@ -100,6 +163,18 @@ to the already-running daemon. The shim does not own Office sessions or spawn
 add-ins; it only adapts process-spawned clients to the long-lived daemon.
 
 ### 2.2 The Office add-in
+
+The Office add-in implementation lives under `src/office-ctl`:
+
+- `common`: shared endpoint configuration, channel client, JSON-RPC types,
+  logging, redacted task history, and reusable UI primitives.
+- `word`: Word task pane entry point, Word-specific startup, capability probing,
+  and `word.*` command implementations.
+- `excel`: Excel task pane entry point, Excel-specific startup, capability
+  probing, and `excel.*` command implementations.
+
+Host-specific folders may expose a consistent registration envelope to the
+daemon, but Office.js calls stay inside the host folder that owns them.
 
 - **Lifetime**: bound to its current document runtime. Loads when the user
   opens the task pane or when a supported deployment activates it.
@@ -189,10 +264,11 @@ add-in can be the connecting party is a network socket.
 ### 3.4 Daemon UI backend
 
 The daemon UI backend is local-only and not part of the MCP tool surface. It
-serves redacted status snapshots to the tray controller and main window. It MAY
-share the add-in HTTPS origin or use an internal desktop bridge, but it MUST
-preserve the same privacy boundary: no document body text, no unredacted tool
-arguments, and no secrets in UI state.
+serves redacted status snapshots to the tray controller and main window. The
+web UI source lives under `src/office-mcp/ui`; the backend state and API live
+under `src/office-mcp/daemon`. The UI MAY share the add-in HTTPS origin or use
+an internal desktop bridge, but it MUST preserve the same privacy boundary: no
+document body text, no unredacted tool arguments, and no secrets in UI state.
 
 ## 4. Lifecycle scenarios
 
