@@ -1,41 +1,37 @@
-use crate::addin_mgr::ImageFetcher;
 use crate::addin_mgr::websocket_accept_key;
 use crate::addin_mgr::{
     AddInInfo, DocumentInfo, HostInfo, SessionDescriptorView, SessionPatch, SessionRegistry,
 };
 use crate::addin_mgr::{
-    AddinChannelConfig, AddinChannelServer, HeartbeatDecision, JsonRpcId, RegisterRequest,
-    SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
+    AddinChannelServer, HeartbeatDecision, JsonRpcId, RegisterRequest, SessionAddedEvent,
+    SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
 };
 use crate::addin_mgr::{
-    AddinConnectionHub, AddinConnectionHubError, CommandRouter, ToolCallRequest, ToolResponse,
+    AddinConnectionHub, AddinConnectionHubError, CommandRouter, ImageFetcher, ToolCallRequest,
+    ToolResponse,
 };
+use crate::addin_mgr::{WebSocketCodec, WebSocketCodecError, WebSocketFrame};
 use crate::addin_mgr::{
-    WebSocketCodec, WebSocketCodecError, WebSocketFrame, WebSocketProtocolError,
-};
-use crate::addin_mgr::{
-    default_addin_public_dir, default_office_ctl_common_dir, default_office_ctl_host_public_dir,
-    static_asset_content_type,
+    default_office_ctl_common_dir, default_office_ctl_host_public_dir, static_asset_content_type,
 };
 use crate::api::{CommandFailure, UiSnapshotRenderer, UiStateOptions, UiStateStore};
 use crate::common::DaemonConfig;
 use crate::common::{AuditLog, AuditRecord};
 use crate::mcp::{
-    ExcelToolCatalog, HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest,
+    ExcelToolCatalog, HttpMethod, McpHttpDecision, McpHttpFrontend, McpHttpRequest,
     ResourceReadRequest, WORD_V1_TOOLS, prompt_catalog_json, prompt_description, prompt_messages,
     resource_request_from_uri, tool_catalog_json, tool_failure, tool_failure_from_command,
     tool_success, word_resource_catalog_for_session, word_resource_templates,
 };
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
-use crate::ui::{UiAssetStore, UiRuntimeError, UiRuntimeFile};
-use native_tls::{Identity, TlsAcceptor, TlsStream};
+pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
+use crate::ui::{UiAssetStore, UiRuntimeFile};
+use native_tls::{TlsAcceptor, TlsStream};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
-use std::fmt::{Display, Formatter};
 use std::fs;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
@@ -71,39 +67,9 @@ impl RuntimeServer {
     /// Returns an error when a configured port or byte limit does not fit the
     /// native runtime type used by the socket server.
     pub fn from_daemon_config(config: &DaemonConfig) -> Result<Self, RuntimeServerError> {
-        Ok(Self::with_config(RuntimeServerConfig {
-            mcp_host: config.mcp.host.clone(),
-            mcp_port: to_u16("mcp.port", config.mcp.port)?,
-            addin_host: config.addin.host.clone(),
-            addin_port: to_u16("addin.port", config.addin.port)?,
-            addin_origin: config.addin.origin.clone(),
-            addin_public_dir: default_addin_public_dir(),
-            certificate_path: PathBuf::from(&config.addin.pfx_path),
-            certificate_passphrase: config.addin.pfx_passphrase.clone(),
-            max_request_bytes: to_usize(
-                "limits.max_request_bytes",
-                config.limits.max_request_bytes,
-            )?,
-            max_ws_frame_bytes: to_usize(
-                "limits.max_ws_frame_bytes",
-                config.limits.max_ws_frame_bytes,
-            )?,
-            max_pending_per_session: to_usize(
-                "addin.max_pending_per_session",
-                config.addin.max_pending_per_session,
-            )?,
-            heartbeat_interval: Duration::from_secs(config.addin.heartbeat_interval_sec),
-            heartbeat_timeout: Duration::from_secs(config.addin.heartbeat_timeout_sec),
-            requests_per_minute: config.limits.requests_per_minute,
-            config_path: None,
-            log_path: Some(config.logging.file.clone()),
-            audit_log: if config.audit.enabled {
-                AuditLog::enabled(&config.audit.path)
-            } else {
-                AuditLog::new()
-            },
-            image_fetcher: ImageFetcher::new(),
-        }))
+        Ok(Self::with_config(RuntimeServerConfig::from_daemon_config(
+            config,
+        )?))
     }
 
     #[must_use]
@@ -767,140 +733,6 @@ impl RuntimeServer {
 impl Default for RuntimeServer {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RuntimeServerConfig {
-    pub mcp_host: String,
-    pub mcp_port: u16,
-    pub addin_host: String,
-    pub addin_port: u16,
-    pub addin_origin: String,
-    pub addin_public_dir: PathBuf,
-    pub certificate_path: PathBuf,
-    pub certificate_passphrase: String,
-    pub max_request_bytes: usize,
-    pub max_ws_frame_bytes: usize,
-    pub max_pending_per_session: usize,
-    pub heartbeat_interval: Duration,
-    pub heartbeat_timeout: Duration,
-    pub requests_per_minute: u64,
-    pub config_path: Option<String>,
-    pub log_path: Option<String>,
-    pub audit_log: AuditLog,
-    pub image_fetcher: ImageFetcher,
-}
-
-impl RuntimeServerConfig {
-    fn mcp_bind_addr(&self) -> String {
-        format!("{}:{}", self.mcp_host, self.mcp_port)
-    }
-
-    fn addin_bind_addr(&self) -> String {
-        format!("{}:{}", self.addin_host, self.addin_port)
-    }
-
-    fn mcp_http_config(&self) -> McpHttpConfig {
-        McpHttpConfig {
-            host: self.mcp_host.clone(),
-            port: self.mcp_port,
-            max_request_bytes: self.max_request_bytes,
-            requests_per_minute: self.requests_per_minute,
-        }
-    }
-
-    fn tls_acceptor(&self) -> Result<TlsAcceptor, RuntimeServerError> {
-        let pfx = fs::read(&self.certificate_path).map_err(|error| {
-            RuntimeServerError::Tls(format!(
-                "Failed to read add-in HTTPS certificate {}: {error}",
-                self.certificate_path.display()
-            ))
-        })?;
-        let identity = Identity::from_pkcs12(&pfx, &self.certificate_passphrase)
-            .map_err(|error| RuntimeServerError::Tls(error.to_string()))?;
-        TlsAcceptor::new(identity).map_err(|error| RuntimeServerError::Tls(error.to_string()))
-    }
-
-    fn addin_channel_config(&self) -> AddinChannelConfig {
-        AddinChannelConfig {
-            origin: self.addin_origin.clone(),
-            heartbeat_interval: self.heartbeat_interval,
-            heartbeat_timeout: self.heartbeat_timeout,
-            max_pending_per_session: self.max_pending_per_session,
-            ..AddinChannelConfig::default()
-        }
-    }
-}
-
-impl Default for RuntimeServerConfig {
-    fn default() -> Self {
-        Self {
-            mcp_host: "127.0.0.1".to_string(),
-            mcp_port: 8800,
-            addin_host: "localhost".to_string(),
-            addin_port: 8765,
-            addin_origin: "https://localhost:8765".to_string(),
-            addin_public_dir: default_addin_public_dir(),
-            certificate_path: default_pfx_path(),
-            certificate_passphrase: "office-mcp-localhost".to_string(),
-            max_request_bytes: 16 * 1024 * 1024,
-            max_ws_frame_bytes: 16 * 1024 * 1024,
-            max_pending_per_session: 4,
-            heartbeat_interval: Duration::from_secs(30),
-            heartbeat_timeout: Duration::from_secs(10),
-            requests_per_minute: 120,
-            config_path: None,
-            log_path: None,
-            audit_log: AuditLog::new(),
-            image_fetcher: ImageFetcher::new(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum RuntimeServerError {
-    Io(std::io::Error),
-    Tls(String),
-    InvalidConfig(String),
-    BadRequest(String),
-    WebSocketProtocol(WebSocketProtocolError),
-    Internal(String),
-}
-
-impl Display for RuntimeServerError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Io(error) => write!(formatter, "{error}"),
-            Self::Tls(message) => formatter.write_str(message),
-            Self::InvalidConfig(message) | Self::BadRequest(message) | Self::Internal(message) => {
-                formatter.write_str(message)
-            }
-            Self::WebSocketProtocol(error) => formatter.write_str(&error.reason),
-        }
-    }
-}
-
-impl std::error::Error for RuntimeServerError {}
-
-impl From<std::io::Error> for RuntimeServerError {
-    fn from(error: std::io::Error) -> Self {
-        Self::Io(error)
-    }
-}
-
-impl From<UiRuntimeError> for RuntimeServerError {
-    fn from(error: UiRuntimeError) -> Self {
-        Self::Internal(error.to_string())
-    }
-}
-
-impl From<WebSocketCodecError> for RuntimeServerError {
-    fn from(error: WebSocketCodecError) -> Self {
-        match error {
-            WebSocketCodecError::Io(error) => Self::Io(error),
-            WebSocketCodecError::Protocol(error) => Self::WebSocketProtocol(error),
-        }
     }
 }
 
@@ -1846,6 +1678,11 @@ fn nested_string_array(value: &Value, object: &str, name: &str) -> Vec<String> {
         .map_or_else(Vec::new, |nested| string_array_field(nested, name))
 }
 
+const ONE_PIXEL_PNG: &[u8] = &[
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0,
+    0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 218, 99, 252, 207, 192, 80, 15, 0, 5,
+    131, 2, 127, 151, 169, 73, 235, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+];
 fn render_ui_snapshot(
     ui_state: &Arc<Mutex<UiStateStore>>,
     registry: &Arc<Mutex<SessionRegistry>>,
@@ -1862,35 +1699,6 @@ fn render_ui_snapshot(
     snapshot.daemon.mcp_endpoint = format!("http://{}:{}/mcp", config.mcp_host, config.mcp_port);
     snapshot.daemon.addin_endpoint = format!("{}/addin", config.addin_origin);
     UiSnapshotRenderer::new().render_text(&snapshot)
-}
-
-fn default_pfx_path() -> PathBuf {
-    let current = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    for ancestor in current.ancestors() {
-        let local_candidate = ancestor.join(".office-mcp-localhost.pfx");
-        if local_candidate.is_file() {
-            return local_candidate;
-        }
-    }
-    current.join(".office-mcp-localhost.pfx")
-}
-
-const ONE_PIXEL_PNG: &[u8] = &[
-    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0,
-    0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 218, 99, 252, 207, 192, 80, 15, 0, 5,
-    131, 2, 127, 151, 169, 73, 235, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
-];
-
-fn to_u16(name: &str, value: u64) -> Result<u16, RuntimeServerError> {
-    value
-        .try_into()
-        .map_err(|_| RuntimeServerError::InvalidConfig(format!("{name} must fit into a TCP port.")))
-}
-
-fn to_usize(name: &str, value: u64) -> Result<usize, RuntimeServerError> {
-    value.try_into().map_err(|_| {
-        RuntimeServerError::InvalidConfig(format!("{name} is too large for this platform."))
-    })
 }
 
 #[cfg(test)]
