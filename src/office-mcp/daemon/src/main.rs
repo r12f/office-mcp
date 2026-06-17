@@ -104,9 +104,6 @@ fn serve_daemon() {
 
 fn serve_daemon_with_optional_tray(start_tray: bool) {
     tracing::info!(start_tray, "office-mcp-daemon run requested");
-    if start_tray {
-        start_tray_background();
-    }
     match load_config().and_then(|config| {
         tracing::info!("loaded daemon configuration");
         DaemonConfigService::assert_boundary_auth_config(&config)?;
@@ -125,6 +122,9 @@ fn serve_daemon_with_optional_tray(start_tray: bool) {
                         None
                     }
                 };
+                if start_tray {
+                    start_tray_background();
+                }
                 let endpoints = config.endpoints();
                 eprintln!("office-mcp-daemon MCP listening on {}", endpoints.mcp);
                 eprintln!(
