@@ -1,6 +1,7 @@
 use crate::addin_mgr::addin_channel_clock::format_system_time;
 use crate::addin_mgr::addin_heartbeat::AddinHeartbeatTimeout;
 use crate::addin_mgr::addin_protocol_version::same_major_version;
+use crate::addin_mgr::addin_tool_payload;
 use crate::addin_mgr::{
     AddinChannelConfig, AddinChannelError, AddinConnectionState, AddinUpgradeGuard,
     HeartbeatDecision, NewSessionInfo, RegisterRequest, RuntimeInfo, SessionAddedEvent,
@@ -378,30 +379,12 @@ impl AddinChannelServer {
 
     #[must_use]
     pub fn tool_invoke_payload(&self, command: &QueuedCommand) -> JsonRpcEnvelope {
-        JsonRpcEnvelope::request(
-            command.request_id.clone(),
-            "tool.invoke",
-            BTreeMap::from([
-                ("session_id".to_string(), command.session_id.clone()),
-                ("tool".to_string(), command.tool.clone()),
-                ("args".to_string(), command.arguments_json.clone()),
-                (
-                    "timeout_ms".to_string(),
-                    command.timeout.as_millis().to_string(),
-                ),
-            ]),
-        )
+        addin_tool_payload::tool_invoke_payload(command)
     }
 
     #[must_use]
     pub fn tool_cancel_payload(&self, cancel: &CancelCommand) -> JsonRpcEnvelope {
-        JsonRpcEnvelope::notification(
-            "tool.cancel",
-            BTreeMap::from([
-                ("request_id".to_string(), cancel.request_id.clone()),
-                ("reason".to_string(), cancel.reason.clone()),
-            ]),
-        )
+        addin_tool_payload::tool_cancel_payload(cancel)
     }
 
     fn next_ping_id(&mut self) -> String {

@@ -7,6 +7,7 @@ pub(crate) mod addin_connection_state;
 pub mod addin_heartbeat;
 pub mod addin_json_rpc;
 pub(crate) mod addin_protocol_version;
+pub(crate) mod addin_tool_payload;
 pub mod addin_upgrade_guard;
 pub mod command_model;
 pub(crate) mod command_queue;
