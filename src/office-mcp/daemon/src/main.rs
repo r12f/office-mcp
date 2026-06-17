@@ -7,7 +7,7 @@ use office_mcp_daemon::mcp_management_client::McpManagementClient;
 use office_mcp_daemon::runtime_server::RuntimeServer;
 use office_mcp_daemon::stdio_bridge::StdioBridge;
 use office_mcp_daemon::tray_host::{TrayHost, TrayHostOptions};
-use office_mcp_daemon::ui_runtime::UiRuntimeFile;
+use office_mcp_daemon::ui_runtime::{UiRuntimeError, UiRuntimeFile};
 use std::path::PathBuf;
 
 fn main() {
@@ -109,17 +109,21 @@ fn serve_daemon() {
 }
 
 fn open_ui() {
-    match load_config() {
-        Ok(config) => {
-            let runtime_file = UiRuntimeFile::from_config(&config);
-            let url = runtime_file.info().ui_url.clone();
+    match ui_url_from_runtime_path(&UiRuntimeFile::default_path()) {
+        Ok(url) => {
             if let Err(error) = open_url(&url) {
                 exit_error(error);
             }
             println!("{url}");
         }
-        Err(error) => exit_error(error),
+        Err(error) => exit_error(format!(
+            "No running office-mcp daemon UI was found. Start the daemon with `office-mcp-daemon daemon run` and try again. {error}"
+        )),
     }
+}
+
+fn ui_url_from_runtime_path(path: &std::path::Path) -> Result<String, UiRuntimeError> {
+    Ok(UiRuntimeFile::read_path(path)?.ui_url)
 }
 
 fn run_tray(args: &[String]) {
@@ -268,7 +272,7 @@ fn exit_error(error: impl std::fmt::Display) -> ! {
 
 #[cfg(test)]
 mod tests {
-    use super::{json_escape, render_redacted_config};
+    use super::{json_escape, render_redacted_config, ui_url_from_runtime_path};
     use office_mcp_daemon::config_service::{
         AddinConfig, AuditConfig, DaemonConfig, LimitsConfig, LogLevel, LoggingConfig, McpConfig,
     };
@@ -319,5 +323,33 @@ mod tests {
     #[test]
     fn escapes_json_control_characters() {
         assert_eq!(json_escape("a\\b\"c\n"), "a\\\\b\\\"c\\n");
+    }
+
+    #[test]
+    fn ui_command_reads_runtime_file_url_instead_of_config_defaults() {
+        let dir = std::env::temp_dir().join(format!(
+            "office-mcp-ui-command-test-{}",
+            std::process::id()
+        ));
+        let path = dir.join("ui-runtime.json");
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        std::fs::write(
+            &path,
+            concat!(
+                "{",
+                "\"origin\":\"https://localhost:8766\",",
+                "\"stateUrl\":\"https://localhost:8766/ui/state\",",
+                "\"uiUrl\":\"https://localhost:8766/ui/\",",
+                "\"pid\":123,",
+                "\"createdAt\":\"1\"",
+                "}"
+            ),
+        )
+        .expect("runtime file");
+
+        let url = ui_url_from_runtime_path(&path).expect("ui url");
+
+        assert_eq!(url, "https://localhost:8766/ui/");
+        let _ = std::fs::remove_dir_all(dir);
     }
 }
