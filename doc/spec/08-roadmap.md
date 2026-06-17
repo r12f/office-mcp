@@ -351,13 +351,26 @@ module so ownership is visible from the directory tree.
       live under `src/office-mcp/daemon/src/runtime/`; the root layout guard
       `daemon_src_root_only_contains_composition_and_transitional_files` proves
       no service modules are added directly under `src`.
-- [ ] Rename Rust modules where needed to match their service boundary. For
+- [x] Rename Rust modules where needed to match their service boundary. For
       example, UI state snapshot code belongs under `api`, tray host/controller
       under `tray`, MCP HTTP/frontend/stdio under `mcp`, and session/command
-      routing under `addin_mgr`.
+      routing under `addin_mgr`. Current daemon source separates shared daemon
+      config model/error types into `common::config_model` and
+      `common::config_error`, UI state DTOs into `api::state_model`, MCP HTTP
+      request/decision/session DTOs into `mcp::http_frontend_model`, add-in
+      registry DTOs into `addin_mgr::session_registry_model`, add-in tool
+      payload helpers into `addin_mgr::addin_tool_payload`, add-in protocol and
+      clock helpers into dedicated `addin_mgr` modules, and the TLS WebSocket
+      session loop into `runtime::websocket_session`.
 - [ ] Split oversized Rust files so each `.rs` file owns one primary concept or
       a tight helper set. Avoid catch-all files with many unrelated domain
-      objects.
+      objects. Progress so far split config, UI state, MCP HTTP frontend,
+      session registry, add-in tool payload, add-in protocol/clock helpers, and
+      runtime WebSocket session objects into separate files with sibling
+      `*_tests.rs` coverage. Remaining large files still needing review include
+      `addin_channel.rs`, `command_router.rs`, `runtime/evidence_fixture.rs`,
+      `common/logger.rs`, `runtime/mcp_rpc.rs`, `runtime/server.rs`, and
+      `mcp/catalog.rs`.
 - [x] Move inline Rust unit tests into sibling files named after the production
       file, such as `logger_tests.rs` for `logger.rs`. Keep only minimal
       compile-only inline test modules when a sibling file is not useful.
