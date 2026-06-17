@@ -24,12 +24,6 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RuntimeSeedState {
-    pub ui_state: UiStateStore,
-    pub registry: SessionRegistry,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeServer {
     config: RuntimeServerConfig,
 }

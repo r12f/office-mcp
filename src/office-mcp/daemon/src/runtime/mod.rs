@@ -9,6 +9,7 @@ pub mod mcp_response;
 pub mod mcp_rpc;
 pub mod mcp_tool_arguments;
 pub mod mcp_tool_audit;
+pub mod runtime_seed_state;
 pub mod server;
 pub mod server_config;
 pub mod static_response;
@@ -17,5 +18,6 @@ pub mod websocket_heartbeat;
 pub mod websocket_heartbeat_service;
 
 pub use evidence_fixture::{UiFixtureOptions, run_ui_fixture};
-pub use server::{RuntimeSeedState, RuntimeServer};
+pub use runtime_seed_state::RuntimeSeedState;
+pub use server::RuntimeServer;
 pub use server_config::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
