@@ -45,9 +45,23 @@ impl TrayHost {
     /// URL cannot be opened, or the daemon cannot be stopped.
     pub fn run(&self) -> Result<(), TrayPlatformError> {
         if self.options.probe {
-            println!("{}", self.probe_json());
+            let probe = self.probe_json();
+            tracing::info!(
+                component = "tray_host",
+                probe = true,
+                native_host = true,
+                can_read_runtime = probe["can_read_runtime"].as_bool().unwrap_or(false),
+                state_fetch_ok = probe["state_fetch_ok"].as_bool().unwrap_or(false),
+                "ran tray probe"
+            );
+            println!("{}", probe);
             return Ok(());
         }
+        tracing::info!(
+            component = "tray_host",
+            probe = false,
+            "starting native tray host"
+        );
         run_platform_tray(&self.options)
     }
 
@@ -77,9 +91,21 @@ impl TrayHost {
 /// Returns an error when the platform URL launcher fails.
 pub fn open_ui_from_runtime(options: &TrayHostOptions) -> Result<(), TrayPlatformError> {
     if let Some(runtime) = runtime_info(options) {
+        tracing::info!(
+            component = "tray_host",
+            ui_url = %runtime.ui_url,
+            source = "runtime_file",
+            "opening daemon UI from tray"
+        );
         open_url(runtime.ui_url.as_str())?;
         return Ok(());
     }
+    tracing::warn!(
+        component = "tray_host",
+        ui_url = "https://localhost:8765/ui/",
+        source = "fallback",
+        "opening daemon UI from tray without runtime file"
+    );
     open_url("https://localhost:8765/ui/")
 }
 
@@ -89,12 +115,17 @@ pub fn open_ui_from_runtime(options: &TrayHostOptions) -> Result<(), TrayPlatfor
 ///
 /// Returns an error when the controller cannot stop the daemon.
 pub fn stop_daemon() -> Result<(), TrayPlatformError> {
+    tracing::info!(component = "tray_host", "stopping daemon from tray");
     DaemonController::from_env()
         .stop()
         .map_err(|error| TrayPlatformError::new(error.to_string()))
 }
 
 pub fn start_tray_background() {
+    tracing::info!(
+        component = "tray_host",
+        "starting tray host background thread"
+    );
     let _ = std::thread::Builder::new()
         .name("office-mcp-tray".to_string())
         .spawn(|| {
@@ -254,6 +285,12 @@ mod native_tray {
                 .with_icon(app_icon())
                 .build()
                 .map_err(|error| TrayPlatformError::new(error.to_string()))?;
+            tracing::info!(
+                component = "tray_host",
+                tooltip = %snapshot.tooltip,
+                platform = %snapshot.platform.label(),
+                "created native tray icon"
+            );
             Ok(Self {
                 options: options.clone(),
                 controller,
@@ -266,6 +303,11 @@ mod native_tray {
             let snapshot = self
                 .controller
                 .snapshot_from_ui_state(read_ui_state(&self.options).as_ref());
+            tracing::debug!(
+                component = "tray_host",
+                tooltip = %snapshot.tooltip,
+                "refreshing tray snapshot"
+            );
             self.apply_snapshot(&snapshot)
         }
     }
@@ -277,14 +319,22 @@ mod native_tray {
                 .map_err(|error| TrayPlatformError::new(error.to_string()))?;
             self.icon.set_menu(Some(Box::new(build_menu(snapshot))));
             self.snapshot = snapshot.clone();
+            tracing::debug!(
+                component = "tray_host",
+                tooltip = %self.snapshot.tooltip,
+                menu_items = self.snapshot.menu.len(),
+                "applied tray snapshot"
+            );
             Ok(())
         }
 
         fn show_ui(&mut self) -> Result<(), TrayPlatformError> {
+            tracing::info!(component = "tray_host", "tray action show UI selected");
             open_ui_from_runtime(&self.options)
         }
 
         fn quit(&mut self) -> Result<(), TrayPlatformError> {
+            tracing::info!(component = "tray_host", "tray action quit selected");
             stop_daemon()
         }
     }

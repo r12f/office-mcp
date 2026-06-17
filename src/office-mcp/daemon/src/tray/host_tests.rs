@@ -1,5 +1,7 @@
 use super::{TrayHost, TrayHostOptions};
+use crate::common::{Logger, LoggerLogLevel};
 use std::fs;
+use std::fs::{read_to_string, remove_dir_all};
 
 #[test]
 fn probe_snapshot_reads_state_file() {
@@ -25,6 +27,35 @@ fn probe_snapshot_reads_state_file() {
     assert_eq!(probe["snapshot"]["menu_items"][1], "Clients: 1");
     assert_eq!(probe["snapshot"]["menu_items"][2], "Documents: 1");
     let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn tray_probe_writes_structured_tracing_event() {
+    let dir = std::env::temp_dir().join(format!("office-mcp-tray-host-log-{}", std::process::id()));
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let state_path = dir.join("state.json");
+    let log_path = dir.join("office-mcp.log");
+    fs::write(
+        &state_path,
+        r#"{"daemon":{"status":"up"},"clients":[{}],"documents":{"word":[{}]},"current_tasks":[]}"#,
+    )
+    .expect("write state");
+    let (subscriber, guard) =
+        Logger::tracing_file_default(LoggerLogLevel::Info, &log_path).expect("init tracing");
+    let host = TrayHost::new(TrayHostOptions {
+        runtime_path: None,
+        probe_state_path: Some(state_path),
+        probe: true,
+    });
+
+    tracing::subscriber::with_default(subscriber, || host.run().expect("run probe"));
+    drop(guard);
+
+    let contents = read_to_string(&log_path).expect("read tracing log file");
+    assert!(contents.contains("ran tray probe"));
+    assert!(contents.contains("\"component\":\"tray_host\""));
+    assert!(contents.contains("\"state_fetch_ok\":true"));
+    let _ = remove_dir_all(dir);
 }
 
 #[test]
@@ -66,4 +97,21 @@ fn background_tray_launcher_owns_native_tray_thread() {
     assert!(source.contains(".name(\"office-mcp-tray\".to_string())"));
     assert!(source.contains("TrayHost::new(TrayHostOptions::default()).run()"));
     assert!(source.contains("office-mcp tray host thread failed to start"));
+}
+
+#[test]
+fn native_tray_actions_emit_tracing_events() {
+    let source_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("tray")
+        .join("host.rs");
+    let source = fs::read_to_string(source_path).expect("read source");
+
+    assert!(source.contains("created native tray icon"));
+    assert!(source.contains("refreshing tray snapshot"));
+    assert!(source.contains("applied tray snapshot"));
+    assert!(source.contains("tray action show UI selected"));
+    assert!(source.contains("tray action quit selected"));
+    assert!(source.contains("opening daemon UI from tray"));
+    assert!(source.contains("stopping daemon from tray"));
 }
