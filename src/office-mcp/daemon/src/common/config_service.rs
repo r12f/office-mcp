@@ -1,3 +1,4 @@
+use crate::common::config_paths::ConfigPathResolver;
 use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
@@ -78,7 +79,7 @@ impl DaemonConfigService {
                     ],
                     addin_channel.string_value(
                         "certificate_path",
-                        &Self::default_pfx_path().display().to_string(),
+                        &ConfigPathResolver::pfx_path().display().to_string(),
                     )?,
                 ),
                 pfx_passphrase: self.string_env_any(
@@ -275,60 +276,15 @@ impl DaemonConfigService {
     }
 
     fn default_config_path(&self) -> PathBuf {
-        if cfg!(windows) {
-            return PathBuf::from(
-                self.env
-                    .get("APPDATA")
-                    .cloned()
-                    .or_else(|| {
-                        self.env
-                            .get("USERPROFILE")
-                            .map(|path| format!("{path}\\AppData\\Roaming"))
-                    })
-                    .unwrap_or_else(|| "C:\\Users\\Default\\AppData\\Roaming".to_string()),
-            )
-            .join("office-mcp")
-            .join("config.toml");
-        }
-        if cfg!(target_os = "macos") {
-            return PathBuf::from(
-                self.env
-                    .get("HOME")
-                    .cloned()
-                    .unwrap_or_else(|| ".".to_string()),
-            )
-            .join("Library")
-            .join("Application Support")
-            .join("office-mcp")
-            .join("config.toml");
-        }
-        PathBuf::from(self.env.get("XDG_CONFIG_HOME").cloned().unwrap_or_else(|| {
-            PathBuf::from(
-                self.env
-                    .get("HOME")
-                    .cloned()
-                    .unwrap_or_else(|| ".".to_string()),
-            )
-            .join(".config")
-            .display()
-            .to_string()
-        }))
-        .join("office-mcp")
-        .join("config.toml")
-    }
-
-    fn default_pfx_path() -> PathBuf {
-        env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join(".office-mcp-localhost.pfx")
+        ConfigPathResolver::new(&self.env).config_path()
     }
 
     fn default_audit_path(&self) -> String {
-        platform_state_path(&self.env, "audit.jsonl")
+        ConfigPathResolver::new(&self.env).audit_path()
     }
 
     fn default_log_path(&self) -> String {
-        platform_state_path(&self.env, "office-mcp.log")
+        ConfigPathResolver::new(&self.env).log_path()
     }
 }
 
@@ -683,44 +639,6 @@ fn optional_path_value(value: String, fallback: &str) -> String {
     } else {
         value
     }
-}
-
-fn platform_state_path(env: &BTreeMap<String, String>, filename: &str) -> String {
-    if cfg!(windows) {
-        return PathBuf::from(
-            env.get("LOCALAPPDATA")
-                .cloned()
-                .or_else(|| {
-                    env.get("USERPROFILE")
-                        .map(|path| format!("{path}\\AppData\\Local"))
-                })
-                .unwrap_or_else(|| "C:\\Users\\Default\\AppData\\Local".to_string()),
-        )
-        .join("office-mcp")
-        .join(filename)
-        .display()
-        .to_string();
-    }
-    if cfg!(target_os = "macos") {
-        return PathBuf::from(env.get("HOME").cloned().unwrap_or_else(|| ".".to_string()))
-            .join("Library")
-            .join("Logs")
-            .join("office-mcp")
-            .join(filename)
-            .display()
-            .to_string();
-    }
-    PathBuf::from(env.get("XDG_STATE_HOME").cloned().unwrap_or_else(|| {
-        PathBuf::from(env.get("HOME").cloned().unwrap_or_else(|| ".".to_string()))
-            .join(".local")
-            .join("state")
-            .display()
-            .to_string()
-    }))
-    .join("office-mcp")
-    .join(filename)
-    .display()
-    .to_string()
 }
 
 fn is_loopback_host(host: &str) -> bool {

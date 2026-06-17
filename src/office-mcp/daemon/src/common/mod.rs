@@ -1,6 +1,7 @@
 pub mod audit_log;
 pub mod client_config;
 pub mod config_display;
+pub(crate) mod config_paths;
 pub mod config_service;
 pub mod logger;
 
