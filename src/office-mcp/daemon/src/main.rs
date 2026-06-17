@@ -7,7 +7,7 @@ use office_mcp_daemon::common::{
 use office_mcp_daemon::evidence_fixture::{UiFixtureOptions, run_ui_fixture};
 use office_mcp_daemon::mcp::McpManagementClient;
 use office_mcp_daemon::mcp::StdioBridge;
-use office_mcp_daemon::runtime_server::RuntimeServer;
+use office_mcp_daemon::runtime::RuntimeServer;
 use office_mcp_daemon::tray::{TrayHost, TrayHostOptions, start_tray_background};
 use office_mcp_daemon::ui::{UiLauncher, UiRuntimeFile};
 use std::path::PathBuf;

@@ -1701,5 +1701,5 @@ fn render_ui_snapshot(
 }
 
 #[cfg(test)]
-#[path = "runtime_server_tests.rs"]
-mod runtime_server_tests;
+#[path = "server_tests.rs"]
+mod server_tests;

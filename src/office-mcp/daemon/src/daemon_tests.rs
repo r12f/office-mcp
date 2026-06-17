@@ -39,7 +39,6 @@ fn daemon_src_root_only_contains_composition_and_transitional_files() {
         "lib.rs",
         "main.rs",
         "parity.rs",
-        "runtime_server.rs",
     ]);
     let forbidden_service_files = BTreeSet::from([
         "addin_channel.rs",

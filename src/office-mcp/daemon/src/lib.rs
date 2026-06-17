@@ -6,7 +6,6 @@ pub mod evidence_fixture;
 pub mod mcp;
 pub mod parity;
 pub mod runtime;
-pub mod runtime_server;
 pub mod tray;
 pub mod ui;
 

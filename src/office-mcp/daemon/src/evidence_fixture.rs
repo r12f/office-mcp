@@ -11,9 +11,7 @@ use crate::common::AuditLog;
 use crate::common::{
     AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
 };
-use crate::runtime_server::{
-    RuntimeSeedState, RuntimeServer, RuntimeServerConfig, RuntimeServerError,
-};
+use crate::runtime::{RuntimeSeedState, RuntimeServer, RuntimeServerConfig, RuntimeServerError};
 use crate::ui::UiRuntimeFile;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};

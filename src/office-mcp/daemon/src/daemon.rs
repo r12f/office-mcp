@@ -7,7 +7,7 @@ use crate::common::DaemonConfigService;
 use crate::common::Logger;
 use crate::mcp::McpHttpFrontend;
 use crate::parity::ParityPlan;
-use crate::runtime_server::RuntimeServer;
+use crate::runtime::RuntimeServer;
 use crate::tray::TrayController;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

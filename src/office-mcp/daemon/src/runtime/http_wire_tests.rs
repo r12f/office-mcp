@@ -1,6 +1,6 @@
 use super::{WireHttpRequest, WireHttpResponse};
 use crate::mcp::HttpMethod;
-use crate::runtime_server::RuntimeServerError;
+use crate::runtime::RuntimeServerError;
 use std::collections::BTreeMap;
 
 #[test]
