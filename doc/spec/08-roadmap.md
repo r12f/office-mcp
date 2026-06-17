@@ -293,7 +293,7 @@ module so ownership is visible from the directory tree.
 - [ ] Create `src/office-mcp/daemon/src/ui/` and merge the sibling
       `src/office-mcp/ui` source/assets into it. The old sibling path should be
       removed after packaging and evidence paths are updated.
-- [ ] Create `src/office-mcp/daemon/src/api/` for daemon UI/control APIs:
+- [x] Create `src/office-mcp/daemon/src/api/` for daemon UI/control APIs:
       status, sessions, current tasks, recent history, config display/control,
       UI runtime file lookup, and UI event streams.
 - [x] Create `src/office-mcp/daemon/src/mcp/` for MCP-only code: Streamable HTTP
