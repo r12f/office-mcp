@@ -9,7 +9,7 @@ use office_mcp_daemon::mcp::McpManagementClient;
 use office_mcp_daemon::mcp::StdioBridge;
 use office_mcp_daemon::runtime_server::RuntimeServer;
 use office_mcp_daemon::tray::{TrayHost, TrayHostOptions, start_tray_background};
-use office_mcp_daemon::ui::{UiRuntimeError, UiRuntimeFile};
+use office_mcp_daemon::ui::{UiLauncher, UiRuntimeFile};
 use std::path::PathBuf;
 
 fn main() {
@@ -154,21 +154,10 @@ const fn logger_level_from_config(
 }
 
 fn open_ui() {
-    match ui_url_from_runtime_path(&UiRuntimeFile::default_path()) {
-        Ok(url) => {
-            if let Err(error) = open_url(&url) {
-                exit_error(error);
-            }
-            println!("{url}");
-        }
-        Err(error) => exit_error(format!(
-            "No running office-mcp daemon UI was found. Start the daemon with `office-mcp-daemon daemon run` and try again. {error}"
-        )),
+    match UiLauncher::default().open() {
+        Ok(url) => println!("{url}"),
+        Err(error) => exit_error(error),
     }
-}
-
-fn ui_url_from_runtime_path(path: &std::path::Path) -> Result<String, UiRuntimeError> {
-    Ok(UiRuntimeFile::read_path(path)?.ui_url)
 }
 
 fn run_tray(args: &[String]) {
@@ -228,35 +217,6 @@ fn read_option(args: &[String], name: &str) -> Option<String> {
         .and_then(|index| args.get(index + 1))
         .filter(|value| !value.starts_with("--"))
         .cloned()
-}
-
-fn open_url(url: &str) -> Result<(), std::io::Error> {
-    #[cfg(windows)]
-    {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", url])
-            .spawn()?
-            .wait()?;
-        return Ok(());
-    }
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(url)
-            .spawn()?
-            .wait()?;
-        return Ok(());
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(url)
-            .spawn()?
-            .wait()?;
-        return Ok(());
-    }
-    #[allow(unreachable_code)]
-    Ok(())
 }
 
 fn exit_error(error: impl std::fmt::Display) -> ! {
