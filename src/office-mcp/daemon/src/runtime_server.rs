@@ -14,7 +14,9 @@ use crate::addin_mgr::{WebSocketCodec, WebSocketCodecError, WebSocketFrame};
 use crate::addin_mgr::{
     default_office_ctl_common_dir, default_office_ctl_host_public_dir, static_asset_content_type,
 };
-use crate::api::{CommandFailure, UiSnapshotRenderer, UiStateOptions, UiStateStore};
+use crate::api::{
+    CommandFailure, UiSnapshotEndpoints, UiSnapshotService, UiStateOptions, UiStateStore,
+};
 use crate::common::DaemonConfig;
 use crate::common::{AuditLog, AuditRecord};
 use crate::mcp::{
@@ -1688,17 +1690,14 @@ fn render_ui_snapshot(
     registry: &Arc<Mutex<SessionRegistry>>,
     config: &RuntimeServerConfig,
 ) -> String {
-    let sessions = registry
-        .lock()
-        .map(|registry| registry.list_sessions())
-        .unwrap_or_default();
-    let mut snapshot = ui_state.lock().map_or_else(
-        |_| UiStateStore::new().snapshot(&sessions, SystemTime::now()),
-        |ui_state| ui_state.snapshot(&sessions, SystemTime::now()),
-    );
-    snapshot.daemon.mcp_endpoint = format!("http://{}:{}/mcp", config.mcp_host, config.mcp_port);
-    snapshot.daemon.addin_endpoint = format!("{}/addin", config.addin_origin);
-    UiSnapshotRenderer::new().render_text(&snapshot)
+    UiSnapshotService::new().render_runtime_snapshot(
+        ui_state,
+        registry,
+        &UiSnapshotEndpoints {
+            mcp_endpoint: format!("http://{}:{}/mcp", config.mcp_host, config.mcp_port),
+            addin_endpoint: format!("{}/addin", config.addin_origin),
+        },
+    )
 }
 
 #[cfg(test)]
