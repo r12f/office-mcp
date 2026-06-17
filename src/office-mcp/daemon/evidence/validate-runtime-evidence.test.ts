@@ -183,6 +183,14 @@ test('runtime evidence validator accepts UI runtime evidence gates', () => {
     assert.notEqual(result.status, 0);
     assert.match(outputText(result.stdout), /Missing required gate: ui\.tray_probe/);
   });
+
+  const missingProductionTray = uiReport();
+  missingProductionTray.gates = missingProductionTray.gates.filter((item) => item.name !== 'ui.production_daemon_tray');
+  withEvidenceFile(missingProductionTray, (path) => {
+    const result = runValidator(path, '--ui');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /Missing required gate: ui\.production_daemon_tray/);
+  });
 });
 
 test('runtime evidence validator rejects missing or failed required gates', () => {
@@ -255,6 +263,7 @@ function uiReport() {
       gate('ui.state_api_origin_redaction', 'passed'),
       gate('ui.events_stream', 'passed'),
       gate('ui.tray_probe', 'passed'),
+      gate('ui.production_daemon_tray', 'passed'),
       gate('ui.browser_smoke', 'passed')
     ]
   };

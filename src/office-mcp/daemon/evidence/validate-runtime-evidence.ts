@@ -140,6 +140,7 @@ function validateUiEvidence(): never {
     'ui.state_api_origin_redaction',
     'ui.events_stream',
     'ui.tray_probe',
+    'ui.production_daemon_tray',
     'ui.browser_smoke'
   ]) {
     requirePassedGate(name);

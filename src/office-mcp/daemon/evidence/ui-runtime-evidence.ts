@@ -41,6 +41,9 @@ const tempDir = mkdtempSync(join(tmpdir(), 'office-mcp-ui-evidence-'));
 const cargoTargetDir = join(tempDir, 'target');
 const runtimePath = join(tempDir, 'ui-runtime.json');
 const probeStatePath = join(tempDir, 'ui-state-probe.json');
+const productionRuntimePath = join(tempDir, 'production-ui-runtime.json');
+const productionLogPath = join(tempDir, 'production-office-mcp.log');
+const productionConfigPath = join(tempDir, 'production-config.toml');
 const previousRuntimePath = process.env.OFFICE_MCP_UI_RUNTIME_PATH;
 process.env.OFFICE_MCP_UI_RUNTIME_PATH = runtimePath;
 
@@ -56,6 +59,7 @@ try {
   await runStateApiGate(runtime.origin);
   await runEventsStreamGate();
   await runTrayProbeGate();
+  await runProductionDaemonTrayGate();
   await runBrowserSmokeGate();
 } finally {
   await stopProcess(daemon);
@@ -166,6 +170,62 @@ async function runTrayProbeGate(): Promise<void> {
   });
 }
 
+async function runProductionDaemonTrayGate(): Promise<void> {
+  await runGate('ui.production_daemon_tray', async () => {
+    if (process.platform !== 'win32') return { skipped_reason: 'Native visible tray evidence is Windows-only.' };
+    const ports = await reserveProductionPorts();
+    writeProductionConfig(ports);
+    rmSync(productionRuntimePath, { force: true });
+    rmSync(productionLogPath, { force: true });
+    const daemonRun = spawn(daemonExecutablePath(), ['daemon', 'run'], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        OFFICE_MCP_CONFIG_PATH: productionConfigPath,
+        OFFICE_MCP_UI_RUNTIME_PATH: productionRuntimePath,
+        OFFICE_MCP_LOGGING__FILE: productionLogPath,
+        OFFICE_MCP_LOGGING__LEVEL: 'debug'
+      },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    daemonRun.stderr.setEncoding('utf8');
+    daemonRun.stderr.on('data', (chunk) => process.stderr.write(chunk));
+    daemonRun.stdout.setEncoding('utf8');
+    daemonRun.stdout.on('data', (chunk) => process.stderr.write(chunk));
+    try {
+      const runtime = await waitForRuntimeFileAt(productionRuntimePath, daemonRun);
+      const state = await httpsText(runtime.stateUrl, { rejectUnauthorized: false });
+      if (state.status !== 200) throw new Error(`Production /ui/state returned ${state.status}.`);
+      const snapshot = JSON.parse(state.body) as { daemon?: { status?: string } };
+      if (snapshot.daemon?.status !== 'up') throw new Error(`Production daemon status is ${snapshot.daemon?.status}.`);
+      const probe = spawnSync(daemonExecutablePath(), ['tray', '--probe', '--runtime-path', productionRuntimePath], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        timeout: 15000,
+        env: { ...process.env, OFFICE_MCP_UI_RUNTIME_PATH: productionRuntimePath }
+      });
+      if (probe.status !== 0) throw new Error(`Production tray probe failed: ${probe.stderr || probe.stdout}`);
+      const probeJson = parseJsonFromStdout(probe.stdout, 'Production tray probe');
+      const probeSnapshot = probeJson.snapshot as Record<string, unknown> | undefined;
+      if (probeJson.state_fetch_ok !== true) throw new Error(`Production tray probe could not fetch UI state: ${probe.stdout}`);
+      if (probeSnapshot?.platform !== 'windows-notification-area') throw new Error(`Wrong tray platform: ${probeSnapshot?.platform}`);
+      if (!Array.isArray(probeSnapshot?.menu_items) || probeSnapshot.menu_items[0] !== 'Status: Up') throw new Error(`Tray menu did not report Up: ${probe.stdout}`);
+      const logText = await waitForLogLine(productionLogPath, 'created native tray icon', daemonRun);
+      if (!logText.includes('windows-notification-area')) throw new Error('Native tray creation log did not include Windows platform evidence.');
+      return {
+        runtime_path: productionRuntimePath,
+        state_url: runtime.stateUrl,
+        ui_url: runtime.uiUrl,
+        log_path: productionLogPath,
+        tray_probe: probeJson,
+        tray_log_contains_native_icon: true
+      };
+    } finally {
+      await stopProcess(daemonRun);
+    }
+  });
+}
+
 function prepareTrayProbeInstallRoot(): string {
   const daemonExe = daemonExecutablePath();
   if (!existsSync(daemonExe)) {
@@ -178,6 +238,79 @@ function prepareTrayProbeInstallRoot(): string {
   if (!existsSync(daemonExe)) throw new Error(`Cannot find built daemon executable: ${daemonExe}`);
   copyFileSync(daemonExe, join(tempDir, 'office-mcp-daemon.exe'));
   return tempDir;
+}
+
+async function reserveProductionPorts(): Promise<{ addin: number; mcp: number }> {
+  const mcp = await reservePort();
+  const addin = await reservePort();
+  if (mcp === addin) return reserveProductionPorts();
+  return { addin, mcp };
+}
+
+async function reservePort(): Promise<number> {
+  const net = await import('node:net');
+  return await new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        server.close(() => reject(new Error('Failed to reserve TCP port.')));
+        return;
+      }
+      const port = address.port;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+function writeProductionConfig(ports: { addin: number; mcp: number }): void {
+  writeFileSync(productionConfigPath, [
+    '[addin_channel]',
+    'bind = "localhost"',
+    `port = ${ports.addin}`,
+    'certificate_path = ".office-mcp-localhost.pfx"',
+    'certificate_passphrase = "office-mcp-localhost"',
+    '',
+    '[mcp_http]',
+    'bind = "127.0.0.1"',
+    `port = ${ports.mcp}`,
+    '',
+    '[logging]',
+    'level = "debug"',
+    `file = ${JSON.stringify(productionLogPath)}`,
+    ''
+  ].join('\n'));
+}
+
+async function waitForRuntimeFileAt(path: string, child: ChildProcess): Promise<{ origin: string; stateUrl: string; uiUrl: string }> {
+  for (let index = 0; index < 600; index += 1) {
+    if (existsSync(path)) {
+      const runtime = JSON.parse(readFileSync(path, 'utf8')) as { origin?: string; stateUrl?: string; uiUrl?: string };
+      if (runtime.origin && runtime.stateUrl && runtime.uiUrl) return { origin: runtime.origin, stateUrl: runtime.stateUrl, uiUrl: runtime.uiUrl };
+    }
+    if (child.exitCode !== null) throw new Error(`Production daemon exited before writing runtime file with code ${child.exitCode}.`);
+    await delay(100);
+  }
+  throw new Error('Timed out waiting for production daemon runtime file.');
+}
+
+async function waitForLogLine(path: string, needle: string, child: ChildProcess): Promise<string> {
+  for (let index = 0; index < 100; index += 1) {
+    if (existsSync(path)) {
+      const text = readFileSync(path, 'utf8');
+      if (text.includes(needle)) return text;
+    }
+    if (child.exitCode !== null) throw new Error(`Production daemon exited before logging ${needle}.`);
+    await delay(100);
+  }
+  throw new Error(`Timed out waiting for log line: ${needle}`);
+}
+
+function parseJsonFromStdout(stdout: string, label: string): Record<string, unknown> {
+  const jsonStart = stdout.indexOf('{');
+  if (jsonStart === -1) throw new Error(`${label} did not emit JSON: ${stdout}`);
+  return JSON.parse(stdout.slice(jsonStart)) as Record<string, unknown>;
 }
 
 function daemonExecutablePath(): string {

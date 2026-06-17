@@ -119,23 +119,32 @@ review the result like a normal collaborator's edits.
 - [x] Daemon UI backend and static web console assets: redacted `/ui/state`,
       `/ui/events`, and `/ui/` are served by the daemon evidence fixture and
       validated by `npm run check:ui`.
-- [ ] User-visible daemon UI server entry point. Running `office-mcp-daemon
+- [x] User-visible daemon UI server entry point. Running `office-mcp-daemon
       daemon run` must make the daemon web console discoverable and openable by
       a normal user without manually guessing `https://localhost:<port>/ui/`.
       Required entry points: `office-mcp-daemon ui`, tray `Show Office MCP`, and
       a documented URL in `daemon status` output. Current Rust evidence covers
-      the `office-mcp-daemon ui` runtime-file path and `daemon status` output
-      including `uiUrl`, `stateUrl`, `logPath`, and `uiCommand`; visible tray
-      evidence remains tracked under M6.5.0.
-- [ ] Real desktop tray icon. The current Rust tray model/probe is not enough;
+      the `office-mcp-daemon ui` runtime-file path, tray `Show Office MCP`
+      dispatch, `daemon status` output including `uiUrl`, `stateUrl`, `logPath`,
+      and `uiCommand`, and `ui.production_daemon_tray` proving production
+      `daemon run` publishes a reachable UI runtime URL.
+- [x] Real desktop tray icon. The current Rust tray model/probe is not enough;
       the product must create a visible Windows notification-area icon during a
       normal daemon/tray launch, with right-click menu items for Up/Down, client
-      count, document count, Show Office MCP, and Quit Office MCP.
-- [ ] Daemon main window with status, endpoints, connected MCP clients, grouped
+      count, document count, Show Office MCP, and Quit Office MCP. Current
+      automated evidence covers production `daemon run` starting the native
+      Windows tray host, logging `created native tray icon` for
+      `windows-notification-area`, and `tray --probe` reading the live daemon UI
+      state with `Status: Up`, client count, document count, Show Office MCP,
+      and Quit Office MCP menu items. Manual right-click visibility remains
+      tracked under M6.5.0.
+- [x] Daemon main window with status, endpoints, connected MCP clients, grouped
       document sessions, current tasks, and recent command history must be
       reachable from the user-visible UI server/tray path, not only from the UI
-      evidence fixture. Current evidence validates rendering behavior but does
-      not prove the production entry point is discoverable.
+      evidence fixture. Current evidence validates rendering behavior through
+      `ui.browser_smoke`; production reachability is covered by
+      `ui.production_daemon_tray`, `office-mcp-daemon ui`, `daemon status`, and
+      tray `Show Office MCP` dispatch.
 - [x] Per-document detail expansion showing the most recent 10 commands and
       success/failure details. Current evidence: `npm run check:ui` verifies
       collapsed/expanded document detail panels and per-document command
@@ -183,13 +192,16 @@ User-reported follow-up from live daemon testing:
       `/ui/state`, and `/ui/events` available for the lifetime of the daemon.
       Covered by `serve_forever_with_runtime_file`, runtime file tests, and
       `production_bound_daemon_exposes_ui_state_and_events`.
-- [ ] Add a real Windows tray startup path that creates a visible notification
+- [x] Add a real Windows tray startup path that creates a visible notification
       icon in normal interactive runs, not just `tray --probe` evidence. Current
       automated evidence covers `office-mcp-daemon daemon run`, which starts the
       native tray host by default on a background thread before running the
       daemon. `--no-tray` is retained for headless/service runs, and
-      `--with-tray` remains accepted for compatibility. Manual Windows evidence
-      is still required to prove the icon is visible in the notification area.
+      `--with-tray` remains accepted for compatibility. `ui.production_daemon_tray`
+      now proves the production path creates the native Windows tray host,
+      exposes live UI state, and logs native notification-area icon creation.
+      Manual Windows interaction evidence remains required for right-click menu
+      visibility.
 - [x] Wire tray `Show Office MCP` to the same UI-opening path as
       `office-mcp-daemon ui`. Covered by `open_ui_from_runtime` and the native
       tray menu action dispatch.
@@ -198,7 +210,10 @@ User-reported follow-up from live daemon testing:
       `native_tray_quit_uses_platform_confirmation_dialogs`.
 - [ ] Add manual/e2e evidence that verifies a visible tray icon exists on
       Windows, the right-click menu appears, and `Show Office MCP` opens the
-      daemon UI.
+      daemon UI. Automated evidence now covers native tray icon creation logs
+      and the live menu model through `ui.production_daemon_tray`; this item
+      remains open until a visible desktop interaction run verifies the icon and
+      right-click menu in the notification area.
 - [x] Add automated coverage that fails when production `daemon run` does not
       expose `/ui/` and when `daemon status` omits the UI URL. Covered by
       `production_bound_daemon_exposes_ui_state_and_events`,
