@@ -203,21 +203,23 @@ User-reported follow-up from live task pane testing:
 - [ ] Move settings into an inline child panel of the top block. Clicking the
       gear must not append a detached settings block at the bottom of the task
       pane.
-- [ ] Replace bare tool-count badges such as `27 Tools` with an inspectable
+- [x] Replace bare tool-count badges such as `27 Tools` with an inspectable
       grouped tool list that shows actual tool names, categories, side effects,
-      and descriptions.
-- [ ] Add per-tool enable/disable controls in task pane settings for Word and
+      and descriptions. Word and Excel now show `Enabled X of Y`, grouped
+      tool names, and per-group enabled counts.
+- [x] Add per-tool enable/disable controls in task pane settings for Word and
       Excel. The persisted state is per full tool name; category toggles are
       optional shortcuts only.
-- [ ] Wire tool permissions into the add-in registration/session update flow:
+- [x] Wire tool permissions into the add-in registration/session update flow:
       disabled tools are omitted from effective `available_tools`, the daemon
       preflight rejects absent tools, and an in-flight race returns
       `TOOL_DISABLED_BY_USER`.
 - [ ] Add automated UI evidence for the compact layout, inline settings panel,
       grouped tool inspection, and per-tool permission toggles at 320 px width.
-- [ ] Add protocol/unit coverage proving `session.updated.available_tools`
+- [x] Add protocol/unit coverage proving `session.updated.available_tools`
       changes after a permission toggle and that disabled tools cannot be
-      invoked.
+      invoked. Coverage exists in the shared add-in channel tests, Word/Excel
+      task pane tests, and Rust session preflight tests.
 
 **Exit criterion**: In a 320 px Office task pane, the first viewport shows a
 compact connection/document summary, current task, and recent task status
@@ -316,19 +318,22 @@ module so ownership is visible from the directory tree.
 - [ ] Split oversized Rust files so each `.rs` file owns one primary concept or
       a tight helper set. Avoid catch-all files with many unrelated domain
       objects.
-- [ ] Move inline Rust unit tests into sibling files named after the production
+- [x] Move inline Rust unit tests into sibling files named after the production
       file, such as `logger_tests.rs` for `logger.rs`. Keep only minimal
       compile-only inline test modules when a sibling file is not useful.
 - [ ] Add `tracing`-based structured logging across daemon boundaries: startup,
       config load/reload, MCP request handling, add-in registration/session
       updates, tool dispatch, command completion/failure, tray actions, UI API
       calls, and shutdown.
-- [ ] Configure daemon file logging with intentional levels and structured
+- [x] Configure daemon file logging with intentional levels and structured
       fields. `daemon status` and the daemon UI must expose the current log path
       so errors can be diagnosed from logs instead of guessed from symptoms.
-- [ ] Add logging tests or evidence that verifies log records are written to the
+      The daemon initializes a tracing JSON file subscriber from
+      `logging.level`/`logging.file`, and daemon UI state exposes `log_path`.
+- [x] Add logging tests or evidence that verifies log records are written to the
       configured file, redact sensitive values, include request/session/tool
-      context when available, and preserve useful levels.
+      context when available, and preserve useful levels. Rust unit tests cover
+      file output, level filtering, redaction, and UI log-path exposure.
 - [ ] Update packaging, evidence harnesses, static asset serving, docs, and tests
       so no production code references the removed sibling `src/office-mcp/ui`
       path.
