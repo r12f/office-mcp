@@ -1,5 +1,6 @@
-use super::{AddinConnectionHub, RuntimeServer, RuntimeServerConfig};
+use super::{RuntimeServer, RuntimeServerConfig};
 use crate::addin_mgr::AddinChannelServer;
+use crate::addin_mgr::AddinConnectionHub;
 use crate::addin_mgr::CommandRouter;
 use crate::addin_mgr::ImageFetcher;
 use crate::addin_mgr::SessionRegistry;

@@ -1,6 +1,4 @@
-use crate::addin_mgr::AddinChannelServer;
 use crate::addin_mgr::SessionRegistry;
-use crate::addin_mgr::{AddinConnectionHub, CommandRouter};
 use crate::addin_mgr::{WebSocketCodec, WebSocketCodecError, WebSocketFrame};
 use crate::api::{UiStateOptions, UiStateStore};
 use crate::common::DaemonConfig;
@@ -10,6 +8,7 @@ use crate::runtime::addin_rpc::AddinJsonRpcRuntime;
 use crate::runtime::http_wire::WireHttpRequest;
 use crate::runtime::mcp_response::{HeartbeatLoopDecision, RuntimeSharedState};
 use crate::runtime::runtime_request_router::RuntimeRequestRouter;
+use crate::runtime::runtime_shared_state_factory::RuntimeSharedStateFactory;
 use crate::runtime::websocket_heartbeat::WebSocketHeartbeatState;
 use crate::runtime::websocket_heartbeat_service::WebSocketHeartbeatService;
 pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
@@ -137,20 +136,7 @@ impl RuntimeServer {
             self.config.mcp_http_config(),
         )));
         let ui_state = Arc::new(Mutex::new(seed_ui_state));
-        let registry = Arc::new(Mutex::new(seed_registry));
-        let addin_channel = Arc::new(Mutex::new(AddinChannelServer::with_config(
-            self.config.addin_channel_config(),
-        )));
-        let connection_hub = Arc::new(AddinConnectionHub::new());
-        let command_router = Arc::new(Mutex::new(CommandRouter::new()));
-        let shared_state = Arc::new(RuntimeSharedState {
-            registry: Arc::clone(&registry),
-            addin_channel: Arc::clone(&addin_channel),
-            connection_hub: Arc::clone(&connection_hub),
-            command_router: Arc::clone(&command_router),
-            audit_log: self.config.audit_log.clone(),
-            image_fetcher: self.config.image_fetcher.clone(),
-        });
+        let shared_state = RuntimeSharedStateFactory::with_registry(&self.config, seed_registry);
         let addin_server = self.clone();
         let addin_ui_state = Arc::clone(&ui_state);
         let addin_tls_acceptor = Arc::clone(&tls_acceptor);
@@ -194,17 +180,7 @@ impl RuntimeServer {
     ) -> Result<(), RuntimeServerError> {
         let (mut stream, peer) = listener.accept()?;
         let registry = SessionRegistry::new();
-        let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
-        let connection_hub = Arc::new(AddinConnectionHub::new());
-        let command_router = Arc::new(Mutex::new(CommandRouter::new()));
-        let shared_state = Arc::new(RuntimeSharedState {
-            registry: Arc::new(Mutex::new(registry.clone())),
-            addin_channel,
-            connection_hub,
-            command_router,
-            audit_log: self.config.audit_log.clone(),
-            image_fetcher: self.config.image_fetcher.clone(),
-        });
+        let shared_state = RuntimeSharedStateFactory::with_registry(&self.config, registry.clone());
         self.handle_mcp_stream(
             &mut stream,
             frontend,
