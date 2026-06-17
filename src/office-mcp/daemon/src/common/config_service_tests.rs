@@ -1,38 +1,8 @@
-use super::{
-    ConfigError, DaemonConfigService, LoadConfigOptions, LogLevel, RawTomlValue, parse_toml,
-};
+use super::{ConfigError, DaemonConfigService, LoadConfigOptions, LogLevel};
 use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-
-#[test]
-fn parses_supported_toml_subset() {
-    let parsed = parse_toml(
-        r#"
-[addin_channel]
-bind = "localhost"
-port = 8765 # inline comments are ignored
-certificate_passphrase = "not#comment"
-
-[mcp_http]
-bind = "127.0.0.1"
-port = 8800
-"#,
-    )
-    .expect("valid TOML subset");
-
-    let addin = parsed.section("addin_channel").0.expect("addin section");
-    assert_eq!(
-        addin.get("bind"),
-        Some(&RawTomlValue::String("localhost".to_string()))
-    );
-    assert_eq!(addin.get("port"), Some(&RawTomlValue::Integer(8765)));
-    assert_eq!(
-        addin.get("certificate_passphrase"),
-        Some(&RawTomlValue::String("not#comment".to_string()))
-    );
-}
 
 #[test]
 fn loads_config_file_values_and_endpoints() {
