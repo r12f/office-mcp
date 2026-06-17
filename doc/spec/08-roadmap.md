@@ -378,7 +378,9 @@ module so ownership is visible from the directory tree.
       `runtime/evidence_fixture_config.rs`. Tray status DTOs, menu model, and
       quit confirmation text now live in `tray/model.rs`, leaving
       `tray/controller.rs` focused on controller behavior and platform adapter
-      contracts. The item remains open until the
+      contracts. Configuration environment override parsing now lives in
+      `common/config_env.rs`, leaving `common/config_service.rs` focused on
+      building and validating the daemon config object. The item remains open until the
       remaining production files above the review threshold are audited for
       single-concept ownership.
 - [x] Move inline Rust unit tests into sibling files named after the production

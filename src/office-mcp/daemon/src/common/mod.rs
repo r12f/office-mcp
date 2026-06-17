@@ -1,6 +1,7 @@
 pub mod audit_log;
 pub mod client_config;
 pub mod config_display;
+pub(crate) mod config_env;
 pub mod config_error;
 pub mod config_model;
 pub(crate) mod config_paths;

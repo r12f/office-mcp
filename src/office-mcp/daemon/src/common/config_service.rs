@@ -1,3 +1,4 @@
+use crate::common::config_env::ConfigEnv;
 use crate::common::config_model::LogLevel;
 use crate::common::config_paths::ConfigPathResolver;
 use crate::common::config_toml::{RawToml, parse_toml};
@@ -55,12 +56,13 @@ impl DaemonConfigService {
         let limits = file_config.section("limits");
         let audit = file_config.section("audit");
         let logging = file_config.section("logging");
+        let config_env = ConfigEnv::new(&self.env);
 
-        let addin_host = self.string_env_any(
+        let addin_host = config_env.string_any(
             &["OFFICE_MCP_ADDIN_CHANNEL__BIND", "OFFICE_MCP_ADDIN_HOST"],
             addin_channel.string_value("bind", "localhost")?,
         );
-        let addin_port = self.int_env_any(
+        let addin_port = config_env.positive_int_any(
             &["OFFICE_MCP_ADDIN_CHANNEL__PORT", "OFFICE_MCP_ADDIN_PORT"],
             addin_channel.int_value("port", 8765)?,
         )?;
@@ -69,14 +71,14 @@ impl DaemonConfigService {
             addin: AddinConfig {
                 host: addin_host.clone(),
                 port: addin_port,
-                origin: self.string_env_any(
+                origin: config_env.string_any(
                     &[
                         "OFFICE_MCP_ADDIN_CHANNEL__ORIGIN",
                         "OFFICE_MCP_ADDIN_ORIGIN",
                     ],
                     format!("https://{addin_host}:{addin_port}"),
                 ),
-                pfx_path: self.string_env_any(
+                pfx_path: config_env.string_any(
                     &[
                         "OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PATH",
                         "OFFICE_MCP_ADDIN_PFX_PATH",
@@ -86,35 +88,35 @@ impl DaemonConfigService {
                         &ConfigPathResolver::pfx_path().display().to_string(),
                     )?,
                 ),
-                pfx_passphrase: self.string_env_any(
+                pfx_passphrase: config_env.string_any(
                     &[
                         "OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PASSPHRASE",
                         "OFFICE_MCP_ADDIN_PFX_PASSPHRASE",
                     ],
                     addin_channel.string_value("certificate_passphrase", "office-mcp-localhost")?,
                 ),
-                heartbeat_interval_sec: self.int_env_any(
+                heartbeat_interval_sec: config_env.positive_int_any(
                     &[
                         "OFFICE_MCP_ADDIN_CHANNEL__HEARTBEAT_INTERVAL_SEC",
                         "OFFICE_MCP_ADDIN_HEARTBEAT_INTERVAL_SEC",
                     ],
                     addin_channel.int_value("heartbeat_interval_sec", 30)?,
                 )?,
-                heartbeat_timeout_sec: self.int_env_any(
+                heartbeat_timeout_sec: config_env.positive_int_any(
                     &[
                         "OFFICE_MCP_ADDIN_CHANNEL__HEARTBEAT_TIMEOUT_SEC",
                         "OFFICE_MCP_ADDIN_HEARTBEAT_TIMEOUT_SEC",
                     ],
                     addin_channel.int_value("heartbeat_timeout_sec", 10)?,
                 )?,
-                session_grace_sec: self.int_env_any(
+                session_grace_sec: config_env.positive_int_any(
                     &[
                         "OFFICE_MCP_ADDIN_CHANNEL__SESSION_GRACE_SEC",
                         "OFFICE_MCP_ADDIN_SESSION_GRACE_SEC",
                     ],
                     addin_channel.int_value("session_grace_sec", 60)?,
                 )?,
-                max_pending_per_session: self.int_env_any(
+                max_pending_per_session: config_env.positive_int_any(
                     &[
                         "OFFICE_MCP_ADDIN_CHANNEL__MAX_PENDING_PER_SESSION",
                         "OFFICE_MCP_ADDIN_MAX_PENDING_PER_SESSION",
@@ -123,45 +125,45 @@ impl DaemonConfigService {
                 )?,
             },
             mcp: McpConfig {
-                host: self.string_env_any(
+                host: config_env.string_any(
                     &["OFFICE_MCP_MCP_HTTP__BIND", "OFFICE_MCP_MCP_HOST"],
                     mcp_http.string_value("bind", "127.0.0.1")?,
                 ),
-                port: self.int_env_any(
+                port: config_env.positive_int_any(
                     &["OFFICE_MCP_MCP_HTTP__PORT", "OFFICE_MCP_MCP_PORT"],
                     mcp_http.int_value("port", 8800)?,
                 )?,
             },
             limits: LimitsConfig {
-                max_response_bytes: self.int_env_any(
+                max_response_bytes: config_env.positive_int_any(
                     &[
                         "OFFICE_MCP_LIMITS__MAX_RESPONSE_BYTES",
                         "OFFICE_MCP_MAX_RESPONSE_BYTES",
                     ],
                     limits.int_value("max_response_bytes", 1024 * 1024)?,
                 )?,
-                max_request_bytes: self.int_env_any(
+                max_request_bytes: config_env.positive_int_any(
                     &[
                         "OFFICE_MCP_LIMITS__MAX_REQUEST_BYTES",
                         "OFFICE_MCP_MAX_REQUEST_BYTES",
                     ],
                     limits.int_value("max_request_bytes", 16 * 1024 * 1024)?,
                 )?,
-                max_ws_frame_bytes: self.int_env_any(
+                max_ws_frame_bytes: config_env.positive_int_any(
                     &[
                         "OFFICE_MCP_LIMITS__MAX_WS_FRAME_BYTES",
                         "OFFICE_MCP_MAX_WS_FRAME_BYTES",
                     ],
                     limits.int_value("max_ws_frame_bytes", 16 * 1024 * 1024)?,
                 )?,
-                default_tool_timeout_ms: self.int_env_any(
+                default_tool_timeout_ms: config_env.positive_int_any(
                     &[
                         "OFFICE_MCP_LIMITS__DEFAULT_TOOL_TIMEOUT_MS",
                         "OFFICE_MCP_DEFAULT_TOOL_TIMEOUT_MS",
                     ],
                     limits.int_value("default_tool_timeout_ms", 30_000)?,
                 )?,
-                requests_per_minute: self.int_env_any(
+                requests_per_minute: config_env.positive_int_any(
                     &[
                         "OFFICE_MCP_LIMITS__REQUESTS_PER_MINUTE",
                         "OFFICE_MCP_REQUESTS_PER_MINUTE",
@@ -170,26 +172,26 @@ impl DaemonConfigService {
                 )?,
             },
             audit: AuditConfig {
-                enabled: self.bool_env_any(
+                enabled: config_env.bool_any(
                     &["OFFICE_MCP_AUDIT__ENABLED", "OFFICE_MCP_AUDIT_ENABLED"],
                     audit.bool_value("enabled", false)?,
                 )?,
-                path: self.string_env_any(
+                path: config_env.string_any(
                     &["OFFICE_MCP_AUDIT__PATH", "OFFICE_MCP_AUDIT_PATH"],
-                    optional_path_value(
+                    ConfigEnv::optional_path_value(
                         audit.string_value("path", &self.default_audit_path())?,
                         &self.default_audit_path(),
                     ),
                 ),
             },
             logging: LoggingConfig {
-                level: LogLevel::parse(&self.string_env_any(
+                level: LogLevel::parse(&config_env.string_any(
                     &["OFFICE_MCP_LOGGING__LEVEL", "OFFICE_MCP_LOG_LEVEL"],
                     logging.string_value("level", "info")?,
                 ))?,
-                file: self.string_env_any(
+                file: config_env.string_any(
                     &["OFFICE_MCP_LOGGING__FILE", "OFFICE_MCP_LOG_FILE"],
-                    optional_path_value(
+                    ConfigEnv::optional_path_value(
                         logging.string_value("file", &self.default_log_path())?,
                         &self.default_log_path(),
                     ),
@@ -243,42 +245,6 @@ impl DaemonConfigService {
         parse_toml(&fs::read_to_string(path).map_err(ConfigError::Io)?)
     }
 
-    fn string_env_any(&self, names: &[&str], fallback: String) -> String {
-        names
-            .iter()
-            .find_map(|name| self.env.get(*name).cloned())
-            .unwrap_or(fallback)
-    }
-
-    fn int_env_any(&self, names: &[&str], fallback: u64) -> Result<u64, ConfigError> {
-        let Some((name, raw)) = names
-            .iter()
-            .find_map(|name| self.env.get(*name).map(|raw| (*name, raw)))
-        else {
-            return Ok(fallback);
-        };
-        raw.parse::<u64>()
-            .ok()
-            .filter(|value| *value > 0)
-            .ok_or_else(|| ConfigError::Validation(format!("{name} must be a positive integer")))
-    }
-
-    fn bool_env_any(&self, names: &[&str], fallback: bool) -> Result<bool, ConfigError> {
-        let Some((name, raw)) = names
-            .iter()
-            .find_map(|name| self.env.get(*name).map(|raw| (*name, raw)))
-        else {
-            return Ok(fallback);
-        };
-        match raw.as_str() {
-            "true" => Ok(true),
-            "false" => Ok(false),
-            _ => Err(ConfigError::Validation(format!(
-                "{name} must be true or false"
-            ))),
-        }
-    }
-
     fn default_config_path(&self) -> PathBuf {
         ConfigPathResolver::new(&self.env).config_path()
     }
@@ -295,14 +261,6 @@ impl DaemonConfigService {
 impl Default for DaemonConfigService {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-fn optional_path_value(value: String, fallback: &str) -> String {
-    if value.is_empty() {
-        fallback.to_string()
-    } else {
-        value
     }
 }
 
