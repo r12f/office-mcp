@@ -552,3 +552,7 @@ fn addin_response_to_tool_response(response: &Value) -> ToolResponse {
         json: data.to_string(),
     }
 }
+
+#[cfg(test)]
+#[path = "mcp_rpc_tests.rs"]
+mod mcp_rpc_tests;
