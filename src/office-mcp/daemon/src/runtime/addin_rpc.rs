@@ -271,3 +271,7 @@ fn nested_string_array(value: &Value, object: &str, name: &str) -> Vec<String> {
         .get(object)
         .map_or_else(Vec::new, |nested| string_array_field(nested, name))
 }
+
+#[cfg(test)]
+#[path = "addin_rpc_tests.rs"]
+mod addin_rpc_tests;
