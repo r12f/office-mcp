@@ -375,7 +375,10 @@ module so ownership is visible from the directory tree.
       `mcp/prompt_catalog.rs` instead of the shared catalog file, and logger
       record serialization now lives in `common/logger_record.rs`. UI evidence
       fixture options, path resolution, and fixture daemon config now live in
-      `runtime/evidence_fixture_config.rs`. The item remains open until the
+      `runtime/evidence_fixture_config.rs`. Tray status DTOs, menu model, and
+      quit confirmation text now live in `tray/model.rs`, leaving
+      `tray/controller.rs` focused on controller behavior and platform adapter
+      contracts. The item remains open until the
       remaining production files above the review threshold are audited for
       single-concept ownership.
 - [x] Move inline Rust unit tests into sibling files named after the production

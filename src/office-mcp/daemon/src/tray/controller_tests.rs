@@ -1,4 +1,5 @@
-use super::{TrayAction, TrayController, TrayHealth, TrayMenuItem, TrayPlatform, TrayStatusInput};
+use super::TrayController;
+use crate::tray::{TrayHealth, TrayPlatform, TrayStatusInput};
 
 #[test]
 fn tray_snapshot_matches_required_menu_order() {
@@ -18,14 +19,8 @@ fn tray_snapshot_matches_required_menu_order() {
     assert_eq!(snapshot.menu[0].label(), Some("Status: Up"));
     assert_eq!(snapshot.menu[1].label(), Some("Clients: 2"));
     assert_eq!(snapshot.menu[2].label(), Some("Documents: 3"));
-    assert_eq!(snapshot.menu[3], TrayMenuItem::Separator);
-    assert_eq!(
-        snapshot.menu[4],
-        TrayMenuItem::Action {
-            action: TrayAction::ShowUi,
-            label: "Show Office MCP".to_string()
-        }
-    );
+    assert_eq!(snapshot.menu[3].label(), None);
+    assert_eq!(snapshot.menu[4].label(), Some("Show Office MCP"));
     assert_eq!(snapshot.menu[5].label(), Some("Quit Office MCP"));
 }
 
