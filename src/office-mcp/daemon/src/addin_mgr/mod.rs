@@ -3,6 +3,7 @@ pub mod command_router;
 pub mod connection_hub;
 pub mod image_fetcher;
 pub mod session_registry;
+pub mod static_assets;
 pub mod websocket_codec;
 pub mod websocket_handshake;
 
@@ -21,6 +22,10 @@ pub use session_registry::{
     NewSessionInfo, OfficeMcpCode, PartialEffect, ProtectionInfo, RegistrationOutcome, RuntimeInfo,
     SessionDescriptor, SessionDetails, SessionInfo, SessionPatch, SessionRegistry, SessionStatus,
     ToolFailure, ToolInvocationError,
+};
+pub use static_assets::{
+    default_addin_public_dir, default_office_ctl_common_dir, default_office_ctl_host_public_dir,
+    find_addin_public_dir_from, static_asset_content_type,
 };
 pub use websocket_codec::{
     WebSocketCodec, WebSocketCodecError, WebSocketFrame, WebSocketProtocolError,

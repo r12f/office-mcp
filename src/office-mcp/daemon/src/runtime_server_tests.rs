@@ -254,7 +254,7 @@ fn production_bound_daemon_exposes_ui_state_and_events() {
         addin_host: "127.0.0.1".to_string(),
         addin_port,
         addin_origin: addin_origin.clone(),
-        addin_public_dir: super::default_addin_public_dir(),
+        addin_public_dir: crate::addin_mgr::default_addin_public_dir(),
         certificate_path: super::default_pfx_path(),
         ..RuntimeServerConfig::default()
     });
@@ -1037,7 +1037,7 @@ fn real_tls_websocket_forwards_mcp_tool_call_and_returns_response() {
     let server = RuntimeServer::with_config(RuntimeServerConfig {
         addin_host: "127.0.0.1".to_string(),
         addin_port: port,
-        addin_public_dir: super::default_addin_public_dir(),
+        addin_public_dir: crate::addin_mgr::default_addin_public_dir(),
         certificate_path: super::default_pfx_path(),
         ..RuntimeServerConfig::default()
     });
@@ -1140,7 +1140,7 @@ fn real_tls_websocket_protocol_error_sends_close_frame() {
     let server = RuntimeServer::with_config(RuntimeServerConfig {
         addin_host: "127.0.0.1".to_string(),
         addin_port: port,
-        addin_public_dir: super::default_addin_public_dir(),
+        addin_public_dir: crate::addin_mgr::default_addin_public_dir(),
         certificate_path: super::default_pfx_path(),
         ..RuntimeServerConfig::default()
     });
@@ -1190,7 +1190,7 @@ fn real_tls_websocket_heartbeat_ping_accepts_pong_response() {
     let server = RuntimeServer::with_config(RuntimeServerConfig {
         addin_host: "127.0.0.1".to_string(),
         addin_port: port,
-        addin_public_dir: super::default_addin_public_dir(),
+        addin_public_dir: crate::addin_mgr::default_addin_public_dir(),
         certificate_path: super::default_pfx_path(),
         heartbeat_interval: std::time::Duration::from_millis(20),
         heartbeat_timeout: std::time::Duration::from_millis(200),
@@ -1436,7 +1436,7 @@ fn addin_roundtrip(request: &str) -> String {
     let port = listener.local_addr().expect("local addr").port();
     let server = RuntimeServer::with_config(RuntimeServerConfig {
         addin_port: port,
-        addin_public_dir: super::default_addin_public_dir(),
+        addin_public_dir: crate::addin_mgr::default_addin_public_dir(),
         ..RuntimeServerConfig::default()
     });
     let handle = thread::spawn(move || {
@@ -1476,7 +1476,7 @@ fn addin_tls_roundtrip(request: &str) -> String {
     let server = RuntimeServer::with_config(RuntimeServerConfig {
         addin_host: "127.0.0.1".to_string(),
         addin_port: port,
-        addin_public_dir: super::default_addin_public_dir(),
+        addin_public_dir: crate::addin_mgr::default_addin_public_dir(),
         certificate_path: super::default_pfx_path(),
         ..RuntimeServerConfig::default()
     });
