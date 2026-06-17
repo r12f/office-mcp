@@ -219,8 +219,16 @@ Rust daemon implementation MUST follow these style rules:
   session ID, and error code.
 - Each completed implementation task, including Rust, add-in UI, packaging,
   evidence, and documentation tasks, must be committed and pushed before
-  starting the next task. Keep commits scoped to one verified task or
-  reviewable slice so daemon changes remain auditable and reversible.
+  starting the next task. This is a code-quality requirement, not optional
+  project hygiene: do not accumulate several finished tasks into one large
+  commit.
+- Each task commit must contain exactly one coherent, locally verified slice.
+  If a task is too large for one reviewable commit, split the task first and
+  commit/push each verified slice independently.
+- Do not begin unrelated cleanup, formatting, or the next TODO item until the
+  current completed slice has been committed and pushed. Blocked work may be
+  left uncommitted only when its working-tree changes remain isolated from the
+  next slice.
 
 - **Lifetime**: starts at user login (Windows Scheduled Task / macOS launchd
   agent / Linux systemd `--user` unit). Runs until the user logs out or the

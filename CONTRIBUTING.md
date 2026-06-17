@@ -46,10 +46,15 @@ design contract kept under [doc/spec/](doc/spec/).
 
 - Work in small, reviewable tasks. A task is a coherent change with its own
   verification evidence, not a milestone-sized batch.
-- After each task is complete and its relevant local checks pass, commit that
-  task before starting the next one.
-- Push after each completed task commit. Do not accumulate many unrelated or
-  loosely related changes into one large commit.
+- After each task is complete and its relevant local checks pass, commit and
+  push that task before starting the next one.
+- Do not accumulate multiple completed tasks into one large commit. This rule
+  applies to code, tests, UI, evidence, packaging, and documentation changes.
+- Keep each commit scoped to exactly one coherent, verified task or reviewable
+  slice. If the work is too large, split it into smaller tasks and commit/push
+  each verified slice independently.
+- Do not begin unrelated cleanup, formatting, or the next TODO item until the
+  current completed slice has been committed and pushed.
 - Commit messages should name the completed task and mention the main evidence
   command when useful.
 - If a task cannot be verified locally, commit only after documenting the gap in
