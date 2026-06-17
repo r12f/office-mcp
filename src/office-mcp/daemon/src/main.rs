@@ -24,6 +24,11 @@ fn main() {
         [command] if command == "stdio" => run_stdio_bridge(),
         [command] if command == "sessions" => list_sessions(),
         [command, subcommand] if command == "daemon" && subcommand == "run" => {
+            serve_daemon_with_optional_tray(true)
+        }
+        [command, subcommand, flag]
+            if command == "daemon" && subcommand == "run" && flag == "--no-tray" =>
+        {
             serve_daemon_with_optional_tray(false)
         }
         [command, subcommand, flag]
@@ -64,7 +69,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: office-mcp-daemon [--describe|--parity-gates|serve|stdio|sessions|ui|tray [--probe] [--runtime-path <path>] [--probe-state-path <path>]|daemon run [--with-tray]|daemon status|daemon start|daemon stop|config endpoints|config show|config claude-desktop [--installed] [--install-root <path>]]"
+                "usage: office-mcp-daemon [--describe|--parity-gates|serve|stdio|sessions|ui|tray [--probe] [--runtime-path <path>] [--probe-state-path <path>]|daemon run [--no-tray|--with-tray]|daemon status|daemon start|daemon stop|config endpoints|config show|config claude-desktop [--installed] [--install-root <path>]]"
             );
             std::process::exit(2);
         }
