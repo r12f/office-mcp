@@ -1,6 +1,7 @@
-use super::{
+use super::SessionRegistry;
+use crate::addin_mgr::{
     AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, OfficeMcpCode, RuntimeInfo, SessionPatch,
-    SessionRegistry, SessionStatus,
+    SessionStatus,
 };
 use std::time::{Duration, SystemTime};
 

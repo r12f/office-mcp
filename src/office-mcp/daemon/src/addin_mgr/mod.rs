@@ -20,6 +20,7 @@ pub mod invocation_error;
 pub mod session_descriptor_view;
 pub mod session_info;
 pub mod session_registry;
+pub(crate) mod session_registry_model;
 pub mod static_assets;
 pub mod websocket_codec;
 pub mod websocket_handshake;
@@ -44,9 +45,10 @@ pub use image_fetcher::{FetchedImage, ImageFetchError, ImageFetcher};
 pub use invocation_error::{OfficeMcpCode, PartialEffect, ToolFailure, ToolInvocationError};
 pub use session_descriptor_view::SessionDescriptorView;
 pub use session_info::SessionInfo;
-pub use session_registry::{
+pub use session_registry::SessionRegistry;
+pub use session_registry_model::{
     AddInInfo, HostDescriptor, HostInfo, InvocationPermit, NewSessionInfo, RegistrationOutcome,
-    RuntimeInfo, SessionDescriptor, SessionDetails, SessionPatch, SessionRegistry, SessionStatus,
+    RuntimeInfo, SessionDescriptor, SessionDetails, SessionPatch, SessionStatus,
 };
 pub use static_assets::{
     default_addin_public_dir, default_office_ctl_common_dir, default_office_ctl_host_public_dir,
