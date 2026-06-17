@@ -6,6 +6,7 @@ pub(crate) mod evidence_fixture_seed;
 pub mod http_wire;
 pub mod json_rpc;
 pub mod mcp_catalog_response;
+pub(crate) mod mcp_forwarded_tool;
 pub mod mcp_response;
 pub mod mcp_rpc;
 pub mod mcp_tool_arguments;
