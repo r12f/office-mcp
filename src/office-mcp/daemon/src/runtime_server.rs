@@ -4,7 +4,9 @@ use crate::addin_mgr::{
     AddinChannelConfig, AddinChannelServer, HeartbeatDecision, JsonRpcId, RegisterRequest,
     SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
 };
-use crate::addin_mgr::{CommandRouter, ToolCallRequest, ToolResponse};
+use crate::addin_mgr::{
+    AddinConnectionHub, AddinConnectionHubError, CommandRouter, ToolCallRequest, ToolResponse,
+};
 use crate::addin_mgr::{
     WebSocketCodec, WebSocketCodecError, WebSocketFrame, WebSocketProtocolError,
 };
@@ -21,13 +23,13 @@ use crate::ui::{UiRuntimeError, UiRuntimeFile};
 use native_tls::{Identity, TlsAcceptor, TlsStream};
 use serde_json::{Value, json};
 use sha1::{Digest, Sha1};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -917,148 +919,6 @@ struct McpDispatchContext<'a> {
     command_router: &'a Arc<Mutex<CommandRouter>>,
     audit_log: &'a AuditLog,
     image_fetcher: &'a ImageFetcher,
-}
-
-#[derive(Debug, Default)]
-struct AddinConnectionHub {
-    state: Mutex<AddinConnectionHubState>,
-    response_available: Condvar,
-}
-
-impl AddinConnectionHub {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn register_connection(&self, connection_id: &str) {
-        let mut state = self.state.lock().expect("addin connection hub lock");
-        state
-            .connections
-            .entry(connection_id.to_string())
-            .or_default();
-    }
-
-    fn bind_instance(&self, connection_id: &str, instance_id: &str) {
-        let mut state = self.state.lock().expect("addin connection hub lock");
-        state
-            .connections
-            .entry(connection_id.to_string())
-            .or_default()
-            .instance_id = Some(instance_id.to_string());
-        state
-            .connection_by_instance
-            .insert(instance_id.to_string(), connection_id.to_string());
-    }
-
-    fn remove_connection(&self, connection_id: &str) {
-        let mut state = self.state.lock().expect("addin connection hub lock");
-        if let Some(connection) = state.connections.remove(connection_id)
-            && let Some(instance_id) = connection.instance_id
-        {
-            state.connection_by_instance.remove(&instance_id);
-        }
-        self.response_available.notify_all();
-    }
-
-    fn invoke(
-        &self,
-        instance_id: &str,
-        request_id: &str,
-        payload: String,
-        timeout: Duration,
-    ) -> Result<Value, AddinConnectionHubError> {
-        let deadline = SystemTime::now() + timeout;
-        let mut state = self.state.lock().expect("addin connection hub lock");
-        let connection_id = state
-            .connection_by_instance
-            .get(instance_id)
-            .cloned()
-            .ok_or(AddinConnectionHubError::NoConnection)?;
-        let connection = state
-            .connections
-            .get_mut(&connection_id)
-            .ok_or(AddinConnectionHubError::NoConnection)?;
-        connection.outbound.push_back(payload);
-        state.pending.insert(request_id.to_string(), None);
-        self.response_available.notify_all();
-
-        loop {
-            if let Some(response) = state.pending.get_mut(request_id).and_then(Option::take) {
-                state.pending.remove(request_id);
-                return Ok(response);
-            }
-            let now = SystemTime::now();
-            let remaining = deadline
-                .duration_since(now)
-                .map_err(|_| AddinConnectionHubError::Timeout)?;
-            let (next_state, wait_result) = self
-                .response_available
-                .wait_timeout(state, remaining)
-                .expect("addin connection hub condvar");
-            state = next_state;
-            if wait_result.timed_out() {
-                state.pending.remove(request_id);
-                return Err(AddinConnectionHubError::Timeout);
-            }
-        }
-    }
-
-    fn take_outbound(&self, connection_id: &str) -> Vec<String> {
-        let mut state = self.state.lock().expect("addin connection hub lock");
-        state
-            .connections
-            .get_mut(connection_id)
-            .map(|connection| connection.outbound.drain(..).collect())
-            .unwrap_or_default()
-    }
-
-    fn send_to_instance(&self, instance_id: &str, payload: String) -> bool {
-        let mut state = self.state.lock().expect("addin connection hub lock");
-        let Some(connection_id) = state.connection_by_instance.get(instance_id).cloned() else {
-            return false;
-        };
-        let Some(connection) = state.connections.get_mut(&connection_id) else {
-            return false;
-        };
-        connection.outbound.push_back(payload);
-        self.response_available.notify_all();
-        true
-    }
-
-    fn complete_from_text(&self, text: &str) -> bool {
-        let Ok(value) = serde_json::from_str::<Value>(text) else {
-            return false;
-        };
-        let Some(request_id) = value.get("id").and_then(Value::as_str) else {
-            return false;
-        };
-        let mut state = self.state.lock().expect("addin connection hub lock");
-        if let Some(slot) = state.pending.get_mut(request_id) {
-            *slot = Some(value);
-            self.response_available.notify_all();
-            return true;
-        }
-        false
-    }
-}
-
-#[derive(Debug, Default)]
-struct AddinConnectionHubState {
-    connections: BTreeMap<String, AddinConnectionHubConnection>,
-    connection_by_instance: BTreeMap<String, String>,
-    pending: BTreeMap<String, Option<Value>>,
-}
-
-#[derive(Debug, Default)]
-struct AddinConnectionHubConnection {
-    instance_id: Option<String>,
-    outbound: VecDeque<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum AddinConnectionHubError {
-    NoConnection,
-    Timeout,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

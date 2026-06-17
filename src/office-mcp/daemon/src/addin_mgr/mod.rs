@@ -1,5 +1,6 @@
 pub mod addin_channel;
 pub mod command_router;
+pub mod connection_hub;
 pub mod image_fetcher;
 pub mod session_registry;
 pub mod websocket_codec;
@@ -12,6 +13,7 @@ pub use addin_channel::{
 pub use command_router::{
     CancelCommand, CommandRouter, CommandRouterError, QueuedCommand, ToolCallRequest, ToolResponse,
 };
+pub use connection_hub::{AddinConnectionHub, AddinConnectionHubError};
 pub use image_fetcher::{FetchedImage, ImageFetchError, ImageFetcher};
 pub use session_registry::{
     AddInInfo, DocumentDescriptor, DocumentInfo, HostDescriptor, HostInfo, InvocationPermit,
