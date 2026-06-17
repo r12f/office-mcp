@@ -19,7 +19,7 @@ use crate::mcp::{
     word_resource_catalog_for_session, word_resource_templates,
 };
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
-use crate::ui::{UiRuntimeError, UiRuntimeFile};
+use crate::ui::{UiAssetStore, UiRuntimeError, UiRuntimeFile};
 use native_tls::{Identity, TlsAcceptor, TlsStream};
 use serde_json::{Value, json};
 use sha1::{Digest, Sha1};
@@ -654,20 +654,16 @@ impl RuntimeServer {
     }
 
     fn serve_ui_asset(name: &str) -> WireHttpResponse {
-        let Some(file_path) = default_ui_asset_path(name) else {
-            return WireHttpResponse::text(404, "Not found".to_string());
-        };
-        let Ok(content) = fs::read(&file_path) else {
+        let Ok(asset) = UiAssetStore::default().read(name) else {
             return WireHttpResponse::text(404, "Not found".to_string());
         };
         WireHttpResponse::binary(
             200,
-            content_type(&file_path),
-            content,
+            asset.content_type,
+            asset.content,
             BTreeMap::from([("Cache-Control".to_string(), "no-store".to_string())]),
         )
     }
-
     fn serve_static(&self, path: &str) -> WireHttpResponse {
         if path == "/assets/icon-32.png" || path == "/assets/icon-80.png" {
             return WireHttpResponse::binary(
@@ -2167,26 +2163,6 @@ fn system_time_millis(value: SystemTime) -> u128 {
         .as_millis()
 }
 
-fn default_ui_asset_path(name: &str) -> Option<PathBuf> {
-    if name.contains("..") || name.contains('/') || name.contains('\\') {
-        return None;
-    }
-    let current = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    for ancestor in current.ancestors() {
-        let candidate = ancestor
-            .join("src")
-            .join("office-mcp")
-            .join("daemon")
-            .join("src")
-            .join("ui")
-            .join("assets")
-            .join(name);
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-    None
-}
 fn content_type(path: &Path) -> &'static str {
     match path.extension().and_then(|extension| extension.to_str()) {
         Some("html") => "text/html; charset=utf-8",
