@@ -3,7 +3,6 @@ pub mod api;
 pub mod client_config;
 pub mod common;
 pub mod daemon;
-pub mod daemon_control;
 pub mod evidence_fixture;
 pub mod mcp;
 pub mod parity;

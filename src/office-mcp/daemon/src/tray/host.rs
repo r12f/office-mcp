@@ -1,4 +1,4 @@
-use crate::daemon_control::DaemonController;
+use crate::api::DaemonController;
 use crate::tray::{TrayController, TrayPlatformError, TraySnapshot};
 use crate::ui::UiRuntimeFile;
 use serde_json::Value;

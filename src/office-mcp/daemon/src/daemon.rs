@@ -134,7 +134,6 @@ mod tests {
         let allowed_root_files = BTreeSet::from([
             "client_config.rs",
             "daemon.rs",
-            "daemon_control.rs",
             "evidence_fixture.rs",
             "lib.rs",
             "main.rs",
@@ -146,6 +145,7 @@ mod tests {
             "audit_log.rs",
             "command_router.rs",
             "config_service.rs",
+            "daemon_control.rs",
             "image_fetcher.rs",
             "logger.rs",
             "mcp_http_frontend.rs",
