@@ -1,4 +1,4 @@
-use crate::ui_state_store::{RegisterClientInput, UiClientTransport, UiStateStore};
+use crate::ui::{RegisterClientInput, UiClientTransport, UiStateStore};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::time::{Duration, SystemTime};
@@ -362,7 +362,7 @@ impl std::error::Error for McpHttpError {}
 #[cfg(test)]
 mod tests {
     use super::{HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
-    use crate::ui_state_store::UiStateStore;
+    use crate::ui::UiStateStore;
     use std::collections::BTreeMap;
     use std::time::{Duration, SystemTime};
 

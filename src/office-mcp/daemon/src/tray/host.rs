@@ -1,6 +1,6 @@
 use crate::daemon_control::DaemonController;
 use crate::tray::{TrayController, TrayPlatformError, TraySnapshot};
-use crate::ui_runtime::UiRuntimeFile;
+use crate::ui::UiRuntimeFile;
 use serde_json::Value;
 use std::path::PathBuf;
 
@@ -108,7 +108,7 @@ fn read_ui_state(options: &TrayHostOptions) -> Option<Value> {
     serde_json::from_str(&body).ok()
 }
 
-fn runtime_info(options: &TrayHostOptions) -> Option<crate::ui_runtime::UiRuntimeInfo> {
+fn runtime_info(options: &TrayHostOptions) -> Option<crate::ui::UiRuntimeInfo> {
     let file = options
         .runtime_path
         .as_ref()

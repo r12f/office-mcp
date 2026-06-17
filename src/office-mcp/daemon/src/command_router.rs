@@ -1,5 +1,5 @@
 use crate::session_registry::{PartialEffect, SessionRegistry, ToolInvocationError};
-use crate::ui_state_store::{CommandFailure, CommandResult, StartCommandInput, UiStateStore};
+use crate::ui::{CommandFailure, CommandResult, StartCommandInput, UiStateStore};
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt::{Display, Formatter};
 use std::time::{Duration, SystemTime};
@@ -427,9 +427,7 @@ mod tests {
         AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, OfficeMcpCode, RuntimeInfo,
         SessionRegistry,
     };
-    use crate::ui_state_store::{
-        RegisterClientInput, UiClientTransport, UiCommandStatus, UiStateStore,
-    };
+    use crate::ui::{RegisterClientInput, UiClientTransport, UiCommandStatus, UiStateStore};
     use std::time::{Duration, SystemTime};
 
     #[test]

@@ -7,7 +7,7 @@ use office_mcp_daemon::mcp_management_client::McpManagementClient;
 use office_mcp_daemon::runtime_server::RuntimeServer;
 use office_mcp_daemon::stdio_bridge::StdioBridge;
 use office_mcp_daemon::tray::{TrayHost, TrayHostOptions};
-use office_mcp_daemon::ui_runtime::{UiRuntimeError, UiRuntimeFile};
+use office_mcp_daemon::ui::{UiRuntimeError, UiRuntimeFile};
 use std::path::PathBuf;
 
 fn main() {

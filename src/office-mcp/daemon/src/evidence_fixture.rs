@@ -10,8 +10,8 @@ use crate::session_registry::{
     AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, PartialEffect, ProtectionInfo, RuntimeInfo,
     SessionRegistry,
 };
-use crate::ui_runtime::UiRuntimeFile;
-use crate::ui_state_store::{
+use crate::ui::UiRuntimeFile;
+use crate::ui::{
     CommandFailure, CommandResult, RegisterClientInput, StartCommandInput, UiClientTransport,
     UiHealth, UiStateStore,
 };
@@ -81,7 +81,7 @@ pub fn run_ui_fixture(options: UiFixtureOptions) -> Result<(), RuntimeServerErro
     );
     let runtime_file = UiRuntimeFile::with_path(
         options.runtime_path,
-        crate::ui_runtime::UiRuntimeInfo::from_config(&config),
+        crate::ui::UiRuntimeInfo::from_config(&config),
     );
     runtime_file.write()?;
     let server = RuntimeServer::with_config(RuntimeServerConfig {
