@@ -1,5 +1,6 @@
 pub mod daemon_control;
 pub mod state_store;
+pub(crate) mod ui_redaction;
 pub mod ui_snapshot_renderer;
 pub mod ui_snapshot_service;
 
