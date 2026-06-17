@@ -3,7 +3,7 @@ use crate::addin_mgr::websocket_accept_key;
 use crate::addin_mgr::{AddinChannelServer, HeartbeatDecision};
 use crate::addin_mgr::{AddinConnectionHub, CommandRouter, ImageFetcher};
 use crate::addin_mgr::{WebSocketCodec, WebSocketCodecError, WebSocketFrame};
-use crate::api::{UiSnapshotEndpoints, UiSnapshotService, UiStateOptions, UiStateStore};
+use crate::api::{UiStateOptions, UiStateStore};
 use crate::common::AuditLog;
 use crate::common::DaemonConfig;
 use crate::mcp::{HttpMethod, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
@@ -12,6 +12,7 @@ use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_rpc::{McpDispatchContext, McpJsonRpcRuntime};
 use crate::runtime::static_response::StaticResponseService;
+use crate::runtime::ui_http::UiHttpService;
 pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
 use crate::ui::UiRuntimeFile;
 use native_tls::{TlsAcceptor, TlsStream};
@@ -518,48 +519,12 @@ impl RuntimeServer {
         if request.path == "/addin" {
             return self.route_websocket_upgrade(request);
         }
-        if matches!(request.path.as_str(), "/ui" | "/ui/" | "/ui/index.html")
-            && request.method == HttpMethod::Get
+        if request.method == HttpMethod::Get
+            && let Some(response) = self
+                .ui_http_service()
+                .try_handle(request, ui_state, registry)
         {
-            return self.static_response_service().serve_ui_asset("index.html");
-        }
-        if request.path == "/ui/app.css" && request.method == HttpMethod::Get {
-            return self.static_response_service().serve_ui_asset("app.css");
-        }
-        if request.path == "/ui/app.js" && request.method == HttpMethod::Get {
-            return self.static_response_service().serve_ui_asset("app.js");
-        }
-        if request.path == "/ui/state" && request.method == HttpMethod::Get {
-            if let Some(origin) = request.headers.get("origin")
-                && origin != &self.config.addin_origin
-            {
-                return WireHttpResponse::text(403, "Forbidden origin".to_string());
-            }
-            return WireHttpResponse::json(
-                200,
-                BTreeMap::new(),
-                render_ui_snapshot(ui_state, registry, &self.config),
-            );
-        }
-        if request.path == "/ui/events" && request.method == HttpMethod::Get {
-            if let Some(origin) = request.headers.get("origin")
-                && origin != &self.config.addin_origin
-            {
-                return WireHttpResponse::text(403, "Forbidden origin".to_string());
-            }
-            return WireHttpResponse::binary(
-                200,
-                "text/event-stream; charset=utf-8",
-                format!(
-                    "event: snapshot\ndata: {}\n\n",
-                    render_ui_snapshot(ui_state, registry, &self.config)
-                )
-                .into_bytes(),
-                BTreeMap::from([
-                    ("Cache-Control".to_string(), "no-store".to_string()),
-                    ("X-Accel-Buffering".to_string(), "no".to_string()),
-                ]),
-            );
+            return response;
         }
         if request.method != HttpMethod::Get {
             return WireHttpResponse::text(405, "Method not allowed".to_string());
@@ -616,6 +581,10 @@ impl RuntimeServer {
 
     fn static_response_service(&self) -> StaticResponseService {
         StaticResponseService::new(self.config.addin_public_dir.clone())
+    }
+
+    fn ui_http_service(&self) -> UiHttpService {
+        UiHttpService::from_config(&self.config)
     }
 
     fn route_request(
@@ -744,21 +713,6 @@ fn json_rpc_request_id(body: &[u8]) -> Option<Value> {
     serde_json::from_slice::<Value>(body)
         .ok()
         .and_then(|value| value.get("id").cloned())
-}
-
-fn render_ui_snapshot(
-    ui_state: &Arc<Mutex<UiStateStore>>,
-    registry: &Arc<Mutex<SessionRegistry>>,
-    config: &RuntimeServerConfig,
-) -> String {
-    UiSnapshotService::new().render_runtime_snapshot(
-        ui_state,
-        registry,
-        &UiSnapshotEndpoints {
-            mcp_endpoint: format!("http://{}:{}/mcp", config.mcp_host, config.mcp_port),
-            addin_endpoint: format!("{}/addin", config.addin_origin),
-        },
-    )
 }
 
 #[cfg(test)]
