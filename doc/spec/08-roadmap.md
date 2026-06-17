@@ -213,7 +213,11 @@ User-reported follow-up from live daemon testing:
       daemon UI. Automated evidence now covers native tray icon creation logs
       and the live menu model through `ui.production_daemon_tray`; this item
       remains open until a visible desktop interaction run verifies the icon and
-      right-click menu in the notification area.
+      right-click menu in the notification area. The manual evidence recorder
+      `npm run evidence:record-tray-manual` and validator gate
+      `npm run evidence:validate-ui -- --require-manual-tray` now exist so the
+      final desktop run can be captured as structured release evidence instead
+      of an untracked note.
 - [x] Add automated coverage that fails when production `daemon run` does not
       expose `/ui/` and when `daemon status` omits the UI URL. Covered by
       `production_bound_daemon_exposes_ui_state_and_events`,

@@ -10,6 +10,7 @@
     "evidence:irm": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (-not $env:OFFICE_MCP_IRM_DOCUMENT_PATH) { $env:OFFICE_MCP_IRM_DOCUMENT_PATH = 'C:\\Users\\riffjiang\\Downloads\\Document 2026-05-31 (6).docx' }; & .\\node_modules\\.bin\\tsx.cmd runtime-evidence.ts --output ../../../../artifacts/runtime-evidence-irm.json --irm-mode protected-read --wait-for-session-ms 120000\"",
     "evidence:excel": "tsx runtime-evidence.ts --output ../../../../artifacts/runtime-evidence-excel.json --include-excel-smoke --wait-for-session-ms 120000",
     "evidence:runtime": "tsx runtime-evidence.ts",
+    "evidence:record-tray-manual": "tsx record-tray-manual-evidence.ts",
     "evidence:ui": "tsx ui-runtime-evidence.ts",
     "evidence:record-agent-client": "tsx record-agent-client-evidence.ts",
     "evidence:validate": "tsx validate-runtime-evidence.ts",

@@ -193,6 +193,32 @@ test('runtime evidence validator accepts UI runtime evidence gates', () => {
   });
 });
 
+test('runtime evidence validator can require manual Windows tray evidence', () => {
+  const ui = uiReport();
+  withEvidenceFile(ui, (path) => {
+    const result = runValidator(path, '--ui', '--require-manual-tray');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /Missing --manual-tray-evidence-path/);
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withEvidenceFile(manualTrayReport(false), (manualPath) => {
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence missing visible tray icon/);
+      assert.match(outputText(result.stdout), /Manual tray evidence missing tray screenshot exists/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withEvidenceFile(manualTrayReport(true), (manualPath) => {
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.equal(result.status, 0, outputText(result.stdout) + outputText(result.stderr));
+      assert.equal(JSON.parse(outputText(result.stdout)).ok, true);
+    });
+  });
+});
+
 test('runtime evidence validator rejects missing or failed required gates', () => {
   const broken = report('passed');
   broken.gates = broken.gates.filter((item) => item.name !== 'word.runtime_read_smoke');
@@ -266,6 +292,25 @@ function uiReport() {
       gate('ui.production_daemon_tray', 'passed'),
       gate('ui.browser_smoke', 'passed')
     ]
+  };
+}
+
+function manualTrayReport(passed: boolean) {
+  return {
+    schema_version: 1,
+    kind: 'tray_manual_evidence',
+    recorded_at: new Date().toISOString(),
+    tester: 'test',
+    platform: 'win32',
+    visible_icon: passed,
+    right_click_menu: passed,
+    show_ui_opened: passed,
+    observed_menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP'],
+    expected_menu_items: ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'],
+    menu_contains_required_items: passed,
+    screenshot_path: 'C:\\temp\\tray.png',
+    screenshot_exists: passed,
+    passed
   };
 }
 

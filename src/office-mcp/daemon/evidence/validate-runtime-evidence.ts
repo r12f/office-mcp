@@ -23,6 +23,8 @@ const evidenceRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(evidenceRoot, '../../../..');
 const evidencePath = resolve(readOption('--input') ?? join(repoRoot, 'artifacts/runtime-evidence.json'));
 const validateUi = hasFlag('--ui');
+const requireManualTray = hasFlag('--require-manual-tray');
+const manualTrayEvidencePath = readOption('--manual-tray-evidence-path') ?? process.env.OFFICE_MCP_TRAY_MANUAL_EVIDENCE_PATH;
 const requireIrm = hasFlag('--require-irm');
 const requireFullWordSmoke = hasFlag('--require-full-word-smoke');
 const requireExcelSmoke = hasFlag('--require-excel-smoke');
@@ -123,6 +125,7 @@ const summary = {
   require_claude_desktop_installation: requireClaudeDesktopInstallation,
   require_agent_client_prompt: requireAgentClientPrompt,
   require_mutation: requireMutation,
+  require_manual_tray: requireManualTray,
   generated_at: report.generated_at,
   endpoint: report.endpoint,
   session_id: report.session_id,
@@ -145,7 +148,29 @@ function validateUiEvidence(): never {
   ]) {
     requirePassedGate(name);
   }
+  if (requireManualTray) validateManualTrayEvidence();
   emitSummary();
+}
+
+function validateManualTrayEvidence(): void {
+  if (!manualTrayEvidencePath) {
+    failures.push('Missing --manual-tray-evidence-path for required manual tray evidence.');
+    return;
+  }
+  const manual = JSON.parse(readFileSync(resolve(manualTrayEvidencePath), 'utf8')) as Record<string, unknown>;
+  if (manual.schema_version !== 1) failures.push(`Unsupported manual tray schema_version: ${manual.schema_version}`);
+  if (manual.kind !== 'tray_manual_evidence') failures.push(`Unsupported manual tray evidence kind: ${manual.kind ?? 'missing'}`);
+  if (manual.platform !== 'win32') failures.push(`Manual tray evidence platform is ${manual.platform}, expected win32.`);
+  for (const [key, label] of [
+    ['visible_icon', 'visible tray icon'],
+    ['right_click_menu', 'right-click menu'],
+    ['show_ui_opened', 'Show Office MCP opened UI'],
+    ['menu_contains_required_items', 'required tray menu items'],
+    ['screenshot_exists', 'tray screenshot exists'],
+    ['passed', 'manual tray evidence passed']
+  ] as const) {
+    if (manual[key] !== true) failures.push(`Manual tray evidence missing ${label}.`);
+  }
 }
 
 function emitSummary(): never {
@@ -157,6 +182,8 @@ function emitSummary(): never {
     endpoint: report.endpoint,
     session_id: report.session_id,
     gates: Object.fromEntries(report.gates.map((gate) => [gate.name, gate.status])),
+    require_manual_tray: requireManualTray,
+    manual_tray_evidence_path: manualTrayEvidencePath ? resolve(manualTrayEvidencePath) : undefined,
     failures
   }, null, 2));
   process.exit(failures.length > 0 ? 1 : 0);

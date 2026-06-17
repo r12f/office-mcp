@@ -147,6 +147,16 @@ Start the Rust daemon from the repository root:
 cargo run -p office-mcp-daemon -- daemon run
 ```
 
+For release/UI validation on Windows, record the visible tray interaction after
+confirming the notification-area icon, right-click menu, and `Show Office MCP`
+command. Attach a screenshot path from the same run:
+
+```powershell
+cd .\src\office-mcp\daemon\evidence
+npm run evidence:record-tray-manual -- --visible-icon true --right-click-menu true --show-ui-opened true --menu-item "Status: Up" --menu-item "Clients: 0" --menu-item "Documents: 0" --menu-item "Show Office MCP" --menu-item "Quit Office MCP" --screenshot-path C:\path\to\tray-visible.png
+npm run evidence:validate-ui -- --input ..\..\..\..\artifacts\ui-runtime-evidence.json --require-manual-tray --manual-tray-evidence-path ..\..\..\..\artifacts\tray-manual-evidence.json
+```
+
 Launch the add-in in Word, then open the **office-mcp > Open** ribbon command
 so the task pane can connect and register the current document session.
 
