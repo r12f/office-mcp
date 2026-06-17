@@ -132,7 +132,6 @@ mod tests {
     fn daemon_src_root_only_contains_composition_and_transitional_files() {
         let src_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         let allowed_root_files = BTreeSet::from([
-            "client_config.rs",
             "daemon.rs",
             "evidence_fixture.rs",
             "lib.rs",
@@ -143,6 +142,7 @@ mod tests {
         let forbidden_service_files = BTreeSet::from([
             "addin_channel.rs",
             "audit_log.rs",
+            "client_config.rs",
             "command_router.rs",
             "config_service.rs",
             "daemon_control.rs",

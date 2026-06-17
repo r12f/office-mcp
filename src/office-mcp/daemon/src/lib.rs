@@ -1,6 +1,5 @@
 pub mod addin_mgr;
 pub mod api;
-pub mod client_config;
 pub mod common;
 pub mod daemon;
 pub mod evidence_fixture;

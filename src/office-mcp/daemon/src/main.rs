@@ -1,7 +1,8 @@
 use office_mcp_daemon::OfficeMcpDaemon;
 use office_mcp_daemon::api::DaemonController;
-use office_mcp_daemon::client_config::ClaudeDesktopConfigBuilder;
-use office_mcp_daemon::common::{DaemonConfig, DaemonConfigService, LoadConfigOptions};
+use office_mcp_daemon::common::{
+    ClaudeDesktopConfigBuilder, DaemonConfig, DaemonConfigService, LoadConfigOptions,
+};
 use office_mcp_daemon::evidence_fixture::{UiFixtureOptions, run_ui_fixture};
 use office_mcp_daemon::mcp::McpManagementClient;
 use office_mcp_daemon::mcp::StdioBridge;
