@@ -1,6 +1,7 @@
 pub mod addin_channel;
 pub mod addin_heartbeat;
 pub mod addin_json_rpc;
+pub(crate) mod command_queue;
 pub mod command_router;
 pub mod connection_hub;
 pub mod image_fetcher;
@@ -15,6 +16,7 @@ pub use addin_channel::{
     SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
 };
 pub use addin_json_rpc::{JsonRpcEnvelope, JsonRpcId, RegisterResult};
+pub(crate) use command_queue::SessionCommandQueue;
 pub use command_router::{
     CancelCommand, CommandRouter, CommandRouterError, QueuedCommand, ToolCallRequest, ToolResponse,
 };
