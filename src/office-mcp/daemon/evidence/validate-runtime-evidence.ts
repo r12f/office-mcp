@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -161,12 +161,19 @@ function validateManualTrayEvidence(): void {
   if (manual.schema_version !== 1) failures.push(`Unsupported manual tray schema_version: ${manual.schema_version}`);
   if (manual.kind !== 'tray_manual_evidence') failures.push(`Unsupported manual tray evidence kind: ${manual.kind ?? 'missing'}`);
   if (manual.platform !== 'win32') failures.push(`Manual tray evidence platform is ${manual.platform}, expected win32.`);
+  const observedMenuItems = Array.isArray(manual.observed_menu_items) ? manual.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];
+  for (const expected of ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP']) {
+    if (!observedMenuItems.some((item) => item.includes(expected))) {
+      failures.push(`Manual tray evidence missing menu item: ${expected}`);
+    }
+  }
+  if (typeof manual.screenshot_path !== 'string' || !existsSync(resolve(manual.screenshot_path))) {
+    failures.push('Manual tray evidence screenshot file does not exist.');
+  }
   for (const [key, label] of [
     ['visible_icon', 'visible tray icon'],
     ['right_click_menu', 'right-click menu'],
     ['show_ui_opened', 'Show Office MCP opened UI'],
-    ['menu_contains_required_items', 'required tray menu items'],
-    ['screenshot_exists', 'tray screenshot exists'],
     ['passed', 'manual tray evidence passed']
   ] as const) {
     if (manual[key] !== true) failures.push(`Manual tray evidence missing ${label}.`);

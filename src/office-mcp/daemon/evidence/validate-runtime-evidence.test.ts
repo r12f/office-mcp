@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -206,15 +206,28 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /Manual tray evidence missing visible tray icon/);
-      assert.match(outputText(result.stdout), /Manual tray evidence missing tray screenshot exists/);
+      assert.match(outputText(result.stdout), /Manual tray evidence screenshot file does not exist/);
     });
   });
 
   withEvidenceFile(ui, (uiPath) => {
-    withEvidenceFile(manualTrayReport(true), (manualPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const passing = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.equal(passing.status, 0, outputText(passing.stdout) + outputText(passing.stderr));
+      assert.equal(JSON.parse(outputText(passing.stdout)).ok, true);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.observed_menu_items = ['Status: Up', 'Clients: 0'];
+      broken.menu_contains_required_items = true;
+      broken.screenshot_exists = true;
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
-      assert.equal(result.status, 0, outputText(result.stdout) + outputText(result.stderr));
-      assert.equal(JSON.parse(outputText(result.stdout)).ok, true);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence missing menu item: Documents:/);
     });
   });
 });
@@ -250,6 +263,19 @@ function withEvidenceFile(data: unknown, callback: (path: string) => void): void
   try {
     const path = join(dir, 'runtime-evidence.json');
     writeFileSync(path, JSON.stringify(data, null, 2));
+    callback(path);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function withManualTrayEvidence(passed: boolean, callback: (path: string) => void): void {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-manual-tray-evidence-'));
+  try {
+    const screenshotPath = join(dir, 'tray-visible.png');
+    if (passed) writeFileSync(screenshotPath, 'fake png bytes for validator file existence');
+    const path = join(dir, 'tray-manual-evidence.json');
+    writeFileSync(path, JSON.stringify(manualTrayReport(passed, screenshotPath), null, 2));
     callback(path);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -295,7 +321,7 @@ function uiReport() {
   };
 }
 
-function manualTrayReport(passed: boolean) {
+function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png') {
   return {
     schema_version: 1,
     kind: 'tray_manual_evidence',
@@ -308,7 +334,7 @@ function manualTrayReport(passed: boolean) {
     observed_menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP'],
     expected_menu_items: ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'],
     menu_contains_required_items: passed,
-    screenshot_path: 'C:\\temp\\tray.png',
+    screenshot_path: screenshotPath,
     screenshot_exists: passed,
     passed
   };
