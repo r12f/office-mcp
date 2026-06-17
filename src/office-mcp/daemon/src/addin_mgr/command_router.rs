@@ -1,4 +1,7 @@
-use crate::addin_mgr::{CommandRouterError, PartialEffect, SessionCommandQueue, SessionRegistry};
+use crate::addin_mgr::{
+    CancelCommand, CommandRouterError, PartialEffect, QueuedCommand, SessionCommandQueue,
+    SessionRegistry, ToolCallRequest, ToolResponse,
+};
 use crate::api::{CommandFailure, CommandResult, StartCommandInput, UiStateStore};
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime};
@@ -367,56 +370,6 @@ impl Default for CommandRouter {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolCallRequest {
-    pub request_id: Option<String>,
-    pub command_id: Option<String>,
-    pub client_id: Option<String>,
-    pub client_name: Option<String>,
-    pub session_id: String,
-    pub tool: String,
-    pub arguments_json: String,
-    pub user_intent: Option<String>,
-    pub timeout: Option<Duration>,
-    pub check_capability: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QueuedCommand {
-    pub command_id: String,
-    pub request_id: String,
-    pub session_id: String,
-    pub instance_id: String,
-    pub tool: String,
-    pub arguments_json: String,
-    pub timeout: Duration,
-    pub enqueued_at: SystemTime,
-    pub deadline_at: SystemTime,
-    pub sequence: u64,
-    pub dispatched: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ToolResponse {
-    Success { json: String },
-    Failure(CommandFailure),
-}
-
-impl ToolResponse {
-    fn estimated_json_bytes(&self) -> usize {
-        match self {
-            Self::Success { json } => json.len(),
-            Self::Failure(failure) => failure.message.len() + failure.office_mcp_code.len() + 128,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CancelCommand {
-    pub request_id: String,
-    pub reason: String,
 }
 
 fn duration_millis(duration: Duration) -> u64 {
