@@ -205,15 +205,16 @@ the tray or CLI without knowing the localhost URL.
 
 User-reported follow-up from live task pane testing:
 
-- [ ] Replace oversized task pane blocks with content-based section heights.
+- [x] Replace oversized task pane blocks with content-based section heights.
       The connection/document summary, current task empty state, and recent task
       empty state must be compact and must not reserve large blank panels.
-- [ ] Merge connection status and document metadata into one compact top block.
-      The top block must contain the settings affordance and enough document
-      context for scanning in a 320 px task pane.
-- [ ] Move settings into an inline child panel of the top block. Clicking the
+      Covered by Word/Excel compact narrow-width task pane contract tests.
+- [x] Merge connection status and document metadata into one compact top block.
+      The top block contains connection status, document metadata, settings,
+      and tool summary, with Word/Excel contract tests enforcing the order.
+- [x] Move settings into an inline child panel of the top block. Clicking the
       gear must not append a detached settings block at the bottom of the task
-      pane.
+      pane. Covered by Word/Excel HTML order contract tests.
 - [x] Replace bare tool-count badges such as `27 Tools` with an inspectable
       grouped tool list that shows actual tool names, categories, side effects,
       and descriptions. Word and Excel now show `Enabled X of Y`, grouped
@@ -225,8 +226,10 @@ User-reported follow-up from live task pane testing:
       disabled tools are omitted from effective `available_tools`, the daemon
       preflight rejects absent tools, and an in-flight race returns
       `TOOL_DISABLED_BY_USER`.
-- [ ] Add automated UI evidence for the compact layout, inline settings panel,
+- [x] Add automated UI evidence for the compact layout, inline settings panel,
       grouped tool inspection, and per-tool permission toggles at 320 px width.
+      Current evidence is static HTML/CSS/JS contract coverage in Word and Excel
+      task pane tests; future pixel-level visual regression can strengthen it.
 - [x] Add protocol/unit coverage proving `session.updated.available_tools`
       changes after a permission toggle and that disabled tools cannot be
       invoked. Coverage exists in the shared add-in channel tests, Word/Excel

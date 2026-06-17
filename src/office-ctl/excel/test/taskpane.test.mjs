@@ -139,6 +139,31 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.doesNotMatch(js, /method: 'session\.added'/);
 });
 
+
+test('Excel task pane keeps settings inline and compact at narrow widths', () => {
+  const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
+  const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
+
+  assert.match(css, /body \{[\s\S]*min-width: 320px;[\s\S]*overflow-x: hidden;/);
+  assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);
+  assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
+  assert.match(css, /\.empty-state \{[\s\S]*padding: 10px;/);
+  assert.match(css, /@media \(min-width: 380px\)/);
+  assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
+  assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
+  assert.doesNotMatch(cssRule(css, '.current-task-panel'), /\bheight:/);
+  assert.doesNotMatch(cssRule(css, '.history-panel'), /\bheight:/);
+  assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
+
+  const summaryStart = html.indexOf('class="panel summary-panel"');
+  const settingsIndex = html.indexOf('id="settingsPanel"');
+  const summaryEnd = html.indexOf('</section>', settingsIndex);
+  const currentTaskIndex = html.indexOf('id="currentTaskHeading"');
+  assert.ok(summaryStart !== -1 && settingsIndex !== -1, 'summary and settings exist');
+  assert.ok(settingsIndex > summaryStart, 'settings panel is inside summary flow');
+  assert.ok(settingsIndex < currentTaskIndex, 'settings appears before current task');
+  assert.ok(summaryEnd < currentTaskIndex, 'summary closes before current task');
+});
 test('Excel task pane announces session only after successful register response', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const registerBody = functionBody(js, 'register');
@@ -161,4 +186,10 @@ function functionBody(source, name) {
     if (depth === 0) return source.slice(open + 1, index);
   }
   assert.fail(`unterminated function ${name}`);
+}
+
+function cssRule(source, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = source.match(new RegExp(`${escaped}\\s*\\{([\\s\\S]*?)\\}`));
+  return match?.[1] || '';
 }
