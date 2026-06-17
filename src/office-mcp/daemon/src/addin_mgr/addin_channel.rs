@@ -1,12 +1,13 @@
-use crate::addin_mgr::addin_heartbeat::{AddinHeartbeatState, AddinHeartbeatTimeout};
+use crate::addin_mgr::addin_heartbeat::AddinHeartbeatTimeout;
 use crate::addin_mgr::{
-    AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionPatch, SessionRegistry,
+    AddInInfo, AddinChannelConfig, AddinConnectionState, DocumentInfo, HostInfo, NewSessionInfo,
+    RuntimeInfo, SessionPatch, SessionRegistry,
 };
 use crate::addin_mgr::{CancelCommand, QueuedCommand};
 use crate::addin_mgr::{JsonRpcEnvelope, JsonRpcId, RegisterResult};
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 pub const SERVER_VERSION: &str = "0.1.0";
 pub const ADDIN_PROTOCOL_VERSION: &str = "1.0";
@@ -128,11 +129,7 @@ impl AddinChannelServer {
         registry.register_runtime(runtime.clone());
         self.connections.insert(
             connection_id,
-            AddinConnectionState {
-                instance_id: runtime.instance_id.clone(),
-                session_id: None,
-                heartbeat: AddinHeartbeatState::default(),
-            },
+            AddinConnectionState::new(runtime.instance_id.clone()),
         );
         tracing::info!(
             component = "addin_channel",
@@ -440,34 +437,6 @@ impl Default for AddinChannelServer {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AddinChannelConfig {
-    pub origin: String,
-    pub session_grace: Duration,
-    pub heartbeat_interval: Duration,
-    pub heartbeat_timeout: Duration,
-    pub max_pending_per_session: usize,
-}
-
-impl Default for AddinChannelConfig {
-    fn default() -> Self {
-        Self {
-            origin: "https://localhost:8765".to_string(),
-            session_grace: Duration::from_mins(1),
-            heartbeat_interval: Duration::from_secs(30),
-            heartbeat_timeout: Duration::from_secs(10),
-            max_pending_per_session: 4,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct AddinConnectionState {
-    instance_id: String,
-    session_id: Option<String>,
-    heartbeat: AddinHeartbeatState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
