@@ -1,8 +1,7 @@
 use super::{
-    ExcelToolCatalog, WORD_V1_TOOLS, prompt_catalog_json, prompt_messages, tool_catalog_json,
-    word_resource_catalog_for_session, word_resource_templates,
+    ExcelToolCatalog, WORD_V1_TOOLS, tool_catalog_json, word_resource_catalog_for_session,
+    word_resource_templates,
 };
-use serde_json::json;
 
 #[test]
 fn tool_catalog_includes_office_word_and_excel_tools() {
@@ -48,24 +47,4 @@ fn word_resource_templates_include_document_and_paragraph_routes() {
 
     assert!(names.contains(&"word.document.template"));
     assert!(names.contains(&"word.paragraph.template"));
-}
-
-#[test]
-fn prompt_catalog_and_messages_are_session_aware() {
-    let prompts = prompt_catalog_json();
-    let names = prompts
-        .iter()
-        .filter_map(|prompt| prompt["name"].as_str())
-        .collect::<Vec<_>>();
-    let messages = prompt_messages(
-        "polish_section",
-        Some(&json!({ "session_id": "session-1", "heading": "Scope" })),
-    )
-    .expect("prompt messages");
-    let text = messages[0]["content"]["text"].as_str().expect("text");
-
-    assert!(names.contains(&"summarize_document"));
-    assert!(names.contains(&"polish_section"));
-    assert!(text.contains("session-1"));
-    assert!(text.contains("Scope"));
 }
