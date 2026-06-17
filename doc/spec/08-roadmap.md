@@ -330,9 +330,12 @@ module so ownership is visible from the directory tree.
 - [x] Create `src/office-mcp/daemon/src/tray/` for tray/menu-bar code: tray
       controller, native tray host, menu model, `Show Office MCP`, and graceful
       quit confirmation.
-- [ ] Keep root files minimal: `main.rs` owns CLI dispatch, `lib.rs` exposes
+- [x] Keep root files minimal: `main.rs` owns CLI dispatch, `lib.rs` exposes
       module wiring, and any top-level daemon composition file only wires
-      service objects together.
+      service objects together. Runtime server and UI evidence fixture code now
+      live under `src/office-mcp/daemon/src/runtime/`; the root layout guard
+      `daemon_src_root_only_contains_composition_and_transitional_files` proves
+      no service modules are added directly under `src`.
 - [ ] Rename Rust modules where needed to match their service boundary. For
       example, UI state snapshot code belongs under `api`, tray host/controller
       under `tray`, MCP HTTP/frontend/stdio under `mcp`, and session/command
