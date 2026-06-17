@@ -1,3 +1,7 @@
+use crate::addin_mgr::{
+    AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, PartialEffect, ProtectionInfo, RuntimeInfo,
+    SessionRegistry,
+};
 use crate::common::AuditLog;
 use crate::common::{
     AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
@@ -5,10 +9,6 @@ use crate::common::{
 use crate::image_fetcher::ImageFetcher;
 use crate::runtime_server::{
     RuntimeSeedState, RuntimeServer, RuntimeServerConfig, RuntimeServerError,
-};
-use crate::session_registry::{
-    AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, PartialEffect, ProtectionInfo, RuntimeInfo,
-    SessionRegistry,
 };
 use crate::ui::UiRuntimeFile;
 use crate::ui::{

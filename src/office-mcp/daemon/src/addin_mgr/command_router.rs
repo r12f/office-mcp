@@ -1,4 +1,4 @@
-use crate::session_registry::{PartialEffect, SessionRegistry, ToolInvocationError};
+use crate::addin_mgr::{PartialEffect, SessionRegistry, ToolInvocationError};
 use crate::ui::{CommandFailure, CommandResult, StartCommandInput, UiStateStore};
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt::{Display, Formatter};
@@ -423,7 +423,7 @@ fn duration_millis(duration: Duration) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{CommandRouter, CommandRouterError, ToolCallRequest, ToolResponse};
-    use crate::session_registry::{
+    use crate::addin_mgr::{
         AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, OfficeMcpCode, RuntimeInfo,
         SessionRegistry,
     };

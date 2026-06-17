@@ -1,4 +1,4 @@
-use crate::session_registry::{PartialEffect, SessionDescriptor};
+use crate::addin_mgr::{PartialEffect, SessionDescriptor};
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime};
 
@@ -488,7 +488,7 @@ mod tests {
         CommandFailure, CommandResult, RegisterClientInput, StartCommandInput, UiClientTransport,
         UiCommandStatus, UiStateOptions, UiStateStore,
     };
-    use crate::session_registry::{
+    use crate::addin_mgr::{
         DocumentDescriptor, HostDescriptor, PartialEffect, SessionDescriptor, SessionStatus,
     };
     use std::time::{Duration, SystemTime};

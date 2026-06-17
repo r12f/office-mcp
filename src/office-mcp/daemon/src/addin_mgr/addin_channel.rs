@@ -1,7 +1,7 @@
-use crate::command_router::{CancelCommand, QueuedCommand};
-use crate::session_registry::{
+use crate::addin_mgr::{
     AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionPatch, SessionRegistry,
 };
+use crate::addin_mgr::{CancelCommand, QueuedCommand};
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::time::{Duration, SystemTime};
@@ -501,10 +501,8 @@ mod tests {
         JsonRpcId, RegisterRequest, SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason,
         SessionUpdatedEvent,
     };
-    use crate::command_router::{CancelCommand, QueuedCommand};
-    use crate::session_registry::{
-        AddInInfo, DocumentInfo, HostInfo, SessionPatch, SessionRegistry,
-    };
+    use crate::addin_mgr::{AddInInfo, DocumentInfo, HostInfo, SessionPatch, SessionRegistry};
+    use crate::addin_mgr::{CancelCommand, QueuedCommand};
     use std::time::{Duration, SystemTime};
 
     #[test]
@@ -702,7 +700,7 @@ mod tests {
 
         assert_eq!(
             registry.list_sessions()[0].status,
-            crate::session_registry::SessionStatus::Stale
+            crate::addin_mgr::SessionStatus::Stale
         );
     }
 

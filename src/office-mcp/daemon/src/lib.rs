@@ -1,6 +1,5 @@
-pub mod addin_channel;
+pub mod addin_mgr;
 pub mod client_config;
-pub mod command_router;
 pub mod common;
 pub mod daemon;
 pub mod daemon_control;
@@ -9,7 +8,6 @@ pub mod image_fetcher;
 pub mod mcp;
 pub mod parity;
 pub mod runtime_server;
-pub mod session_registry;
 pub mod tray;
 pub mod ui;
 

@@ -1,12 +1,12 @@
-use crate::addin_channel::AddinChannelServer;
-use crate::command_router::CommandRouter;
+use crate::addin_mgr::AddinChannelServer;
+use crate::addin_mgr::CommandRouter;
+use crate::addin_mgr::SessionRegistry;
 use crate::common::AuditLog;
 use crate::common::DaemonConfigService;
 use crate::common::Logger;
 use crate::mcp::McpHttpFrontend;
 use crate::parity::ParityPlan;
 use crate::runtime_server::RuntimeServer;
-use crate::session_registry::SessionRegistry;
 use crate::tray::TrayController;
 use crate::ui::UiStateStore;
 

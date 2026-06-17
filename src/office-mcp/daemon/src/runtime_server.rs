@@ -1,13 +1,13 @@
-use crate::addin_channel::{
+use crate::addin_mgr::{AddInInfo, DocumentInfo, HostInfo, SessionPatch, SessionRegistry};
+use crate::addin_mgr::{
     AddinChannelConfig, AddinChannelServer, HeartbeatDecision, JsonRpcId, RegisterRequest,
     SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
 };
-use crate::command_router::{CommandRouter, ToolCallRequest, ToolResponse};
+use crate::addin_mgr::{CommandRouter, ToolCallRequest, ToolResponse};
 use crate::common::DaemonConfig;
 use crate::common::{AuditLog, AuditRecord};
 use crate::image_fetcher::ImageFetcher;
 use crate::mcp::{HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
-use crate::session_registry::{AddInInfo, DocumentInfo, HostInfo, SessionPatch, SessionRegistry};
 use crate::ui::{CommandFailure, UiStateStore};
 use crate::ui::{UiRuntimeError, UiRuntimeFile};
 use native_tls::{Identity, TlsAcceptor, TlsStream};
@@ -465,7 +465,7 @@ impl RuntimeServer {
         })?;
         match addin_channel.start_ping(connection_id, SystemTime::now()) {
             Ok(ping) => Ok(Some(json_rpc_envelope_to_text(&ping))),
-            Err(crate::addin_channel::AddinChannelError::UnknownConnection(_)) => Ok(None),
+            Err(crate::addin_mgr::AddinChannelError::UnknownConnection(_)) => Ok(None),
             Err(error) => Err(RuntimeServerError::Internal(error.to_string())),
         }
     }
@@ -509,7 +509,7 @@ impl RuntimeServer {
         ) {
             Ok(HeartbeatDecision::KeepOpen) => Ok(HeartbeatLoopDecision::KeepOpen),
             Ok(HeartbeatDecision::Close { .. }) => Ok(HeartbeatLoopDecision::Close),
-            Err(crate::addin_channel::AddinChannelError::UnknownConnection(_)) => {
+            Err(crate::addin_mgr::AddinChannelError::UnknownConnection(_)) => {
                 Ok(HeartbeatLoopDecision::KeepOpen)
             }
             Err(error) => Err(RuntimeServerError::Internal(error.to_string())),
@@ -1584,7 +1584,7 @@ impl McpJsonRpcRuntime {
 
     fn invoke_queued_tool(
         context: &McpDispatchContext<'_>,
-        queued: &crate::command_router::QueuedCommand,
+        queued: &crate::addin_mgr::QueuedCommand,
         tool: &str,
     ) -> ToolResponse {
         let payload = {
@@ -1603,7 +1603,7 @@ impl McpJsonRpcRuntime {
                 message: format!("Session {} lost its add-in connection.", queued.session_id),
                 tool: Some(tool.to_string()),
                 retriable: true,
-                partial_effect: Some(crate::session_registry::PartialEffect::Unknown),
+                partial_effect: Some(crate::addin_mgr::PartialEffect::Unknown),
             }),
             Err(AddinConnectionHubError::Timeout) => {
                 Self::send_timeout_cancel(context, queued);
@@ -1615,7 +1615,7 @@ impl McpJsonRpcRuntime {
                     ),
                     tool: Some(tool.to_string()),
                     retriable: true,
-                    partial_effect: Some(crate::session_registry::PartialEffect::Unknown),
+                    partial_effect: Some(crate::addin_mgr::PartialEffect::Unknown),
                 })
             }
         }
@@ -1623,12 +1623,12 @@ impl McpJsonRpcRuntime {
 
     fn send_timeout_cancel(
         context: &McpDispatchContext<'_>,
-        queued: &crate::command_router::QueuedCommand,
+        queued: &crate::addin_mgr::QueuedCommand,
     ) {
         let cancel_payload = {
             let addin_channel = context.addin_channel.lock().expect("addin channel lock");
             json_rpc_envelope_to_text(&addin_channel.tool_cancel_payload(
-                &crate::command_router::CancelCommand {
+                &crate::addin_mgr::CancelCommand {
                     request_id: queued.request_id.clone(),
                     reason: "deadline_expired".to_string(),
                 },
@@ -1641,7 +1641,7 @@ impl McpJsonRpcRuntime {
 
     fn complete_queued_tool(
         context: &mut McpDispatchContext<'_>,
-        queued: &crate::command_router::QueuedCommand,
+        queued: &crate::addin_mgr::QueuedCommand,
         tool_response: ToolResponse,
         tool: &str,
         audit_started_at: SystemTime,
@@ -1943,7 +1943,7 @@ fn json_rpc_request_id(body: &[u8]) -> Option<Value> {
         .and_then(|value| value.get("id").cloned())
 }
 
-fn register_reply_to_json(reply: crate::addin_channel::JsonRpcEnvelope) -> String {
+fn register_reply_to_json(reply: crate::addin_mgr::JsonRpcEnvelope) -> String {
     let id = reply.id.map_or(Value::Null, json_rpc_id_value);
     let Some(result) = reply.result else {
         return json!({ "jsonrpc": "2.0", "id": id, "result": null }).to_string();
@@ -2402,7 +2402,7 @@ fn preprocess_tool_arguments(
         message: error.to_string(),
         tool: Some(tool.to_string()),
         retriable: false,
-        partial_effect: Some(crate::session_registry::PartialEffect::None),
+        partial_effect: Some(crate::addin_mgr::PartialEffect::None),
     })?;
     let mut updated = arguments.clone();
     if let Some(object) = updated.as_object_mut() {
@@ -2422,7 +2422,7 @@ fn record_tool_audit(
     audit_log: &AuditLog,
     tool: &str,
     session_id: &str,
-    completed: &Result<ToolResponse, crate::command_router::CommandRouterError>,
+    completed: &Result<ToolResponse, crate::addin_mgr::CommandRouterError>,
     started_at: SystemTime,
     completed_at: SystemTime,
 ) {
@@ -2488,9 +2488,9 @@ fn duration_millis(started_at: SystemTime, completed_at: SystemTime) -> u64 {
 
 fn tool_failure_from_command(failure: &CommandFailure) -> Value {
     let partial_effect = failure.partial_effect.map(|effect| match effect {
-        crate::session_registry::PartialEffect::None => "none",
-        crate::session_registry::PartialEffect::Possible => "possible",
-        crate::session_registry::PartialEffect::Unknown => "unknown",
+        crate::addin_mgr::PartialEffect::None => "none",
+        crate::addin_mgr::PartialEffect::Possible => "possible",
+        crate::addin_mgr::PartialEffect::Unknown => "unknown",
     });
     let error = json!({
         "office_mcp_code": failure.office_mcp_code,
@@ -2528,7 +2528,7 @@ fn addin_response_to_tool_response(response: &Value) -> ToolResponse {
                 .get("retriable")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
-            partial_effect: Some(crate::session_registry::PartialEffect::Unknown),
+            partial_effect: Some(crate::addin_mgr::PartialEffect::Unknown),
         });
     }
     let result = response.get("result").cloned().unwrap_or(Value::Null);
@@ -2553,7 +2553,7 @@ fn addin_response_to_tool_response(response: &Value) -> ToolResponse {
                 .get("retriable")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
-            partial_effect: Some(crate::session_registry::PartialEffect::Unknown),
+            partial_effect: Some(crate::addin_mgr::PartialEffect::Unknown),
         });
     }
     let data = result.get("data").cloned().unwrap_or(result);
@@ -2562,7 +2562,7 @@ fn addin_response_to_tool_response(response: &Value) -> ToolResponse {
     }
 }
 
-fn json_rpc_envelope_to_text(envelope: &crate::addin_channel::JsonRpcEnvelope) -> String {
+fn json_rpc_envelope_to_text(envelope: &crate::addin_mgr::JsonRpcEnvelope) -> String {
     let mut value = json!({ "jsonrpc": "2.0" });
     if let Some(id) = envelope.id.clone() {
         value["id"] = json_rpc_id_value(id);
@@ -2585,7 +2585,7 @@ fn json_rpc_envelope_to_text(envelope: &crate::addin_channel::JsonRpcEnvelope) -
     value.to_string()
 }
 
-fn session_descriptor_json(session: &crate::session_registry::SessionDescriptor) -> Value {
+fn session_descriptor_json(session: &crate::addin_mgr::SessionDescriptor) -> Value {
     json!({
         "session_id": session.session_id,
         "instance_id": session.instance_id,
@@ -2613,8 +2613,8 @@ fn session_descriptor_json(session: &crate::session_registry::SessionDescriptor)
         "queue_depth": session.queue_depth,
         "registered_at": format_unix_time(session.registered_at),
         "status": match session.status {
-            crate::session_registry::SessionStatus::Active => "active",
-            crate::session_registry::SessionStatus::Stale => "stale",
+            crate::addin_mgr::SessionStatus::Active => "active",
+            crate::addin_mgr::SessionStatus::Stale => "stale",
         }
     })
 }
@@ -2910,11 +2910,11 @@ fn ui_command_error_json(error: &crate::ui::UiCommandError) -> Value {
     })
 }
 
-fn partial_effect_json(value: crate::session_registry::PartialEffect) -> &'static str {
+fn partial_effect_json(value: crate::addin_mgr::PartialEffect) -> &'static str {
     match value {
-        crate::session_registry::PartialEffect::None => "none",
-        crate::session_registry::PartialEffect::Possible => "possible",
-        crate::session_registry::PartialEffect::Unknown => "unknown",
+        crate::addin_mgr::PartialEffect::None => "none",
+        crate::addin_mgr::PartialEffect::Possible => "possible",
+        crate::addin_mgr::PartialEffect::Unknown => "unknown",
     }
 }
 
@@ -3045,14 +3045,14 @@ mod tests {
         RuntimeServer, RuntimeServerConfig, RuntimeServerError, RuntimeSharedState, WebSocketCodec,
         WebSocketFrame,
     };
-    use crate::addin_channel::{AddinChannelConfig, AddinChannelServer};
-    use crate::command_router::CommandRouter;
+    use crate::addin_mgr::CommandRouter;
+    use crate::addin_mgr::{
+        AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionRegistry,
+    };
+    use crate::addin_mgr::{AddinChannelConfig, AddinChannelServer};
     use crate::common::AuditLog;
     use crate::image_fetcher::ImageFetcher;
     use crate::mcp::McpHttpFrontend;
-    use crate::session_registry::{
-        AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionRegistry,
-    };
     use crate::ui::UiStateStore;
     use native_tls::TlsConnector;
     use serde_json::Value;
