@@ -183,8 +183,11 @@ User-reported follow-up from live daemon testing:
 - [ ] Add manual/e2e evidence that verifies a visible tray icon exists on
       Windows, the right-click menu appears, and `Show Office MCP` opens the
       daemon UI.
-- [ ] Add automated coverage that fails when production `daemon run` does not
-      expose `/ui/` and when `daemon status` omits the UI URL.
+- [x] Add automated coverage that fails when production `daemon run` does not
+      expose `/ui/` and when `daemon status` omits the UI URL. Covered by
+      `production_bound_daemon_exposes_ui_state_and_events`,
+      `status_reports_runtime_details_without_auth_material`, and
+      `ui_command_reads_runtime_file_url_instead_of_config_defaults`.
 
 **Exit criterion**: Starting office-mcp in its normal local mode creates a
 running UI server and a visible tray icon. A user can open the daemon UI from

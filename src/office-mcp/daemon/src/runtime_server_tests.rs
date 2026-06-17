@@ -242,6 +242,62 @@ fn serves_daemon_ui_assets_over_addin_listener() {
 }
 
 #[test]
+fn production_bound_daemon_exposes_ui_state_and_events() {
+    let mcp_listener = TcpListener::bind("127.0.0.1:0").expect("bind mcp listener");
+    let mcp_port = mcp_listener.local_addr().expect("mcp addr").port();
+    let addin_listener = TcpListener::bind("127.0.0.1:0").expect("bind addin listener");
+    let addin_port = addin_listener.local_addr().expect("addin addr").port();
+    let addin_origin = format!("https://localhost:{addin_port}");
+    let server = RuntimeServer::with_config(RuntimeServerConfig {
+        mcp_host: "127.0.0.1".to_string(),
+        mcp_port,
+        addin_host: "127.0.0.1".to_string(),
+        addin_port,
+        addin_origin: addin_origin.clone(),
+        addin_public_dir: super::default_addin_public_dir(),
+        certificate_path: super::default_pfx_path(),
+        ..RuntimeServerConfig::default()
+    });
+
+    thread::spawn(move || {
+        let _ = server.serve_bound_with_state_forever(
+            &mcp_listener,
+            &addin_listener,
+            UiStateStore::new(),
+            SessionRegistry::new(),
+        );
+    });
+
+    let html = addin_tls_request(
+        addin_port,
+        "GET /ui/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(html.starts_with("HTTP/1.1 200 OK"));
+    assert!(html.contains("Office MCP"));
+
+    let state = addin_tls_request(
+        addin_port,
+        &format!(
+            "GET /ui/state HTTP/1.1\r\nHost: localhost\r\nOrigin: {addin_origin}\r\nConnection: close\r\n\r\n"
+        ),
+    );
+    assert!(state.starts_with("HTTP/1.1 200 OK"));
+    assert!(state.contains("\"status\":\"up\""));
+    assert!(state.contains(&format!("http://127.0.0.1:{mcp_port}/mcp")));
+    assert!(state.contains(&format!("https://localhost:{addin_port}/addin")));
+
+    let events = addin_tls_request(
+        addin_port,
+        &format!(
+            "GET /ui/events HTTP/1.1\r\nHost: localhost\r\nOrigin: {addin_origin}\r\nConnection: close\r\n\r\n"
+        ),
+    );
+    assert!(events.starts_with("HTTP/1.1 200 OK"));
+    assert!(events.contains("Content-Type: text/event-stream; charset=utf-8"));
+    assert!(events.contains("event: snapshot"));
+    assert!(events.contains("data: {"));
+}
+#[test]
 fn rejects_foreign_ui_state_origin_over_addin_listener() {
     let response = addin_roundtrip(
         "GET /ui/state HTTP/1.1\r\nHost: localhost\r\nOrigin: https://evil.example\r\n\r\n",
@@ -1401,6 +1457,19 @@ fn addin_roundtrip(request: &str) -> String {
     response
 }
 
+fn addin_tls_request(port: u16, request: &str) -> String {
+    let connector = TlsConnector::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("tls connector");
+    let stream = TcpStream::connect(("127.0.0.1", port)).expect("connect client");
+    let mut stream = connector.connect("localhost", stream).expect("connect tls");
+    stream.write_all(request.as_bytes()).expect("write request");
+    stream.flush().expect("flush request");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("read response");
+    response
+}
 fn addin_tls_roundtrip(request: &str) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
     let port = listener.local_addr().expect("local addr").port();
