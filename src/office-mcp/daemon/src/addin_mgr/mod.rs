@@ -4,6 +4,7 @@ pub mod connection_hub;
 pub mod image_fetcher;
 pub mod session_registry;
 pub mod websocket_codec;
+pub mod websocket_handshake;
 
 pub use addin_channel::{
     AddinChannelConfig, AddinChannelError, AddinChannelServer, HeartbeatDecision, JsonRpcEnvelope,
@@ -24,3 +25,4 @@ pub use session_registry::{
 pub use websocket_codec::{
     WebSocketCodec, WebSocketCodecError, WebSocketFrame, WebSocketProtocolError,
 };
+pub use websocket_handshake::websocket_accept_key;
