@@ -29,17 +29,48 @@ impl UiSnapshotService {
         registry: &Arc<Mutex<SessionRegistry>>,
         endpoints: &UiSnapshotEndpoints,
     ) -> String {
-        let sessions = registry
-            .lock()
-            .map(|registry| registry.list_sessions())
-            .unwrap_or_default();
-        let mut snapshot = ui_state.lock().map_or_else(
-            |_| UiStateStore::new().snapshot(&sessions, SystemTime::now()),
-            |ui_state| ui_state.snapshot(&sessions, SystemTime::now()),
-        );
+        let sessions = match registry.lock() {
+            Ok(registry) => registry.list_sessions(),
+            Err(error) => {
+                tracing::warn!(
+                    component = "ui_snapshot_service",
+                    %error,
+                    "rendering UI snapshot without registry after lock failure"
+                );
+                Vec::new()
+            }
+        };
+        let ui_state_lock_failed;
+        let mut snapshot = match ui_state.lock() {
+            Ok(ui_state) => {
+                ui_state_lock_failed = false;
+                ui_state.snapshot(&sessions, SystemTime::now())
+            }
+            Err(error) => {
+                ui_state_lock_failed = true;
+                tracing::warn!(
+                    component = "ui_snapshot_service",
+                    %error,
+                    "rendering fallback UI snapshot after state lock failure"
+                );
+                UiStateStore::new().snapshot(&sessions, SystemTime::now())
+            }
+        };
         snapshot.daemon.mcp_endpoint = endpoints.mcp_endpoint.clone();
         snapshot.daemon.addin_endpoint = endpoints.addin_endpoint.clone();
-        self.renderer.render_text(&snapshot)
+        let rendered = self.renderer.render_text(&snapshot);
+        tracing::debug!(
+            component = "ui_snapshot_service",
+            status = ?snapshot.daemon.status,
+            clients = snapshot.clients.len(),
+            documents = snapshot.documents.values().map(Vec::len).sum::<usize>(),
+            current_tasks = snapshot.current_tasks.len(),
+            recent_commands = snapshot.recent_commands.len(),
+            ui_state_lock_failed,
+            bytes = rendered.len(),
+            "rendered UI API snapshot"
+        );
+        rendered
     }
 }
 
