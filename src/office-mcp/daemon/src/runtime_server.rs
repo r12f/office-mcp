@@ -4,11 +4,11 @@ use crate::addin_mgr::{
     SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
 };
 use crate::addin_mgr::{CommandRouter, ToolCallRequest, ToolResponse};
+use crate::api::{CommandFailure, UiStateStore};
 use crate::common::DaemonConfig;
 use crate::common::{AuditLog, AuditRecord};
 use crate::image_fetcher::ImageFetcher;
 use crate::mcp::{HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
-use crate::ui::{CommandFailure, UiStateStore};
 use crate::ui::{UiRuntimeError, UiRuntimeFile};
 use native_tls::{Identity, TlsAcceptor, TlsStream};
 use serde_json::{Value, json};
@@ -2844,32 +2844,32 @@ fn render_ui_snapshot(
     .to_string()
 }
 
-fn ui_health_json(value: crate::ui::UiHealth) -> &'static str {
+fn ui_health_json(value: crate::api::UiHealth) -> &'static str {
     match value {
-        crate::ui::UiHealth::Up => "up",
-        crate::ui::UiHealth::Degraded => "degraded",
-        crate::ui::UiHealth::Down => "down",
+        crate::api::UiHealth::Up => "up",
+        crate::api::UiHealth::Degraded => "degraded",
+        crate::api::UiHealth::Down => "down",
     }
 }
 
-fn ui_command_status_json(value: crate::ui::UiCommandStatus) -> &'static str {
+fn ui_command_status_json(value: crate::api::UiCommandStatus) -> &'static str {
     match value {
-        crate::ui::UiCommandStatus::Running => "running",
-        crate::ui::UiCommandStatus::Success => "success",
-        crate::ui::UiCommandStatus::Failure => "failure",
-        crate::ui::UiCommandStatus::Cancelled => "cancelled",
-        crate::ui::UiCommandStatus::Timeout => "timeout",
+        crate::api::UiCommandStatus::Running => "running",
+        crate::api::UiCommandStatus::Success => "success",
+        crate::api::UiCommandStatus::Failure => "failure",
+        crate::api::UiCommandStatus::Cancelled => "cancelled",
+        crate::api::UiCommandStatus::Timeout => "timeout",
     }
 }
 
-fn ui_client_transport_json(value: crate::ui::UiClientTransport) -> &'static str {
+fn ui_client_transport_json(value: crate::api::UiClientTransport) -> &'static str {
     match value {
-        crate::ui::UiClientTransport::Http => "http",
-        crate::ui::UiClientTransport::StdioBridge => "stdio-bridge",
+        crate::api::UiClientTransport::Http => "http",
+        crate::api::UiClientTransport::StdioBridge => "stdio-bridge",
     }
 }
 
-fn ui_client_json(client: &crate::ui::UiClientRecord) -> Value {
+fn ui_client_json(client: &crate::api::UiClientRecord) -> Value {
     json!({
         "client_id": client.client_id,
         "transport": ui_client_transport_json(client.transport),
@@ -2880,7 +2880,7 @@ fn ui_client_json(client: &crate::ui::UiClientRecord) -> Value {
     })
 }
 
-fn ui_command_json(command: &crate::ui::UiCommandRecord) -> Value {
+fn ui_command_json(command: &crate::api::UiCommandRecord) -> Value {
     json!({
         "command_id": command.command_id,
         "mcp_request_id": command.mcp_request_id,
@@ -2900,7 +2900,7 @@ fn ui_command_json(command: &crate::ui::UiCommandRecord) -> Value {
     })
 }
 
-fn ui_command_error_json(error: &crate::ui::UiCommandError) -> Value {
+fn ui_command_error_json(error: &crate::api::UiCommandError) -> Value {
     json!({
         "office_mcp_code": error.office_mcp_code,
         "message": error.message,
@@ -3050,10 +3050,10 @@ mod tests {
         AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionRegistry,
     };
     use crate::addin_mgr::{AddinChannelConfig, AddinChannelServer};
+    use crate::api::UiStateStore;
     use crate::common::AuditLog;
     use crate::image_fetcher::ImageFetcher;
     use crate::mcp::McpHttpFrontend;
-    use crate::ui::UiStateStore;
     use native_tls::TlsConnector;
     use serde_json::Value;
     use std::collections::BTreeSet;

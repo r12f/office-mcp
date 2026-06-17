@@ -1,6 +1,7 @@
 use crate::addin_mgr::AddinChannelServer;
 use crate::addin_mgr::CommandRouter;
 use crate::addin_mgr::SessionRegistry;
+use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::common::DaemonConfigService;
 use crate::common::Logger;
@@ -8,7 +9,6 @@ use crate::mcp::McpHttpFrontend;
 use crate::parity::ParityPlan;
 use crate::runtime_server::RuntimeServer;
 use crate::tray::TrayController;
-use crate::ui::UiStateStore;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ComponentDescription {

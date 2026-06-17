@@ -2,6 +2,10 @@ use crate::addin_mgr::{
     AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, PartialEffect, ProtectionInfo, RuntimeInfo,
     SessionRegistry,
 };
+use crate::api::{
+    CommandFailure, CommandResult, RegisterClientInput, StartCommandInput, UiClientTransport,
+    UiHealth, UiStateStore,
+};
 use crate::common::AuditLog;
 use crate::common::{
     AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
@@ -11,10 +15,6 @@ use crate::runtime_server::{
     RuntimeSeedState, RuntimeServer, RuntimeServerConfig, RuntimeServerError,
 };
 use crate::ui::UiRuntimeFile;
-use crate::ui::{
-    CommandFailure, CommandResult, RegisterClientInput, StartCommandInput, UiClientTransport,
-    UiHealth, UiStateStore,
-};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
