@@ -63,9 +63,12 @@ fn tracing_file_subscriber_writes_json_events_with_level_filter() {
     ));
     let path = dir.join("office-mcp-tracing.log");
 
-    let guard = Logger::init_tracing_file(LogLevel::Warn, &path).expect("init tracing");
-    tracing::info!(component = "daemon", "hidden info");
-    tracing::warn!(component = "daemon", "visible warning");
+    let (subscriber, guard) =
+        Logger::tracing_file_default(LogLevel::Warn, &path).expect("init tracing");
+    tracing::subscriber::with_default(subscriber, || {
+        tracing::info!(component = "daemon", "hidden info");
+        tracing::warn!(component = "daemon", "visible warning");
+    });
     drop(guard);
 
     let contents = read_to_string(&path).expect("read tracing log file");

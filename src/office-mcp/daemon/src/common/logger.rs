@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::MakeWriter;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Logger {
@@ -116,17 +117,53 @@ impl Logger {
         }
         let appender = OpenOptions::new().create(true).append(true).open(file)?;
         let (writer, guard) = tracing_appender::non_blocking(appender);
-        let filter = EnvFilter::new(min_level.as_str());
-        tracing_subscriber::fmt()
-            .json()
-            .with_env_filter(filter)
-            .with_writer(writer)
-            .with_current_span(false)
-            .with_span_list(false)
-            .try_init()
+        let subscriber = tracing_file_subscriber(min_level, writer);
+        tracing::subscriber::set_global_default(subscriber)
             .map_err(|error| LoggerError::TracingInit(error.to_string()))?;
         Ok(TracingLogGuard { _guard: guard })
     }
+
+    /// Creates a tracing file subscriber and guard without installing it globally.
+    ///
+    /// This is intended for tests that need isolated tracing capture with
+    /// `tracing::subscriber::with_default`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the log directory or file cannot be created.
+    #[cfg(test)]
+    pub(crate) fn tracing_file_default(
+        min_level: LogLevel,
+        file: impl AsRef<Path>,
+    ) -> Result<(impl tracing::Subscriber + Send + Sync, TracingLogGuard), LoggerError> {
+        let file = file.as_ref();
+        if let Some(parent) = file.parent() {
+            create_dir_all(parent)?;
+        }
+        let appender = OpenOptions::new().create(true).append(true).open(file)?;
+        let (writer, guard) = tracing_appender::non_blocking(appender);
+        Ok((
+            tracing_file_subscriber(min_level, writer),
+            TracingLogGuard { _guard: guard },
+        ))
+    }
+}
+
+fn tracing_file_subscriber<W>(
+    min_level: LogLevel,
+    writer: W,
+) -> impl tracing::Subscriber + Send + Sync
+where
+    W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
+{
+    let filter = EnvFilter::new(min_level.as_str());
+    tracing_subscriber::fmt()
+        .json()
+        .with_env_filter(filter)
+        .with_writer(writer)
+        .with_current_span(false)
+        .with_span_list(false)
+        .finish()
 }
 
 impl Default for Logger {

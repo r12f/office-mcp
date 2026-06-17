@@ -39,12 +39,32 @@ impl McpHttpFrontend {
         now: SystemTime,
     ) -> McpHttpDecision {
         if let Err(error) = self.validate_origin(request.header("origin")) {
+            tracing::warn!(
+                component = "mcp_http_frontend",
+                client = %request.client_key(),
+                origin = ?request.header("origin"),
+                error = %error,
+                "rejected MCP HTTP request origin"
+            );
             return error.into();
         }
         if let Err(error) = self.validate_request_size(request.body_bytes) {
+            tracing::warn!(
+                component = "mcp_http_frontend",
+                client = %request.client_key(),
+                body_bytes = request.body_bytes,
+                error = %error,
+                "rejected oversized MCP HTTP request"
+            );
             return error.into();
         }
         if let Err(error) = self.check_rate_limit(request.client_key(), now) {
+            tracing::warn!(
+                component = "mcp_http_frontend",
+                client = %request.client_key(),
+                error = %error,
+                "rate limited MCP HTTP request"
+            );
             return error.into();
         }
         match request.method {
@@ -52,7 +72,15 @@ impl McpHttpFrontend {
             HttpMethod::Get | HttpMethod::Delete => {
                 self.handle_session_request(ui_state, request, now)
             }
-            _ => McpHttpDecision::reject(405, "Method not allowed"),
+            _ => {
+                tracing::warn!(
+                    component = "mcp_http_frontend",
+                    client = %request.client_key(),
+                    method = ?request.method,
+                    "rejected unsupported MCP HTTP method"
+                );
+                McpHttpDecision::reject(405, "Method not allowed")
+            }
         }
     }
 
@@ -60,6 +88,12 @@ impl McpHttpFrontend {
         let removed = self.sessions.remove(session_id).is_some();
         if removed {
             ui_state.unregister_client(session_id);
+            tracing::info!(
+                component = "mcp_http_frontend",
+                session_id = %session_id,
+                active_sessions = self.sessions.len(),
+                "closed MCP HTTP session"
+            );
         }
         removed
     }
@@ -77,14 +111,31 @@ impl McpHttpFrontend {
     ) -> McpHttpDecision {
         if let Some(session_id) = request.header("mcp-session-id") {
             if !self.sessions.contains_key(session_id) {
+                tracing::warn!(
+                    component = "mcp_http_frontend",
+                    client = %request.client_key(),
+                    session_id = %session_id,
+                    "rejected unknown MCP HTTP session"
+                );
                 return McpHttpDecision::json_rpc_error(404, -32000, "Unknown MCP session ID.");
             }
             ui_state.touch_client(session_id, now);
+            tracing::debug!(
+                component = "mcp_http_frontend",
+                client = %request.client_key(),
+                session_id = %session_id,
+                "forwarding MCP HTTP POST to transport"
+            );
             return McpHttpDecision::ForwardToTransport {
                 session_id: Some(session_id.to_string()),
             };
         }
         if !request.is_initialize {
+            tracing::warn!(
+                component = "mcp_http_frontend",
+                client = %request.client_key(),
+                "rejected MCP HTTP POST without session"
+            );
             return McpHttpDecision::json_rpc_error(
                 400,
                 -32000,
@@ -107,6 +158,13 @@ impl McpHttpFrontend {
             transport: UiClientTransport::Http,
             name: client_name,
         });
+        tracing::info!(
+            component = "mcp_http_frontend",
+            client = %request.client_key(),
+            session_id = %session_id,
+            active_sessions = self.sessions.len(),
+            "initialized MCP HTTP session"
+        );
         McpHttpDecision::InitializeTransport { session_id }
     }
 
@@ -117,13 +175,33 @@ impl McpHttpFrontend {
         now: SystemTime,
     ) -> McpHttpDecision {
         let Some(session_id) = request.header("mcp-session-id") else {
+            tracing::warn!(
+                component = "mcp_http_frontend",
+                client = %request.client_key(),
+                method = ?request.method,
+                "rejected MCP HTTP session request without session"
+            );
             return McpHttpDecision::reject(400, "Invalid or missing MCP session ID");
         };
         let Some(session) = self.sessions.get_mut(session_id) else {
+            tracing::warn!(
+                component = "mcp_http_frontend",
+                client = %request.client_key(),
+                method = ?request.method,
+                session_id = %session_id,
+                "rejected unknown MCP HTTP session request"
+            );
             return McpHttpDecision::reject(400, "Invalid or missing MCP session ID");
         };
         session.last_activity_at = now;
         ui_state.touch_client(session_id, now);
+        tracing::debug!(
+            component = "mcp_http_frontend",
+            client = %request.client_key(),
+            method = ?request.method,
+            session_id = %session_id,
+            "forwarding MCP HTTP session request to transport"
+        );
         McpHttpDecision::ForwardToTransport {
             session_id: Some(session_id.to_string()),
         }

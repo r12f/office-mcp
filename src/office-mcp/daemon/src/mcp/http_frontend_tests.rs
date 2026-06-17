@@ -1,6 +1,8 @@
 use super::{HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
 use crate::api::UiStateStore;
+use crate::common::{Logger, LoggerLogLevel};
 use std::collections::BTreeMap;
+use std::fs::{read_to_string, remove_dir_all};
 use std::time::{Duration, SystemTime};
 
 #[test]
@@ -200,6 +202,59 @@ fn rejects_unsupported_methods_and_large_bodies() {
         unsupported,
         McpHttpDecision::reject(405, "Method not allowed")
     );
+}
+
+#[test]
+fn writes_structured_tracing_events_for_session_lifecycle_and_rejections() {
+    let dir = std::env::temp_dir().join(format!(
+        "office-mcp-mcp-http-frontend-log-{}",
+        std::process::id()
+    ));
+    let path = dir.join("office-mcp.log");
+    let (subscriber, guard) =
+        Logger::tracing_file_default(LoggerLogLevel::Debug, &path).expect("init tracing");
+    let mut frontend = McpHttpFrontend::new();
+    let mut ui_state = UiStateStore::new();
+
+    let session_id = tracing::subscriber::with_default(subscriber, || {
+        let McpHttpDecision::InitializeTransport { session_id } = frontend.handle_request(
+            &mut ui_state,
+            &request(
+                HttpMethod::Post,
+                [("x-office-mcp-client", "log-test-client")],
+                true,
+            ),
+            SystemTime::UNIX_EPOCH,
+        ) else {
+            panic!("expected initialization");
+        };
+        frontend.handle_request(
+            &mut ui_state,
+            &request(
+                HttpMethod::Post,
+                [("mcp-session-id", session_id.as_str())],
+                false,
+            ),
+            SystemTime::UNIX_EPOCH,
+        );
+        frontend.handle_request(
+            &mut ui_state,
+            &request(HttpMethod::Get, [("origin", "https://evil.example")], false),
+            SystemTime::UNIX_EPOCH,
+        );
+        frontend.close_session(&mut ui_state, &session_id);
+        session_id
+    });
+    drop(guard);
+
+    let contents = read_to_string(&path).expect("read tracing log file");
+    assert!(contents.contains("initialized MCP HTTP session"));
+    assert!(contents.contains("forwarding MCP HTTP POST to transport"));
+    assert!(contents.contains("rejected MCP HTTP request origin"));
+    assert!(contents.contains("closed MCP HTTP session"));
+    assert!(contents.contains("\"component\":\"mcp_http_frontend\""));
+    assert!(contents.contains(&session_id));
+    let _ = remove_dir_all(dir);
 }
 
 fn request<const N: usize>(
