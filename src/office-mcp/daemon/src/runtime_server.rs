@@ -23,8 +23,8 @@ use crate::common::{AuditLog, AuditRecord};
 use crate::mcp::{
     ExcelToolCatalog, HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest,
     ResourceReadRequest, WORD_V1_TOOLS, prompt_catalog_json, prompt_description, prompt_messages,
-    resource_request_from_uri, tool_catalog_json, word_resource_catalog_for_session,
-    word_resource_templates,
+    resource_request_from_uri, tool_catalog_json, tool_failure, tool_failure_from_command,
+    tool_success, word_resource_catalog_for_session, word_resource_templates,
 };
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
 use crate::ui::{UiAssetStore, UiRuntimeError, UiRuntimeFile};
@@ -1544,28 +1544,6 @@ fn register_reply_to_json(reply: crate::addin_mgr::JsonRpcEnvelope) -> String {
     .to_string()
 }
 
-fn tool_success(data: &Value) -> Value {
-    json!({
-        "content": [{ "type": "text", "text": data.to_string() }],
-        "structuredContent": data
-    })
-}
-
-fn tool_failure(code: &str, message: &str, tool: Option<&str>, retriable: bool) -> Value {
-    let error = json!({
-        "office_mcp_code": code,
-        "message": message,
-        "tool": tool,
-        "retriable": retriable,
-        "partial_effect": null
-    });
-    json!({
-        "isError": true,
-        "content": [{ "type": "text", "text": error.to_string() }],
-        "structuredContent": { "error": error }
-    })
-}
-
 fn preprocess_tool_arguments(
     image_fetcher: &ImageFetcher,
     tool: &str,
@@ -1673,26 +1651,6 @@ fn duration_millis(started_at: SystemTime, completed_at: SystemTime) -> u64 {
         .as_millis()
         .try_into()
         .unwrap_or(u64::MAX)
-}
-
-fn tool_failure_from_command(failure: &CommandFailure) -> Value {
-    let partial_effect = failure.partial_effect.map(|effect| match effect {
-        crate::addin_mgr::PartialEffect::None => "none",
-        crate::addin_mgr::PartialEffect::Possible => "possible",
-        crate::addin_mgr::PartialEffect::Unknown => "unknown",
-    });
-    let error = json!({
-        "office_mcp_code": failure.office_mcp_code,
-        "message": failure.message,
-        "tool": failure.tool,
-        "retriable": failure.retriable,
-        "partial_effect": partial_effect
-    });
-    json!({
-        "isError": true,
-        "content": [{ "type": "text", "text": error.to_string() }],
-        "structuredContent": { "error": error }
-    })
 }
 
 fn addin_response_to_tool_response(response: &Value) -> ToolResponse {

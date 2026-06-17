@@ -3,6 +3,7 @@ pub mod http_frontend;
 pub mod management_client;
 pub mod resource_request;
 pub mod stdio_bridge;
+pub mod tool_result;
 
 pub use catalog::{
     ExcelToolCatalog, WORD_V1_TOOLS, prompt_catalog_json, prompt_description, prompt_messages,
@@ -14,3 +15,4 @@ pub use http_frontend::{
 pub use management_client::McpManagementClient;
 pub use resource_request::{ResourceReadRequest, resource_request_from_uri};
 pub use stdio_bridge::{StdioBridge, StdioBridgeError};
+pub use tool_result::{tool_failure, tool_failure_from_command, tool_success};
