@@ -1,10 +1,11 @@
 use crate::addin_mgr::addin_heartbeat::AddinHeartbeatTimeout;
 use crate::addin_mgr::{
-    AddInInfo, AddinChannelConfig, AddinChannelError, AddinConnectionState, DocumentInfo, HostInfo,
-    NewSessionInfo, RuntimeInfo, SessionPatch, SessionRegistry,
+    AddinChannelConfig, AddinChannelError, AddinConnectionState, HeartbeatDecision, NewSessionInfo,
+    RegisterRequest, RuntimeInfo, SessionAddedEvent, SessionRegistry, SessionRemovedEvent,
+    SessionUpdatedEvent,
 };
 use crate::addin_mgr::{CancelCommand, QueuedCommand};
-use crate::addin_mgr::{JsonRpcEnvelope, JsonRpcId, RegisterResult};
+use crate::addin_mgr::{JsonRpcEnvelope, RegisterResult};
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
@@ -436,49 +437,6 @@ impl Default for AddinChannelServer {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RegisterRequest {
-    pub id: JsonRpcId,
-    pub instance_id: String,
-    pub host: HostInfo,
-    pub add_in: AddInInfo,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SessionAddedEvent {
-    pub session_id: String,
-    pub instance_id: String,
-    pub document: DocumentInfo,
-    pub available_tools: Vec<String>,
-    pub is_active: Option<bool>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SessionUpdatedEvent {
-    pub session_id: String,
-    pub patch: SessionPatch,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SessionRemovedEvent {
-    pub session_id: String,
-    pub reason: SessionRemovedReason,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SessionRemovedReason {
-    Closed,
-    Crashed,
-    Replaced,
-    Unknown,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HeartbeatDecision {
-    KeepOpen,
-    Close { code: u16 },
 }
 
 fn same_major(left: &str, right: &str) -> bool {

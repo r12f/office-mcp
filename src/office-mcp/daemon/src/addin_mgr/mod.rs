@@ -1,6 +1,7 @@
 pub mod addin_channel;
 pub mod addin_channel_config;
 pub mod addin_channel_error;
+pub mod addin_channel_model;
 pub(crate) mod addin_connection_state;
 pub mod addin_heartbeat;
 pub mod addin_json_rpc;
@@ -16,12 +17,13 @@ pub mod static_assets;
 pub mod websocket_codec;
 pub mod websocket_handshake;
 
-pub use addin_channel::{
-    AddinChannelServer, HeartbeatDecision, RegisterRequest, SessionAddedEvent, SessionRemovedEvent,
-    SessionRemovedReason, SessionUpdatedEvent,
-};
+pub use addin_channel::AddinChannelServer;
 pub use addin_channel_config::AddinChannelConfig;
 pub use addin_channel_error::AddinChannelError;
+pub use addin_channel_model::{
+    HeartbeatDecision, RegisterRequest, SessionAddedEvent, SessionRemovedEvent,
+    SessionRemovedReason, SessionUpdatedEvent,
+};
 pub(crate) use addin_connection_state::AddinConnectionState;
 pub use addin_json_rpc::{JsonRpcEnvelope, JsonRpcId, RegisterResult};
 pub use command_model::{CancelCommand, QueuedCommand, ToolCallRequest, ToolResponse};

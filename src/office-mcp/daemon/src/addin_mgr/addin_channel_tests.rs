@@ -1,9 +1,11 @@
 use super::{
-    ADDIN_PROTOCOL_VERSION, AddinChannelError, AddinChannelServer, HeartbeatDecision, JsonRpcId,
-    RegisterRequest, SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason,
-    SessionUpdatedEvent,
+    ADDIN_PROTOCOL_VERSION, AddinChannelError, AddinChannelServer, HeartbeatDecision,
+    RegisterRequest, SessionAddedEvent, SessionRemovedEvent, SessionUpdatedEvent,
 };
-use crate::addin_mgr::{AddInInfo, DocumentInfo, HostInfo, SessionPatch, SessionRegistry};
+use crate::addin_mgr::{
+    AddInInfo, DocumentInfo, HostInfo, JsonRpcId, SessionPatch, SessionRegistry,
+    SessionRemovedReason,
+};
 use crate::addin_mgr::{CancelCommand, QueuedCommand};
 use crate::common::{Logger, LoggerLogLevel};
 use std::fs::{read_to_string, remove_dir_all};
