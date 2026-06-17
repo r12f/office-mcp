@@ -1,4 +1,5 @@
 pub mod addin_channel;
+pub mod addin_json_rpc;
 pub mod command_router;
 pub mod connection_hub;
 pub mod image_fetcher;
@@ -9,10 +10,10 @@ pub mod websocket_codec;
 pub mod websocket_handshake;
 
 pub use addin_channel::{
-    AddinChannelConfig, AddinChannelError, AddinChannelServer, HeartbeatDecision, JsonRpcEnvelope,
-    JsonRpcId, RegisterRequest, RegisterResult, SessionAddedEvent, SessionRemovedEvent,
-    SessionRemovedReason, SessionUpdatedEvent,
+    AddinChannelConfig, AddinChannelError, AddinChannelServer, HeartbeatDecision, RegisterRequest,
+    SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
 };
+pub use addin_json_rpc::{JsonRpcEnvelope, JsonRpcId, RegisterResult};
 pub use command_router::{
     CancelCommand, CommandRouter, CommandRouterError, QueuedCommand, ToolCallRequest, ToolResponse,
 };

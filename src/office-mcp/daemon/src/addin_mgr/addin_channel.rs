@@ -2,6 +2,7 @@ use crate::addin_mgr::{
     AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionPatch, SessionRegistry,
 };
 use crate::addin_mgr::{CancelCommand, QueuedCommand};
+use crate::addin_mgr::{JsonRpcEnvelope, JsonRpcId, RegisterResult};
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::time::{Duration, SystemTime};
@@ -479,16 +480,6 @@ pub struct RegisterRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RegisterResult {
-    pub server_version: String,
-    pub protocol_version: String,
-    pub session_grace_sec: u64,
-    pub heartbeat_interval_sec: u64,
-    pub max_pending_per_session: usize,
-    pub assigned_instance_id: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionAddedEvent {
     pub session_id: String,
     pub instance_id: String,
@@ -521,50 +512,6 @@ pub enum SessionRemovedReason {
 pub enum HeartbeatDecision {
     KeepOpen,
     Close { code: u16 },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum JsonRpcId {
-    String(String),
-    Number(i64),
-    Null,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JsonRpcEnvelope {
-    pub id: Option<JsonRpcId>,
-    pub method: Option<String>,
-    pub params: BTreeMap<String, String>,
-    pub result: Option<RegisterResult>,
-}
-
-impl JsonRpcEnvelope {
-    fn request(id: String, method: &str, params: BTreeMap<String, String>) -> Self {
-        Self {
-            id: Some(JsonRpcId::String(id)),
-            method: Some(method.to_string()),
-            params,
-            result: None,
-        }
-    }
-
-    fn notification(method: &str, params: BTreeMap<String, String>) -> Self {
-        Self {
-            id: None,
-            method: Some(method.to_string()),
-            params,
-            result: None,
-        }
-    }
-
-    fn success(id: JsonRpcId, result: RegisterResult) -> Self {
-        Self {
-            id: Some(id),
-            method: None,
-            params: BTreeMap::new(),
-            result: Some(result),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
