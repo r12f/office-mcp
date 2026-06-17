@@ -234,10 +234,27 @@ button:hover {
 }
 
 .tool-group-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 650;
   text-transform: uppercase;
+}
+
+.tool-group-title span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-group-title span:last-child {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
 }
 
 .tool-chip-list {

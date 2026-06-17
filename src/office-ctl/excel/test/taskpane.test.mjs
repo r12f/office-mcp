@@ -35,6 +35,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(html, /id="toolList"/);
   assert.match(html, /id="toolPermissionList"/);
   assert.match(html, /id="enabledToolCount"/);
+  assert.match(html, /Enabled 0 of 0/);
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
   assert.match(html, /aria-label="Open Settings"/);
   assert.ok(html.indexOf('id="settingsPanel"') < html.indexOf('id="currentTaskHeading"'));
@@ -53,8 +54,11 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /const toolListEl = document\.getElementById\('toolList'\)/);
   assert.match(js, /const toolPermissionListEl = document\.getElementById\('toolPermissionList'\)/);
   assert.match(js, /function renderToolSummary\(\)/);
+  assert.match(js, /toolCountEl\.textContent = `Enabled \$\{effective\.length\} of \$\{AVAILABLE_TOOLS\.length\}`/);
+  assert.match(js, /\$\{tools\.length\}\/\$\{groupTotal\} enabled/);
   assert.match(js, /renderToolSummary\(\)/);
   assert.match(js, /function renderToolPermissions\(\)/);
+  assert.match(js, /enabledToolCountEl\.textContent = `Enabled \$\{enabled\.length\} of \$\{AVAILABLE_TOOLS\.length\}`/);
   assert.match(js, /function effectiveTools\(\)/);
   assert.match(js, /available_tools: effectiveTools\(\)/);
   assert.match(js, /sessionUpdatedNotification\(\{/);

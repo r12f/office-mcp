@@ -518,15 +518,19 @@
 
   function renderToolSummary() {
     const effective = effectiveTools();
-    toolCountEl.textContent = `${effective.length} Tools`;
+    toolCountEl.textContent = `Enabled ${effective.length} of ${AVAILABLE_TOOLS.length}`;
     toolListEl.textContent = '';
     for (const group of TOOL_GROUPS) {
       const tools = group.tools.filter((tool) => effective.includes(tool));
       if (tools.length === 0) continue;
+      const groupTotal = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool)).length;
       const groupEl = document.createElement('section');
       groupEl.className = 'tool-group';
       groupEl.innerHTML = [
-        `<h3 class="tool-group-title">${escapeHtml(group.label)}</h3>`,
+        '<h3 class="tool-group-title">',
+        `<span>${escapeHtml(group.label)}</span>`,
+        `<span>${tools.length}/${groupTotal} enabled</span>`,
+        '</h3>',
         `<div class="tool-chip-list">${tools.map((tool) => `<span class="tool-chip">${escapeHtml(tool)}</span>`).join('')}</div>`
       ].join('');
       toolListEl.appendChild(groupEl);
@@ -535,7 +539,7 @@
 
   function renderToolPermissions() {
     const enabled = effectiveTools();
-    enabledToolCountEl.textContent = `${enabled.length} Enabled`;
+    enabledToolCountEl.textContent = `Enabled ${enabled.length} of ${AVAILABLE_TOOLS.length}`;
     toolPermissionListEl.textContent = '';
     for (const group of TOOL_GROUPS) {
       for (const tool of group.tools) {
