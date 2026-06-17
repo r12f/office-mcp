@@ -97,6 +97,7 @@ impl Default for OfficeMcpDaemon {
 #[cfg(test)]
 mod tests {
     use super::OfficeMcpDaemon;
+    use std::collections::BTreeSet;
 
     #[test]
     fn daemon_owns_all_required_domain_objects() {
@@ -125,5 +126,59 @@ mod tests {
         let daemon = OfficeMcpDaemon::new();
 
         assert_eq!(daemon.parity_plan().gates().len(), 8);
+    }
+
+    #[test]
+    fn daemon_src_root_only_contains_composition_and_transitional_files() {
+        let src_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let allowed_root_files = BTreeSet::from([
+            "client_config.rs",
+            "daemon.rs",
+            "daemon_control.rs",
+            "evidence_fixture.rs",
+            "image_fetcher.rs",
+            "lib.rs",
+            "main.rs",
+            "parity.rs",
+            "runtime_server.rs",
+        ]);
+        let forbidden_service_files = BTreeSet::from([
+            "addin_channel.rs",
+            "audit_log.rs",
+            "command_router.rs",
+            "config_service.rs",
+            "logger.rs",
+            "mcp_http_frontend.rs",
+            "mcp_management_client.rs",
+            "session_registry.rs",
+            "state_store.rs",
+            "stdio_bridge.rs",
+        ]);
+
+        let root_files = std::fs::read_dir(&src_dir)
+            .expect("read daemon src dir")
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_type()
+                    .map(|file_type| file_type.is_file())
+                    .unwrap_or(false)
+            })
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect::<BTreeSet<_>>();
+
+        for file in &forbidden_service_files {
+            assert!(
+                !root_files.contains(*file),
+                "service module {file} must stay under its functional module directory"
+            );
+        }
+
+        for file in &root_files {
+            assert!(
+                allowed_root_files.contains(file.as_str()),
+                "unexpected daemon src root file {file}; place service code under common, ui, api, mcp, addin_mgr, or tray"
+            );
+        }
     }
 }
