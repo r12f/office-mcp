@@ -1,14 +1,14 @@
+use crate::addin_mgr::JsonRpcEnvelope;
 use crate::addin_mgr::addin_channel_clock::format_system_time;
 use crate::addin_mgr::addin_heartbeat::AddinHeartbeatTimeout;
-use crate::addin_mgr::addin_protocol_version::same_major_version;
+use crate::addin_mgr::addin_registration::AddinRegistrationPolicy;
 use crate::addin_mgr::addin_tool_payload;
 use crate::addin_mgr::{
     AddinChannelConfig, AddinChannelError, AddinConnectionState, AddinUpgradeGuard,
-    HeartbeatDecision, NewSessionInfo, RegisterRequest, RuntimeInfo, SessionAddedEvent,
-    SessionRegistry, SessionRemovedEvent, SessionUpdatedEvent,
+    HeartbeatDecision, NewSessionInfo, RegisterRequest, SessionAddedEvent, SessionRegistry,
+    SessionRemovedEvent, SessionUpdatedEvent,
 };
 use crate::addin_mgr::{CancelCommand, QueuedCommand};
-use crate::addin_mgr::{JsonRpcEnvelope, RegisterResult};
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
@@ -72,42 +72,13 @@ impl AddinChannelServer {
         request: RegisterRequest,
         now: SystemTime,
     ) -> Result<JsonRpcEnvelope, AddinChannelError> {
-        if request.instance_id.is_empty()
-            || request.host.app.is_empty()
-            || request.add_in.protocol_version.is_empty()
-        {
-            tracing::warn!(
-                component = "addin_channel",
-                connection_id = %connection_id,
-                instance_id = %request.instance_id,
-                host_app = %request.host.app,
-                "rejected malformed add-in register request"
-            );
-            return Err(AddinChannelError::MalformedRegister);
-        }
-        if !same_major_version(&request.add_in.protocol_version, ADDIN_PROTOCOL_VERSION) {
-            tracing::warn!(
-                component = "addin_channel",
-                connection_id = %connection_id,
-                instance_id = %request.instance_id,
-                offered = %request.add_in.protocol_version,
-                supported = %ADDIN_PROTOCOL_VERSION,
-                "rejected add-in protocol version"
-            );
-            return Err(AddinChannelError::ProtocolVersionMismatch {
-                offered: request.add_in.protocol_version,
-                supported: ADDIN_PROTOCOL_VERSION.to_string(),
-            });
-        }
-        let runtime = RuntimeInfo {
-            instance_id: request.instance_id.clone(),
-            host: request.host,
-            add_in: request.add_in,
-            registered_at: now,
-        };
+        let request_id = request.id.clone();
+        let registration = AddinRegistrationPolicy::new(SERVER_VERSION, ADDIN_PROTOCOL_VERSION);
+        registration.validate(&connection_id, &request)?;
+        let runtime = registration.runtime_from(request, now);
         registry.register_runtime(runtime.clone());
         self.connections.insert(
-            connection_id,
+            connection_id.clone(),
             AddinConnectionState::new(runtime.instance_id.clone()),
         );
         tracing::info!(
@@ -120,15 +91,8 @@ impl AddinChannelServer {
             "registered add-in runtime"
         );
         Ok(JsonRpcEnvelope::success(
-            request.id,
-            RegisterResult {
-                server_version: SERVER_VERSION.to_string(),
-                protocol_version: ADDIN_PROTOCOL_VERSION.to_string(),
-                session_grace_sec: self.config.session_grace.as_secs(),
-                heartbeat_interval_sec: self.config.heartbeat_interval.as_secs(),
-                max_pending_per_session: self.config.max_pending_per_session,
-                assigned_instance_id: runtime.instance_id,
-            },
+            request_id,
+            registration.register_result(&runtime, &self.config),
         ))
     }
 
