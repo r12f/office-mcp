@@ -6,13 +6,12 @@ use crate::addin_mgr::{
 use crate::api::{CommandFailure, UiStateStore};
 use crate::common::{AuditLog, AuditRecord};
 use crate::mcp::{
-    ExcelToolCatalog, ResourceReadRequest, WORD_V1_TOOLS, prompt_catalog_json, prompt_description,
-    prompt_messages, resource_request_from_uri, tool_catalog_json, tool_failure,
-    tool_failure_from_command, tool_success, word_resource_catalog_for_session,
-    word_resource_templates,
+    ExcelToolCatalog, ResourceReadRequest, WORD_V1_TOOLS, resource_request_from_uri, tool_failure,
+    tool_failure_from_command, tool_success,
 };
 use crate::runtime::addin_tool_response::AddinToolResponseMapper;
 use crate::runtime::json_rpc;
+use crate::runtime::mcp_catalog_response::McpCatalogResponder;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -39,49 +38,15 @@ impl McpJsonRpcRuntime {
             return json_rpc::error(&id, -32600, "Invalid Request");
         };
         match method {
-            "tools/list" => json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": { "tools": tool_catalog_json() }
-            })
-            .to_string(),
+            "tools/list" => McpCatalogResponder::tools_list(&id),
             "tools/call" => Self::handle_tools_call(context, &id, &value),
-            "resources/list" => Self::handle_resources_list(context.registry, &id),
-            "resources/templates/list" => Self::handle_resource_templates_list(&id),
+            "resources/list" => McpCatalogResponder::resources_list(context.registry, &id),
+            "resources/templates/list" => McpCatalogResponder::resource_templates_list(&id),
             "resources/read" => Self::handle_resources_read(context, &id, &value),
-            "prompts/list" => json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": { "prompts": prompt_catalog_json() }
-            })
-            .to_string(),
-            "prompts/get" => Self::handle_prompts_get(&id, &value),
+            "prompts/list" => McpCatalogResponder::prompts_list(&id),
+            "prompts/get" => McpCatalogResponder::prompts_get(&id, &value),
             _ => json_rpc::error(&id, -32601, &format!("Unknown method {method}")),
         }
-    }
-
-    fn handle_resources_list(registry: &SessionRegistry, id: &Value) -> String {
-        let mut resources = vec![json!({
-            "uri": "office://sessions",
-            "name": "office.sessions",
-            "title": "Office Sessions",
-            "mimeType": "application/json"
-        })];
-        for session in registry.list_sessions() {
-            if session.app == "word" {
-                resources.extend(word_resource_catalog_for_session(&session.session_id));
-            }
-        }
-        json!({ "jsonrpc": "2.0", "id": id, "result": { "resources": resources } }).to_string()
-    }
-
-    fn handle_resource_templates_list(id: &Value) -> String {
-        json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "result": { "resourceTemplates": word_resource_templates() }
-        })
-        .to_string()
     }
 
     fn handle_resources_read(
@@ -143,28 +108,6 @@ impl McpJsonRpcRuntime {
                 .to_string()
             }
             Err(message) => json_rpc::error(id, -32602, &message),
-        }
-    }
-
-    fn handle_prompts_get(id: &Value, value: &Value) -> String {
-        let Some(name) = value
-            .get("params")
-            .and_then(|params| params.get("name"))
-            .and_then(Value::as_str)
-        else {
-            return json_rpc::error(id, -32602, "prompts/get requires params.name");
-        };
-        let arguments = value
-            .get("params")
-            .and_then(|params| params.get("arguments"));
-        match prompt_messages(name, arguments) {
-            Some(messages) => json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": { "description": prompt_description(name), "messages": messages }
-            })
-            .to_string(),
-            None => json_rpc::error(id, -32602, &format!("Unknown prompt {name}")),
         }
     }
 

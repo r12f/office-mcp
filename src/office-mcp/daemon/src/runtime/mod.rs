@@ -4,6 +4,7 @@ pub mod addin_tool_response;
 pub mod evidence_fixture;
 pub mod http_wire;
 pub mod json_rpc;
+pub mod mcp_catalog_response;
 pub mod mcp_response;
 pub mod mcp_rpc;
 pub mod server;
