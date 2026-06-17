@@ -1,0 +1,1560 @@
+use super::{
+    AddinConnectionHub, AddinJsonRpcRuntime, McpDispatchContext, McpJsonRpcRuntime, RuntimeServer,
+    RuntimeServerConfig, RuntimeServerError, RuntimeSharedState, WebSocketCodec, WebSocketFrame,
+};
+use crate::addin_mgr::CommandRouter;
+use crate::addin_mgr::ImageFetcher;
+use crate::addin_mgr::{
+    AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionRegistry,
+};
+use crate::addin_mgr::{AddinChannelConfig, AddinChannelServer};
+use crate::api::UiStateStore;
+use crate::common::AuditLog;
+use crate::mcp::McpHttpFrontend;
+use native_tls::TlsConnector;
+use serde_json::Value;
+use std::collections::BTreeSet;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+#[test]
+fn serves_healthz_over_real_loopback_socket() {
+    let response = roundtrip("GET /healthz HTTP/1.1\r\nHost: localhost\r\n\r\n");
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("{\"ok\":true}"));
+}
+
+#[test]
+fn initializes_mcp_session_over_real_loopback_socket() {
+    let body = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}";
+    let response = roundtrip(&format!(
+        "POST /mcp HTTP/1.1\r\nHost: localhost\r\nOrigin: http://127.0.0.1:8800\r\nContent-Length: {}\r\n\r\n{}",
+        body.len(),
+        body
+    ));
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("MCP-Session-Id: mcp-session-1"));
+    let reply: Value = serde_json::from_str(http_body(&response)).expect("initialize json");
+    assert_eq!(reply["id"], 1);
+    assert_eq!(reply["result"]["serverInfo"]["name"], "office-mcp");
+    assert!(reply["result"]["capabilities"]["tools"].is_object());
+}
+
+#[test]
+fn serves_tools_list_after_mcp_session_initialization() {
+    let body = r#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#;
+    let response = roundtrip_with_frontend(
+        &format!(
+            "POST /mcp HTTP/1.1\r\nHost: localhost\r\nMCP-Session-Id: mcp-session-1\r\nContent-Length: {}\r\n\r\n{}",
+            body.len(),
+            body
+        ),
+        |frontend, ui_state| {
+            let initialize = crate::mcp::McpHttpRequest {
+                method: crate::mcp::HttpMethod::Post,
+                headers: std::collections::BTreeMap::new(),
+                remote_addr: Some("127.0.0.1".to_string()),
+                body_bytes: 0,
+                is_initialize: true,
+            };
+            frontend.handle_request(ui_state, &initialize, std::time::SystemTime::UNIX_EPOCH);
+        },
+    );
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("office.list_sessions"));
+    assert!(response.contains("word.get_text"));
+    assert!(!response.contains("not wired"));
+}
+
+#[test]
+fn rejects_foreign_browser_origin_over_socket() {
+    let response =
+        roundtrip("GET /mcp HTTP/1.1\r\nHost: localhost\r\nOrigin: https://evil.example\r\n\r\n");
+
+    assert!(response.starts_with("HTTP/1.1 403 Forbidden"));
+    assert!(response.contains("Forbidden origin"));
+}
+
+#[test]
+fn serves_addin_taskpane_static_asset_over_socket() {
+    let response = addin_roundtrip("GET /taskpane.html HTTP/1.1\r\nHost: localhost\r\n\r\n");
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("Content-Type: text/html; charset=utf-8"));
+    assert!(response.contains("Office MCP"));
+    assert!(response.contains("taskpane-shell"));
+    assert!(response.contains("/common/browser-ui.js"));
+    assert!(response.contains("/common/addin-channel.js"));
+    assert!(response.contains("/common/logger.js"));
+    assert!(response.contains("/common/task-history.js"));
+}
+
+#[test]
+fn serves_versioned_addin_static_assets_with_query_strings() {
+    let word_js = addin_roundtrip("GET /taskpane.js?v=0.1.6 HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    assert!(word_js.starts_with("HTTP/1.1 200 OK"));
+    assert!(word_js.contains("__OFFICE_MCP_TASKPANE_READY__"));
+
+    let common_js =
+        addin_roundtrip("GET /common/addin-channel.js?v=0.1.6 HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    assert!(common_js.starts_with("HTTP/1.1 200 OK"));
+    assert!(common_js.contains("OfficeCtlAddinChannel"));
+
+    let excel_js =
+        addin_roundtrip("GET /excel/taskpane.js?v=0.1.6 HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    assert!(excel_js.starts_with("HTTP/1.1 200 OK"));
+    assert!(excel_js.contains("function isExcelHost"));
+    assert!(excel_js.contains("Office.HostType?.Excel"));
+}
+
+#[test]
+fn serves_excel_taskpane_static_assets_over_socket() {
+    let html = addin_roundtrip("GET /excel/taskpane.html HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    assert!(html.starts_with("HTTP/1.1 200 OK"));
+    assert!(html.contains("Office MCP Excel"));
+    assert!(html.contains("/excel/taskpane.js?v=0.1.6"));
+    assert!(html.contains("/common/addin-channel.js?v=0.1.6"));
+
+    let js = addin_roundtrip("GET /excel/taskpane.js HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    assert!(js.starts_with("HTTP/1.1 200 OK"));
+    assert!(js.contains("function isExcelHost"));
+    assert!(js.contains("Office.HostType?.Excel"));
+    assert!(js.contains("sessionAddedNotification"));
+
+    let css = addin_roundtrip("GET /excel/taskpane.css HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    assert!(css.starts_with("HTTP/1.1 200 OK"));
+    assert!(css.contains("--excel: #217346"));
+}
+
+#[test]
+fn serves_office_ctl_common_browser_asset_over_socket() {
+    let response = addin_roundtrip("GET /common/browser-ui.js HTTP/1.1\r\nHost: localhost\r\n\r\n");
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("Content-Type: text/javascript; charset=utf-8"));
+    assert!(response.contains("OfficeCtlCommon"));
+    assert!(response.contains("redactText"));
+}
+
+#[test]
+fn serves_office_ctl_common_channel_asset_over_socket() {
+    let response =
+        addin_roundtrip("GET /common/addin-channel.js HTTP/1.1\r\nHost: localhost\r\n\r\n");
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("Content-Type: text/javascript; charset=utf-8"));
+    assert!(response.contains("OfficeCtlAddinChannel"));
+    assert!(response.contains("sendJsonRpc"));
+}
+
+#[test]
+fn serves_office_ctl_common_task_history_asset_over_socket() {
+    let response =
+        addin_roundtrip("GET /common/task-history.js HTTP/1.1\r\nHost: localhost\r\n\r\n");
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("Content-Type: text/javascript; charset=utf-8"));
+    assert!(response.contains("OfficeCtlTaskHistory"));
+    assert!(response.contains("TaskHistoryStore"));
+}
+
+#[test]
+fn serves_office_ctl_common_logger_asset_over_socket() {
+    let response = addin_roundtrip("GET /common/logger.js HTTP/1.1\r\nHost: localhost\r\n\r\n");
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("Content-Type: text/javascript; charset=utf-8"));
+    assert!(response.contains("OfficeCtlLogger"));
+    assert!(response.contains("AddinLogger"));
+}
+
+#[test]
+fn serves_addin_taskpane_over_tls_socket() {
+    let response = addin_tls_roundtrip(
+        "GET /taskpane.html HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("taskpane-shell"));
+}
+
+#[test]
+fn serves_redacted_ui_state_over_addin_listener() {
+    let response = addin_roundtrip(
+        "GET /ui/state HTTP/1.1\r\nHost: localhost\r\nOrigin: https://localhost:8765\r\n\r\n",
+    );
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("\"status\":\"up\""));
+    assert!(response.contains("\"clients\":[]"));
+    assert!(response.contains("\"documents\""));
+    assert!(response.contains("\"recent_commands\""));
+}
+
+#[test]
+fn serves_daemon_ui_assets_over_addin_listener() {
+    let html = addin_roundtrip("GET /ui/ HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    assert!(html.starts_with("HTTP/1.1 200 OK"));
+    assert!(html.contains("Content-Type: text/html; charset=utf-8"));
+    assert!(html.contains("Office MCP"));
+    assert!(html.contains("id=\"currentTasks\""));
+    assert!(html.contains("id=\"clients\""));
+    assert!(html.contains("id=\"daemonVersion\""));
+    assert!(html.contains("id=\"daemonUptime\""));
+    assert!(html.contains("data-copy=\"mcpEndpoint\""));
+    assert!(html.contains("id=\"resultFilter\""));
+
+    let css = addin_roundtrip("GET /ui/app.css HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    assert!(css.starts_with("HTTP/1.1 200 OK"));
+    assert!(css.contains("prefers-color-scheme"));
+    assert!(css.contains("forced-colors"));
+    assert!(css.contains("prefers-reduced-motion"));
+
+    let js = addin_roundtrip("GET /ui/app.js HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    assert!(js.starts_with("HTTP/1.1 200 OK"));
+    assert!(js.contains("/ui/state"));
+    assert!(js.contains("renderDocuments"));
+    assert!(js.contains("document_command_history"));
+    assert!(js.contains("RelativeTimeFormat"));
+    assert!(js.contains("config_path"));
+    assert!(js.contains("last_error"));
+}
+
+#[test]
+fn rejects_foreign_ui_state_origin_over_addin_listener() {
+    let response = addin_roundtrip(
+        "GET /ui/state HTTP/1.1\r\nHost: localhost\r\nOrigin: https://evil.example\r\n\r\n",
+    );
+
+    assert!(response.starts_with("HTTP/1.1 403 Forbidden"));
+}
+
+#[test]
+fn accepts_addin_websocket_upgrade_with_exact_origin() {
+    let response = addin_roundtrip(concat!(
+        "GET /addin HTTP/1.1\r\n",
+        "Host: localhost\r\n",
+        "Origin: https://localhost:8765\r\n",
+        "Upgrade: websocket\r\n",
+        "Connection: Upgrade\r\n",
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n",
+        "Sec-WebSocket-Version: 13\r\n",
+        "\r\n"
+    ));
+
+    assert!(response.starts_with("HTTP/1.1 101 Switching Protocols"));
+    assert!(response.contains("Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo="));
+}
+
+#[test]
+fn rejects_addin_websocket_upgrade_with_foreign_origin() {
+    let response = addin_roundtrip(concat!(
+        "GET /addin HTTP/1.1\r\n",
+        "Host: localhost\r\n",
+        "Origin: https://evil.example\r\n",
+        "Upgrade: websocket\r\n",
+        "Connection: Upgrade\r\n",
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n",
+        "Sec-WebSocket-Version: 13\r\n",
+        "\r\n"
+    ));
+
+    assert!(response.starts_with("HTTP/1.1 403 Forbidden"));
+}
+
+#[test]
+fn computes_websocket_accept_key() {
+    assert_eq!(
+        super::websocket_accept_key("dGhlIHNhbXBsZSBub25jZQ=="),
+        "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+    );
+}
+
+#[test]
+fn websocket_codec_reads_masked_text_frame_and_writes_text_frame() {
+    let input = masked_text_frame("hello");
+    let frame = WebSocketCodec::read_frame(&mut input.as_slice(), 1024).expect("frame");
+    assert_eq!(frame, Some(WebSocketFrame::Text("hello".to_string())));
+
+    let mut output = Vec::new();
+    WebSocketCodec::write_text(&mut output, "ok").expect("write");
+    assert_eq!(output, vec![0x81, 0x02, b'o', b'k']);
+}
+#[test]
+fn websocket_codec_maps_protocol_errors_to_close_codes() {
+    let unmasked_text = vec![0x81, 0x02, b'h', b'i'];
+    let error = WebSocketCodec::read_frame(&mut unmasked_text.as_slice(), 1024)
+        .expect_err("unmasked client frame rejected");
+    assert_ws_error(error, 1002, "masked");
+
+    let fragmented_text = {
+        let mut frame = masked_text_frame("hi");
+        frame[0] = 0x01;
+        frame
+    };
+    let error = WebSocketCodec::read_frame(&mut fragmented_text.as_slice(), 1024)
+        .expect_err("fragmented frame rejected");
+    assert_ws_error(error, 1002, "Fragmented");
+
+    let binary_frame = {
+        let mut frame = masked_text_frame("hi");
+        frame[0] = 0x82;
+        frame
+    };
+    let error = WebSocketCodec::read_frame(&mut binary_frame.as_slice(), 1024)
+        .expect_err("unsupported opcode rejected");
+    assert_ws_error(error, 1002, "Unsupported");
+
+    let oversized = masked_text_frame("hello");
+    let error = WebSocketCodec::read_frame(&mut oversized.as_slice(), 2)
+        .expect_err("oversized frame rejected");
+    assert_ws_error(error, 1009, "exceeds");
+}
+
+#[test]
+fn websocket_codec_writes_close_frame_with_code_and_reason() {
+    let mut output = Vec::new();
+    WebSocketCodec::write_close(&mut output, 4002, "Heartbeat timeout").expect("close");
+
+    assert_eq!(output[0], 0x88);
+    assert_eq!(output[1] as usize, 2 + "Heartbeat timeout".len());
+    assert_eq!(u16::from_be_bytes([output[2], output[3]]), 4002);
+    assert_eq!(&output[4..], b"Heartbeat timeout");
+}
+
+#[test]
+fn addin_json_rpc_register_and_session_added_update_registry() {
+    let registry = Arc::new(Mutex::new(SessionRegistry::new()));
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::with_config(
+        AddinChannelConfig::default(),
+    )));
+
+    let register_reply = addin_handle_text(
+        r#"{"jsonrpc":"2.0","id":"register-1","method":"register","params":{"instance_id":"instance-1","host":{"app":"word","version":"16.0","platform":"windows"},"add_in":{"version":"0.1.0","protocol_version":"1.0","supported_features":["doc.read"]}}}"#,
+        "connection-1",
+        &registry,
+        &addin_channel,
+    )
+    .expect("register reply");
+
+    assert!(register_reply.contains("assigned_instance_id"));
+    let register_json: Value = serde_json::from_str(&register_reply).expect("register reply json");
+    let result = register_json
+        .get("result")
+        .and_then(Value::as_object)
+        .expect("register result object");
+    let fields = result.keys().cloned().collect::<BTreeSet<_>>();
+    assert_eq!(
+        fields,
+        BTreeSet::from([
+            "assigned_instance_id".to_string(),
+            "heartbeat_interval_sec".to_string(),
+            "max_pending_per_session".to_string(),
+            "protocol_version".to_string(),
+            "server_version".to_string(),
+            "session_grace_sec".to_string(),
+        ])
+    );
+    let register_reply_lower = register_reply.to_lowercase();
+    for forbidden in ["api_key", "apikey", "secret", "token", "bearer", "pairing"] {
+        assert!(!register_reply_lower.contains(forbidden));
+    }
+    assert!(
+        registry
+            .lock()
+            .expect("registry")
+            .list_sessions()
+            .is_empty()
+    );
+
+    let session_reply = addin_handle_text(
+        r#"{"jsonrpc":"2.0","method":"session.added","params":{"session_id":"session-1","instance_id":"instance-1","document":{"filename":"Draft.docx","is_read_only":false},"available_tools":["word.get_text"],"is_active":true}}"#,
+        "connection-1",
+        &registry,
+        &addin_channel,
+    );
+
+    assert_eq!(session_reply, None);
+    let sessions = registry.lock().expect("registry").list_sessions();
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0].document.title.as_deref(), Some("Draft.docx"));
+    assert_eq!(sessions[0].available_tool_count, 1);
+}
+
+#[test]
+fn addin_json_rpc_session_updated_and_removed_update_registry() {
+    let registry = Arc::new(Mutex::new(SessionRegistry::new()));
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::with_config(
+        AddinChannelConfig::default(),
+    )));
+
+    addin_handle_text(
+        r#"{"jsonrpc":"2.0","id":"register-1","method":"register","params":{"instance_id":"instance-1","host":{"app":"word","version":"16.0","platform":"windows"},"add_in":{"version":"0.1.0","protocol_version":"1.0","supported_features":["doc.read"]}}}"#,
+        "connection-1",
+        &registry,
+        &addin_channel,
+    )
+    .expect("register reply");
+    addin_handle_text(
+        r#"{"jsonrpc":"2.0","method":"session.added","params":{"session_id":"session-1","instance_id":"instance-1","document":{"filename":"Draft.docx"},"available_tools":["word.get_text"],"is_active":true}}"#,
+        "connection-1",
+        &registry,
+        &addin_channel,
+    );
+
+    let update_reply = addin_handle_text(
+        r#"{"jsonrpc":"2.0","method":"session.updated","params":{"session_id":"session-1","patch":{"document":{"title":"Final","filename":"Final.docx","is_dirty":true},"available_tools":["word.get_text","word.add_comment"],"is_active":false}}}"#,
+        "connection-1",
+        &registry,
+        &addin_channel,
+    );
+
+    assert_eq!(update_reply, None);
+    let sessions = registry.lock().expect("registry").list_sessions();
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0].document.title.as_deref(), Some("Final"));
+    assert_eq!(sessions[0].document.filename.as_deref(), Some("Final.docx"));
+    assert_eq!(sessions[0].document.is_dirty, Some(true));
+    assert_eq!(sessions[0].available_tool_count, 2);
+    assert_eq!(sessions[0].is_active, Some(false));
+    drop(sessions);
+
+    let remove_reply = addin_handle_text(
+        r#"{"jsonrpc":"2.0","method":"session.removed","params":{"session_id":"session-1","reason":"closed"}}"#,
+        "connection-1",
+        &registry,
+        &addin_channel,
+    );
+
+    assert_eq!(remove_reply, None);
+    assert!(
+        registry
+            .lock()
+            .expect("registry")
+            .list_sessions()
+            .is_empty()
+    );
+}
+
+#[test]
+fn mcp_json_rpc_lists_tools_and_connected_sessions() {
+    let registry = registry_with_word_session();
+
+    let tools = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}"#,
+    );
+    let tools: serde_json::Value = serde_json::from_str(&tools).expect("tools json");
+    let mut names = tools["result"]["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect::<Vec<_>>();
+    names.sort_unstable();
+    assert_eq!(
+        names,
+        vec![
+            "excel.add_sheet",
+            "excel.create_chart",
+            "excel.create_table",
+            "excel.format_range",
+            "excel.read_range",
+            "excel.set_formula",
+            "excel.write_range",
+            "office.get_session_info",
+            "office.list_sessions",
+            "word.accept_change",
+            "word.add_column",
+            "word.add_comment",
+            "word.add_row",
+            "word.apply_formatting",
+            "word.apply_style",
+            "word.delete_range",
+            "word.find_text",
+            "word.format_cell",
+            "word.get_outline",
+            "word.get_paragraph",
+            "word.get_selection",
+            "word.get_text",
+            "word.insert_heading",
+            "word.insert_image",
+            "word.insert_list",
+            "word.insert_page_break",
+            "word.insert_paragraph",
+            "word.insert_table",
+            "word.read_table",
+            "word.reject_change",
+            "word.replace_text",
+            "word.resolve_comment",
+            "word.save",
+            "word.set_heading_level",
+            "word.update_cell",
+            "word.update_paragraph",
+        ]
+    );
+
+    let sessions = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"call-1","method":"tools/call","params":{"name":"office.list_sessions","arguments":{}}}"#,
+    );
+    let sessions: serde_json::Value = serde_json::from_str(&sessions).expect("sessions json");
+    assert_eq!(
+        sessions["result"]["structuredContent"]["sessions"][0]["session_id"],
+        "session-1"
+    );
+    assert_eq!(
+        sessions["result"]["structuredContent"]["sessions"][0]["document"]["title"],
+        "Draft.docx"
+    );
+
+    let info = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"call-2","method":"tools/call","params":{"name":"office.get_session_info","arguments":{"session_id":"session-1"}}}"#,
+    );
+    let info: serde_json::Value = serde_json::from_str(&info).expect("info json");
+    assert_eq!(
+        info["result"]["structuredContent"]["descriptor"]["session_id"],
+        "session-1"
+    );
+    assert_eq!(
+        info["result"]["structuredContent"]["available_tools"][0],
+        "word.get_text"
+    );
+}
+
+#[test]
+fn mcp_json_rpc_lists_resources_and_prompts() {
+    let registry = registry_with_word_session();
+
+    let resources = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"resources-1","method":"resources/list","params":{}}"#,
+    );
+    let resources: serde_json::Value = serde_json::from_str(&resources).expect("resources json");
+    let uris = resources["result"]["resources"]
+        .as_array()
+        .expect("resources")
+        .iter()
+        .filter_map(|resource| resource["uri"].as_str())
+        .collect::<Vec<_>>();
+    assert!(uris.contains(&"office://sessions"));
+    assert!(uris.contains(&"office://word/session-1/document?offset=0&limit=200"));
+    assert!(uris.contains(&"office://word/session-1/comments"));
+
+    let templates = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"templates-1","method":"resources/templates/list","params":{}}"#,
+    );
+    let templates: serde_json::Value = serde_json::from_str(&templates).expect("templates json");
+    let uri_templates = templates["result"]["resourceTemplates"]
+        .as_array()
+        .expect("resource templates")
+        .iter()
+        .filter_map(|template| template["uriTemplate"].as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        uri_templates,
+        vec![
+            "office://word/{session_id}/comments",
+            "office://word/{session_id}/document{?offset,limit}",
+            "office://word/{session_id}/paragraph/{index}",
+            "office://word/{session_id}/selection",
+            "office://word/{session_id}/structure",
+            "office://word/{session_id}/track_changes",
+        ]
+    );
+
+    let prompts = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"prompts-1","method":"prompts/list","params":{}}"#,
+    );
+    let prompts: serde_json::Value = serde_json::from_str(&prompts).expect("prompts json");
+    let names = prompts["result"]["prompts"]
+        .as_array()
+        .expect("prompts")
+        .iter()
+        .filter_map(|prompt| prompt["name"].as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        names,
+        vec![
+            "summarize_document",
+            "polish_section",
+            "extract_action_items"
+        ]
+    );
+
+    let prompt = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"prompt-1","method":"prompts/get","params":{"name":"polish_section","arguments":{"session_id":"session-1","heading":"Scope"}}}"#,
+    );
+    let prompt: serde_json::Value = serde_json::from_str(&prompt).expect("prompt json");
+    let prompt_text = prompt["result"]["messages"][0]["content"]["text"]
+        .as_str()
+        .expect("prompt text");
+    assert!(prompt_text.contains("Scope"));
+    assert!(prompt_text.contains("explicit approval"));
+
+    let summary = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"prompt-2","method":"prompts/get","params":{"name":"summarize_document","arguments":{"session_id":"session-1"}}}"#,
+    );
+    let summary: serde_json::Value = serde_json::from_str(&summary).expect("summary prompt");
+    let summary_text = summary["result"]["messages"][0]["content"]["text"]
+        .as_str()
+        .expect("summary prompt text");
+    assert!(summary_text.contains("office://word/session-1/document"));
+    assert!(summary_text.contains("word.add_comment"));
+}
+
+#[test]
+fn mcp_json_rpc_reads_resources_through_addin_connection() {
+    let registry = registry_with_word_session();
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("connection-1");
+    connection_hub.bind_instance("connection-1", "instance-1");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("connection-1");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["method"], "tool.invoke");
+        assert_eq!(invoke["params"]["tool"], "word._get_comments");
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"comments":[]}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"read-1","method":"resources/read","params":{"uri":"office://word/session-1/comments"}}"#,
+    );
+    response_thread.join().expect("response thread");
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("resource reply json");
+    assert_eq!(
+        reply["result"]["contents"][0]["uri"],
+        "office://word/session-1/comments"
+    );
+    assert!(
+        reply["result"]["contents"][0]["text"]
+            .as_str()
+            .expect("resource text")
+            .contains("comments")
+    );
+}
+
+#[test]
+fn mcp_json_rpc_structure_resource_routes_to_full_structure_tool() {
+    let registry = registry_with_word_session();
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("connection-1");
+    connection_hub.bind_instance("connection-1", "instance-1");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("connection-1");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["method"], "tool.invoke");
+        assert_eq!(invoke["params"]["tool"], "word._get_structure");
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"outline":[],"headings":[],"lists":[],"tables":[]}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"read-structure","method":"resources/read","params":{"uri":"office://word/session-1/structure"}}"#,
+    );
+    response_thread.join().expect("response thread");
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    assert_eq!(
+        reply["result"]["contents"][0]["uri"],
+        "office://word/session-1/structure"
+    );
+    assert_eq!(
+        reply["result"]["contents"][0]["mimeType"],
+        "application/json"
+    );
+}
+#[test]
+fn mcp_json_rpc_forwarded_word_tool_invokes_addin_connection() {
+    let registry = registry_with_word_session();
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("connection-1");
+    connection_hub.bind_instance("connection-1", "instance-1");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("connection-1");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        assert_eq!(outbound.len(), 1);
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["method"], "tool.invoke");
+        assert_eq!(invoke["params"]["session_id"], "session-1");
+        assert_eq!(invoke["params"]["tool"], "word.get_text");
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"text":"hello"}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"call-3","method":"tools/call","params":{"name":"word.get_text","arguments":{"session_id":"session-1","offset":0,"limit":1}}}"#,
+    );
+
+    response_thread.join().expect("response thread");
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    assert_eq!(reply["result"]["structuredContent"]["text"], "hello");
+    assert!(
+        !reply["result"]
+            .get("isError")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
+    );
+    assert!(
+        ui_state
+            .snapshot(&registry.list_sessions(), std::time::SystemTime::UNIX_EPOCH)
+            .current_tasks
+            .is_empty()
+    );
+}
+
+#[test]
+fn mcp_json_rpc_forwarded_excel_tool_invokes_addin_connection() {
+    let registry = registry_with_excel_session();
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("excel-connection");
+    connection_hub.bind_instance("excel-connection", "excel-instance");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("excel-connection");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        assert_eq!(outbound.len(), 1);
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["method"], "tool.invoke");
+        assert_eq!(invoke["params"]["session_id"], "excel-session");
+        assert_eq!(invoke["params"]["tool"], "excel.create_table");
+        assert_eq!(invoke["params"]["args"]["address"], "A1:B2");
+        assert_eq!(invoke["params"]["args"]["has_headers"], true);
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"table":"Table1","address":"A1:B2","has_headers":true}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"excel-call","method":"tools/call","params":{"name":"excel.create_table","arguments":{"session_id":"excel-session","address":"A1:B2","has_headers":true}}}"#,
+    );
+
+    response_thread.join().expect("response thread");
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    assert_eq!(reply["result"]["structuredContent"]["table"], "Table1");
+    assert_eq!(reply["result"]["structuredContent"]["has_headers"], true);
+}
+
+#[test]
+fn mcp_json_rpc_insert_image_base64_is_validated_before_forwarding() {
+    let registry = registry_with_word_session_with_tools(vec!["word.insert_image"]);
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("connection-1");
+    connection_hub.bind_instance("connection-1", "instance-1");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("connection-1");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["params"]["tool"], "word.insert_image");
+        let args = invoke["params"]["args"].as_str().map_or_else(
+            || invoke["params"]["args"].clone(),
+            |raw| serde_json::from_str(raw).expect("parsed args"),
+        );
+        assert_eq!(args["image"]["mime_type"], "image/png");
+        assert_eq!(args["image"]["byte_length"], 9);
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"inserted":true}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"call-image","method":"tools/call","params":{"name":"word.insert_image","arguments":{"session_id":"session-1","anchor":{"kind":"end_of_document"},"image":{"base64":"iVBORw0KGgoA"}}}}"#,
+    );
+    response_thread.join().expect("response thread");
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    assert_eq!(reply["result"]["structuredContent"]["inserted"], true);
+}
+
+#[test]
+fn mcp_json_rpc_forwarded_word_tool_writes_audit_records() {
+    let audit_dir = std::env::temp_dir().join(format!(
+        "office-mcp-runtime-audit-{}-{}",
+        std::process::id(),
+        unique_suffix()
+    ));
+    let audit_path = audit_dir.join("audit.jsonl");
+    let registry = registry_with_word_session();
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("connection-1");
+    connection_hub.bind_instance("connection-1", "instance-1");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let audit_log = AuditLog::enabled(&audit_path);
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("connection-1");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"text":"document body"}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &audit_log,
+        image_fetcher: &ImageFetcher::new(),
+    };
+    let _reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"call-audit","method":"tools/call","params":{"name":"word.get_text","arguments":{"session_id":"session-1","offset":0,"limit":10}}}"#,
+    );
+    response_thread.join().expect("response thread");
+
+    let contents = std::fs::read_to_string(&audit_path).expect("audit file");
+    assert!(contents.contains("\"tool\":\"word.get_text\""));
+    assert!(contents.contains("\"session_id\":\"session-1\""));
+    assert!(contents.contains("\"ok\":true"));
+    assert!(!contents.contains("document body"));
+    let _ = std::fs::remove_dir_all(audit_dir);
+}
+
+#[test]
+fn mcp_json_rpc_preflight_failure_writes_redacted_audit_record() {
+    let audit_dir = std::env::temp_dir().join(format!(
+        "office-mcp-runtime-audit-{}-{}",
+        std::process::id(),
+        unique_suffix()
+    ));
+    let audit_path = audit_dir.join("audit.jsonl");
+    let registry = registry_with_word_session();
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let audit_log = AuditLog::enabled(&audit_path);
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &audit_log,
+        image_fetcher: &ImageFetcher::new(),
+    };
+
+    let _reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"call-audit-failure","method":"tools/call","params":{"name":"word.insert_paragraph","arguments":{"session_id":"session-1","text":"secret body","anchor":{"kind":"end_of_document"}}}}"#,
+    );
+
+    let contents = std::fs::read_to_string(&audit_path).expect("audit file");
+    assert!(contents.contains("\"tool\":\"word.insert_paragraph\""));
+    assert!(contents.contains("HOST_CAPABILITY_UNAVAILABLE"));
+    assert!(contents.contains("\"ok\":false"));
+    assert!(!contents.contains("secret body"));
+    let _ = std::fs::remove_dir_all(audit_dir);
+}
+
+#[test]
+fn mcp_json_rpc_forwarded_word_tool_sends_cancel_on_timeout() {
+    let registry = registry_with_word_session();
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("connection-1");
+    connection_hub.bind_instance("connection-1", "instance-1");
+    let command_router = Arc::new(Mutex::new(CommandRouter::with_limits(
+        1024 * 1024,
+        std::time::Duration::from_millis(10),
+    )));
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+    };
+
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"call-timeout","method":"tools/call","params":{"name":"word.get_text","arguments":{"session_id":"session-1"}}}"#,
+    );
+
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    assert_eq!(
+        reply["result"]["structuredContent"]["error"]["office_mcp_code"],
+        "TIMEOUT"
+    );
+    let outbound = connection_hub.take_outbound("connection-1");
+    assert_eq!(outbound.len(), 2);
+    let cancel: serde_json::Value = serde_json::from_str(&outbound[1]).expect("cancel json");
+    assert_eq!(cancel["method"], "tool.cancel");
+    assert_eq!(cancel["params"]["reason"], "deadline_expired");
+}
+
+#[test]
+fn real_tls_websocket_forwards_mcp_tool_call_and_returns_response() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let port = listener.local_addr().expect("local addr").port();
+    let server = RuntimeServer::with_config(RuntimeServerConfig {
+        addin_host: "127.0.0.1".to_string(),
+        addin_port: port,
+        addin_public_dir: super::default_addin_public_dir(),
+        certificate_path: super::default_pfx_path(),
+        ..RuntimeServerConfig::default()
+    });
+    let acceptor = server.config.tls_acceptor().expect("tls acceptor");
+    let shared_state = Arc::new(RuntimeSharedState {
+        registry: Arc::new(Mutex::new(SessionRegistry::new())),
+        addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
+        connection_hub: Arc::new(AddinConnectionHub::new()),
+        command_router: Arc::new(Mutex::new(CommandRouter::new())),
+        audit_log: AuditLog::new(),
+        image_fetcher: ImageFetcher::new(),
+    });
+    let server_shared_state = Arc::clone(&shared_state);
+    let server_handle = thread::spawn(move || {
+        let ui_state = Arc::new(Mutex::new(UiStateStore::new()));
+        let (stream, _) = listener.accept().expect("accept");
+        let mut stream = acceptor.accept(stream).expect("accept tls");
+        server
+            .handle_addin_tls_stream(&mut stream, &ui_state, &server_shared_state)
+            .expect("handle addin websocket");
+    });
+
+    let connector = TlsConnector::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("tls connector");
+    let stream = TcpStream::connect(("127.0.0.1", port)).expect("connect client");
+    let mut stream = connector.connect("localhost", stream).expect("connect tls");
+    stream
+        .write_all(
+            concat!(
+                "GET /addin HTTP/1.1\r\n",
+                "Host: localhost\r\n",
+                "Origin: https://localhost:8765\r\n",
+                "Upgrade: websocket\r\n",
+                "Connection: Upgrade\r\n",
+                "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n",
+                "Sec-WebSocket-Version: 13\r\n",
+                "\r\n"
+            )
+            .as_bytes(),
+        )
+        .expect("write upgrade");
+    let upgrade = read_http_response_head(&mut stream);
+    assert!(upgrade.starts_with("HTTP/1.1 101 Switching Protocols"));
+
+    write_client_ws_text(
+        &mut stream,
+        r#"{"jsonrpc":"2.0","id":"register-1","method":"register","params":{"instance_id":"instance-1","host":{"app":"word","version":"16.0","platform":"windows"},"add_in":{"version":"0.1.0","protocol_version":"1.0","supported_features":["doc.read"]}}}"#,
+    );
+    let register_reply = read_server_ws_text(&mut stream);
+    assert!(register_reply.contains("assigned_instance_id"));
+    write_client_ws_text(
+        &mut stream,
+        r#"{"jsonrpc":"2.0","method":"session.added","params":{"session_id":"session-1","instance_id":"instance-1","document":{"filename":"Live.docx"},"available_tools":["word.get_text"],"is_active":true}}"#,
+    );
+
+    let mcp_shared_state = Arc::clone(&shared_state);
+    let mcp_handle = thread::spawn(move || {
+        let registry = mcp_shared_state.registry.lock().expect("registry").clone();
+        let mut ui_state = UiStateStore::new();
+        let mut context = McpDispatchContext {
+            registry: &registry,
+            ui_state: &mut ui_state,
+            addin_channel: &mcp_shared_state.addin_channel,
+            connection_hub: &mcp_shared_state.connection_hub,
+            command_router: &mcp_shared_state.command_router,
+            audit_log: &mcp_shared_state.audit_log,
+            image_fetcher: &mcp_shared_state.image_fetcher,
+        };
+        McpJsonRpcRuntime::handle_body(
+            &mut context,
+            br#"{"jsonrpc":"2.0","id":"call-1","method":"tools/call","params":{"name":"word.get_text","arguments":{"session_id":"session-1","offset":0,"limit":1}}}"#,
+        )
+    });
+
+    let invoke = read_server_ws_text(&mut stream);
+    let invoke: serde_json::Value = serde_json::from_str(&invoke).expect("invoke json");
+    assert_eq!(invoke["method"], "tool.invoke");
+    assert_eq!(invoke["params"]["session_id"], "session-1");
+    let request_id = invoke["id"].as_str().expect("request id").to_string();
+    write_client_ws_text(
+        &mut stream,
+        &format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"text":"live"}}}}}}"#
+        ),
+    );
+
+    let mcp_reply = mcp_handle.join().expect("mcp thread");
+    let mcp_reply: serde_json::Value = serde_json::from_str(&mcp_reply).expect("mcp json");
+    assert_eq!(mcp_reply["result"]["structuredContent"]["text"], "live");
+    drop(stream);
+    server_handle.join().expect("server thread");
+}
+
+#[test]
+fn real_tls_websocket_protocol_error_sends_close_frame() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let port = listener.local_addr().expect("local addr").port();
+    let server = RuntimeServer::with_config(RuntimeServerConfig {
+        addin_host: "127.0.0.1".to_string(),
+        addin_port: port,
+        addin_public_dir: super::default_addin_public_dir(),
+        certificate_path: super::default_pfx_path(),
+        ..RuntimeServerConfig::default()
+    });
+    let acceptor = server.config.tls_acceptor().expect("tls acceptor");
+    let shared_state = Arc::new(RuntimeSharedState {
+        registry: Arc::new(Mutex::new(SessionRegistry::new())),
+        addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
+        connection_hub: Arc::new(AddinConnectionHub::new()),
+        command_router: Arc::new(Mutex::new(CommandRouter::new())),
+        audit_log: AuditLog::new(),
+        image_fetcher: ImageFetcher::new(),
+    });
+    let server_shared_state = Arc::clone(&shared_state);
+    let server_handle = thread::spawn(move || {
+        let ui_state = Arc::new(Mutex::new(UiStateStore::new()));
+        let (stream, _) = listener.accept().expect("accept");
+        let mut stream = acceptor.accept(stream).expect("accept tls");
+        server
+            .handle_addin_tls_stream(&mut stream, &ui_state, &server_shared_state)
+            .expect("handle addin websocket");
+    });
+
+    let connector = TlsConnector::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("tls connector");
+    let stream = TcpStream::connect(("127.0.0.1", port)).expect("connect client");
+    let mut stream = connector.connect("localhost", stream).expect("connect tls");
+    websocket_upgrade(&mut stream);
+    let upgrade = read_http_response_head(&mut stream);
+    assert!(upgrade.starts_with("HTTP/1.1 101 Switching Protocols"));
+
+    stream
+        .write_all(&[0x81, 0x02, b'h', b'i'])
+        .expect("write unmasked frame");
+    stream.flush().expect("flush unmasked frame");
+    let (code, reason) = read_server_ws_close(&mut stream);
+    assert_eq!(code, 1002);
+    assert!(reason.contains("masked"));
+    drop(stream);
+    server_handle.join().expect("server thread");
+}
+#[test]
+fn real_tls_websocket_heartbeat_ping_accepts_pong_response() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let port = listener.local_addr().expect("local addr").port();
+    let server = RuntimeServer::with_config(RuntimeServerConfig {
+        addin_host: "127.0.0.1".to_string(),
+        addin_port: port,
+        addin_public_dir: super::default_addin_public_dir(),
+        certificate_path: super::default_pfx_path(),
+        heartbeat_interval: std::time::Duration::from_millis(20),
+        heartbeat_timeout: std::time::Duration::from_millis(200),
+        ..RuntimeServerConfig::default()
+    });
+    let acceptor = server.config.tls_acceptor().expect("tls acceptor");
+    let shared_state = Arc::new(RuntimeSharedState {
+        registry: Arc::new(Mutex::new(SessionRegistry::new())),
+        addin_channel: Arc::new(Mutex::new(AddinChannelServer::with_config(
+            server.config.addin_channel_config(),
+        ))),
+        connection_hub: Arc::new(AddinConnectionHub::new()),
+        command_router: Arc::new(Mutex::new(CommandRouter::new())),
+        audit_log: AuditLog::new(),
+        image_fetcher: ImageFetcher::new(),
+    });
+    let server_shared_state = Arc::clone(&shared_state);
+    let server_handle = thread::spawn(move || {
+        let ui_state = Arc::new(Mutex::new(UiStateStore::new()));
+        let (stream, _) = listener.accept().expect("accept");
+        let mut stream = acceptor.accept(stream).expect("accept tls");
+        server
+            .handle_addin_tls_stream(&mut stream, &ui_state, &server_shared_state)
+            .expect("handle addin websocket");
+    });
+
+    let connector = TlsConnector::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("tls connector");
+    let stream = TcpStream::connect(("127.0.0.1", port)).expect("connect client");
+    let mut stream = connector.connect("localhost", stream).expect("connect tls");
+    websocket_upgrade(&mut stream);
+    let upgrade = read_http_response_head(&mut stream);
+    assert!(upgrade.starts_with("HTTP/1.1 101 Switching Protocols"));
+    write_client_ws_text(
+        &mut stream,
+        r#"{"jsonrpc":"2.0","id":"register-1","method":"register","params":{"instance_id":"instance-1","host":{"app":"word","version":"16.0","platform":"windows"},"add_in":{"version":"0.1.0","protocol_version":"1.0","supported_features":["doc.read"]}}}"#,
+    );
+    assert!(read_server_ws_text(&mut stream).contains("assigned_instance_id"));
+
+    let ping = read_server_ws_text(&mut stream);
+    let ping: serde_json::Value = serde_json::from_str(&ping).expect("ping json");
+    assert_eq!(ping["method"], "ping");
+    let ping_id = ping["id"].as_str().expect("ping id");
+    write_client_ws_text(
+        &mut stream,
+        &format!(r#"{{"jsonrpc":"2.0","id":"{ping_id}","result":{{}}}}"#),
+    );
+    drop(stream);
+    server_handle.join().expect("server thread");
+}
+
+fn addin_handle_text(
+    text: &str,
+    connection_id: &str,
+    registry: &Arc<Mutex<SessionRegistry>>,
+    addin_channel: &Arc<Mutex<AddinChannelServer>>,
+) -> Option<String> {
+    let connection_hub = AddinConnectionHub::new();
+    connection_hub.register_connection(connection_id);
+    AddinJsonRpcRuntime::handle_text(
+        text,
+        connection_id,
+        registry,
+        addin_channel,
+        &connection_hub,
+    )
+}
+
+fn mcp_handle_body(registry: &SessionRegistry, body: &[u8]) -> String {
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let mut context = McpDispatchContext {
+        registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+    };
+    McpJsonRpcRuntime::handle_body(&mut context, body)
+}
+
+fn roundtrip(request: &str) -> String {
+    roundtrip_with_frontend(request, |_frontend, _ui_state| {})
+}
+
+fn http_body(response: &str) -> &str {
+    response.split_once("\r\n\r\n").map_or("", |(_, body)| body)
+}
+
+fn roundtrip_with_frontend(
+    request: &str,
+    setup: impl FnOnce(&mut McpHttpFrontend, &mut UiStateStore) + Send + 'static,
+) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let port = listener.local_addr().expect("local addr").port();
+    let server = RuntimeServer::with_config(RuntimeServerConfig {
+        mcp_port: 8800,
+        ..RuntimeServerConfig::default()
+    });
+    let handle = thread::spawn(move || {
+        let mut frontend = McpHttpFrontend::new();
+        let mut ui_state = UiStateStore::new();
+        setup(&mut frontend, &mut ui_state);
+        server
+            .serve_next(&listener, &mut frontend, &mut ui_state)
+            .expect("serve next");
+    });
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect client");
+    stream.write_all(request.as_bytes()).expect("write request");
+    stream
+        .shutdown(std::net::Shutdown::Write)
+        .expect("shutdown");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("read response");
+    handle.join().expect("server thread");
+    response
+}
+
+fn registry_with_word_session() -> SessionRegistry {
+    registry_with_word_session_with_tools(vec![
+        "word.get_text",
+        "word.get_outline",
+        "word.get_paragraph",
+        "word.get_selection",
+        "word.save",
+    ])
+}
+
+fn registry_with_word_session_with_tools(tools: Vec<&str>) -> SessionRegistry {
+    let now = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(10);
+    let mut registry = SessionRegistry::new();
+    registry.register_runtime(RuntimeInfo {
+        instance_id: "instance-1".to_string(),
+        host: HostInfo {
+            app: "word".to_string(),
+            version: Some("16.0".to_string()),
+            platform: Some("windows".to_string()),
+            build: Some("Desktop".to_string()),
+        },
+        add_in: AddInInfo {
+            version: "0.1.0".to_string(),
+            protocol_version: "1.0".to_string(),
+            supported_features: vec!["doc.read".to_string()],
+        },
+        registered_at: now,
+    });
+    registry.add_session(
+        NewSessionInfo {
+            session_id: "session-1".to_string(),
+            instance_id: "instance-1".to_string(),
+            document: DocumentInfo {
+                filename: Some("Draft.docx".to_string()),
+                ..DocumentInfo::default()
+            },
+            available_tools: tools.into_iter().map(str::to_string).collect(),
+            is_active: Some(true),
+        },
+        now,
+    );
+    registry
+}
+
+fn registry_with_excel_session() -> SessionRegistry {
+    let now = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(10);
+    let mut registry = SessionRegistry::new();
+    registry.register_runtime(RuntimeInfo {
+        instance_id: "excel-instance".to_string(),
+        host: HostInfo {
+            app: "excel".to_string(),
+            version: Some("16.0".to_string()),
+            platform: Some("windows".to_string()),
+            build: Some("Desktop".to_string()),
+        },
+        add_in: AddInInfo {
+            version: "0.1.6".to_string(),
+            protocol_version: "1.0".to_string(),
+            supported_features: vec!["workbook.session".to_string()],
+        },
+        registered_at: now,
+    });
+    registry.add_session(
+        NewSessionInfo {
+            session_id: "excel-session".to_string(),
+            instance_id: "excel-instance".to_string(),
+            document: DocumentInfo {
+                filename: Some("Budget.xlsx".to_string()),
+                ..DocumentInfo::default()
+            },
+            available_tools: super::EXCEL_V1_TOOLS
+                .iter()
+                .map(|tool| tool.name.to_string())
+                .collect(),
+            is_active: Some(true),
+        },
+        now,
+    );
+    registry
+}
+
+fn addin_roundtrip(request: &str) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let port = listener.local_addr().expect("local addr").port();
+    let server = RuntimeServer::with_config(RuntimeServerConfig {
+        addin_port: port,
+        addin_public_dir: super::default_addin_public_dir(),
+        ..RuntimeServerConfig::default()
+    });
+    let handle = thread::spawn(move || {
+        let ui_state = UiStateStore::new();
+        let (mut stream, _) = listener.accept().expect("accept");
+        server
+            .handle_addin_stream(&mut stream, &ui_state)
+            .expect("handle addin");
+    });
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect client");
+    stream.write_all(request.as_bytes()).expect("write request");
+    stream
+        .shutdown(std::net::Shutdown::Write)
+        .expect("shutdown");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("read response");
+    handle.join().expect("server thread");
+    response
+}
+
+fn addin_tls_roundtrip(request: &str) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let port = listener.local_addr().expect("local addr").port();
+    let server = RuntimeServer::with_config(RuntimeServerConfig {
+        addin_host: "127.0.0.1".to_string(),
+        addin_port: port,
+        addin_public_dir: super::default_addin_public_dir(),
+        certificate_path: super::default_pfx_path(),
+        ..RuntimeServerConfig::default()
+    });
+    let acceptor = server.config.tls_acceptor().expect("tls acceptor");
+    let handle = thread::spawn(move || {
+        let ui_state = Arc::new(Mutex::new(UiStateStore::new()));
+        let registry = Arc::new(Mutex::new(SessionRegistry::new()));
+        let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+        let connection_hub = Arc::new(AddinConnectionHub::new());
+        let shared_state = Arc::new(RuntimeSharedState {
+            registry,
+            addin_channel,
+            connection_hub,
+            command_router: Arc::new(Mutex::new(CommandRouter::new())),
+            audit_log: AuditLog::new(),
+            image_fetcher: ImageFetcher::new(),
+        });
+        let (stream, _) = listener.accept().expect("accept");
+        let mut stream = acceptor.accept(stream).expect("accept tls");
+        server
+            .handle_addin_tls_stream(&mut stream, &ui_state, &shared_state)
+            .expect("handle addin tls");
+    });
+    let connector = TlsConnector::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("tls connector");
+    let stream = TcpStream::connect(("127.0.0.1", port)).expect("connect client");
+    let mut stream = connector.connect("localhost", stream).expect("connect tls");
+    stream.write_all(request.as_bytes()).expect("write request");
+    stream.flush().expect("flush request");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("read response");
+    handle.join().expect("server thread");
+    response
+}
+
+fn read_http_response_head(stream: &mut impl Read) -> String {
+    let mut buffer = Vec::new();
+    let mut byte = [0_u8; 1];
+    loop {
+        stream.read_exact(&mut byte).expect("read response byte");
+        buffer.push(byte[0]);
+        if buffer.ends_with(b"\r\n\r\n") {
+            break;
+        }
+    }
+    String::from_utf8(buffer).expect("response utf8")
+}
+
+fn websocket_upgrade(stream: &mut impl Write) {
+    stream
+        .write_all(
+            concat!(
+                "GET /addin HTTP/1.1\r\n",
+                "Host: localhost\r\n",
+                "Origin: https://localhost:8765\r\n",
+                "Upgrade: websocket\r\n",
+                "Connection: Upgrade\r\n",
+                "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n",
+                "Sec-WebSocket-Version: 13\r\n",
+                "\r\n"
+            )
+            .as_bytes(),
+        )
+        .expect("write upgrade");
+}
+
+fn write_client_ws_text(stream: &mut impl Write, text: &str) {
+    stream
+        .write_all(&masked_text_frame(text))
+        .expect("write websocket frame");
+    stream.flush().expect("flush websocket frame");
+}
+
+fn read_server_ws_close(stream: &mut impl Read) -> (u16, String) {
+    let mut header = [0_u8; 2];
+    stream.read_exact(&mut header).expect("read close header");
+    assert_eq!(header[0] & 0x0f, 0x8, "expected close frame");
+    assert_eq!(header[0] & 0x80, 0x80, "close frame must be final");
+    assert_eq!(header[1] & 0x80, 0, "server close must not be masked");
+    let length = usize::from(header[1] & 0x7f);
+    let mut payload = vec![0_u8; length];
+    stream.read_exact(&mut payload).expect("read close payload");
+    let code = u16::from_be_bytes([payload[0], payload[1]]);
+    let reason = String::from_utf8(payload[2..].to_vec()).expect("close reason utf8");
+    (code, reason)
+}
+fn read_server_ws_text(stream: &mut impl Read) -> String {
+    let mut header = [0_u8; 2];
+    stream.read_exact(&mut header).expect("read frame header");
+    let opcode = header[0] & 0x0f;
+    assert_eq!(opcode, 0x1, "expected text frame");
+    let masked = header[1] & 0x80 != 0;
+    assert!(!masked, "server frames must not be masked");
+    let mut length = usize::from(header[1] & 0x7f);
+    if length == 126 {
+        let mut extended = [0_u8; 2];
+        stream.read_exact(&mut extended).expect("read extended len");
+        length = usize::from(u16::from_be_bytes(extended));
+    } else if length == 127 {
+        let mut extended = [0_u8; 8];
+        stream.read_exact(&mut extended).expect("read extended len");
+        length = usize::try_from(u64::from_be_bytes(extended)).expect("frame len");
+    }
+    let mut payload = vec![0_u8; length];
+    stream.read_exact(&mut payload).expect("read frame payload");
+    String::from_utf8(payload).expect("text utf8")
+}
+
+fn unique_suffix() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("time")
+        .as_nanos()
+}
+
+fn assert_ws_error(error: RuntimeServerError, close_code: u16, reason: &str) {
+    match error {
+        RuntimeServerError::WebSocketProtocol(error) => {
+            assert_eq!(error.close_code, close_code);
+            assert!(
+                error.reason.contains(reason),
+                "expected `{}` to contain `{}`",
+                error.reason,
+                reason
+            );
+        }
+        other => panic!("expected websocket protocol error, got {other:?}"),
+    }
+}
+fn masked_text_frame(text: &str) -> Vec<u8> {
+    let mask = [1_u8, 2, 3, 4];
+    let mut frame = vec![0x81];
+    if text.len() < 126 {
+        frame.push(0x80 | u8::try_from(text.len()).expect("short text"));
+    } else if let Ok(length) = u16::try_from(text.len()) {
+        frame.push(0x80 | 0x7e);
+        frame.extend_from_slice(&length.to_be_bytes());
+    } else {
+        frame.push(0x80 | 127);
+        frame.extend_from_slice(&(text.len() as u64).to_be_bytes());
+    }
+    frame.extend_from_slice(&mask);
+    for (index, byte) in text.as_bytes().iter().enumerate() {
+        frame.push(byte ^ mask[index % 4]);
+    }
+    frame
+}
