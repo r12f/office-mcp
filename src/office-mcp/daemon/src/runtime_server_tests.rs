@@ -1416,7 +1416,7 @@ fn registry_with_excel_session() -> SessionRegistry {
                 filename: Some("Budget.xlsx".to_string()),
                 ..DocumentInfo::default()
             },
-            available_tools: super::EXCEL_V1_TOOLS
+            available_tools: crate::mcp::ExcelToolCatalog::tools()
                 .iter()
                 .map(|tool| tool.name.to_string())
                 .collect(),
