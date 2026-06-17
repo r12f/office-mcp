@@ -103,11 +103,14 @@ fn serve_daemon() {
 }
 
 fn serve_daemon_with_optional_tray(start_tray: bool) {
+    tracing::info!(start_tray, "office-mcp-daemon run requested");
     if start_tray {
         start_tray_background();
     }
     match load_config().and_then(|config| {
+        tracing::info!("loaded daemon configuration");
         DaemonConfigService::assert_boundary_auth_config(&config)?;
+        tracing::info!("validated daemon boundary configuration");
         Ok(config)
     }) {
         Ok(config) => match RuntimeServer::from_daemon_config(&config) {
@@ -139,6 +142,7 @@ fn serve_daemon_with_optional_tray(start_tray: bool) {
                     tracing::error!(%error, "office-mcp-daemon stopped with error");
                     exit_error(error);
                 }
+                tracing::info!("office-mcp-daemon stopped cleanly");
             }
             Err(error) => exit_error(error),
         },
