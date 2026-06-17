@@ -287,7 +287,7 @@ User-reported architecture follow-up: the Rust daemon source is currently too
 flat. Files under `src/office-mcp/daemon/src` must be reorganized by functional
 module so ownership is visible from the directory tree.
 
-- [ ] Create `src/office-mcp/daemon/src/common/` for shared config, logger,
+- [x] Create `src/office-mcp/daemon/src/common/` for shared config, logger,
       audit log, redaction, limits, shared errors, and utility code. `common`
       must not depend on product-facing modules.
 - [ ] Create `src/office-mcp/daemon/src/ui/` and merge the sibling
@@ -296,14 +296,14 @@ module so ownership is visible from the directory tree.
 - [ ] Create `src/office-mcp/daemon/src/api/` for daemon UI/control APIs:
       status, sessions, current tasks, recent history, config display/control,
       UI runtime file lookup, and UI event streams.
-- [ ] Create `src/office-mcp/daemon/src/mcp/` for MCP-only code: Streamable HTTP
+- [x] Create `src/office-mcp/daemon/src/mcp/` for MCP-only code: Streamable HTTP
       frontend, stdio bridge, MCP management client, resources, prompts, tool
       catalog, MCP request validation, and MCP error translation.
 - [ ] Create `src/office-mcp/daemon/src/addin_mgr/` for add-in-facing code:
       local HTTPS/WSS channel, exact `Origin` validation, add-in JSON-RPC,
       registration, heartbeat, session registry, command router, image fetch
       preprocessing for add-in calls, and stale-session handling.
-- [ ] Create `src/office-mcp/daemon/src/tray/` for tray/menu-bar code: tray
+- [x] Create `src/office-mcp/daemon/src/tray/` for tray/menu-bar code: tray
       controller, native tray host, menu model, `Show Office MCP`, and graceful
       quit confirmation.
 - [ ] Keep root files minimal: `main.rs` owns CLI dispatch, `lib.rs` exposes
@@ -332,7 +332,7 @@ module so ownership is visible from the directory tree.
 - [ ] Update packaging, evidence harnesses, static asset serving, docs, and tests
       so no production code references the removed sibling `src/office-mcp/ui`
       path.
-- [ ] Add a source-layout test or lint script that fails if new daemon service
+- [x] Add a source-layout test or lint script that fails if new daemon service
       modules are added directly under `src/office-mcp/daemon/src` instead of
       one of `common`, `ui`, `api`, `mcp`, `addin_mgr`, or `tray`.
 
