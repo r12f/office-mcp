@@ -28,6 +28,7 @@
     runtimeIds,
     saveEndpointOverride: storeEndpointOverride,
     sessionAddedNotification,
+    sessionUpdatedNotification,
     sendJsonRpc,
     validateEndpoint
   } = window.OfficeCtlAddinChannel;
@@ -70,15 +71,46 @@
     { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.accept_change', 'word.reject_change'] },
     { label: 'Document', tools: ['word.save'] }
   ];
-
+  const TOOL_METADATA = new Map([
+    ['word.get_text', { category: 'Read', sideEffect: 'read', description: 'Read document text by paragraph range.' }],
+    ['word.get_outline', { category: 'Read', sideEffect: 'read', description: 'Read heading outline and structure.' }],
+    ['word.get_paragraph', { category: 'Read', sideEffect: 'read', description: 'Read a single paragraph by index.' }],
+    ['word.find_text', { category: 'Read', sideEffect: 'read', description: 'Find text matches in the document body.' }],
+    ['word.get_selection', { category: 'Read', sideEffect: 'read', description: 'Read the current selection.' }],
+    ['word.insert_paragraph', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
+    ['word.insert_heading', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a heading paragraph.' }],
+    ['word.insert_image', { category: 'Insert', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
+    ['word.insert_table', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a table with provided values.' }],
+    ['word.insert_page_break', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a page break.' }],
+    ['word.insert_list', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a list.' }],
+    ['word.replace_text', { category: 'Edit', sideEffect: 'mutating', description: 'Replace matching document text.' }],
+    ['word.update_paragraph', { category: 'Edit', sideEffect: 'mutating', description: 'Update paragraph text and style.' }],
+    ['word.delete_range', { category: 'Edit', sideEffect: 'mutating', description: 'Delete text resolved from an anchor.' }],
+    ['word.apply_formatting', { category: 'Edit', sideEffect: 'mutating', description: 'Apply formatting to an anchored range.' }],
+    ['word.read_table', { category: 'Tables', sideEffect: 'read', description: 'Read table dimensions and cell values.' }],
+    ['word.update_cell', { category: 'Tables', sideEffect: 'mutating', description: 'Update a table cell value.' }],
+    ['word.add_row', { category: 'Tables', sideEffect: 'mutating', description: 'Add a row to a table.' }],
+    ['word.add_column', { category: 'Tables', sideEffect: 'mutating', description: 'Add a column to a table.' }],
+    ['word.format_cell', { category: 'Tables', sideEffect: 'mutating', description: 'Format a table cell.' }],
+    ['word.set_heading_level', { category: 'Edit', sideEffect: 'mutating', description: 'Change a paragraph heading level.' }],
+    ['word.apply_style', { category: 'Edit', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
+    ['word.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a comment to an anchored range.' }],
+    ['word.resolve_comment', { category: 'Review', sideEffect: 'mutating', description: 'Resolve an existing comment.' }],
+    ['word.accept_change', { category: 'Review', sideEffect: 'mutating', description: 'Accept a tracked change by fingerprint.' }],
+    ['word.reject_change', { category: 'Review', sideEffect: 'mutating', description: 'Reject a tracked change by fingerprint.' }],
+    ['word.save', { category: 'Document', sideEffect: 'mutating', description: 'Save the current document.' }]
+  ]);
   let socket;
   const { instanceId, sessionId } = runtimeIds();
+  const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.word.tool-permissions.${sessionId}`;
   let documentInfo = null;
   let serverInfo = { serverVersion: 'Unknown', protocolVersion: PROTOCOL_VERSION };
   let reconnectTimer;
   let reconnectAttempt = 0;
   let endpointDirty = false;
   let suppressNextSettingsClick = false;
+  let toolPermissions = loadToolPermissions();
+  let sessionAnnounced = false;
   const logger = new AddinLogger({ redactText });
   const taskStore = new TaskHistoryStore({ redactText });
 
@@ -104,6 +136,8 @@
   const endpointInputEl = document.getElementById('endpointInput');
   const endpointErrorEl = document.getElementById('endpointError');
   const saveEndpointEl = document.getElementById('saveEndpoint');
+  const enabledToolCountEl = document.getElementById('enabledToolCount');
+  const toolPermissionListEl = document.getElementById('toolPermissionList');
   const announcerEl = document.getElementById('announcer');
 
   settingsToggleEl.addEventListener('click', handleSettingsClick);
@@ -217,10 +251,11 @@
       session_id: sessionId,
       instance_id: instanceId,
       document,
-      available_tools: AVAILABLE_TOOLS,
+      available_tools: effectiveTools(),
       is_active: null
     }));
     sessionEl.textContent = sessionId;
+    sessionAnnounced = true;
     renderDocumentState();
     setConnectionState('connected', 'Connected');
   }
@@ -281,6 +316,7 @@
     startTask(requestId, tool, message.params || {}, message.params.timeout_ms);
     let data;
     try {
+      if (!isToolEnabled(tool)) throw toolDisabledError(tool);
       if (taskStore.isCancelled(requestId)) throw cancelledError(tool);
       switch (tool) {
         case 'word.get_text':
@@ -389,6 +425,13 @@
 
   function cancelledError(tool) {
     return Object.assign(new Error(`Tool ${tool} was cancelled.`), { officeMcpCode: 'CANCELLED', partialEffect: 'unknown' });
+  }
+
+  function toolDisabledError(tool) {
+    return Object.assign(new Error(`Tool ${tool} is disabled by task pane settings.`), {
+      officeMcpCode: 'TOOL_DISABLED_BY_USER',
+      partialEffect: 'none'
+    });
   }
 
   async function getText(args) {
@@ -1261,14 +1304,16 @@
     protocolVersionEl.textContent = serverInfo.protocolVersion;
     hostPlatformEl.textContent = hostSummary();
     renderToolSummary();
+    renderToolPermissions();
     renderHistory();
   }
 
   function renderToolSummary() {
-    toolCountEl.textContent = `${AVAILABLE_TOOLS.length} Tools`;
+    const effective = effectiveTools();
+    toolCountEl.textContent = `${effective.length} Tools`;
     toolListEl.textContent = '';
     for (const group of TOOL_GROUPS) {
-      const tools = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool));
+      const tools = group.tools.filter((tool) => effective.includes(tool));
       if (tools.length === 0) continue;
       const groupEl = document.createElement('section');
       groupEl.className = 'tool-group';
@@ -1278,6 +1323,77 @@
       ].join('');
       toolListEl.appendChild(groupEl);
     }
+  }
+
+  function renderToolPermissions() {
+    const enabled = effectiveTools();
+    enabledToolCountEl.textContent = `${enabled.length} Enabled`;
+    toolPermissionListEl.textContent = '';
+    for (const group of TOOL_GROUPS) {
+      for (const tool of group.tools) {
+        if (!AVAILABLE_TOOLS.includes(tool)) continue;
+        const metadata = TOOL_METADATA.get(tool) || { category: group.label, sideEffect: 'read', description: 'Office tool.' };
+        const id = `toolPermission-${tool.replace(/[^a-z0-9_-]/gi, '-')}`;
+        const checked = isToolEnabled(tool);
+        const row = document.createElement('label');
+        row.className = `tool-permission-row${metadata.sideEffect === 'mutating' ? ' is-mutating' : ''}`;
+        row.setAttribute('for', id);
+        row.innerHTML = [
+          `<input id="${id}" class="tool-toggle" type="checkbox" data-tool="${escapeHtml(tool)}" ${checked ? 'checked' : ''} />`,
+          '<span class="tool-permission-main">',
+          '<span class="tool-permission-title">',
+          `<span class="tool-permission-name">${escapeHtml(tool)}</span>`,
+          `<span class="side-effect-pill ${metadata.sideEffect === 'mutating' ? 'mutating' : 'read'}">${escapeHtml(metadata.sideEffect)}</span>`,
+          '</span>',
+          `<span class="tool-permission-meta">${escapeHtml(metadata.category)} - ${escapeHtml(metadata.description)}</span>`,
+          '</span>'
+        ].join('');
+        toolPermissionListEl.appendChild(row);
+      }
+    }
+    toolPermissionListEl.querySelectorAll('[data-tool]').forEach((input) => {
+      input.addEventListener('change', handleToolPermissionChange);
+    });
+  }
+
+  function handleToolPermissionChange(event) {
+    const tool = event.currentTarget.dataset.tool;
+    if (!tool) return;
+    toolPermissions[tool] = event.currentTarget.checked;
+    saveToolPermissions();
+    renderToolSummary();
+    renderToolPermissions();
+    sendSessionToolUpdate();
+  }
+
+  function effectiveTools() {
+    return AVAILABLE_TOOLS.filter(isToolEnabled);
+  }
+
+  function isToolEnabled(tool) {
+    return toolPermissions[tool] !== false;
+  }
+
+  function loadToolPermissions() {
+    try {
+      const parsed = JSON.parse(window.localStorage?.getItem(TOOL_PERMISSION_STORAGE_KEY) || '{}');
+      if (!parsed || typeof parsed !== 'object') return {};
+      return Object.fromEntries(AVAILABLE_TOOLS.map((tool) => [tool, parsed[tool] !== false]));
+    } catch {
+      return {};
+    }
+  }
+
+  function saveToolPermissions() {
+    window.localStorage?.setItem(TOOL_PERMISSION_STORAGE_KEY, JSON.stringify(toolPermissions));
+  }
+
+  function sendSessionToolUpdate() {
+    if (!sessionAnnounced) return;
+    send(sessionUpdatedNotification({
+      session_id: sessionId,
+      patch: { available_tools: effectiveTools() }
+    }));
   }
 
   function renderDocumentState() {

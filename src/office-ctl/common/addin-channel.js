@@ -111,6 +111,14 @@
     };
   }
 
+  function sessionUpdatedNotification(params) {
+    return {
+      jsonrpc: '2.0',
+      method: 'session.updated',
+      params
+    };
+  }
+
   function registerResult(message, fallbackProtocolVersion = '1.0') {
     return {
       serverVersion: message?.result?.server_version || 'Unknown',
@@ -161,6 +169,7 @@
     runtimeIds,
     saveEndpointOverride,
     sessionAddedNotification,
+    sessionUpdatedNotification,
     sendJsonRpc,
     validateEndpoint
   });

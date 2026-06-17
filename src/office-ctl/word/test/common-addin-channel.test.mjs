@@ -111,6 +111,11 @@ test('common add-in channel builds and classifies protocol messages', () => {
     method: 'session.added',
     params: { session_id: 'session-1' }
   }));
+  assert.equal(JSON.stringify(channel.sessionUpdatedNotification({ session_id: 'session-1', patch: { available_tools: [] } })), JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'session.updated',
+    params: { session_id: 'session-1', patch: { available_tools: [] } }
+  }));
   const registerResult = channel.registerResult({ result: { server_version: '0.2.0', protocol_version: '1.1' } }, '1.0');
   assert.equal(registerResult.serverVersion, '0.2.0');
   assert.equal(registerResult.protocolVersion, '1.1');

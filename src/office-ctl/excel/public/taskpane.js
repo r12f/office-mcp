@@ -20,6 +20,7 @@
     runtimeIds,
     saveEndpointOverride: storeEndpointOverride,
     sessionAddedNotification,
+    sessionUpdatedNotification,
     sendJsonRpc,
     validateEndpoint
   } = window.OfficeCtlAddinChannel;
@@ -42,7 +43,17 @@
     { label: 'Tables', tools: ['excel.create_table'] },
     { label: 'Charts', tools: ['excel.create_chart'] }
   ];
+  const TOOL_METADATA = new Map([
+    ['excel.read_range', { category: 'Read', sideEffect: 'read', description: 'Read values, text, and number formats from a range.' }],
+    ['excel.write_range', { category: 'Edit', sideEffect: 'mutating', description: 'Write a value matrix into a range.' }],
+    ['excel.add_sheet', { category: 'Workbook', sideEffect: 'mutating', description: 'Add a worksheet to the workbook.' }],
+    ['excel.set_formula', { category: 'Edit', sideEffect: 'mutating', description: 'Set formulas in a range.' }],
+    ['excel.format_range', { category: 'Edit', sideEffect: 'mutating', description: 'Apply formatting to a range.' }],
+    ['excel.create_table', { category: 'Tables', sideEffect: 'mutating', description: 'Create a table from a range.' }],
+    ['excel.create_chart', { category: 'Charts', sideEffect: 'mutating', description: 'Create a chart from a range.' }]
+  ]);
   const { instanceId, sessionId } = runtimeIds();
+  const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.excel.tool-permissions.${sessionId}`;
   const logger = new AddinLogger({ redactText });
   const taskStore = new TaskHistoryStore({ redactText });
   let socket;
@@ -52,6 +63,8 @@
   let suppressNextSettingsClick = false;
   let serverInfo = { serverVersion: 'Unknown', protocolVersion: PROTOCOL_VERSION };
   let documentInfo = null;
+  let toolPermissions = loadToolPermissions();
+  let sessionAnnounced = false;
 
   const connectionBadgeEl = document.getElementById('connectionBadge');
   const sessionEl = document.getElementById('session');
@@ -75,6 +88,8 @@
   const endpointInputEl = document.getElementById('endpointInput');
   const endpointErrorEl = document.getElementById('endpointError');
   const saveEndpointEl = document.getElementById('saveEndpoint');
+  const enabledToolCountEl = document.getElementById('enabledToolCount');
+  const toolPermissionListEl = document.getElementById('toolPermissionList');
   const announcerEl = document.getElementById('announcer');
 
   settingsToggleEl.addEventListener('click', handleSettingsClick);
@@ -180,10 +195,11 @@
       session_id: sessionId,
       instance_id: instanceId,
       document: workbook,
-      available_tools: AVAILABLE_TOOLS,
+      available_tools: effectiveTools(),
       is_active: null
     }));
     sessionEl.textContent = sessionId;
+    sessionAnnounced = true;
     renderDocumentState();
     setConnectionState('connected', 'Connected');
   }
@@ -252,6 +268,7 @@
     taskStore.start(requestId, tool, message.params || {}, message.params?.timeout_ms);
     renderCurrentTask();
     try {
+      if (!isToolEnabled(tool)) throw toolDisabledError(tool);
       if (taskStore.isCancelled(requestId)) throw cancelledError(tool);
       let data;
       switch (tool) {
@@ -296,6 +313,13 @@
 
   function cancelledError(tool) {
     return Object.assign(new Error(`Tool ${tool} was cancelled.`), { officeMcpCode: 'CANCELLED', partialEffect: 'unknown' });
+  }
+
+  function toolDisabledError(tool) {
+    return Object.assign(new Error(`Tool ${tool} is disabled by task pane settings.`), {
+      officeMcpCode: 'TOOL_DISABLED_BY_USER',
+      partialEffect: 'none'
+    });
   }
 
   async function readRange(args) {
@@ -487,15 +511,17 @@
     protocolVersionEl.textContent = serverInfo.protocolVersion;
     hostPlatformEl.textContent = 'Excel / Unknown';
     renderToolSummary();
+    renderToolPermissions();
     renderCurrentTask();
     renderHistory();
   }
 
   function renderToolSummary() {
-    toolCountEl.textContent = `${AVAILABLE_TOOLS.length} Tools`;
+    const effective = effectiveTools();
+    toolCountEl.textContent = `${effective.length} Tools`;
     toolListEl.textContent = '';
     for (const group of TOOL_GROUPS) {
-      const tools = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool));
+      const tools = group.tools.filter((tool) => effective.includes(tool));
       if (tools.length === 0) continue;
       const groupEl = document.createElement('section');
       groupEl.className = 'tool-group';
@@ -505,6 +531,77 @@
       ].join('');
       toolListEl.appendChild(groupEl);
     }
+  }
+
+  function renderToolPermissions() {
+    const enabled = effectiveTools();
+    enabledToolCountEl.textContent = `${enabled.length} Enabled`;
+    toolPermissionListEl.textContent = '';
+    for (const group of TOOL_GROUPS) {
+      for (const tool of group.tools) {
+        if (!AVAILABLE_TOOLS.includes(tool)) continue;
+        const metadata = TOOL_METADATA.get(tool) || { category: group.label, sideEffect: 'read', description: 'Office tool.' };
+        const id = `toolPermission-${tool.replace(/[^a-z0-9_-]/gi, '-')}`;
+        const checked = isToolEnabled(tool);
+        const row = document.createElement('label');
+        row.className = `tool-permission-row${metadata.sideEffect === 'mutating' ? ' is-mutating' : ''}`;
+        row.setAttribute('for', id);
+        row.innerHTML = [
+          `<input id="${id}" class="tool-toggle" type="checkbox" data-tool="${escapeHtml(tool)}" ${checked ? 'checked' : ''} />`,
+          '<span class="tool-permission-main">',
+          '<span class="tool-permission-title">',
+          `<span class="tool-permission-name">${escapeHtml(tool)}</span>`,
+          `<span class="side-effect-pill ${metadata.sideEffect === 'mutating' ? 'mutating' : 'read'}">${escapeHtml(metadata.sideEffect)}</span>`,
+          '</span>',
+          `<span class="tool-permission-meta">${escapeHtml(metadata.category)} - ${escapeHtml(metadata.description)}</span>`,
+          '</span>'
+        ].join('');
+        toolPermissionListEl.appendChild(row);
+      }
+    }
+    toolPermissionListEl.querySelectorAll('[data-tool]').forEach((input) => {
+      input.addEventListener('change', handleToolPermissionChange);
+    });
+  }
+
+  function handleToolPermissionChange(event) {
+    const tool = event.currentTarget.dataset.tool;
+    if (!tool) return;
+    toolPermissions[tool] = event.currentTarget.checked;
+    saveToolPermissions();
+    renderToolSummary();
+    renderToolPermissions();
+    sendSessionToolUpdate();
+  }
+
+  function effectiveTools() {
+    return AVAILABLE_TOOLS.filter(isToolEnabled);
+  }
+
+  function isToolEnabled(tool) {
+    return toolPermissions[tool] !== false;
+  }
+
+  function loadToolPermissions() {
+    try {
+      const parsed = JSON.parse(window.localStorage?.getItem(TOOL_PERMISSION_STORAGE_KEY) || '{}');
+      if (!parsed || typeof parsed !== 'object') return {};
+      return Object.fromEntries(AVAILABLE_TOOLS.map((tool) => [tool, parsed[tool] !== false]));
+    } catch {
+      return {};
+    }
+  }
+
+  function saveToolPermissions() {
+    window.localStorage?.setItem(TOOL_PERMISSION_STORAGE_KEY, JSON.stringify(toolPermissions));
+  }
+
+  function sendSessionToolUpdate() {
+    if (!sessionAnnounced) return;
+    send(sessionUpdatedNotification({
+      session_id: sessionId,
+      patch: { available_tools: effectiveTools() }
+    }));
   }
 
   function renderDocumentState() {
