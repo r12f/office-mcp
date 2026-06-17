@@ -362,7 +362,7 @@ module so ownership is visible from the directory tree.
       payload helpers into `addin_mgr::addin_tool_payload`, add-in protocol and
       clock helpers into dedicated `addin_mgr` modules, and the TLS WebSocket
       session loop into `runtime::websocket_session`.
-- [ ] Split oversized Rust files so each `.rs` file owns one primary concept or
+- [x] Split oversized Rust files so each `.rs` file owns one primary concept or
       a tight helper set. Avoid catch-all files with many unrelated domain
       objects. Progress so far split config, UI state, MCP HTTP frontend,
       session registry, add-in tool payload, add-in protocol/clock helpers, and
@@ -387,9 +387,14 @@ module so ownership is visible from the directory tree.
       Daemon runtime status-file parsing, process liveness checks, and status
       JSON rendering now live in `api/daemon_status.rs`, leaving
       `api/daemon_control.rs` focused on installed daemon start/stop control.
-      The item remains open until the
-      remaining production files above the review threshold are audited for
-      single-concept ownership.
+      The remaining production files above the review threshold were audited:
+      `CommandRouter`, `RuntimeServer`, `ImageFetcher`, `DaemonConfigService`,
+      `AddinChannelServer`, `McpHttpFrontend`, `NativeTraySurface`,
+      `SessionRegistry`, `StdioBridge`, `TrayHost`, `UiRuntimeFile`,
+      `UiStateStore`, `RuntimeServerConfig`, and wire/parser modules each now
+      own one primary domain object or a tight protocol/platform helper set.
+      Further splits should be driven by a new responsibility boundary, not by
+      line count alone.
 - [x] Move inline Rust unit tests into sibling files named after the production
       file, such as `logger_tests.rs` for `logger.rs`. Keep only minimal
       compile-only inline test modules when a sibling file is not useful.
