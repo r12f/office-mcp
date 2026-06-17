@@ -167,19 +167,27 @@ failed, without inspecting terminal output, logs, or hidden localhost URLs.
 
 User-reported follow-up from live daemon testing:
 
-- [ ] Add a production `office-mcp-daemon ui` command that reads the current UI
+- [x] Add a production `office-mcp-daemon ui` command that reads the current UI
       runtime file, opens/focuses the daemon web console, and prints a clear
-      error when no daemon UI server is running.
-- [ ] Ensure `daemon status` reports the actual UI URL and state URL for the
+      error when no daemon UI server is running. Covered by `open_ui`,
+      `ui_url_from_runtime_path`, and
+      `ui_command_reads_runtime_file_url_instead_of_config_defaults`.
+- [x] Ensure `daemon status` reports the actual UI URL and state URL for the
       currently running daemon, including non-default ports such as `8766`.
-- [ ] Ensure `daemon run` writes a fresh UI runtime file and keeps `/ui/`,
+      Covered by `DaemonController::status_json` and
+      `status_reports_runtime_details_without_auth_material`.
+- [x] Ensure `daemon run` writes a fresh UI runtime file and keeps `/ui/`,
       `/ui/state`, and `/ui/events` available for the lifetime of the daemon.
+      Covered by `serve_forever_with_runtime_file`, runtime file tests, and
+      `production_bound_daemon_exposes_ui_state_and_events`.
 - [ ] Add a real Windows tray startup path that creates a visible notification
       icon in normal interactive runs, not just `tray --probe` evidence.
-- [ ] Wire tray `Show Office MCP` to the same UI-opening path as
-      `office-mcp-daemon ui`.
-- [ ] Wire tray `Quit Office MCP` to graceful daemon shutdown and visible menu
-      confirmation.
+- [x] Wire tray `Show Office MCP` to the same UI-opening path as
+      `office-mcp-daemon ui`. Covered by `open_ui_from_runtime` and the native
+      tray menu action dispatch.
+- [x] Wire tray `Quit Office MCP` to graceful daemon shutdown and visible menu
+      confirmation. Covered by `stop_daemon`, `confirm_quit`, and
+      `native_tray_quit_uses_platform_confirmation_dialogs`.
 - [ ] Add manual/e2e evidence that verifies a visible tray icon exists on
       Windows, the right-click menu appears, and `Show Office MCP` opens the
       daemon UI.
