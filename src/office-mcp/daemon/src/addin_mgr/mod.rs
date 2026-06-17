@@ -5,6 +5,7 @@ pub mod addin_channel_model;
 pub(crate) mod addin_connection_state;
 pub mod addin_heartbeat;
 pub mod addin_json_rpc;
+pub mod addin_upgrade_guard;
 pub mod command_model;
 pub(crate) mod command_queue;
 pub mod command_router;
@@ -29,6 +30,7 @@ pub use addin_channel_model::{
 };
 pub(crate) use addin_connection_state::AddinConnectionState;
 pub use addin_json_rpc::{JsonRpcEnvelope, JsonRpcId, RegisterResult};
+pub use addin_upgrade_guard::AddinUpgradeGuard;
 pub use command_model::{CancelCommand, QueuedCommand, ToolCallRequest, ToolResponse};
 pub(crate) use command_queue::SessionCommandQueue;
 pub use command_router::CommandRouter;

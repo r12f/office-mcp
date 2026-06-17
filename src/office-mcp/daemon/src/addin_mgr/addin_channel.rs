@@ -1,8 +1,8 @@
 use crate::addin_mgr::addin_heartbeat::AddinHeartbeatTimeout;
 use crate::addin_mgr::{
-    AddinChannelConfig, AddinChannelError, AddinConnectionState, HeartbeatDecision, NewSessionInfo,
-    RegisterRequest, RuntimeInfo, SessionAddedEvent, SessionRegistry, SessionRemovedEvent,
-    SessionUpdatedEvent,
+    AddinChannelConfig, AddinChannelError, AddinConnectionState, AddinUpgradeGuard,
+    HeartbeatDecision, NewSessionInfo, RegisterRequest, RuntimeInfo, SessionAddedEvent,
+    SessionRegistry, SessionRemovedEvent, SessionUpdatedEvent,
 };
 use crate::addin_mgr::{CancelCommand, QueuedCommand};
 use crate::addin_mgr::{JsonRpcEnvelope, RegisterResult};
@@ -15,6 +15,7 @@ pub const ADDIN_PROTOCOL_VERSION: &str = "1.0";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AddinChannelServer {
     config: AddinChannelConfig,
+    upgrade_guard: AddinUpgradeGuard,
     connections: BTreeMap<String, AddinConnectionState>,
     next_ping_id: u64,
 }
@@ -27,8 +28,10 @@ impl AddinChannelServer {
 
     #[must_use]
     pub fn with_config(config: AddinChannelConfig) -> Self {
+        let upgrade_guard = AddinUpgradeGuard::new(&config);
         Self {
             config,
+            upgrade_guard,
             connections: BTreeMap::new(),
             next_ping_id: 1,
         }
@@ -50,34 +53,7 @@ impl AddinChannelServer {
         path: &str,
         origin: Option<&str>,
     ) -> Result<(), AddinChannelError> {
-        if path != "/addin" {
-            tracing::warn!(
-                component = "addin_channel",
-                path = %path,
-                origin = ?origin,
-                "rejected add-in websocket upgrade path"
-            );
-            return Err(AddinChannelError::InvalidUpgradePath(path.to_string()));
-        }
-        if origin != Some(self.config.origin.as_str()) {
-            tracing::warn!(
-                component = "addin_channel",
-                path = %path,
-                origin = ?origin,
-                expected_origin = %self.config.origin,
-                "rejected add-in websocket origin"
-            );
-            return Err(AddinChannelError::ForbiddenOrigin(
-                origin.unwrap_or_default().to_string(),
-            ));
-        }
-        tracing::debug!(
-            component = "addin_channel",
-            path = %path,
-            origin = ?origin,
-            "accepted add-in websocket upgrade"
-        );
-        Ok(())
+        self.upgrade_guard.validate(path, origin)
     }
 
     /// Registers a document-scoped add-in runtime.
