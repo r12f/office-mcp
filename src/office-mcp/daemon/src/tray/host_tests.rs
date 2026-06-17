@@ -69,11 +69,7 @@ fn linux_tray_manifest_enables_native_status_notifier_features() {
 
 #[test]
 fn native_tray_quit_uses_platform_confirmation_dialogs() {
-    let source_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("tray")
-        .join("host.rs");
-    let source = fs::read_to_string(source_path).expect("read source");
+    let source = read_tray_source("native_tray.rs");
 
     assert!(source.contains("confirm_quit(&surface.snapshot.quit_confirmation)"));
     assert!(source.contains("impl TrayPlatformAdapter for NativeTraySurface"));
@@ -101,11 +97,11 @@ fn background_tray_launcher_owns_native_tray_thread() {
 
 #[test]
 fn native_tray_actions_emit_tracing_events() {
-    let source_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("tray")
-        .join("host.rs");
-    let source = fs::read_to_string(source_path).expect("read source");
+    let source = format!(
+        "{}\n{}",
+        read_tray_source("host.rs"),
+        read_tray_source("native_tray.rs")
+    );
 
     assert!(source.contains("created native tray icon"));
     assert!(source.contains("refreshing tray snapshot"));
@@ -114,4 +110,12 @@ fn native_tray_actions_emit_tracing_events() {
     assert!(source.contains("tray action quit selected"));
     assert!(source.contains("opening daemon UI from tray"));
     assert!(source.contains("stopping daemon from tray"));
+}
+
+fn read_tray_source(name: &str) -> String {
+    let source_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("tray")
+        .join(name);
+    fs::read_to_string(source_path).expect("read tray source")
 }
