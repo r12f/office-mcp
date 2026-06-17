@@ -123,7 +123,10 @@ review the result like a normal collaborator's edits.
       daemon run` must make the daemon web console discoverable and openable by
       a normal user without manually guessing `https://localhost:<port>/ui/`.
       Required entry points: `office-mcp-daemon ui`, tray `Show Office MCP`, and
-      a documented URL in `daemon status` output.
+      a documented URL in `daemon status` output. Current Rust evidence covers
+      the `office-mcp-daemon ui` runtime-file path and `daemon status` output
+      including `uiUrl`, `stateUrl`, `logPath`, and `uiCommand`; visible tray
+      evidence remains tracked under M6.5.0.
 - [ ] Real desktop tray icon. The current Rust tray model/probe is not enough;
       the product must create a visible Windows notification-area icon during a
       normal daemon/tray launch, with right-click menu items for Up/Down, client

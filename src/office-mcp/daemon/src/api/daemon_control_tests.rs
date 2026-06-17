@@ -99,6 +99,7 @@ fn status_reports_runtime_details_without_auth_material() {
 
     assert!(json.contains("\"running\": false"));
     assert!(json.contains("https://localhost:8765/ui/"));
+    assert!(json.contains("\"uiCommand\": \"office-mcp-daemon ui\""));
     assert!(json.contains("\"logPath\": \"C:\\\\logs\\\\office-mcp.log\""));
     assert!(!json.contains("token"));
     assert!(!json.contains("secret"));

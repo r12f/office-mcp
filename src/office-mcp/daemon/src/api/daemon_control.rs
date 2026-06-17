@@ -140,7 +140,8 @@ impl DaemonController {
                 "  \"pid\": {},\n",
                 "  \"uiUrl\": {},\n",
                 "  \"stateUrl\": {},\n",
-                "  \"logPath\": {}\n",
+                "  \"logPath\": {},\n",
+                "  \"uiCommand\": \"office-mcp-daemon ui\"\n",
                 "}}"
             ),
             running,
