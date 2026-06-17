@@ -346,10 +346,19 @@ module so ownership is visible from the directory tree.
 - [x] Move inline Rust unit tests into sibling files named after the production
       file, such as `logger_tests.rs` for `logger.rs`. Keep only minimal
       compile-only inline test modules when a sibling file is not useful.
-- [ ] Add `tracing`-based structured logging across daemon boundaries: startup,
+- [x] Add `tracing`-based structured logging across daemon boundaries: startup,
       config load/reload, MCP request handling, add-in registration/session
       updates, tool dispatch, command completion/failure, tray actions, UI API
       calls, and shutdown.
+      Covered by structured tracing events and tests for daemon startup/config/
+      shutdown (`daemon_run_has_startup_config_and_shutdown_tracing`), MCP HTTP
+      (`writes_structured_tracing_events_for_session_lifecycle_and_rejections`),
+      add-in lifecycle (`writes_structured_tracing_events_for_addin_session_lifecycle`),
+      command routing (`writes_structured_tracing_events_for_command_lifecycle`),
+      tray host actions (`tray_probe_writes_structured_tracing_event` and
+      `native_tray_actions_emit_tracing_events`), UI snapshot rendering
+      (`writes_structured_tracing_event_for_ui_api_snapshot`), and file logging
+      (`tracing_file_subscriber_writes_json_events_with_level_filter`).
 - [x] Configure daemon file logging with intentional levels and structured
       fields. `daemon status` and the daemon UI must expose the current log path
       so errors can be diagnosed from logs instead of guessed from symptoms.
