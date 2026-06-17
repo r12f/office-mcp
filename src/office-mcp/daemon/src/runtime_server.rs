@@ -2,9 +2,9 @@ use crate::addin_channel::{
     AddinChannelConfig, AddinChannelServer, HeartbeatDecision, JsonRpcId, RegisterRequest,
     SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
 };
-use crate::audit_log::{AuditLog, AuditRecord};
 use crate::command_router::{CommandRouter, ToolCallRequest, ToolResponse};
-use crate::config_service::DaemonConfig;
+use crate::common::DaemonConfig;
+use crate::common::{AuditLog, AuditRecord};
 use crate::image_fetcher::ImageFetcher;
 use crate::mcp::{HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
 use crate::session_registry::{AddInInfo, DocumentInfo, HostInfo, SessionPatch, SessionRegistry};
@@ -3046,8 +3046,8 @@ mod tests {
         WebSocketFrame,
     };
     use crate::addin_channel::{AddinChannelConfig, AddinChannelServer};
-    use crate::audit_log::AuditLog;
     use crate::command_router::CommandRouter;
+    use crate::common::AuditLog;
     use crate::image_fetcher::ImageFetcher;
     use crate::mcp::McpHttpFrontend;
     use crate::session_registry::{

@@ -1,6 +1,6 @@
-use crate::audit_log::AuditLog;
-use crate::config_service::{
-    AddinConfig, AuditConfig, DaemonConfig, LimitsConfig, LogLevel, LoggingConfig, McpConfig,
+use crate::common::AuditLog;
+use crate::common::{
+    AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
 };
 use crate::image_fetcher::ImageFetcher;
 use crate::runtime_server::{
@@ -244,7 +244,7 @@ fn fixture_config(
             path: "audit.jsonl".to_string(),
         },
         logging: LoggingConfig {
-            level: LogLevel::Error,
+            level: ConfigLogLevel::Error,
             file: String::new(),
         },
     }

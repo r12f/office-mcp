@@ -1,8 +1,8 @@
 use crate::addin_channel::AddinChannelServer;
-use crate::audit_log::AuditLog;
 use crate::command_router::CommandRouter;
-use crate::config_service::DaemonConfigService;
-use crate::logger::Logger;
+use crate::common::AuditLog;
+use crate::common::DaemonConfigService;
+use crate::common::Logger;
 use crate::mcp::McpHttpFrontend;
 use crate::parity::ParityPlan;
 use crate::runtime_server::RuntimeServer;

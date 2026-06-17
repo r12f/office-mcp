@@ -1,6 +1,6 @@
 use office_mcp_daemon::OfficeMcpDaemon;
 use office_mcp_daemon::client_config::ClaudeDesktopConfigBuilder;
-use office_mcp_daemon::config_service::{DaemonConfig, DaemonConfigService, LoadConfigOptions};
+use office_mcp_daemon::common::{DaemonConfig, DaemonConfigService, LoadConfigOptions};
 use office_mcp_daemon::daemon_control::DaemonController;
 use office_mcp_daemon::evidence_fixture::{UiFixtureOptions, run_ui_fixture};
 use office_mcp_daemon::mcp::McpManagementClient;
@@ -178,7 +178,7 @@ fn print_claude_desktop_config(args: &[String]) {
     println!("{}", builder.to_json());
 }
 
-fn load_config() -> Result<DaemonConfig, office_mcp_daemon::config_service::ConfigError> {
+fn load_config() -> Result<DaemonConfig, office_mcp_daemon::common::ConfigError> {
     DaemonConfigService::new().load(LoadConfigOptions::default())
 }
 
@@ -273,8 +273,9 @@ fn exit_error(error: impl std::fmt::Display) -> ! {
 #[cfg(test)]
 mod tests {
     use super::{json_escape, render_redacted_config, ui_url_from_runtime_path};
-    use office_mcp_daemon::config_service::{
-        AddinConfig, AuditConfig, DaemonConfig, LimitsConfig, LogLevel, LoggingConfig, McpConfig,
+    use office_mcp_daemon::common::{
+        AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig,
+        McpConfig,
     };
 
     #[test]
@@ -307,7 +308,7 @@ mod tests {
                 path: String::new(),
             },
             logging: LoggingConfig {
-                level: LogLevel::Info,
+                level: ConfigLogLevel::Info,
                 file: String::new(),
             },
         };

@@ -1,4 +1,4 @@
-use crate::config_service::DaemonConfig;
+use crate::common::DaemonConfig;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::Write as FmtWrite;

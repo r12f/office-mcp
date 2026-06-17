@@ -1,4 +1,4 @@
-use crate::config_service::DaemonConfig;
+use crate::common::DaemonConfig;
 use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
@@ -231,8 +231,9 @@ fn required_string(value: &serde_json::Value, key: &str) -> Result<String, UiRun
 #[cfg(test)]
 mod tests {
     use super::{UiRuntimeFile, UiRuntimeInfo, default_path_from_env};
-    use crate::config_service::{
-        AddinConfig, AuditConfig, DaemonConfig, LimitsConfig, LogLevel, LoggingConfig, McpConfig,
+    use crate::common::{
+        AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig,
+        McpConfig,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -322,7 +323,7 @@ mod tests {
                 path: String::new(),
             },
             logging: LoggingConfig {
-                level: LogLevel::Info,
+                level: ConfigLogLevel::Info,
                 file: String::new(),
             },
         };
