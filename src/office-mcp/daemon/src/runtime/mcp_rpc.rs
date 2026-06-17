@@ -1,10 +1,9 @@
 use crate::addin_mgr::{
-    AddinChannelServer, AddinConnectionHub, AddinConnectionHubError, CommandRouter,
-    CommandRouterError, ImageFetcher, QueuedCommand, SessionDescriptorView, SessionRegistry,
-    ToolCallRequest, ToolResponse,
+    AddinChannelServer, AddinConnectionHub, AddinConnectionHubError, CommandRouter, ImageFetcher,
+    QueuedCommand, SessionDescriptorView, SessionRegistry, ToolCallRequest, ToolResponse,
 };
 use crate::api::{CommandFailure, UiStateStore};
-use crate::common::{AuditLog, AuditRecord};
+use crate::common::AuditLog;
 use crate::mcp::{
     ExcelToolCatalog, ResourceReadRequest, WORD_V1_TOOLS, resource_request_from_uri, tool_failure,
     tool_failure_from_command, tool_success,
@@ -13,6 +12,7 @@ use crate::runtime::addin_tool_response::AddinToolResponseMapper;
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_catalog_response::McpCatalogResponder;
 use crate::runtime::mcp_tool_arguments::McpToolArgumentPreprocessor;
+use crate::runtime::mcp_tool_audit::McpToolAuditRecorder;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -207,7 +207,7 @@ impl McpJsonRpcRuntime {
                 Ok(queued) => queued,
                 Err(error) => {
                     let failure = error.as_command_failure(tool);
-                    record_failure_audit(
+                    McpToolAuditRecorder::record_failure(
                         context.audit_log,
                         tool,
                         session_id,
@@ -294,7 +294,7 @@ impl McpJsonRpcRuntime {
                 SystemTime::now(),
             )
         };
-        record_tool_audit(
+        McpToolAuditRecorder::record_completed(
             context.audit_log,
             tool,
             &queued.session_id,
@@ -332,76 +332,6 @@ impl McpJsonRpcRuntime {
             "available_tools": info.available_tools
         }))
     }
-}
-
-fn record_tool_audit(
-    audit_log: &AuditLog,
-    tool: &str,
-    session_id: &str,
-    completed: &Result<ToolResponse, CommandRouterError>,
-    started_at: SystemTime,
-    completed_at: SystemTime,
-) {
-    let duration_ms = duration_millis(started_at, completed_at);
-    let record = match completed {
-        Ok(ToolResponse::Success { .. }) => {
-            AuditRecord::success(SystemTime::now(), tool, Some(session_id), duration_ms)
-        }
-        Ok(ToolResponse::Failure(failure)) => AuditRecord::failure(
-            SystemTime::now(),
-            tool,
-            Some(session_id),
-            duration_ms,
-            &failure.office_mcp_code,
-            &failure.message,
-        ),
-        Err(error) => {
-            let failure = error.as_command_failure(tool);
-            AuditRecord::failure(
-                SystemTime::now(),
-                tool,
-                Some(session_id),
-                duration_ms,
-                &failure.office_mcp_code,
-                &failure.message,
-            )
-        }
-    };
-    if let Err(error) = audit_log.record(&record) {
-        tracing::error!(%error, "failed to write audit record");
-        eprintln!("office-mcp-daemon failed to write audit record: {error}");
-    }
-}
-
-fn record_failure_audit(
-    audit_log: &AuditLog,
-    tool: &str,
-    session_id: &str,
-    failure: &CommandFailure,
-    started_at: SystemTime,
-    completed_at: SystemTime,
-) {
-    let record = AuditRecord::failure(
-        SystemTime::now(),
-        tool,
-        Some(session_id),
-        duration_millis(started_at, completed_at),
-        &failure.office_mcp_code,
-        &failure.message,
-    );
-    if let Err(error) = audit_log.record(&record) {
-        tracing::error!(%error, "failed to write audit record");
-        eprintln!("office-mcp-daemon failed to write audit record: {error}");
-    }
-}
-
-fn duration_millis(started_at: SystemTime, completed_at: SystemTime) -> u64 {
-    completed_at
-        .duration_since(started_at)
-        .unwrap_or_default()
-        .as_millis()
-        .try_into()
-        .unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]

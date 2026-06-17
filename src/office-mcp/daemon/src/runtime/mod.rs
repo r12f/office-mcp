@@ -8,6 +8,7 @@ pub mod mcp_catalog_response;
 pub mod mcp_response;
 pub mod mcp_rpc;
 pub mod mcp_tool_arguments;
+pub mod mcp_tool_audit;
 pub mod server;
 pub mod server_config;
 pub mod static_response;
