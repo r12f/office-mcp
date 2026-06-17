@@ -1,6 +1,4 @@
-use crate::addin_mgr::session_registry::{
-    DocumentInfo, NewSessionInfo, SessionPatch, SessionStatus,
-};
+use crate::addin_mgr::{DocumentInfo, NewSessionInfo, SessionPatch, SessionStatus};
 use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
