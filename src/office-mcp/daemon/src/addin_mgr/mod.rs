@@ -1,4 +1,5 @@
 pub mod addin_channel;
+pub mod addin_heartbeat;
 pub mod addin_json_rpc;
 pub mod command_router;
 pub mod connection_hub;

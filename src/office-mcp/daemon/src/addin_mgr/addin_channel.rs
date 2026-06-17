@@ -1,3 +1,4 @@
+use crate::addin_mgr::addin_heartbeat::{AddinHeartbeatState, AddinHeartbeatTimeout};
 use crate::addin_mgr::{
     AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionPatch, SessionRegistry,
 };
@@ -130,8 +131,7 @@ impl AddinChannelServer {
             AddinConnectionState {
                 instance_id: runtime.instance_id.clone(),
                 session_id: None,
-                pending_ping_id: None,
-                missed_pongs: 0,
+                heartbeat: AddinHeartbeatState::default(),
             },
         );
         tracing::info!(
@@ -332,7 +332,7 @@ impl AddinChannelServer {
             .connections
             .get_mut(connection_id)
             .ok_or_else(|| AddinChannelError::UnknownConnection(connection_id.to_string()))?;
-        connection.pending_ping_id = Some(ping_id.clone());
+        connection.heartbeat.start_ping(ping_id.clone());
         Ok(JsonRpcEnvelope::request(
             ping_id,
             "ping",
@@ -354,12 +354,7 @@ impl AddinChannelServer {
             .connections
             .get_mut(connection_id)
             .ok_or_else(|| AddinChannelError::UnknownConnection(connection_id.to_string()))?;
-        if connection.pending_ping_id.as_deref() != Some(response_id) {
-            return Ok(false);
-        }
-        connection.pending_ping_id = None;
-        connection.missed_pongs = 0;
-        Ok(true)
+        Ok(connection.heartbeat.handle_pong(response_id))
     }
 
     /// Records a missed heartbeat and decides whether to close the socket.
@@ -377,28 +372,33 @@ impl AddinChannelServer {
             .connections
             .get_mut(connection_id)
             .ok_or_else(|| AddinChannelError::UnknownConnection(connection_id.to_string()))?;
-        connection.pending_ping_id = None;
-        connection.missed_pongs += 1;
-        if connection.missed_pongs < 2 {
-            tracing::warn!(
-                component = "addin_channel",
-                connection_id = %connection_id,
-                instance_id = %connection.instance_id,
-                missed_pongs = connection.missed_pongs,
-                "add-in heartbeat missed"
-            );
-            return Ok(HeartbeatDecision::KeepOpen);
+        match connection.heartbeat.record_timeout() {
+            AddinHeartbeatTimeout::KeepOpen { missed_pongs } => {
+                tracing::warn!(
+                    component = "addin_channel",
+                    connection_id = %connection_id,
+                    instance_id = %connection.instance_id,
+                    missed_pongs = missed_pongs,
+                    "add-in heartbeat missed"
+                );
+                Ok(HeartbeatDecision::KeepOpen)
+            }
+            AddinHeartbeatTimeout::Close {
+                missed_pongs,
+                close_code,
+            } => {
+                registry.mark_instance_stale(&connection.instance_id, stale_since);
+                tracing::warn!(
+                    component = "addin_channel",
+                    connection_id = %connection_id,
+                    instance_id = %connection.instance_id,
+                    missed_pongs = missed_pongs,
+                    close_code = close_code,
+                    "closing stale add-in connection after heartbeat misses"
+                );
+                Ok(HeartbeatDecision::Close { code: close_code })
+            }
         }
-        registry.mark_instance_stale(&connection.instance_id, stale_since);
-        tracing::warn!(
-            component = "addin_channel",
-            connection_id = %connection_id,
-            instance_id = %connection.instance_id,
-            missed_pongs = connection.missed_pongs,
-            close_code = 4002,
-            "closing stale add-in connection after heartbeat misses"
-        );
-        Ok(HeartbeatDecision::Close { code: 4002 })
     }
 
     #[must_use]
@@ -467,8 +467,7 @@ impl Default for AddinChannelConfig {
 struct AddinConnectionState {
     instance_id: String,
     session_id: Option<String>,
-    pending_ping_id: Option<String>,
-    missed_pongs: u8,
+    heartbeat: AddinHeartbeatState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
