@@ -2,6 +2,7 @@ pub mod addin_http;
 pub mod addin_rpc;
 pub mod addin_tool_response;
 pub mod evidence_fixture;
+pub(crate) mod evidence_fixture_seed;
 pub mod http_wire;
 pub mod json_rpc;
 pub mod mcp_catalog_response;
