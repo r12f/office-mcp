@@ -28,6 +28,7 @@ impl StaticResponseService {
 
     #[must_use]
     pub(crate) fn serve_addin_asset(&self, path: &str) -> WireHttpResponse {
+        let path = path.split_once('?').map_or(path, |(path, _)| path);
         if path == "/assets/icon-32.png" || path == "/assets/icon-80.png" {
             return WireHttpResponse::binary(
                 200,
@@ -98,3 +99,7 @@ const ONE_PIXEL_PNG: &[u8] = &[
     0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 218, 99, 252, 207, 192, 80, 15, 0, 5,
     131, 2, 127, 151, 169, 73, 235, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
 ];
+
+#[cfg(test)]
+#[path = "static_response_tests.rs"]
+mod static_response_tests;
