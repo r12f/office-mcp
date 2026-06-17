@@ -1,10 +1,12 @@
 pub mod addin_channel;
+pub(crate) mod addin_channel_clock;
 pub mod addin_channel_config;
 pub mod addin_channel_error;
 pub mod addin_channel_model;
 pub(crate) mod addin_connection_state;
 pub mod addin_heartbeat;
 pub mod addin_json_rpc;
+pub(crate) mod addin_protocol_version;
 pub mod addin_upgrade_guard;
 pub mod command_model;
 pub(crate) mod command_queue;

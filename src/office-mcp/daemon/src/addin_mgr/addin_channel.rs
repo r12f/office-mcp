@@ -1,4 +1,6 @@
+use crate::addin_mgr::addin_channel_clock::format_system_time;
 use crate::addin_mgr::addin_heartbeat::AddinHeartbeatTimeout;
+use crate::addin_mgr::addin_protocol_version::same_major_version;
 use crate::addin_mgr::{
     AddinChannelConfig, AddinChannelError, AddinConnectionState, AddinUpgradeGuard,
     HeartbeatDecision, NewSessionInfo, RegisterRequest, RuntimeInfo, SessionAddedEvent,
@@ -82,7 +84,7 @@ impl AddinChannelServer {
             );
             return Err(AddinChannelError::MalformedRegister);
         }
-        if !same_major(&request.add_in.protocol_version, ADDIN_PROTOCOL_VERSION) {
+        if !same_major_version(&request.add_in.protocol_version, ADDIN_PROTOCOL_VERSION) {
             tracing::warn!(
                 component = "addin_channel",
                 connection_id = %connection_id,
@@ -413,18 +415,6 @@ impl Default for AddinChannelServer {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn same_major(left: &str, right: &str) -> bool {
-    left.split('.').next() == right.split('.').next()
-}
-
-fn format_system_time(value: SystemTime) -> String {
-    let seconds = value
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    format!("unix:{seconds}")
 }
 
 #[cfg(test)]
