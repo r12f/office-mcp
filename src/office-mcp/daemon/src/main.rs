@@ -23,7 +23,14 @@ fn main() {
         [command] if command == "serve" => serve_daemon(),
         [command] if command == "stdio" => run_stdio_bridge(),
         [command] if command == "sessions" => list_sessions(),
-        [command, subcommand] if command == "daemon" && subcommand == "run" => serve_daemon(),
+        [command, subcommand] if command == "daemon" && subcommand == "run" => {
+            serve_daemon_with_optional_tray(false)
+        }
+        [command, subcommand, flag]
+            if command == "daemon" && subcommand == "run" && flag == "--with-tray" =>
+        {
+            serve_daemon_with_optional_tray(true)
+        }
         [command, subcommand] if command == "daemon" && subcommand == "status" => {
             println!("{}", DaemonController::from_env().status_json());
         }
@@ -57,7 +64,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: office-mcp-daemon [--describe|--parity-gates|serve|stdio|sessions|ui|tray [--probe] [--runtime-path <path>] [--probe-state-path <path>]|daemon run|daemon status|daemon start|daemon stop|config endpoints|config show|config claude-desktop [--installed] [--install-root <path>]]"
+                "usage: office-mcp-daemon [--describe|--parity-gates|serve|stdio|sessions|ui|tray [--probe] [--runtime-path <path>] [--probe-state-path <path>]|daemon run [--with-tray]|daemon status|daemon start|daemon stop|config endpoints|config show|config claude-desktop [--installed] [--install-root <path>]]"
             );
             std::process::exit(2);
         }
@@ -87,6 +94,13 @@ fn run_stdio_bridge() {
 }
 
 fn serve_daemon() {
+    serve_daemon_with_optional_tray(false);
+}
+
+fn serve_daemon_with_optional_tray(start_tray: bool) {
+    if start_tray {
+        start_tray_background();
+    }
     match load_config().and_then(|config| {
         DaemonConfigService::assert_boundary_auth_config(&config)?;
         Ok(config)
@@ -125,6 +139,21 @@ fn serve_daemon() {
         },
         Err(error) => exit_error(error),
     }
+}
+
+fn start_tray_background() {
+    let _ = std::thread::Builder::new()
+        .name("office-mcp-tray".to_string())
+        .spawn(|| {
+            if let Err(error) = TrayHost::new(TrayHostOptions::default()).run() {
+                tracing::error!(%error, "office-mcp tray host stopped with error");
+                eprintln!("office-mcp-daemon tray host stopped with error: {error}");
+            }
+        })
+        .map_err(|error| {
+            tracing::error!(%error, "office-mcp tray host thread failed to start");
+            eprintln!("office-mcp-daemon failed to start tray host thread: {error}");
+        });
 }
 
 const fn logger_level_from_config(

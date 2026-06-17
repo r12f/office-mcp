@@ -184,7 +184,11 @@ User-reported follow-up from live daemon testing:
       Covered by `serve_forever_with_runtime_file`, runtime file tests, and
       `production_bound_daemon_exposes_ui_state_and_events`.
 - [ ] Add a real Windows tray startup path that creates a visible notification
-      icon in normal interactive runs, not just `tray --probe` evidence.
+      icon in normal interactive runs, not just `tray --probe` evidence. Current
+      automated evidence covers `office-mcp-daemon daemon run --with-tray`,
+      which starts the native tray host on a background thread before running
+      the daemon; manual Windows evidence is still required to prove the icon is
+      visible in the notification area.
 - [x] Wire tray `Show Office MCP` to the same UI-opening path as
       `office-mcp-daemon ui`. Covered by `open_ui_from_runtime` and the native
       tray menu action dispatch.

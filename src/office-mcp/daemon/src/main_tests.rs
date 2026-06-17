@@ -76,3 +76,17 @@ fn ui_command_reads_runtime_file_url_instead_of_config_defaults() {
     assert_eq!(url, "https://localhost:8766/ui/");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn daemon_run_with_tray_is_wired_to_background_tray_start() {
+    let source_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("main.rs");
+    let source = std::fs::read_to_string(source_path).expect("read main source");
+
+    assert!(source.contains("daemon\" && subcommand == \"run\" && flag == \"--with-tray"));
+    assert!(source.contains("serve_daemon_with_optional_tray(true)"));
+    assert!(source.contains("start_tray_background();"));
+    assert!(source.contains("TrayHost::new(TrayHostOptions::default()).run()"));
+    assert!(source.contains("office-mcp-tray"));
+}
