@@ -87,6 +87,4 @@ fn daemon_run_with_tray_is_wired_to_background_tray_start() {
     assert!(source.contains("daemon\" && subcommand == \"run\" && flag == \"--with-tray"));
     assert!(source.contains("serve_daemon_with_optional_tray(true)"));
     assert!(source.contains("start_tray_background();"));
-    assert!(source.contains("TrayHost::new(TrayHostOptions::default()).run()"));
-    assert!(source.contains("office-mcp-tray"));
 }

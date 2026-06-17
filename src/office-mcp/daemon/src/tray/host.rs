@@ -94,6 +94,21 @@ pub fn stop_daemon() -> Result<(), TrayPlatformError> {
         .map_err(|error| TrayPlatformError::new(error.to_string()))
 }
 
+pub fn start_tray_background() {
+    let _ = std::thread::Builder::new()
+        .name("office-mcp-tray".to_string())
+        .spawn(|| {
+            if let Err(error) = TrayHost::new(TrayHostOptions::default()).run() {
+                tracing::error!(%error, "office-mcp tray host stopped with error");
+                eprintln!("office-mcp-daemon tray host stopped with error: {error}");
+            }
+        })
+        .map_err(|error| {
+            tracing::error!(%error, "office-mcp tray host thread failed to start");
+            eprintln!("office-mcp-daemon failed to start tray host thread: {error}");
+        });
+}
+
 fn read_ui_state(options: &TrayHostOptions) -> Option<Value> {
     if let Some(path) = options.probe_state_path.as_ref() {
         let body = std::fs::read_to_string(path).ok()?;

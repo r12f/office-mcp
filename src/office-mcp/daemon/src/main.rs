@@ -8,7 +8,7 @@ use office_mcp_daemon::evidence_fixture::{UiFixtureOptions, run_ui_fixture};
 use office_mcp_daemon::mcp::McpManagementClient;
 use office_mcp_daemon::mcp::StdioBridge;
 use office_mcp_daemon::runtime_server::RuntimeServer;
-use office_mcp_daemon::tray::{TrayHost, TrayHostOptions};
+use office_mcp_daemon::tray::{TrayHost, TrayHostOptions, start_tray_background};
 use office_mcp_daemon::ui::{UiRuntimeError, UiRuntimeFile};
 use std::path::PathBuf;
 
@@ -139,21 +139,6 @@ fn serve_daemon_with_optional_tray(start_tray: bool) {
         },
         Err(error) => exit_error(error),
     }
-}
-
-fn start_tray_background() {
-    let _ = std::thread::Builder::new()
-        .name("office-mcp-tray".to_string())
-        .spawn(|| {
-            if let Err(error) = TrayHost::new(TrayHostOptions::default()).run() {
-                tracing::error!(%error, "office-mcp tray host stopped with error");
-                eprintln!("office-mcp-daemon tray host stopped with error: {error}");
-            }
-        })
-        .map_err(|error| {
-            tracing::error!(%error, "office-mcp tray host thread failed to start");
-            eprintln!("office-mcp-daemon failed to start tray host thread: {error}");
-        });
 }
 
 const fn logger_level_from_config(

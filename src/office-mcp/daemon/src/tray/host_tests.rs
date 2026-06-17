@@ -53,3 +53,17 @@ fn native_tray_quit_uses_platform_confirmation_dialogs() {
     assert!(source.contains("zenity"));
     assert!(source.contains("kdialog"));
 }
+
+#[test]
+fn background_tray_launcher_owns_native_tray_thread() {
+    let source_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("tray")
+        .join("host.rs");
+    let source = fs::read_to_string(source_path).expect("read source");
+
+    assert!(source.contains("pub fn start_tray_background()"));
+    assert!(source.contains(".name(\"office-mcp-tray\".to_string())"));
+    assert!(source.contains("TrayHost::new(TrayHostOptions::default()).run()"));
+    assert!(source.contains("office-mcp tray host thread failed to start"));
+}
