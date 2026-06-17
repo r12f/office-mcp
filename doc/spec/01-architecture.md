@@ -53,24 +53,36 @@ src/
     word/                       # Word entry point, initialization, and Word commands.
     excel/                      # Excel entry point, initialization, and Excel commands.
   office-mcp/                   # Native office-mcp product runtime.
-    daemon/                     # Rust daemon service and daemon-owned state.
-    ui/                         # Web UI assets for tray-opened daemon console.
+    daemon/                     # Rust daemon service, daemon-owned state, and daemon UI.
+      src/
+        common/                 # Shared config, logging, redaction, limits, audit, errors.
+        ui/                     # Daemon web UI assets and UI runtime file helpers.
+        api/                    # Local daemon UI/control API: status, config, sessions, tasks.
+        mcp/                    # MCP Streamable HTTP frontend and stdio bridge.
+        addin_mgr/              # Add-in HTTPS/WSS channel, sessions, routing, command queue.
+        tray/                   # Native tray/menu-bar host, menu model, UI open/quit actions.
+        main.rs                 # CLI entry point and top-level command dispatch.
+        lib.rs                  # Public module wiring only.
 packaging/                      # Installers, release packaging, catalog/bootstrap scripts.
 ```
 
 `src/office-ctl` owns code that runs inside Office webview runtimes. Host-specific
 folders such as `word` and `excel` may depend on `common`, but `common` MUST NOT
 depend on a specific Office host. `src/office-mcp/daemon` owns the local daemon
-process and all server-side session management. `src/office-mcp/ui` owns the
-daemon web interface shown from the tray and served or bridged by the daemon.
-The UI may consume only redacted daemon status APIs; it must not own protocol
-routing, session mutation, or Office command execution. `packaging` owns
-installation and release assembly only; it must not become a runtime code owner.
+process, all server-side session management, and the daemon UI it serves. The
+current sibling `src/office-mcp/ui` directory is a transitional location and
+SHOULD be merged into `src/office-mcp/daemon/src/ui` so daemon UI source,
+runtime-file handling, and UI-serving code live under one ownership boundary.
+The UI may consume only redacted daemon status/control APIs from `api`; it must
+not own protocol routing, session mutation, or Office command execution.
+`packaging` owns installation and release assembly only; it must not become a
+runtime code owner.
 
-Legacy top-level `mcp-server/`, `addin/`, `docs/`, and `rust-daemon/` paths MUST
-NOT remain after the source-layout migration. Temporary reference code must not
-remain in the target tree after Rust parity is proven; protocol and runtime
-evidence lives in Rust tests and `src/office-mcp/daemon/evidence`.
+Legacy top-level `mcp-server/`, `addin/`, `docs/`, `rust-daemon/`, and sibling
+daemon UI source paths MUST NOT remain after the source-layout migration.
+Temporary reference code must not remain in the target tree after Rust parity is
+proven; protocol and runtime evidence lives in Rust tests and
+`src/office-mcp/daemon/evidence`.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -113,37 +125,98 @@ There is exactly one. Everything below assumes it is already running; how it
 gets started is install-time concern, not runtime concern (see §2.3).
 
 The production daemon implementation is the native Rust application in
-`src/office-mcp/daemon`. Its web console assets live in `src/office-mcp/ui` and
-are served or bridged by the daemon. Existing MCP transport behavior, add-in
-JSON-RPC registration, Office tool routing, UI state redaction, and evidence
-harnesses are contract tests for the Rust daemon; they MUST NOT be deleted or
-weakened while implementation continues.
+`src/office-mcp/daemon`. Its web console assets and UI runtime helpers live
+under the daemon's `ui` module and are served or bridged by the daemon. Existing
+MCP transport behavior, add-in JSON-RPC registration, Office tool routing, UI
+state redaction, and evidence harnesses are contract tests for the Rust daemon;
+they MUST NOT be deleted or weakened while implementation continues.
 
 Rust code is expected to use explicit domain objects and ownership boundaries,
-not C-style procedural modules with global state. The minimum daemon object
-model is:
+not C-style procedural modules with global state. Rust source files MUST be
+organized by functional module, not as a flat list in `daemon/src`. The required
+module boundaries are:
+
+- `common`: shared infrastructure with no product-server ownership. Contains
+  config loading/redaction, logging, audit logging, limits, shared error types,
+  time helpers, and cross-module utilities. It must not depend on `api`, `mcp`,
+  `addin_mgr`, `tray`, or host-specific Office logic.
+- `ui`: daemon web UI source/assets, UI runtime file helpers, and UI asset
+  serving helpers. It depends on `api` view models only through stable DTOs and
+  must not dispatch MCP or add-in commands directly.
+- `api`: local daemon UI/control API used by the frontend UI and tray. Owns
+  redacted status snapshots, sessions/tasks/client view models, config/status
+  control endpoints, and UI event streams. It may read daemon state through
+  service interfaces but must not contain MCP protocol handling or Office.js
+  command execution.
+- `mcp`: MCP-facing interfaces only: Streamable HTTP frontend, MCP session and
+  client tracking, stdio bridge, MCP JSON-RPC/request validation, MCP resource
+  and prompt catalogs, and translation from MCP calls into add-in session
+  invocations.
+- `addin_mgr`: add-in-facing runtime management: HTTPS/WSS channel, exact
+  `Origin` checks, add-in JSON-RPC framing, registration, heartbeat,
+  `SessionRegistry`, per-session `CommandRouter`, stale-session handling, and
+  forwarding tool invocations to connected Office add-ins.
+- `tray`: native tray/menu-bar integration, tray menu model, platform adapters,
+  `Show Office MCP`, and graceful quit confirmation. It consumes `api`/`ui`
+  surfaces rather than reading add-in or MCP internals directly.
+- Root files such as `main.rs`, `lib.rs`, and top-level daemon composition own
+  CLI dispatch and dependency wiring only.
+
+The minimum daemon object model is:
 
 - `OfficeMcpDaemon`: owns process lifetime, startup/shutdown, and component
   wiring.
-- `DaemonConfigService`: loads, validates, redacts, and watches daemon config.
-- `McpHttpFrontend`: owns the Streamable HTTP server, request validation,
+- `DaemonConfigService` (`common`): loads, validates, redacts, and watches daemon config.
+- `McpHttpFrontend` (`mcp`): owns the Streamable HTTP server, request validation,
   MCP session/client tracking, and MCP error translation.
-- `AddinChannelServer`: owns local HTTPS/WSS serving, origin checks,
+- `AddinChannelServer` (`addin_mgr`): owns local HTTPS/WSS serving, origin checks,
   JSON-RPC framing, heartbeat, and registration.
-- `SessionRegistry`: owns Office runtime/session identity, stale-session grace,
+- `SessionRegistry` (`addin_mgr`): owns Office runtime/session identity, stale-session grace,
   capability metadata, and queue depth.
-- `CommandRouter`: owns tool dispatch, per-session serialization, timeouts,
+- `CommandRouter` (`addin_mgr`): owns tool dispatch, per-session serialization, timeouts,
   cancellation, and result/error mapping.
-- `UiStateStore`: owns redacted daemon UI snapshots, current tasks, bounded
+- `DaemonApiServer` (`api`): owns local UI/control API routing and event streams.
+- `UiStateStore` (`api`): owns redacted daemon UI snapshots, current tasks, bounded
   command history, and UI subscriptions.
-- `TrayController`: owns native tray/menu-bar integration, status menu updates,
+- `TrayController` (`tray`): owns native tray/menu-bar integration, status menu updates,
   show-UI action, and graceful quit confirmation.
-- `AuditLog` and `Logger`: own optional audit records and operational logs with
+- `AuditLog` and `Logger` (`common`): own optional audit records and operational logs with
   redaction at the boundary.
 
 These objects may use traits for platform-specific adapters, such as tray
 integration and certificate stores, but protocol/domain state should remain in
 portable core types.
+
+#### Rust daemon code style
+
+Rust daemon implementation MUST follow these style rules:
+
+- Keep files small and cohesive. A Rust source file should own one primary
+  concept or a tight set of helper types for that concept. Do not place many
+  unrelated structs, enums, traits, and service implementations in one `.rs`
+  file.
+- Prefer explicit object/domain types with clear ownership and injected
+  dependencies. Avoid procedural catch-all modules, global mutable state, and
+  service code hidden in utility files.
+- Unit tests for `foo.rs` live in a sibling `foo_tests.rs` file in the same
+  module directory. Production files should not contain large inline
+  `#[cfg(test)] mod tests` blocks except for tiny compile-only checks where a
+  sibling file would add no value.
+- Each module directory may have a `mod.rs` only for public exports and module
+  wiring; implementation should live in named files.
+- New Rust work must add logging with the `tracing` ecosystem. Use spans for
+  request/session/tool lifecycles and structured fields for session ID, request
+  ID, tool name, client ID, endpoint, and error code where available.
+- Log levels must be intentional: `error` for failed operations requiring
+  operator attention, `warn` for degraded/retriable or suspicious conditions,
+  `info` for lifecycle and user-visible state transitions, `debug` for normal
+  diagnostic details, and `trace` only for high-volume protocol internals.
+- Logs must be written to a daemon log file configured through the daemon config
+  and visible in `daemon status`/UI diagnostics. Console logging may remain for
+  developer runs, but file logging is required for production diagnosis.
+- Error investigations should use structured logs first. Do not rely on guessing
+  from symptoms when the daemon can record the failing boundary, request ID,
+  session ID, and error code.
 
 - **Lifetime**: starts at user login (Windows Scheduled Task / macOS launchd
   agent / Linux systemd `--user` unit). Runs until the user logs out or the
@@ -268,11 +341,17 @@ add-in can be the connecting party is a network socket.
 
 The daemon UI backend is local-only and not part of the MCP tool surface. It
 serves redacted status snapshots to the tray controller and main window. The
-web UI source lives under `src/office-mcp/ui`; the backend state and API live
-under `src/office-mcp/daemon`. The UI MAY share the add-in HTTPS origin or use
-an internal desktop bridge, but it MUST preserve the same privacy boundary: no
-document body text, no unredacted tool arguments, and no sensitive local
-configuration values in UI state.
+web UI source, UI runtime helpers, backend state, and UI/control API live under
+`src/office-mcp/daemon`, separated into the `ui` and `api` modules. The UI MAY
+share the add-in HTTPS origin or use an internal desktop bridge, but it MUST
+preserve the same privacy boundary: no document body text, no unredacted tool
+arguments, and no sensitive local configuration values in UI state.
+
+The normal production daemon path must expose the UI server, not only a test
+fixture. `daemon run` owns the UI runtime file and keeps `/ui/`, `/ui/state`,
+and `/ui/events` available for as long as the daemon is running. The tray host
+and `office-mcp-daemon ui` command both open the URL recorded in that runtime
+file.
 
 ## 4. Lifecycle scenarios
 
@@ -280,8 +359,9 @@ configuration values in UI state.
 
 1. User logs in. OS-level autostart launches the daemon.
 2. Daemon reads its config, binds MCP HTTP plus local HTTPS/WSS, and idles.
-3. Daemon tray icon appears and reports `Up` once listeners are ready.
-4. No add-ins connected → `office.list_sessions` returns `[]`.
+3. Daemon UI server is available on the configured local HTTPS origin.
+4. Daemon tray icon appears and reports `Up` once listeners are ready.
+5. No add-ins connected → `office.list_sessions` returns `[]`.
 
 ### 4.2 MCP client starts before any Office
 

@@ -66,6 +66,11 @@ impl CommandRouter {
             timeout_ms: Some(duration_millis(timeout)),
             started_at: Some(now),
         });
+        let sequence = self
+            .queues_by_session
+            .entry(request.session_id.clone())
+            .or_default()
+            .next_sequence();
         let queued = QueuedCommand {
             command_id,
             request_id,
@@ -77,11 +82,7 @@ impl CommandRouter {
             enqueued_at: now,
             deadline_at: now + timeout,
             dispatched: false,
-            sequence: self
-                .queues_by_session
-                .entry(permit.host_app.clone())
-                .or_default()
-                .next_sequence(),
+            sequence,
         };
         self.queues_by_session
             .entry(queued.session_id.clone())
@@ -463,6 +464,7 @@ mod tests {
         assert_eq!(first.sequence, 0);
         assert_eq!(second.sequence, 1);
         assert_eq!(router.queue_depth("session-1"), 2);
+        assert_eq!(router.queue_depth("word"), 0);
         let snapshot = ui_state.snapshot(&[], now);
         assert_eq!(snapshot.current_tasks.len(), 2);
         assert_eq!(snapshot.clients[0].in_flight_request_count, 2);

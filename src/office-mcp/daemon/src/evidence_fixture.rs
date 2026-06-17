@@ -305,7 +305,15 @@ fn excel_session() -> NewSessionInfo {
             is_protected: Some(false),
             ..DocumentInfo::default()
         },
-        available_tools: vec!["excel.get_range".to_string()],
+        available_tools: vec![
+            "excel.read_range".to_string(),
+            "excel.write_range".to_string(),
+            "excel.add_sheet".to_string(),
+            "excel.set_formula".to_string(),
+            "excel.format_range".to_string(),
+            "excel.create_table".to_string(),
+            "excel.create_chart".to_string(),
+        ],
         is_active: Some(false),
     }
 }

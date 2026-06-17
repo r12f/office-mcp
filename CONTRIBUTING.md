@@ -16,7 +16,8 @@ design contract kept under [doc/spec/](doc/spec/).
 - `src/office-mcp/daemon/evidence/` contains runtime, UI, smoke, and validation
   evidence harnesses. Run evidence commands from this directory.
 
-- `src/office-mcp/ui/` contains the daemon web console assets.
+- `src/office-mcp/ui/` is a transitional daemon web console location. Target
+  ownership is `src/office-mcp/daemon/src/ui/`.
 - `src/office-ctl/common/` contains shared TypeScript add-in utilities.
 - `src/office-ctl/word/` is the Word add-in package. Run manifest validation and task pane
   checks from this directory.
@@ -38,10 +39,23 @@ design contract kept under [doc/spec/](doc/spec/).
 ## What we don't want yet
 
 - New root-level application packages. Keep daemon runtime code in
-  `src/office-mcp/daemon/`, daemon UI code in `src/office-mcp/ui/`, add-in
-  runtime code in `src/office-ctl/`, and installer glue in `packaging/`.
+  `src/office-mcp/daemon/`, daemon UI code under the daemon `ui` module,
+  add-in runtime code in `src/office-ctl/`, and installer glue in `packaging/`.
 - Unplanned host tool catalogs. Word and Excel v1 have specs; PowerPoint and
   Outlook remain future milestones until their capability docs are written.
+
+## Implementation workflow
+
+- Work in small, reviewable tasks. A task is a coherent change with its own
+  verification evidence, not a milestone-sized batch.
+- After each task is complete and its relevant local checks pass, commit that
+  task before starting the next one.
+- Push after each completed task commit. Do not accumulate many unrelated or
+  loosely related changes into one large commit.
+- Commit messages should name the completed task and mention the main evidence
+  command when useful.
+- If a task cannot be verified locally, commit only after documenting the gap in
+  the commit message or follow-up TODO.
 
 ## Discussion
 

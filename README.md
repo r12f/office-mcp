@@ -74,9 +74,9 @@ npm run check
 
 | Path | Owner |
 |---|---|
-| `src/office-mcp/daemon/` | Native Rust daemon service and daemon-owned state/API. |
+| `src/office-mcp/daemon/` | Native Rust daemon service, daemon-owned state/API, and daemon UI source. |
 | `src/office-mcp/daemon/evidence/` | Runtime, UI, smoke, and validation evidence harnesses for daemon parity and release gates. |
-| `src/office-mcp/ui/` | Web UI assets for the tray-opened daemon console. |
+| `src/office-mcp/ui/` | Transitional daemon web UI asset location; target ownership is `src/office-mcp/daemon/src/ui/`. |
 | `src/office-ctl/common/` | Shared TypeScript add-in utilities: config, logging, channel/protocol helpers, redaction, and reusable UI primitives. |
 | `src/office-ctl/word/` | Word add-in package: XML manifest, task pane static bundle, add-in validation scripts, and Word catalog registration script. |
 | `src/office-ctl/excel/` | Excel add-in entry point and host-specific command surface. |
@@ -297,8 +297,8 @@ powershell -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-msi.p
 ```
 
 The MSI build stages the same split layout under `artifacts\msi-stage\`:
-`office-mcp-daemon.exe` for the Rust daemon runtime, `office-mcp/ui/` for the
-daemon web console, `office-ctl/word/` and `office-ctl/excel/` for the Office task pane bundles,
+`office-mcp-daemon.exe` for the Rust daemon runtime, daemon-owned UI assets for
+the daemon web console, `office-ctl/word/` and `office-ctl/excel/` for the Office task pane bundles,
 `scripts/` for installer helper scripts, and `addin-catalog/` for the sideload
 manifests. It generates the WiX payload fragment and asserts that the Rust
 daemon, UI assets, add-in bundles, catalog manifests, and launcher scripts are

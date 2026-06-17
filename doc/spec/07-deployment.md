@@ -8,7 +8,7 @@ each other.
 | Component | What it is | Where it lives | Updated how |
 |---|---|---|---|
 | `office-mcp` | Native Rust long-running daemon from `src/office-mcp/daemon`. | `%LOCALAPPDATA%\office-mcp\` (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | MSI / Homebrew tap |
-| `office-mcp-ui` | Web UI assets from `src/office-mcp/ui`, opened from the tray and served or bridged by the daemon. | Installed beside the daemon | MSI / Homebrew tap |
+| `office-mcp-ui` | Web UI assets owned by `src/office-mcp/daemon/src/ui`, opened from the tray and served or bridged by the daemon. | Installed beside the daemon | MSI / Homebrew tap |
 | `office-ctl` | Office add-in bundles from `src/office-ctl`: shared `common` code plus host entries such as `word` and `excel`. | Installed beside the daemon and served from its trusted local HTTPS origin | Installer / atomic local replacement |
 | Manifest | XML / JSON describing the add-in | Sideloaded via the trusted catalog by the installer; AppSource / M365 admin push for managed deployments | See §3 |
 | Bootstrap installer | MSI / .pkg / shell script | Downloaded from GitHub Releases | Per-release |
@@ -19,8 +19,7 @@ The target source tree is:
 doc/                 # Specifications and design documentation.
 src/office-ctl/      # TypeScript Office add-ins: common, word, excel.
 src/office-mcp/
-  daemon/            # Rust daemon service and daemon-owned state/API.
-  ui/                # Web UI assets for the tray-opened daemon console.
+  daemon/            # Rust daemon service, daemon-owned state/API, and daemon UI.
 packaging/           # Installers and release assembly.
 ```
 
@@ -28,8 +27,10 @@ The actual installation procedure — including daemon autostart and add-in
 catalog registration — is in §6, not here. §1 is just the artifact list.
 
 The production daemon is the native Rust executable built from
-`src/office-mcp/daemon`. Its main-window web assets are built from
-`src/office-mcp/ui` and packaged beside the daemon. Installers MUST stage the
+`src/office-mcp/daemon`. Its main-window web assets are owned by the daemon's
+`ui` module and packaged beside the executable. The sibling
+`src/office-mcp/ui` path is transitional and should be removed after the UI
+source is merged into `src/office-mcp/daemon/src/ui`. Installers MUST stage the
 Rust daemon as the runtime and keep using the protocol, runtime, UI, tray,
 redaction, and packaging evidence gates as release checks.
 
@@ -203,6 +204,14 @@ level = "info"                   # trace | debug | info | warn | error
 file  = ""                       # default: platform log dir
 ```
 
+The Rust daemon uses the `tracing` ecosystem for structured logs. Production
+runs MUST write logs to a file, either the configured `logging.file` path or the
+platform default log location when that field is empty. The effective log path
+is part of daemon diagnostics and must be visible from `daemon status` and the
+daemon UI. Logs must redact document body content, inserted/replacement text,
+base64 image data, certificate passphrases, and other sensitive configuration
+values while preserving request/session/tool/error context for debugging.
+
 Environment variables override daemon config keys, prefixed `OFFICE_MCP_`
 (e.g. `OFFICE_MCP_ADDIN_CHANNEL__PORT=9000`). They are not visible to the
 web add-in. The section-style names matching the TOML structure are canonical;
@@ -239,10 +248,10 @@ powershell -ExecutionPolicy Bypass -File .\packaging\windows\uninstall-windows.p
 ```
 
 The current MSI build is a user-scoped installer for the native Rust daemon. It
-installs `office-mcp-daemon.exe`, daemon UI assets from `src/office-mcp/ui`, the
-add-in bundle, catalog manifest, default `config.toml`, and launcher scripts
-under `%LOCALAPPDATA%\office-mcp\`. The launchers set `OFFICE_MCP_CONFIG_PATH`
-to that installed config. The MSI also registers the Office trusted catalog and an
+installs `office-mcp-daemon.exe`, daemon-owned UI assets, the add-in bundle,
+catalog manifest, default `config.toml`, and launcher scripts under
+`%LOCALAPPDATA%\office-mcp\`. The launchers set `OFFICE_MCP_CONFIG_PATH` to
+that installed config. The MSI also registers the Office trusted catalog and an
 HKCU `Run` entry that starts the tray launcher at logon. A later production
 packaging pass may replace the PowerShell launcher with a native
 `office-mcp.exe`, move mutable config to `%APPDATA%\office-mcp\`, and replace
@@ -308,6 +317,20 @@ office-mcp sessions          # list documents with a connected add-in runtime
 The tray icon and main window are part of production verification, not optional
 developer diagnostics. UI behavior and state redaction are specified in
 [09-ui.md](09-ui.md).
+
+Production verification MUST include the normal daemon path, not only fixture
+or probe commands:
+
+- `office-mcp-daemon daemon run` writes the UI runtime file and serves `/ui/`,
+  `/ui/state`, and `/ui/events` on the configured local HTTPS origin.
+- `office-mcp-daemon daemon status` reports the current UI URL and state URL.
+- `office-mcp-daemon ui` opens or prints the current daemon UI URL and fails
+  clearly when no daemon UI server is running.
+- The Windows tray launch path creates a visible notification-area icon in an
+  interactive user session. `tray --probe` is useful automated coverage, but it
+  is not sufficient evidence that the user can see or use the tray.
+- The tray `Show Office MCP` action opens or focuses the same UI URL reported by
+  `daemon status`.
 
 ## 7. Versioning & upgrades
 

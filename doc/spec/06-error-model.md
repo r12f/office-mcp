@@ -28,6 +28,7 @@ failures that an agent can act on.
 | `PATH_REFUSED` | A daemon-side file destination violates path policy. |
 | `IMAGE_FETCH_FAILED` | The daemon could not fetch or validate an image URL. |
 | `HOST_CAPABILITY_UNAVAILABLE` | The session lacks a required API set or verified host capability. |
+| `TOOL_DISABLED_BY_USER` | The user disabled this tool for the current add-in session. |
 | `CANCELLED` | The client or daemon cancelled the operation. |
 | `TIMEOUT` | The operation exceeded its deadline. |
 | `MAX_RESPONSE_SIZE` | The result exceeded `MAX_RESPONSE_BYTES`. |
@@ -162,6 +163,7 @@ Tools with an explicit state precondition may return `STALE_INDEX`.
 | `IRM_DENIED` | Do not retry unchanged. |
 | `ANCHOR_NOT_FOUND` | Re-read and alter arguments. |
 | `STALE_INDEX` | Re-read state; retry at most once automatically. |
+| `TOOL_DISABLED_BY_USER` | Do not retry unchanged; ask the user to re-enable the tool in the add-in task pane settings. |
 | `TIMEOUT` | Retry only when the operation is known idempotent or after re-reading state. |
 
 Humans should see the symbolic code, session ID, and actionable message.

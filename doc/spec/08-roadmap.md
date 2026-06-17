@@ -2,6 +2,17 @@
 
 ## Milestones
 
+## Implementation workflow requirements
+
+- Each checked roadmap item or coherent implementation task must be completed as
+  a separate commit after its relevant verification passes.
+- Push after each completed task commit. Do not batch multiple completed tasks
+  into one large commit.
+- Large migrations, especially M6.5.0, M6.5.1, and M6.6.1, must be decomposed
+  into reviewable slices with one commit and push per slice.
+- Commit messages should name the task and, when useful, include the local check
+  or evidence command that proves the slice.
+
 ### M0 — Spec & scaffolding (this PR)
 
 - [x] Architecture & protocol specs
@@ -99,13 +110,23 @@ review the result like a normal collaborator's edits.
 
 ### M6.5 — Product UI
 
-- [x] Daemon tray icon with right-click status menu: Up/Down, client count,
-      document count, separator, Show Office MCP, Quit Office MCP.
-- [x] Daemon main window with status, endpoints, connected MCP clients, grouped
-      document sessions, current tasks, and recent command history. Current
-      evidence: `npm run check:ui` covers the daemon web console, state API,
-      browser smoke, connected/degraded/empty states, current tasks, history,
-      endpoint copy controls, and responsive desktop/task-pane layouts.
+- [x] Daemon UI backend and static web console assets: redacted `/ui/state`,
+      `/ui/events`, and `/ui/` are served by the daemon evidence fixture and
+      validated by `npm run check:ui`.
+- [ ] User-visible daemon UI server entry point. Running `office-mcp-daemon
+      daemon run` must make the daemon web console discoverable and openable by
+      a normal user without manually guessing `https://localhost:<port>/ui/`.
+      Required entry points: `office-mcp-daemon ui`, tray `Show Office MCP`, and
+      a documented URL in `daemon status` output.
+- [ ] Real desktop tray icon. The current Rust tray model/probe is not enough;
+      the product must create a visible Windows notification-area icon during a
+      normal daemon/tray launch, with right-click menu items for Up/Down, client
+      count, document count, Show Office MCP, and Quit Office MCP.
+- [ ] Daemon main window with status, endpoints, connected MCP clients, grouped
+      document sessions, current tasks, and recent command history must be
+      reachable from the user-visible UI server/tray path, not only from the UI
+      evidence fixture. Current evidence validates rendering behavior but does
+      not prove the production entry point is discoverable.
 - [x] Per-document detail expansion showing the most recent 10 commands and
       success/failure details. Current evidence: `npm run check:ui` verifies
       collapsed/expanded document detail panels and per-document command
@@ -130,22 +151,87 @@ review the result like a normal collaborator's edits.
       high contrast, reduced motion, desktop layout, and 320 px task pane/main
       window layout.
 
-**Exit criterion**: A non-technical user can open the tray menu and main window
-to understand whether office-mcp is running, which clients and documents are
+**Exit criterion**: A non-technical user can see the daemon tray icon, open the
+tray menu, open the daemon main window from that menu or `office-mcp-daemon ui`,
+and understand whether office-mcp is running, which clients and documents are
 connected, what task is currently executing, and why the last relevant command
-failed, without inspecting terminal output or logs.
+failed, without inspecting terminal output, logs, or hidden localhost URLs.
+
+### M6.5.0 — Daemon UI server and tray visibility follow-up
+
+User-reported follow-up from live daemon testing:
+
+- [ ] Add a production `office-mcp-daemon ui` command that reads the current UI
+      runtime file, opens/focuses the daemon web console, and prints a clear
+      error when no daemon UI server is running.
+- [ ] Ensure `daemon status` reports the actual UI URL and state URL for the
+      currently running daemon, including non-default ports such as `8766`.
+- [ ] Ensure `daemon run` writes a fresh UI runtime file and keeps `/ui/`,
+      `/ui/state`, and `/ui/events` available for the lifetime of the daemon.
+- [ ] Add a real Windows tray startup path that creates a visible notification
+      icon in normal interactive runs, not just `tray --probe` evidence.
+- [ ] Wire tray `Show Office MCP` to the same UI-opening path as
+      `office-mcp-daemon ui`.
+- [ ] Wire tray `Quit Office MCP` to graceful daemon shutdown and visible menu
+      confirmation.
+- [ ] Add manual/e2e evidence that verifies a visible tray icon exists on
+      Windows, the right-click menu appears, and `Show Office MCP` opens the
+      daemon UI.
+- [ ] Add automated coverage that fails when production `daemon run` does not
+      expose `/ui/` and when `daemon status` omits the UI URL.
+
+**Exit criterion**: Starting office-mcp in its normal local mode creates a
+running UI server and a visible tray icon. A user can open the daemon UI from
+the tray or CLI without knowing the localhost URL.
+
+### M6.5.1 — Add-in task pane layout and tool permissions
+
+User-reported follow-up from live task pane testing:
+
+- [ ] Replace oversized task pane blocks with content-based section heights.
+      The connection/document summary, current task empty state, and recent task
+      empty state must be compact and must not reserve large blank panels.
+- [ ] Merge connection status and document metadata into one compact top block.
+      The top block must contain the settings affordance and enough document
+      context for scanning in a 320 px task pane.
+- [ ] Move settings into an inline child panel of the top block. Clicking the
+      gear must not append a detached settings block at the bottom of the task
+      pane.
+- [ ] Replace bare tool-count badges such as `27 Tools` with an inspectable
+      grouped tool list that shows actual tool names, categories, side effects,
+      and descriptions.
+- [ ] Add per-tool enable/disable controls in task pane settings for Word and
+      Excel. The persisted state is per full tool name; category toggles are
+      optional shortcuts only.
+- [ ] Wire tool permissions into the add-in registration/session update flow:
+      disabled tools are omitted from effective `available_tools`, the daemon
+      preflight rejects absent tools, and an in-flight race returns
+      `TOOL_DISABLED_BY_USER`.
+- [ ] Add automated UI evidence for the compact layout, inline settings panel,
+      grouped tool inspection, and per-tool permission toggles at 320 px width.
+- [ ] Add protocol/unit coverage proving `session.updated.available_tools`
+      changes after a permission toggle and that disabled tools cannot be
+      invoked.
+
+**Exit criterion**: In a 320 px Office task pane, the first viewport shows a
+compact connection/document summary, current task, and recent task status
+without large empty blocks; settings open inside the top block; users can see
+which tools are available and disable any individual tool with daemon-visible
+effect.
 
 ### M6.6 — Rust native daemon migration
 
-- [x] Normalize the source tree to the target layout: `doc/` for specs,
-      `src/office-ctl/{common,word,excel}` for TypeScript Office add-ins,
-      `src/office-mcp/{daemon,ui}` for the Rust daemon service and its web
-      console, and `packaging/` for installers and release assembly.
+- [x] Normalize the source tree away from legacy top-level packages into
+      `doc/`, `src/office-ctl/{common,word,excel}`, `src/office-mcp/daemon`,
+      and `packaging/`. The current sibling `src/office-mcp/ui` path is now
+      transitional; M6.6.1 moves daemon UI ownership into
+      `src/office-mcp/daemon/src/ui`.
 - [x] Add the Rust daemon under `src/office-mcp/daemon` and preserve protocol
       parity through Rust unit tests plus evidence harnesses.
-- [x] Move the daemon web console source under `src/office-mcp/ui`; it may only
-      consume redacted daemon status APIs and must not own protocol routing,
-      session mutation, or Office command execution.
+- [x] Move the daemon web console out of legacy top-level runtime paths. It may
+      only consume redacted daemon status APIs and must not own protocol
+      routing, session mutation, or Office command execution. Final ownership
+      moves under the daemon `ui` module in M6.6.1.
 - [x] Port the daemon behind explicit domain objects: `OfficeMcpDaemon`,
       `DaemonConfigService`, `McpHttpFrontend`, `AddinChannelServer`,
       `SessionRegistry`, `CommandRouter`, `UiStateStore`, `TrayController`,
@@ -188,6 +274,67 @@ failed, without inspecting terminal output or logs.
 the add-in protocol, MCP client behavior, evidence report schema, UI state
 redaction guarantees, user-visible tray/main-window behavior, or the host add-in
 contract shared by Word and Excel.
+
+### M6.6.1 — Rust daemon source organization
+
+User-reported architecture follow-up: the Rust daemon source is currently too
+flat. Files under `src/office-mcp/daemon/src` must be reorganized by functional
+module so ownership is visible from the directory tree.
+
+- [ ] Create `src/office-mcp/daemon/src/common/` for shared config, logger,
+      audit log, redaction, limits, shared errors, and utility code. `common`
+      must not depend on product-facing modules.
+- [ ] Create `src/office-mcp/daemon/src/ui/` and merge the sibling
+      `src/office-mcp/ui` source/assets into it. The old sibling path should be
+      removed after packaging and evidence paths are updated.
+- [ ] Create `src/office-mcp/daemon/src/api/` for daemon UI/control APIs:
+      status, sessions, current tasks, recent history, config display/control,
+      UI runtime file lookup, and UI event streams.
+- [ ] Create `src/office-mcp/daemon/src/mcp/` for MCP-only code: Streamable HTTP
+      frontend, stdio bridge, MCP management client, resources, prompts, tool
+      catalog, MCP request validation, and MCP error translation.
+- [ ] Create `src/office-mcp/daemon/src/addin_mgr/` for add-in-facing code:
+      local HTTPS/WSS channel, exact `Origin` validation, add-in JSON-RPC,
+      registration, heartbeat, session registry, command router, image fetch
+      preprocessing for add-in calls, and stale-session handling.
+- [ ] Create `src/office-mcp/daemon/src/tray/` for tray/menu-bar code: tray
+      controller, native tray host, menu model, `Show Office MCP`, and graceful
+      quit confirmation.
+- [ ] Keep root files minimal: `main.rs` owns CLI dispatch, `lib.rs` exposes
+      module wiring, and any top-level daemon composition file only wires
+      service objects together.
+- [ ] Rename Rust modules where needed to match their service boundary. For
+      example, UI state snapshot code belongs under `api`, tray host/controller
+      under `tray`, MCP HTTP/frontend/stdio under `mcp`, and session/command
+      routing under `addin_mgr`.
+- [ ] Split oversized Rust files so each `.rs` file owns one primary concept or
+      a tight helper set. Avoid catch-all files with many unrelated domain
+      objects.
+- [ ] Move inline Rust unit tests into sibling files named after the production
+      file, such as `logger_tests.rs` for `logger.rs`. Keep only minimal
+      compile-only inline test modules when a sibling file is not useful.
+- [ ] Add `tracing`-based structured logging across daemon boundaries: startup,
+      config load/reload, MCP request handling, add-in registration/session
+      updates, tool dispatch, command completion/failure, tray actions, UI API
+      calls, and shutdown.
+- [ ] Configure daemon file logging with intentional levels and structured
+      fields. `daemon status` and the daemon UI must expose the current log path
+      so errors can be diagnosed from logs instead of guessed from symptoms.
+- [ ] Add logging tests or evidence that verifies log records are written to the
+      configured file, redact sensitive values, include request/session/tool
+      context when available, and preserve useful levels.
+- [ ] Update packaging, evidence harnesses, static asset serving, docs, and tests
+      so no production code references the removed sibling `src/office-mcp/ui`
+      path.
+- [ ] Add a source-layout test or lint script that fails if new daemon service
+      modules are added directly under `src/office-mcp/daemon/src` instead of
+      one of `common`, `ui`, `api`, `mcp`, `addin_mgr`, or `tray`.
+
+**Exit criterion**: A new contributor can identify daemon ownership boundaries
+from the directory tree alone; the daemon has no large flat module dump under
+`src`, tests live in sibling `_tests.rs` files, tracing-backed file logs are
+available for diagnosis, the UI source is owned by the daemon `ui` module, and
+all existing Rust, evidence, packaging, and add-in checks still pass.
 
 ### M7 — Excel
 
