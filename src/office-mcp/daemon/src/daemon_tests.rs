@@ -33,13 +33,7 @@ fn daemon_tracks_rust_runtime_readiness_gates() {
 #[test]
 fn daemon_src_root_only_contains_composition_and_transitional_files() {
     let src_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let allowed_root_files = BTreeSet::from([
-        "daemon.rs",
-        "evidence_fixture.rs",
-        "lib.rs",
-        "main.rs",
-        "parity.rs",
-    ]);
+    let allowed_root_files = BTreeSet::from(["daemon.rs", "lib.rs", "main.rs", "parity.rs"]);
     let forbidden_service_files = BTreeSet::from([
         "addin_channel.rs",
         "audit_log.rs",
