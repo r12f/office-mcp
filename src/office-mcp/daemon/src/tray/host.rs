@@ -1,4 +1,5 @@
 use crate::api::DaemonController;
+use crate::tray::ui_state_client::TrayUiStateClient;
 use crate::tray::{TrayController, TrayPlatformError, TraySnapshot};
 use crate::ui::UiRuntimeFile;
 use serde_json::Value;
@@ -129,9 +130,19 @@ pub fn start_tray_background() {
     let _ = std::thread::Builder::new()
         .name("office-mcp-tray".to_string())
         .spawn(|| {
-            if let Err(error) = TrayHost::new(TrayHostOptions::default()).run() {
-                tracing::error!(%error, "office-mcp tray host stopped with error");
-                eprintln!("office-mcp-daemon tray host stopped with error: {error}");
+            let result =
+                std::panic::catch_unwind(|| TrayHost::new(TrayHostOptions::default()).run());
+            match result {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    tracing::error!(%error, "office-mcp tray host stopped with error");
+                    eprintln!("office-mcp-daemon tray host stopped with error: {error}");
+                }
+                Err(payload) => {
+                    let message = panic_message(payload.as_ref());
+                    tracing::error!(panic = %message, "office-mcp tray host panicked");
+                    eprintln!("office-mcp-daemon tray host panicked: {message}");
+                }
             }
         })
         .map_err(|error| {
@@ -140,18 +151,35 @@ pub fn start_tray_background() {
         });
 }
 
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    payload.downcast_ref::<&str>().map_or_else(
+        || {
+            payload
+                .downcast_ref::<String>()
+                .map_or("unknown panic".to_string(), Clone::clone)
+        },
+        |message| (*message).to_string(),
+    )
+}
+
 fn read_ui_state(options: &TrayHostOptions) -> Option<Value> {
     if let Some(path) = options.probe_state_path.as_ref() {
         let body = std::fs::read_to_string(path).ok()?;
         return serde_json::from_str(&body).ok();
     }
     let runtime = runtime_info(options)?;
-    let body = ureq::get(runtime.state_url.as_str())
-        .call()
-        .ok()?
-        .into_string()
-        .ok()?;
-    serde_json::from_str(&body).ok()
+    match TrayUiStateClient::new(runtime.state_url.as_str()).fetch_json() {
+        Ok(value) => Some(value),
+        Err(error) => {
+            tracing::warn!(
+                component = "tray_host",
+                state_url = %runtime.state_url,
+                %error,
+                "failed to read daemon UI state for tray snapshot"
+            );
+            None
+        }
+    }
 }
 
 fn runtime_info(options: &TrayHostOptions) -> Option<crate::ui::UiRuntimeInfo> {

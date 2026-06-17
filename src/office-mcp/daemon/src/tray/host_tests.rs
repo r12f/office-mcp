@@ -82,6 +82,15 @@ fn native_tray_quit_uses_platform_confirmation_dialogs() {
 }
 
 #[test]
+fn native_tray_allows_background_event_loop_on_windows_and_linux() {
+    let source = read_tray_source("native_tray.rs");
+
+    assert!(source.contains("EventLoopBuilderExtWindows"));
+    assert!(source.contains("EventLoopBuilderExtUnix"));
+    assert!(source.contains("builder.with_any_thread(true);"));
+}
+
+#[test]
 fn background_tray_launcher_owns_native_tray_thread() {
     let source_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")

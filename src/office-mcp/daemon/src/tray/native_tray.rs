@@ -5,7 +5,7 @@ use crate::tray::{
 };
 use std::time::{Duration, Instant};
 use tao::event::{Event, StartCause};
-use tao::event_loop::{ControlFlow, EventLoop};
+use tao::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
@@ -13,7 +13,7 @@ const SHOW_ID: &str = "office-mcp-show";
 const QUIT_ID: &str = "office-mcp-quit";
 
 pub fn run(options: &TrayHostOptions) -> Result<(), TrayPlatformError> {
-    let event_loop = EventLoop::new();
+    let event_loop = tray_event_loop();
     let mut surface = NativeTraySurface::new(options)?;
     let mut next_refresh = Instant::now();
     event_loop.run(move |event, _, control_flow| {
@@ -45,6 +45,29 @@ pub fn run(options: &TrayHostOptions) -> Result<(), TrayPlatformError> {
         }
     });
 }
+
+fn tray_event_loop() -> EventLoop<()> {
+    let mut builder = EventLoopBuilder::new();
+    allow_background_thread_event_loop(&mut builder);
+    builder.build()
+}
+
+#[cfg(windows)]
+fn allow_background_thread_event_loop(builder: &mut EventLoopBuilder<()>) {
+    use tao::platform::windows::EventLoopBuilderExtWindows;
+
+    builder.with_any_thread(true);
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn allow_background_thread_event_loop(builder: &mut EventLoopBuilder<()>) {
+    use tao::platform::unix::EventLoopBuilderExtUnix;
+
+    builder.with_any_thread(true);
+}
+
+#[cfg(target_os = "macos")]
+fn allow_background_thread_event_loop(_builder: &mut EventLoopBuilder<()>) {}
 
 struct NativeTraySurface {
     options: TrayHostOptions,

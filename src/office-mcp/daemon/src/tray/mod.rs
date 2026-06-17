@@ -1,5 +1,6 @@
 pub mod controller;
 pub mod host;
+pub(crate) mod ui_state_client;
 
 pub use controller::{
     QuitConfirmation, TrayAction, TrayController, TrayHealth, TrayMenuItem, TrayPlatform,
