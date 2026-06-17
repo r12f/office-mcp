@@ -1,7 +1,4 @@
-use super::{
-    AddinConnectionHub, McpDispatchContext, McpJsonRpcRuntime, RuntimeServer, RuntimeServerConfig,
-    RuntimeSharedState,
-};
+use super::{AddinConnectionHub, RuntimeServer, RuntimeServerConfig};
 use crate::addin_mgr::AddinChannelServer;
 use crate::addin_mgr::CommandRouter;
 use crate::addin_mgr::ImageFetcher;
@@ -12,6 +9,8 @@ use crate::common::{
     AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
 };
 use crate::mcp::McpHttpFrontend;
+use crate::runtime::mcp_response::RuntimeSharedState;
+use crate::runtime::mcp_rpc::{McpDispatchContext, McpJsonRpcRuntime};
 use native_tls::TlsConnector;
 use serde_json::Value;
 use std::io::{Read, Write};

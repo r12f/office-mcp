@@ -1,22 +1,23 @@
 use crate::addin_mgr::SessionRegistry;
 use crate::addin_mgr::websocket_accept_key;
 use crate::addin_mgr::{AddinChannelServer, HeartbeatDecision};
-use crate::addin_mgr::{AddinConnectionHub, CommandRouter, ImageFetcher};
+use crate::addin_mgr::{AddinConnectionHub, CommandRouter};
 use crate::addin_mgr::{WebSocketCodec, WebSocketCodecError, WebSocketFrame};
 use crate::api::{UiStateOptions, UiStateStore};
-use crate::common::AuditLog;
 use crate::common::DaemonConfig;
-use crate::mcp::{HttpMethod, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
+use crate::mcp::{HttpMethod, McpHttpFrontend, McpHttpRequest};
 use crate::runtime::addin_rpc::AddinJsonRpcRuntime;
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
 use crate::runtime::json_rpc;
-use crate::runtime::mcp_rpc::{McpDispatchContext, McpJsonRpcRuntime};
+use crate::runtime::mcp_response::{
+    HeartbeatLoopDecision, McpHttpResponseService, RuntimeSharedState,
+};
 use crate::runtime::static_response::StaticResponseService;
 use crate::runtime::ui_http::UiHttpService;
 pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
 use crate::ui::UiRuntimeFile;
 use native_tls::{TlsAcceptor, TlsStream};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
@@ -615,7 +616,7 @@ impl RuntimeServer {
             },
             SystemTime::now(),
         );
-        runtime_response(decision, registry, ui_state, shared_state, &body)
+        McpHttpResponseService::runtime_response(decision, registry, ui_state, shared_state, &body)
     }
 }
 
@@ -623,96 +624,6 @@ impl Default for RuntimeServer {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[derive(Debug, Clone)]
-struct RuntimeSharedState {
-    registry: Arc<Mutex<SessionRegistry>>,
-    addin_channel: Arc<Mutex<AddinChannelServer>>,
-    connection_hub: Arc<AddinConnectionHub>,
-    command_router: Arc<Mutex<CommandRouter>>,
-    audit_log: AuditLog,
-    image_fetcher: ImageFetcher,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HeartbeatLoopDecision {
-    KeepOpen,
-    Close,
-}
-
-fn runtime_response(
-    decision: McpHttpDecision,
-    registry: &SessionRegistry,
-    ui_state: &mut UiStateStore,
-    shared_state: &Arc<RuntimeSharedState>,
-    body: &[u8],
-) -> WireHttpResponse {
-    let request_id = json_rpc_request_id(body);
-    match decision {
-        McpHttpDecision::InitializeTransport { session_id } => {
-            let initialize_body = json!({
-                "jsonrpc": "2.0",
-                "id": request_id.unwrap_or(Value::Null),
-                "result": {
-                    "protocolVersion": "2025-06-18",
-                    "capabilities": { "tools": {}, "resources": {}, "prompts": {} },
-                    "serverInfo": { "name": "office-mcp", "version": "0.1.0" }
-                }
-            })
-            .to_string();
-            WireHttpResponse::json(
-                200,
-                BTreeMap::from([
-                    ("MCP-Session-Id".to_string(), session_id),
-                    ("MCP-Protocol-Version".to_string(), "2025-06-18".to_string()),
-                ]),
-                initialize_body,
-            )
-        }
-        McpHttpDecision::ForwardToTransport { .. } => {
-            let mut context = McpDispatchContext {
-                registry,
-                ui_state,
-                addin_channel: &shared_state.addin_channel,
-                connection_hub: &shared_state.connection_hub,
-                command_router: &shared_state.command_router,
-                audit_log: &shared_state.audit_log,
-                image_fetcher: &shared_state.image_fetcher,
-            };
-            let body = McpJsonRpcRuntime::handle_body(&mut context, body);
-            WireHttpResponse::json(200, BTreeMap::new(), body)
-        }
-        McpHttpDecision::Reject {
-            status,
-            body,
-            headers,
-        } => {
-            let mut response = WireHttpResponse::text(status, body);
-            response.headers.extend(headers);
-            response
-        }
-        McpHttpDecision::JsonRpcError {
-            status,
-            code,
-            message,
-        } => WireHttpResponse::json(
-            status,
-            BTreeMap::new(),
-            json!({
-                "jsonrpc": "2.0",
-                "id": request_id.unwrap_or(Value::Null),
-                "error": { "code": code, "message": message }
-            })
-            .to_string(),
-        ),
-    }
-}
-
-fn json_rpc_request_id(body: &[u8]) -> Option<Value> {
-    serde_json::from_slice::<Value>(body)
-        .ok()
-        .and_then(|value| value.get("id").cloned())
 }
 
 #[cfg(test)]
