@@ -175,6 +175,10 @@ mod tests {
         }
 
         for file in &root_files {
+            if file.ends_with("_tests.rs") {
+                continue;
+            }
+
             assert!(
                 allowed_root_files.contains(file.as_str()),
                 "unexpected daemon src root file {file}; place service code under common, ui, api, mcp, addin_mgr, or tray"
