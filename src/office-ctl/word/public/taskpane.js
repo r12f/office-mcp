@@ -62,6 +62,14 @@
     'word.reject_change',
     'word.save'
   ];
+  const TOOL_GROUPS = [
+    { label: 'Read', tools: ['word.get_text', 'word.get_outline', 'word.get_paragraph', 'word.find_text', 'word.get_selection'] },
+    { label: 'Insert', tools: ['word.insert_paragraph', 'word.insert_heading', 'word.insert_image', 'word.insert_table', 'word.insert_page_break', 'word.insert_list'] },
+    { label: 'Edit', tools: ['word.replace_text', 'word.update_paragraph', 'word.delete_range', 'word.apply_formatting', 'word.set_heading_level', 'word.apply_style'] },
+    { label: 'Tables', tools: ['word.read_table', 'word.update_cell', 'word.add_row', 'word.add_column', 'word.format_cell'] },
+    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.accept_change', 'word.reject_change'] },
+    { label: 'Document', tools: ['word.save'] }
+  ];
 
   let socket;
   const { instanceId, sessionId } = runtimeIds();
@@ -85,6 +93,7 @@
   const documentStateEl = document.getElementById('documentState');
   const connectionDetailEl = document.getElementById('connectionDetail');
   const toolCountEl = document.getElementById('toolCount');
+  const toolListEl = document.getElementById('toolList');
   const currentTaskEl = document.getElementById('currentTask');
   const currentTaskStateEl = document.getElementById('currentTaskState');
   const historyListEl = document.getElementById('historyList');
@@ -1251,8 +1260,24 @@
     serverVersionEl.textContent = serverInfo.serverVersion;
     protocolVersionEl.textContent = serverInfo.protocolVersion;
     hostPlatformEl.textContent = hostSummary();
-    toolCountEl.textContent = `${AVAILABLE_TOOLS.length} Tools`;
+    renderToolSummary();
     renderHistory();
+  }
+
+  function renderToolSummary() {
+    toolCountEl.textContent = `${AVAILABLE_TOOLS.length} Tools`;
+    toolListEl.textContent = '';
+    for (const group of TOOL_GROUPS) {
+      const tools = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool));
+      if (tools.length === 0) continue;
+      const groupEl = document.createElement('section');
+      groupEl.className = 'tool-group';
+      groupEl.innerHTML = [
+        `<h3 class="tool-group-title">${escapeHtml(group.label)}</h3>`,
+        `<div class="tool-chip-list">${tools.map((tool) => `<span class="tool-chip">${escapeHtml(tool)}</span>`).join('')}</div>`
+      ].join('');
+      toolListEl.appendChild(groupEl);
+    }
   }
 
   function renderDocumentState() {

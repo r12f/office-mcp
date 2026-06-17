@@ -35,6 +35,13 @@
     'excel.create_table',
     'excel.create_chart'
   ];
+  const TOOL_GROUPS = [
+    { label: 'Read', tools: ['excel.read_range'] },
+    { label: 'Edit', tools: ['excel.write_range', 'excel.set_formula', 'excel.format_range'] },
+    { label: 'Workbook', tools: ['excel.add_sheet'] },
+    { label: 'Tables', tools: ['excel.create_table'] },
+    { label: 'Charts', tools: ['excel.create_chart'] }
+  ];
   const { instanceId, sessionId } = runtimeIds();
   const logger = new AddinLogger({ redactText });
   const taskStore = new TaskHistoryStore({ redactText });
@@ -57,6 +64,7 @@
   const documentStateEl = document.getElementById('documentState');
   const connectionDetailEl = document.getElementById('connectionDetail');
   const toolCountEl = document.getElementById('toolCount');
+  const toolListEl = document.getElementById('toolList');
   const currentTaskEl = document.getElementById('currentTask');
   const currentTaskStateEl = document.getElementById('currentTaskState');
   const historyListEl = document.getElementById('historyList');
@@ -478,9 +486,25 @@
     serverVersionEl.textContent = serverInfo.serverVersion;
     protocolVersionEl.textContent = serverInfo.protocolVersion;
     hostPlatformEl.textContent = 'Excel / Unknown';
-    toolCountEl.textContent = `${AVAILABLE_TOOLS.length} Tools`;
+    renderToolSummary();
     renderCurrentTask();
     renderHistory();
+  }
+
+  function renderToolSummary() {
+    toolCountEl.textContent = `${AVAILABLE_TOOLS.length} Tools`;
+    toolListEl.textContent = '';
+    for (const group of TOOL_GROUPS) {
+      const tools = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool));
+      if (tools.length === 0) continue;
+      const groupEl = document.createElement('section');
+      groupEl.className = 'tool-group';
+      groupEl.innerHTML = [
+        `<h3 class="tool-group-title">${escapeHtml(group.label)}</h3>`,
+        `<div class="tool-chip-list">${tools.map((tool) => `<span class="tool-chip">${escapeHtml(tool)}</span>`).join('')}</div>`
+      ].join('');
+      toolListEl.appendChild(groupEl);
+    }
   }
 
   function renderDocumentState() {
@@ -489,7 +513,6 @@
     protectionEl.textContent = workbook.protection?.kind || 'Unknown';
     documentStateEl.textContent = `Dirty: ${valueLabel(workbook.is_dirty)} / Read-only: ${valueLabel(workbook.is_read_only)}`;
     hostPlatformEl.textContent = `Excel / ${window.Office?.context?.platform || 'Unknown'}`;
-    toolCountEl.textContent = `${AVAILABLE_TOOLS.length} Tools`;
   }
 
   function renderCurrentTask() {

@@ -16,18 +16,17 @@
   <body>
     <a class="skip-link" href="#main">Skip to Status</a>
     <main id="main" class="taskpane-shell">
-      <header class="topbar" aria-label="Daemon connection">
-        <div class="identity">
-          <span id="connectionBadge" class="status-badge status-neutral" aria-live="polite">Connecting…</span>
-          <h1>Office MCP</h1>
-        </div>
-        <button id="settingsToggle" class="icon-button" type="button" aria-label="Open Settings" aria-expanded="false" aria-controls="settingsPanel">⚙</button>
-      </header>
+      <section class="panel summary-panel" aria-labelledby="documentHeading">
+        <header class="topbar" aria-label="Daemon connection">
+          <div class="identity">
+            <span id="connectionBadge" class="status-badge status-neutral" aria-live="polite">Connecting…</span>
+            <h1>Office MCP</h1>
+          </div>
+          <button id="settingsToggle" class="icon-button" type="button" aria-label="Open Settings" aria-expanded="false" aria-controls="settingsPanel">⚙</button>
+        </header>
 
-      <section class="panel document-panel" aria-labelledby="documentHeading">
-        <div class="section-heading">
+        <div class="section-heading document-heading">
           <h2 id="documentHeading">Document</h2>
-          <span id="toolCount" class="meta-pill">0 Tools</span>
         </div>
         <dl class="metadata-grid">
           <dt>Title</dt>
@@ -49,6 +48,26 @@
           <dt>Last Error</dt>
           <dd id="connectionDetail">None</dd>
         </dl>
+
+        <details class="tools-panel">
+          <summary>
+            <span>Available Tools</span>
+            <span id="toolCount" class="meta-pill">0 Tools</span>
+          </summary>
+          <div id="toolList" class="tool-list" aria-label="Available Word tools"></div>
+        </details>
+
+        <section id="settingsPanel" class="settings-panel" aria-labelledby="settingsHeading" hidden>
+          <h2 id="settingsHeading">Settings</h2>
+          <form id="settingsForm" novalidate>
+            <label for="endpointInput">Daemon Endpoint</label>
+            <div class="input-row">
+              <input id="endpointInput" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="wss://localhost:8765/addin…" />
+              <button id="saveEndpoint" type="submit">Save Endpoint</button>
+            </div>
+            <p id="endpointError" class="field-error" role="alert"></p>
+          </form>
+        </section>
       </section>
 
       <section class="panel current-task-panel" aria-labelledby="currentTaskHeading">
@@ -65,18 +84,6 @@
           <span id="historyCount" class="meta-pill">0 / 20</span>
         </div>
         <ol id="historyList" class="history-list" aria-live="polite"></ol>
-      </section>
-
-      <section id="settingsPanel" class="panel settings-panel" aria-labelledby="settingsHeading" hidden>
-        <h2 id="settingsHeading">Settings</h2>
-        <form id="settingsForm" novalidate>
-          <label for="endpointInput">Daemon Endpoint</label>
-          <div class="input-row">
-            <input id="endpointInput" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="wss://localhost:8765/addin…" />
-            <button id="saveEndpoint" type="submit">Save Endpoint</button>
-          </div>
-          <p id="endpointError" class="field-error" role="alert"></p>
-        </form>
       </section>
 
       <div id="announcer" class="sr-only" aria-live="polite"></div>
