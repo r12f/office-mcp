@@ -1,6 +1,7 @@
 pub mod addin_rpc;
 pub mod evidence_fixture;
 pub mod http_wire;
+pub mod json_rpc;
 pub mod server;
 pub mod server_config;
 pub mod static_response;

@@ -3,7 +3,7 @@ use crate::addin_mgr::{
     SessionAddedEvent, SessionPatch, SessionRegistry, SessionRemovedEvent, SessionRemovedReason,
     SessionUpdatedEvent,
 };
-use crate::runtime::server::{json_rpc_error, json_rpc_id, json_rpc_id_value};
+use crate::runtime::json_rpc;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -59,9 +59,9 @@ impl AddinJsonRpcRuntime {
         connection_hub: &AddinConnectionHub,
     ) -> String {
         let id_value = value.get("id").cloned().unwrap_or(Value::Null);
-        let id = json_rpc_id(&id_value);
+        let id = json_rpc::id(&id_value);
         let Some(params) = value.get("params") else {
-            return json_rpc_error(&id_value, -32602, "Malformed register request");
+            return json_rpc::error(&id_value, -32602, "Malformed register request");
         };
         let request = RegisterRequest {
             id,
@@ -92,7 +92,7 @@ impl AddinJsonRpcRuntime {
                 }
                 register_reply_to_json(reply)
             }
-            Err(error) => json_rpc_error(&id_value, -32602, &error.to_string()),
+            Err(error) => json_rpc::error(&id_value, -32602, &error.to_string()),
         }
     }
 
@@ -166,7 +166,7 @@ impl AddinJsonRpcRuntime {
 }
 
 fn register_reply_to_json(reply: crate::addin_mgr::JsonRpcEnvelope) -> String {
-    let id = reply.id.map_or(Value::Null, json_rpc_id_value);
+    let id = reply.id.map_or(Value::Null, json_rpc::id_value);
     let Some(result) = reply.result else {
         return json!({ "jsonrpc": "2.0", "id": id, "result": null }).to_string();
     };

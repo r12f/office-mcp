@@ -1,5 +1,5 @@
 use crate::addin_mgr::websocket_accept_key;
-use crate::addin_mgr::{AddinChannelServer, HeartbeatDecision, JsonRpcId};
+use crate::addin_mgr::{AddinChannelServer, HeartbeatDecision};
 use crate::addin_mgr::{
     AddinConnectionHub, AddinConnectionHubError, CommandRouter, ImageFetcher, ToolCallRequest,
     ToolResponse,
@@ -19,6 +19,7 @@ use crate::mcp::{
 };
 use crate::runtime::addin_rpc::AddinJsonRpcRuntime;
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
+use crate::runtime::json_rpc;
 use crate::runtime::static_response::StaticResponseService;
 pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
 use crate::ui::UiRuntimeFile;
@@ -462,7 +463,7 @@ impl RuntimeServer {
             RuntimeServerError::Internal("Add-in channel lock poisoned.".to_string())
         })?;
         match addin_channel.start_ping(connection_id, SystemTime::now()) {
-            Ok(ping) => Ok(Some(json_rpc_envelope_to_text(&ping))),
+            Ok(ping) => Ok(Some(json_rpc::envelope_to_text(&ping))),
             Err(crate::addin_mgr::AddinChannelError::UnknownConnection(_)) => Ok(None),
             Err(error) => Err(RuntimeServerError::Internal(error.to_string())),
         }
@@ -695,11 +696,11 @@ struct McpJsonRpcRuntime;
 impl McpJsonRpcRuntime {
     fn handle_body(context: &mut McpDispatchContext<'_>, body: &[u8]) -> String {
         let Ok(value) = serde_json::from_slice::<Value>(body) else {
-            return json_rpc_error(&Value::Null, -32700, "Parse error");
+            return json_rpc::error(&Value::Null, -32700, "Parse error");
         };
         let id = value.get("id").cloned().unwrap_or(Value::Null);
         let Some(method) = value.get("method").and_then(Value::as_str) else {
-            return json_rpc_error(&id, -32600, "Invalid Request");
+            return json_rpc::error(&id, -32600, "Invalid Request");
         };
         match method {
             "tools/list" => json!({
@@ -719,7 +720,7 @@ impl McpJsonRpcRuntime {
             })
             .to_string(),
             "prompts/get" => Self::handle_prompts_get(&id, &value),
-            _ => json_rpc_error(&id, -32601, &format!("Unknown method {method}")),
+            _ => json_rpc::error(&id, -32601, &format!("Unknown method {method}")),
         }
     }
 
@@ -757,7 +758,7 @@ impl McpJsonRpcRuntime {
             .and_then(|params| params.get("uri"))
             .and_then(Value::as_str)
         else {
-            return json_rpc_error(id, -32602, "resources/read requires params.uri");
+            return json_rpc::error(id, -32602, "resources/read requires params.uri");
         };
         match resource_request_from_uri(context.registry, uri) {
             Ok(ResourceReadRequest::Sessions) => json!({
@@ -805,7 +806,7 @@ impl McpJsonRpcRuntime {
                 })
                 .to_string()
             }
-            Err(message) => json_rpc_error(id, -32602, &message),
+            Err(message) => json_rpc::error(id, -32602, &message),
         }
     }
 
@@ -815,7 +816,7 @@ impl McpJsonRpcRuntime {
             .and_then(|params| params.get("name"))
             .and_then(Value::as_str)
         else {
-            return json_rpc_error(id, -32602, "prompts/get requires params.name");
+            return json_rpc::error(id, -32602, "prompts/get requires params.name");
         };
         let arguments = value
             .get("params")
@@ -827,7 +828,7 @@ impl McpJsonRpcRuntime {
                 "result": { "description": prompt_description(name), "messages": messages }
             })
             .to_string(),
-            None => json_rpc_error(id, -32602, &format!("Unknown prompt {name}")),
+            None => json_rpc::error(id, -32602, &format!("Unknown prompt {name}")),
         }
     }
     fn handle_tools_call(
@@ -836,10 +837,10 @@ impl McpJsonRpcRuntime {
         value: &Value,
     ) -> String {
         let Some(params) = value.get("params") else {
-            return json_rpc_error(id, -32602, "Missing tool call params");
+            return json_rpc::error(id, -32602, "Missing tool call params");
         };
         let Some(name) = params.get("name").and_then(Value::as_str) else {
-            return json_rpc_error(id, -32602, "Missing tool name");
+            return json_rpc::error(id, -32602, "Missing tool name");
         };
         let arguments = params.get("arguments").unwrap_or(&Value::Null);
         let result = match name {
@@ -947,7 +948,7 @@ impl McpJsonRpcRuntime {
     ) -> ToolResponse {
         let payload = {
             let addin_channel = context.addin_channel.lock().expect("addin channel lock");
-            json_rpc_envelope_to_text(&addin_channel.tool_invoke_payload(queued))
+            json_rpc::envelope_to_text(&addin_channel.tool_invoke_payload(queued))
         };
         match context.connection_hub.invoke(
             &queued.instance_id,
@@ -985,7 +986,7 @@ impl McpJsonRpcRuntime {
     ) {
         let cancel_payload = {
             let addin_channel = context.addin_channel.lock().expect("addin channel lock");
-            json_rpc_envelope_to_text(&addin_channel.tool_cancel_payload(
+            json_rpc::envelope_to_text(&addin_channel.tool_cancel_payload(
                 &crate::addin_mgr::CancelCommand {
                     request_id: queued.request_id.clone(),
                     reason: "deadline_expired".to_string(),
@@ -1290,56 +1291,6 @@ fn addin_response_to_tool_response(response: &Value) -> ToolResponse {
     ToolResponse::Success {
         json: data.to_string(),
     }
-}
-
-fn json_rpc_envelope_to_text(envelope: &crate::addin_mgr::JsonRpcEnvelope) -> String {
-    let mut value = json!({ "jsonrpc": "2.0" });
-    if let Some(id) = envelope.id.clone() {
-        value["id"] = json_rpc_id_value(id);
-    }
-    if let Some(method) = envelope.method.as_ref() {
-        value["method"] = Value::String(method.clone());
-    }
-    if !envelope.params.is_empty() {
-        let params = envelope
-            .params
-            .iter()
-            .map(|(key, value)| {
-                let parsed = serde_json::from_str::<Value>(value)
-                    .unwrap_or_else(|_| Value::String(value.clone()));
-                (key.clone(), parsed)
-            })
-            .collect::<serde_json::Map<_, _>>();
-        value["params"] = Value::Object(params);
-    }
-    value.to_string()
-}
-
-pub(crate) fn json_rpc_id(value: &Value) -> JsonRpcId {
-    if let Some(text) = value.as_str() {
-        JsonRpcId::String(text.to_string())
-    } else if let Some(number) = value.as_i64() {
-        JsonRpcId::Number(number)
-    } else {
-        JsonRpcId::Null
-    }
-}
-
-pub(crate) fn json_rpc_id_value(id: JsonRpcId) -> Value {
-    match id {
-        JsonRpcId::String(value) => Value::String(value),
-        JsonRpcId::Number(value) => Value::Number(value.into()),
-        JsonRpcId::Null => Value::Null,
-    }
-}
-
-pub(crate) fn json_rpc_error(id: &Value, code: i64, message: &str) -> String {
-    json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "error": { "code": code, "message": message }
-    })
-    .to_string()
 }
 
 fn render_ui_snapshot(
