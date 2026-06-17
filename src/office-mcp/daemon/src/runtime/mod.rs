@@ -1,5 +1,6 @@
 pub mod addin_http;
 pub mod addin_rpc;
+pub mod addin_tool_response;
 pub mod evidence_fixture;
 pub mod http_wire;
 pub mod json_rpc;

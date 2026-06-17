@@ -11,6 +11,7 @@ use crate::mcp::{
     tool_failure_from_command, tool_success, word_resource_catalog_for_session,
     word_resource_templates,
 };
+use crate::runtime::addin_tool_response::AddinToolResponseMapper;
 use crate::runtime::json_rpc;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
@@ -292,7 +293,7 @@ impl McpJsonRpcRuntime {
             payload,
             queued.timeout,
         ) {
-            Ok(response) => addin_response_to_tool_response(&response),
+            Ok(response) => AddinToolResponseMapper::map(&response),
             Err(AddinConnectionHubError::NoConnection) => ToolResponse::Failure(CommandFailure {
                 office_mcp_code: "SESSION_LOST".to_string(),
                 message: format!("Session {} lost its add-in connection.", queued.session_id),
@@ -495,62 +496,6 @@ fn duration_millis(started_at: SystemTime, completed_at: SystemTime) -> u64 {
         .as_millis()
         .try_into()
         .unwrap_or(u64::MAX)
-}
-
-fn addin_response_to_tool_response(response: &Value) -> ToolResponse {
-    if let Some(error) = response.get("error") {
-        return ToolResponse::Failure(CommandFailure {
-            office_mcp_code: error
-                .get("office_mcp_code")
-                .or_else(|| error.get("code"))
-                .and_then(Value::as_str)
-                .unwrap_or("ADDIN_ERROR")
-                .to_string(),
-            message: error
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or("Add-in tool call failed.")
-                .to_string(),
-            tool: error
-                .get("tool")
-                .and_then(Value::as_str)
-                .map(str::to_string),
-            retriable: error
-                .get("retriable")
-                .and_then(Value::as_bool)
-                .unwrap_or(false),
-            partial_effect: Some(crate::addin_mgr::PartialEffect::Unknown),
-        });
-    }
-    let result = response.get("result").cloned().unwrap_or(Value::Null);
-    if result.get("ok").and_then(Value::as_bool) == Some(false) {
-        let error = result.get("error").cloned().unwrap_or(Value::Null);
-        return ToolResponse::Failure(CommandFailure {
-            office_mcp_code: error
-                .get("office_mcp_code")
-                .and_then(Value::as_str)
-                .unwrap_or("ADDIN_ERROR")
-                .to_string(),
-            message: error
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or("Add-in tool call failed.")
-                .to_string(),
-            tool: error
-                .get("tool")
-                .and_then(Value::as_str)
-                .map(str::to_string),
-            retriable: error
-                .get("retriable")
-                .and_then(Value::as_bool)
-                .unwrap_or(false),
-            partial_effect: Some(crate::addin_mgr::PartialEffect::Unknown),
-        });
-    }
-    let data = result.get("data").cloned().unwrap_or(result);
-    ToolResponse::Success {
-        json: data.to_string(),
-    }
 }
 
 #[cfg(test)]
