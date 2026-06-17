@@ -2,6 +2,7 @@ pub mod addin_http;
 pub mod addin_rpc;
 pub mod addin_tool_response;
 pub mod evidence_fixture;
+pub(crate) mod evidence_fixture_config;
 pub(crate) mod evidence_fixture_seed;
 pub mod http_wire;
 pub mod json_rpc;
@@ -23,7 +24,8 @@ pub mod websocket_heartbeat;
 pub mod websocket_heartbeat_service;
 pub(crate) mod websocket_session;
 
-pub use evidence_fixture::{UiFixtureOptions, run_ui_fixture};
+pub use evidence_fixture::run_ui_fixture;
+pub use evidence_fixture_config::UiFixtureOptions;
 pub use runtime_seed_state::RuntimeSeedState;
 pub use server::RuntimeServer;
 pub use server_config::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};

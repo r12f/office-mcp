@@ -373,8 +373,11 @@ module so ownership is visible from the directory tree.
       tool invocation from `runtime/mcp_rpc.rs`, and runtime connection
       handling from `runtime/server.rs`. The MCP prompt catalog now lives in
       `mcp/prompt_catalog.rs` instead of the shared catalog file, and logger
-      record serialization now lives in `common/logger_record.rs`. Remaining
-      large files still needing review include `runtime/evidence_fixture.rs`.
+      record serialization now lives in `common/logger_record.rs`. UI evidence
+      fixture options, path resolution, and fixture daemon config now live in
+      `runtime/evidence_fixture_config.rs`. The item remains open until the
+      remaining production files above the review threshold are audited for
+      single-concept ownership.
 - [x] Move inline Rust unit tests into sibling files named after the production
       file, such as `logger_tests.rs` for `logger.rs`. Keep only minimal
       compile-only inline test modules when a sibling file is not useful.
