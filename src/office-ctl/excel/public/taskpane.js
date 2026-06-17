@@ -112,7 +112,7 @@
       setStatus('Unsupported host');
       return;
     }
-    setConnectionState('connecting', 'Connecting...');
+    setConnectionState('connecting', 'Connecting…');
     connect();
   });
 
@@ -136,7 +136,7 @@
     daemonEl.textContent = endpoint;
     endpointInputEl.value = endpoint;
     endpointDirty = false;
-    setConnectionState('connecting', 'Connecting...');
+    setConnectionState('connecting', 'Connecting…');
     socket = new WebSocket(endpoint);
     socket.addEventListener('open', () => register());
     socket.addEventListener('message', (event) => handleMessage(event.data));
@@ -158,7 +158,7 @@
     const nextEndpoint = clearEndpointOverride();
     logger.warn('websocket.fallback_to_manifest_origin', { failedEndpoint, nextEndpoint });
     connectionDetailEl.textContent = `Endpoint ${failedEndpoint} failed. Retrying ${nextEndpoint}.`;
-    setConnectionState('reconnecting', 'Reconnecting...');
+    setConnectionState('reconnecting', 'Reconnecting…');
     reconnectAttempt = 0;
     clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(connect, 250);
@@ -167,7 +167,7 @@
 
   function register() {
     reconnectAttempt = 0;
-    setConnectionState('connecting', 'Registering...');
+    setConnectionState('connecting', 'Registering…');
     const requestId = crypto.randomUUID();
     send(registerRequest(requestId, {
       instance_id: instanceId,
@@ -489,7 +489,7 @@
   }
 
   function scheduleReconnect() {
-    setConnectionState('reconnecting', 'Reconnecting...');
+    setConnectionState('reconnecting', 'Reconnecting…');
     const delay = reconnectDelay(reconnectAttempt);
     reconnectAttempt += 1;
     connectionDetailEl.textContent = `Disconnected. Reconnecting in ${formatDuration(delay)}.`;
@@ -724,7 +724,7 @@
       storeEndpointOverride(value);
       endpointDirty = false;
       saveEndpointEl.disabled = true;
-      saveEndpointEl.textContent = 'Saving...';
+      saveEndpointEl.textContent = 'Saving…';
       setTimeout(() => {
         saveEndpointEl.disabled = false;
         saveEndpointEl.textContent = 'Save Endpoint';

@@ -38,6 +38,10 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(html, /Enabled 0 of 0/);
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
   assert.match(html, /aria-label="Open Settings"/);
+  assert.match(html, /Connecting…/);
+  assert.match(html, /wss:\/\/localhost:8765\/addin…/);
+  assert.doesNotMatch(html, /Connecting\.\.\./);
+  assert.doesNotMatch(html, /addin\.\.\./);
   assert.ok(html.indexOf('id="settingsPanel"') < html.indexOf('id="currentTaskHeading"'));
   assert.ok(html.indexOf('id="toolList"') < html.indexOf('id="settingsPanel"'));
   assert.match(css, /--excel: #217346/);
@@ -87,6 +91,12 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /Partial effect:/);
   assert.match(js, /mapped\.office_mcp_code === 'CANCELLED' \? 'cancelled' : 'failure'/);
   assert.match(js, /Discard unsaved endpoint changes\?/);
+  assert.match(js, /Connecting…/);
+  assert.match(js, /Reconnecting…/);
+  assert.match(js, /Registering…/);
+  assert.doesNotMatch(js, /Connecting\.\.\./);
+  assert.doesNotMatch(js, /Reconnecting\.\.\./);
+  assert.doesNotMatch(js, /Registering\.\.\./);
   assert.match(js, /settingsToggleEl\.setAttribute\('aria-label', opening \? 'Close Settings' : 'Open Settings'\)/);
   assert.match(js, /settingsToggleEl\.addEventListener\('click', handleSettingsClick\)/);
   assert.match(js, /settingsToggleEl\.addEventListener\('keydown', activateSettingsWithKeyboard\)/);
@@ -95,7 +105,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /event\.key !== 'Enter' && event\.key !== ' '/);
   assert.match(js, /endpointInputEl\.focus\(\)/);
   assert.match(js, /saveEndpointEl\.disabled = true/);
-  assert.match(js, /saveEndpointEl\.textContent = 'Saving\.\.\.'/);
+  assert.match(js, /saveEndpointEl\.textContent = 'Saving…'/);
   assert.match(js, /registerRequest\(requestId/);
   assert.match(js, /Office\.AutoShowTaskpaneWithDocument/);
   assert.match(js, /function enableAutoOpen\(\)/);
