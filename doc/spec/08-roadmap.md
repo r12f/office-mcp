@@ -368,8 +368,9 @@ module so ownership is visible from the directory tree.
       session registry, add-in tool payload, add-in protocol/clock helpers, and
       runtime WebSocket session objects into separate files with sibling
       `*_tests.rs` coverage. Recent slices also extracted add-in registration
-      policy from `addin_channel.rs` and command completion helpers from
-      `command_router.rs`. Remaining large files still needing review include
+      policy and add-in session event handling from `addin_channel.rs`, plus
+      command completion helpers from `command_router.rs`. Remaining large
+      files still needing review include
       `runtime/evidence_fixture.rs`, `common/logger.rs`, `runtime/mcp_rpc.rs`,
       `runtime/server.rs`, and `mcp/catalog.rs`.
 - [x] Move inline Rust unit tests into sibling files named after the production

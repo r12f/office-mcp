@@ -2,11 +2,12 @@ use crate::addin_mgr::JsonRpcEnvelope;
 use crate::addin_mgr::addin_channel_clock::format_system_time;
 use crate::addin_mgr::addin_heartbeat::AddinHeartbeatTimeout;
 use crate::addin_mgr::addin_registration::AddinRegistrationPolicy;
+use crate::addin_mgr::addin_session_events::AddinSessionEventHandler;
 use crate::addin_mgr::addin_tool_payload;
 use crate::addin_mgr::{
     AddinChannelConfig, AddinChannelError, AddinConnectionState, AddinUpgradeGuard,
-    HeartbeatDecision, NewSessionInfo, RegisterRequest, SessionAddedEvent, SessionRegistry,
-    SessionRemovedEvent, SessionUpdatedEvent,
+    HeartbeatDecision, RegisterRequest, SessionAddedEvent, SessionRegistry, SessionRemovedEvent,
+    SessionUpdatedEvent,
 };
 use crate::addin_mgr::{CancelCommand, QueuedCommand};
 use std::collections::BTreeMap;
@@ -109,55 +110,13 @@ impl AddinChannelServer {
         event: SessionAddedEvent,
         now: SystemTime,
     ) -> Result<(), AddinChannelError> {
-        let connection = self
-            .connections
-            .get_mut(connection_id)
-            .ok_or_else(|| AddinChannelError::UnknownConnection(connection_id.to_string()))?;
-        if event.instance_id != connection.instance_id {
-            tracing::warn!(
-                component = "addin_channel",
-                connection_id = %connection_id,
-                expected_instance_id = %connection.instance_id,
-                actual_instance_id = %event.instance_id,
-                session_id = %event.session_id,
-                "rejected add-in session for wrong instance"
-            );
-            return Err(AddinChannelError::InstanceMismatch {
-                expected: connection.instance_id.clone(),
-                actual: event.instance_id,
-            });
-        }
-        if event.session_id.is_empty() {
-            tracing::warn!(
-                component = "addin_channel",
-                connection_id = %connection_id,
-                instance_id = %connection.instance_id,
-                "rejected malformed add-in session added event"
-            );
-            return Err(AddinChannelError::MalformedSessionEvent);
-        }
-        let tool_count = event.available_tools.len();
-        let session = registry.add_session(
-            NewSessionInfo {
-                session_id: event.session_id.clone(),
-                instance_id: connection.instance_id.clone(),
-                document: event.document,
-                available_tools: event.available_tools,
-                is_active: event.is_active,
-            },
+        AddinSessionEventHandler::add_session(
+            registry,
+            &mut self.connections,
+            connection_id,
+            event,
             now,
-        );
-        connection.session_id = Some(session.session_id);
-        tracing::info!(
-            component = "addin_channel",
-            connection_id = %connection_id,
-            instance_id = %connection.instance_id,
-            session_id = %event.session_id,
-            tool_count = tool_count,
-            is_active = ?event.is_active,
-            "added add-in document session"
-        );
-        Ok(())
+        )
     }
 
     /// Applies add-in session metadata updates.
@@ -170,28 +129,7 @@ impl AddinChannelServer {
         registry: &mut SessionRegistry,
         event: SessionUpdatedEvent,
     ) -> Result<(), AddinChannelError> {
-        if event.session_id.is_empty() {
-            tracing::warn!(
-                component = "addin_channel",
-                "rejected malformed add-in session updated event"
-            );
-            return Err(AddinChannelError::MalformedSessionEvent);
-        }
-        if registry.update_session(&event.session_id, event.patch) {
-            tracing::debug!(
-                component = "addin_channel",
-                session_id = %event.session_id,
-                "updated add-in document session"
-            );
-            Ok(())
-        } else {
-            tracing::warn!(
-                component = "addin_channel",
-                session_id = %event.session_id,
-                "rejected update for unknown add-in session"
-            );
-            Err(AddinChannelError::UnknownSession(event.session_id))
-        }
+        AddinSessionEventHandler::update_session(registry, event)
     }
 
     /// Removes a document session after the add-in reports it closed or was replaced.
@@ -204,36 +142,7 @@ impl AddinChannelServer {
         registry: &mut SessionRegistry,
         event: SessionRemovedEvent,
     ) -> Result<(), AddinChannelError> {
-        if event.session_id.is_empty() {
-            tracing::warn!(
-                component = "addin_channel",
-                reason = ?event.reason,
-                "rejected malformed add-in session removed event"
-            );
-            return Err(AddinChannelError::MalformedSessionEvent);
-        }
-        for connection in self.connections.values_mut() {
-            if connection.session_id.as_deref() == Some(event.session_id.as_str()) {
-                connection.session_id = None;
-            }
-        }
-        if registry.remove_session(&event.session_id) {
-            tracing::info!(
-                component = "addin_channel",
-                session_id = %event.session_id,
-                reason = ?event.reason,
-                "removed add-in document session"
-            );
-            Ok(())
-        } else {
-            tracing::warn!(
-                component = "addin_channel",
-                session_id = %event.session_id,
-                reason = ?event.reason,
-                "rejected removal for unknown add-in session"
-            );
-            Err(AddinChannelError::UnknownSession(event.session_id))
-        }
+        AddinSessionEventHandler::remove_session(registry, &mut self.connections, event)
     }
 
     pub fn remove_connection(

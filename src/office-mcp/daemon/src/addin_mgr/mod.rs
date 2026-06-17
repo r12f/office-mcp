@@ -8,6 +8,7 @@ pub mod addin_heartbeat;
 pub mod addin_json_rpc;
 pub(crate) mod addin_protocol_version;
 pub(crate) mod addin_registration;
+pub(crate) mod addin_session_events;
 pub(crate) mod addin_tool_payload;
 pub mod addin_upgrade_guard;
 pub(crate) mod command_completion;
