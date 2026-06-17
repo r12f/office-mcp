@@ -85,6 +85,7 @@ pub struct UiRuntimeInfo {
     pub origin: String,
     pub state_url: String,
     pub ui_url: String,
+    pub log_path: Option<String>,
     pub pid: u32,
     pub created_at: String,
 }
@@ -92,15 +93,24 @@ pub struct UiRuntimeInfo {
 impl UiRuntimeInfo {
     #[must_use]
     pub fn from_config(config: &DaemonConfig) -> Self {
-        Self::with_origin(config.addin.origin.clone())
+        Self::with_origin_and_log_path(
+            config.addin.origin.clone(),
+            Some(config.logging.file.clone()),
+        )
     }
 
     #[must_use]
     pub fn with_origin(origin: String) -> Self {
+        Self::with_origin_and_log_path(origin, None)
+    }
+
+    #[must_use]
+    pub fn with_origin_and_log_path(origin: String, log_path: Option<String>) -> Self {
         Self {
             state_url: format!("{origin}/ui/state"),
             ui_url: format!("{origin}/ui/"),
             origin,
+            log_path,
             pid: std::process::id(),
             created_at: current_timestamp(),
         }
@@ -114,6 +124,7 @@ impl UiRuntimeInfo {
                 "  \"origin\": \"{}\",\n",
                 "  \"stateUrl\": \"{}\",\n",
                 "  \"uiUrl\": \"{}\",\n",
+                "  \"logPath\": {},\n",
                 "  \"pid\": {},\n",
                 "  \"createdAt\": \"{}\"\n",
                 "}}\n"
@@ -121,6 +132,10 @@ impl UiRuntimeInfo {
             json_escape(&self.origin),
             json_escape(&self.state_url),
             json_escape(&self.ui_url),
+            self.log_path.as_ref().map_or_else(
+                || "null".to_string(),
+                |path| format!("\"{}\"", json_escape(path))
+            ),
             self.pid,
             json_escape(&self.created_at)
         )
@@ -138,6 +153,10 @@ impl UiRuntimeInfo {
             origin: required_string(&value, "origin")?,
             state_url: required_string(&value, "stateUrl")?,
             ui_url: required_string(&value, "uiUrl")?,
+            log_path: value
+                .get("logPath")
+                .and_then(serde_json::Value::as_str)
+                .map(ToString::to_string),
             pid: value
                 .get("pid")
                 .and_then(serde_json::Value::as_u64)

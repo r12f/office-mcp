@@ -13,8 +13,23 @@ fn runtime_info_uses_ui_urls_without_credentials() {
     assert!(json.contains("\"origin\": \"https://localhost:8765\""));
     assert!(json.contains("\"stateUrl\": \"https://localhost:8765/ui/state\""));
     assert!(json.contains("\"uiUrl\": \"https://localhost:8765/ui/\""));
+    assert!(json.contains("\"logPath\": null"));
     assert!(!json.contains("token"));
     assert!(!json.contains("secret"));
+}
+
+#[test]
+fn runtime_info_can_publish_configured_log_path() {
+    let info = UiRuntimeInfo::with_origin_and_log_path(
+        "https://localhost:8765".to_string(),
+        Some("C:\\logs\\office-mcp.log".to_string()),
+    );
+
+    let json = info.to_json();
+    let parsed = UiRuntimeInfo::from_json(&json).expect("parse runtime info");
+
+    assert!(json.contains("\"logPath\": \"C:\\\\logs\\\\office-mcp.log\""));
+    assert_eq!(parsed.log_path.as_deref(), Some("C:\\logs\\office-mcp.log"));
 }
 
 #[test]
@@ -44,6 +59,7 @@ fn reads_runtime_file_body() {
     assert_eq!(parsed.origin, info.origin);
     assert_eq!(parsed.state_url, info.state_url);
     assert_eq!(parsed.ui_url, info.ui_url);
+    assert_eq!(parsed.log_path, None);
 }
 
 #[test]
@@ -91,11 +107,15 @@ fn runtime_file_can_be_built_from_config() {
         },
         logging: LoggingConfig {
             level: ConfigLogLevel::Info,
-            file: String::new(),
+            file: "C:\\logs\\office-mcp.log".to_string(),
         },
     };
 
     let file = UiRuntimeFile::from_config(&config);
     assert_eq!(file.info().origin, "https://localhost:8765");
+    assert_eq!(
+        file.info().log_path.as_deref(),
+        Some("C:\\logs\\office-mcp.log")
+    );
     assert!(file.path().ends_with("ui-runtime.json"));
 }

@@ -91,7 +91,7 @@ fn status_reports_runtime_details_without_auth_material() {
     fs::create_dir_all(&dir).expect("temp dir");
     fs::write(
         &path,
-        "{\"pid\":0,\"uiUrl\":\"https://localhost:8765/ui/\",\"stateUrl\":\"https://localhost:8765/ui/state\"}",
+        "{\"pid\":0,\"uiUrl\":\"https://localhost:8765/ui/\",\"stateUrl\":\"https://localhost:8765/ui/state\",\"logPath\":\"C:\\\\logs\\\\office-mcp.log\"}",
     )
     .expect("runtime file");
 
@@ -99,6 +99,7 @@ fn status_reports_runtime_details_without_auth_material() {
 
     assert!(json.contains("\"running\": false"));
     assert!(json.contains("https://localhost:8765/ui/"));
+    assert!(json.contains("\"logPath\": \"C:\\\\logs\\\\office-mcp.log\""));
     assert!(!json.contains("token"));
     assert!(!json.contains("secret"));
     let _ = fs::remove_dir_all(dir);

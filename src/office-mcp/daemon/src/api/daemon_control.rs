@@ -139,7 +139,8 @@ impl DaemonController {
                 "  \"runtimePath\": \"{}\",\n",
                 "  \"pid\": {},\n",
                 "  \"uiUrl\": {},\n",
-                "  \"stateUrl\": {}\n",
+                "  \"stateUrl\": {},\n",
+                "  \"logPath\": {}\n",
                 "}}"
             ),
             running,
@@ -161,6 +162,13 @@ impl DaemonController {
                 .map_or_else(
                     || "null".to_string(),
                     |url| format!("\"{}\"", json_escape(url))
+                ),
+            runtime
+                .as_ref()
+                .and_then(|status| status.log_path.as_ref())
+                .map_or_else(
+                    || "null".to_string(),
+                    |path| format!("\"{}\"", json_escape(path))
                 )
         )
     }
@@ -188,6 +196,7 @@ struct RuntimeStatus {
     pid: Option<u32>,
     ui_url: Option<String>,
     state_url: Option<String>,
+    log_path: Option<String>,
 }
 
 impl RuntimeStatus {
@@ -204,6 +213,10 @@ impl RuntimeStatus {
                 .map(ToString::to_string),
             state_url: value
                 .get("stateUrl")
+                .and_then(serde_json::Value::as_str)
+                .map(ToString::to_string),
+            log_path: value
+                .get("logPath")
                 .and_then(serde_json::Value::as_str)
                 .map(ToString::to_string),
         })
