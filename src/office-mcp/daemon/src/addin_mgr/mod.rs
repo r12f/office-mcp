@@ -2,6 +2,7 @@ pub mod addin_channel;
 pub mod command_router;
 pub mod image_fetcher;
 pub mod session_registry;
+pub mod websocket_codec;
 
 pub use addin_channel::{
     AddinChannelConfig, AddinChannelError, AddinChannelServer, HeartbeatDecision, JsonRpcEnvelope,
@@ -17,4 +18,7 @@ pub use session_registry::{
     NewSessionInfo, OfficeMcpCode, PartialEffect, ProtectionInfo, RegistrationOutcome, RuntimeInfo,
     SessionDescriptor, SessionDetails, SessionInfo, SessionPatch, SessionRegistry, SessionStatus,
     ToolFailure, ToolInvocationError,
+};
+pub use websocket_codec::{
+    WebSocketCodec, WebSocketCodecError, WebSocketFrame, WebSocketProtocolError,
 };

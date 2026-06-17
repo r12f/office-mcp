@@ -5,6 +5,9 @@ use crate::addin_mgr::{
     SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
 };
 use crate::addin_mgr::{CommandRouter, ToolCallRequest, ToolResponse};
+use crate::addin_mgr::{
+    WebSocketCodec, WebSocketCodecError, WebSocketFrame, WebSocketProtocolError,
+};
 use crate::api::{CommandFailure, UiStateOptions, UiStateStore};
 use crate::common::DaemonConfig;
 use crate::common::{AuditLog, AuditRecord};
@@ -424,7 +427,7 @@ impl RuntimeServer {
             let frame = match WebSocketCodec::read_frame(stream, self.config.max_ws_frame_bytes) {
                 Ok(Some(frame)) => frame,
                 Ok(None) => break,
-                Err(RuntimeServerError::Io(error))
+                Err(WebSocketCodecError::Io(error))
                     if matches!(
                         error.kind(),
                         std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
@@ -432,11 +435,11 @@ impl RuntimeServer {
                 {
                     continue;
                 }
-                Err(RuntimeServerError::WebSocketProtocol(error)) => {
+                Err(WebSocketCodecError::Protocol(error)) => {
                     WebSocketCodec::write_close(stream, error.close_code, &error.reason)?;
                     break;
                 }
-                Err(error) => return Err(error),
+                Err(error) => return Err(error.into()),
             };
             match frame {
                 WebSocketFrame::Text(text) => {
@@ -886,6 +889,15 @@ impl From<UiRuntimeError> for RuntimeServerError {
     }
 }
 
+impl From<WebSocketCodecError> for RuntimeServerError {
+    fn from(error: WebSocketCodecError) -> Self {
+        match error {
+            WebSocketCodecError::Io(error) => Self::Io(error),
+            WebSocketCodecError::Protocol(error) => Self::WebSocketProtocol(error),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct RuntimeSharedState {
     registry: Arc<Mutex<SessionRegistry>>,
@@ -1052,155 +1064,6 @@ enum AddinConnectionHubError {
 enum HeartbeatLoopDecision {
     KeepOpen,
     Close,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum WebSocketFrame {
-    Text(String),
-    Close,
-    Ping(Vec<u8>),
-    Pong,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WebSocketProtocolError {
-    pub close_code: u16,
-    pub reason: String,
-}
-
-impl WebSocketProtocolError {
-    fn protocol(reason: impl Into<String>) -> Self {
-        Self {
-            close_code: 1002,
-            reason: reason.into(),
-        }
-    }
-
-    fn too_large(reason: impl Into<String>) -> Self {
-        Self {
-            close_code: 1009,
-            reason: reason.into(),
-        }
-    }
-}
-
-struct WebSocketCodec;
-
-impl WebSocketCodec {
-    fn read_frame(
-        stream: &mut impl Read,
-        max_frame_bytes: usize,
-    ) -> Result<Option<WebSocketFrame>, RuntimeServerError> {
-        let mut header = [0_u8; 2];
-        if let Err(error) = stream.read_exact(&mut header) {
-            return if error.kind() == std::io::ErrorKind::UnexpectedEof {
-                Ok(None)
-            } else {
-                Err(RuntimeServerError::Io(error))
-            };
-        }
-        let fin = header[0] & 0x80 != 0;
-        let opcode = header[0] & 0x0f;
-        let masked = header[1] & 0x80 != 0;
-        if !fin {
-            return Err(RuntimeServerError::WebSocketProtocol(
-                WebSocketProtocolError::protocol("Fragmented WebSocket frames are not supported."),
-            ));
-        }
-        let mut length = usize::from(header[1] & 0x7f);
-        if length == 126 {
-            let mut extended = [0_u8; 2];
-            stream.read_exact(&mut extended)?;
-            length = usize::from(u16::from_be_bytes(extended));
-        } else if length == 127 {
-            let mut extended = [0_u8; 8];
-            stream.read_exact(&mut extended)?;
-            let raw = u64::from_be_bytes(extended);
-            length = raw.try_into().map_err(|_| {
-                RuntimeServerError::WebSocketProtocol(WebSocketProtocolError::too_large(
-                    "WebSocket frame is too large.",
-                ))
-            })?;
-        }
-        if length > max_frame_bytes {
-            return Err(RuntimeServerError::WebSocketProtocol(
-                WebSocketProtocolError::too_large("WebSocket frame exceeds configured byte limit."),
-            ));
-        }
-        let mut mask = [0_u8; 4];
-        if masked {
-            stream.read_exact(&mut mask)?;
-        } else if matches!(opcode, 0x1 | 0x8 | 0x9 | 0xA) {
-            return Err(RuntimeServerError::WebSocketProtocol(
-                WebSocketProtocolError::protocol("Client WebSocket frames must be masked."),
-            ));
-        }
-        let mut payload = vec![0_u8; length];
-        stream.read_exact(&mut payload)?;
-        if masked {
-            for (index, byte) in payload.iter_mut().enumerate() {
-                *byte ^= mask[index % 4];
-            }
-        }
-        match opcode {
-            0x1 => String::from_utf8(payload)
-                .map(WebSocketFrame::Text)
-                .map(Some)
-                .map_err(|_| {
-                    RuntimeServerError::WebSocketProtocol(WebSocketProtocolError::protocol(
-                        "Invalid UTF-8 text frame.",
-                    ))
-                }),
-            0x8 => Ok(Some(WebSocketFrame::Close)),
-            0x9 => Ok(Some(WebSocketFrame::Ping(payload))),
-            0xA => Ok(Some(WebSocketFrame::Pong)),
-            _ => Err(RuntimeServerError::WebSocketProtocol(
-                WebSocketProtocolError::protocol(format!("Unsupported WebSocket opcode {opcode}.")),
-            )),
-        }
-    }
-
-    fn write_text(stream: &mut impl Write, text: &str) -> Result<(), RuntimeServerError> {
-        Self::write_frame(stream, 0x1, text.as_bytes())
-    }
-
-    fn write_pong(stream: &mut impl Write, payload: &[u8]) -> Result<(), RuntimeServerError> {
-        Self::write_frame(stream, 0xA, payload)
-    }
-
-    fn write_close(
-        stream: &mut impl Write,
-        code: u16,
-        reason: &str,
-    ) -> Result<(), RuntimeServerError> {
-        let reason = reason.as_bytes();
-        let reason = &reason[..reason.len().min(123)];
-        let mut payload = Vec::with_capacity(2 + reason.len());
-        payload.extend_from_slice(&code.to_be_bytes());
-        payload.extend_from_slice(reason);
-        Self::write_frame(stream, 0x8, &payload)
-    }
-
-    fn write_frame(
-        stream: &mut impl Write,
-        opcode: u8,
-        payload: &[u8],
-    ) -> Result<(), RuntimeServerError> {
-        let mut header = vec![0x80 | opcode];
-        if payload.len() < 126 {
-            header.push(payload.len().try_into().unwrap_or(125));
-        } else if let Ok(length) = u16::try_from(payload.len()) {
-            header.push(126);
-            header.extend_from_slice(&length.to_be_bytes());
-        } else {
-            header.push(127);
-            header.extend_from_slice(&(payload.len() as u64).to_be_bytes());
-        }
-        stream.write_all(&header)?;
-        stream.write_all(payload)?;
-        stream.flush()?;
-        Ok(())
-    }
 }
 
 struct AddinJsonRpcRuntime;
