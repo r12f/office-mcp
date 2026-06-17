@@ -383,7 +383,11 @@ module so ownership is visible from the directory tree.
       building and validating the daemon config object. Add-in JSON-RPC params
       parsing and register reply serialization now live in
       `runtime/addin_rpc_message.rs`, leaving `runtime/addin_rpc.rs` focused on
-      dispatching parsed add-in methods into channel and registry services. The item remains open until the
+      dispatching parsed add-in methods into channel and registry services.
+      Daemon runtime status-file parsing, process liveness checks, and status
+      JSON rendering now live in `api/daemon_status.rs`, leaving
+      `api/daemon_control.rs` focused on installed daemon start/stop control.
+      The item remains open until the
       remaining production files above the review threshold are audited for
       single-concept ownership.
 - [x] Move inline Rust unit tests into sibling files named after the production
