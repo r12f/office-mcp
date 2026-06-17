@@ -3,6 +3,7 @@ use crate::addin_mgr::AddinChannelServer;
 use crate::addin_mgr::CommandRouter;
 use crate::addin_mgr::ImageFetcher;
 use crate::addin_mgr::SessionRegistry;
+use crate::addin_mgr::websocket_accept_key;
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::common::{
@@ -247,7 +248,7 @@ fn rejects_addin_websocket_upgrade_with_foreign_origin() {
 #[test]
 fn computes_websocket_accept_key() {
     assert_eq!(
-        super::websocket_accept_key("dGhlIHNhbXBsZSBub25jZQ=="),
+        websocket_accept_key("dGhlIHNhbXBsZSBub25jZQ=="),
         "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
     );
 }

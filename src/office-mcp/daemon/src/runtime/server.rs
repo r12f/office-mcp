@@ -1,19 +1,17 @@
 use crate::addin_mgr::SessionRegistry;
-use crate::addin_mgr::websocket_accept_key;
 use crate::addin_mgr::{AddinChannelServer, HeartbeatDecision};
 use crate::addin_mgr::{AddinConnectionHub, CommandRouter};
 use crate::addin_mgr::{WebSocketCodec, WebSocketCodecError, WebSocketFrame};
 use crate::api::{UiStateOptions, UiStateStore};
 use crate::common::DaemonConfig;
 use crate::mcp::{HttpMethod, McpHttpFrontend, McpHttpRequest};
+use crate::runtime::addin_http::AddinHttpService;
 use crate::runtime::addin_rpc::AddinJsonRpcRuntime;
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_response::{
     HeartbeatLoopDecision, McpHttpResponseService, RuntimeSharedState,
 };
-use crate::runtime::static_response::StaticResponseService;
-use crate::runtime::ui_http::UiHttpService;
 pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
 use crate::ui::UiRuntimeFile;
 use native_tls::{TlsAcceptor, TlsStream};
@@ -290,8 +288,9 @@ impl RuntimeServer {
         shared_state: &Arc<RuntimeSharedState>,
     ) -> Result<(), RuntimeServerError> {
         let request = WireHttpRequest::read_from(stream, self.config.max_request_bytes)?;
-        let websocket_upgrade = self.is_valid_websocket_upgrade(&request);
-        let response = self.route_addin_request(ui_state, &shared_state.registry, &request);
+        let addin_http = self.addin_http_service();
+        let websocket_upgrade = addin_http.is_valid_websocket_upgrade(&request);
+        let response = addin_http.route_request(ui_state, &shared_state.registry, &request);
         stream.write_all(&response.to_bytes())?;
         stream.flush()?;
         if websocket_upgrade && response.status == 101 {
@@ -343,7 +342,9 @@ impl RuntimeServer {
         let request = WireHttpRequest::read_from(stream, self.config.max_request_bytes)?;
         let registry = Arc::new(Mutex::new(SessionRegistry::new()));
         let ui_state = Arc::new(Mutex::new(ui_state.clone()));
-        let response = self.route_addin_request(&ui_state, &registry, &request);
+        let response = self
+            .addin_http_service()
+            .route_request(&ui_state, &registry, &request);
         stream.write_all(&response.to_bytes())?;
         stream.flush()?;
         Ok(())
@@ -508,84 +509,8 @@ impl RuntimeServer {
         }
     }
 
-    fn route_addin_request(
-        &self,
-        ui_state: &Arc<Mutex<UiStateStore>>,
-        registry: &Arc<Mutex<SessionRegistry>>,
-        request: &WireHttpRequest,
-    ) -> WireHttpResponse {
-        if request.path == "/healthz" && request.method == HttpMethod::Get {
-            return WireHttpResponse::json(200, BTreeMap::new(), "{\"ok\":true}".to_string());
-        }
-        if request.path == "/addin" {
-            return self.route_websocket_upgrade(request);
-        }
-        if request.method == HttpMethod::Get
-            && let Some(response) = self
-                .ui_http_service()
-                .try_handle(request, ui_state, registry)
-        {
-            return response;
-        }
-        if request.method != HttpMethod::Get {
-            return WireHttpResponse::text(405, "Method not allowed".to_string());
-        }
-        self.static_response_service()
-            .serve_addin_asset(&request.path)
-    }
-
-    fn route_websocket_upgrade(&self, request: &WireHttpRequest) -> WireHttpResponse {
-        if request.method != HttpMethod::Get {
-            return WireHttpResponse::text(405, "Method not allowed".to_string());
-        }
-        if request.headers.get("origin") != Some(&self.config.addin_origin) {
-            return WireHttpResponse::text(403, "Forbidden origin".to_string());
-        }
-        let upgrade = request
-            .headers
-            .get("upgrade")
-            .is_some_and(|value| value.eq_ignore_ascii_case("websocket"));
-        let connection = request
-            .headers
-            .get("connection")
-            .is_some_and(|value| value.to_ascii_lowercase().contains("upgrade"));
-        let Some(key) = request.headers.get("sec-websocket-key") else {
-            return WireHttpResponse::text(400, "Missing Sec-WebSocket-Key".to_string());
-        };
-        if !upgrade || !connection {
-            return WireHttpResponse::text(400, "Invalid WebSocket upgrade".to_string());
-        }
-        WireHttpResponse::switching_protocols(BTreeMap::from([
-            ("Upgrade".to_string(), "websocket".to_string()),
-            ("Connection".to_string(), "Upgrade".to_string()),
-            (
-                "Sec-WebSocket-Accept".to_string(),
-                websocket_accept_key(key),
-            ),
-        ]))
-    }
-
-    fn is_valid_websocket_upgrade(&self, request: &WireHttpRequest) -> bool {
-        request.path == "/addin"
-            && request.method == HttpMethod::Get
-            && request.headers.get("origin") == Some(&self.config.addin_origin)
-            && request
-                .headers
-                .get("upgrade")
-                .is_some_and(|value| value.eq_ignore_ascii_case("websocket"))
-            && request
-                .headers
-                .get("connection")
-                .is_some_and(|value| value.to_ascii_lowercase().contains("upgrade"))
-            && request.headers.contains_key("sec-websocket-key")
-    }
-
-    fn static_response_service(&self) -> StaticResponseService {
-        StaticResponseService::new(self.config.addin_public_dir.clone())
-    }
-
-    fn ui_http_service(&self) -> UiHttpService {
-        UiHttpService::from_config(&self.config)
+    fn addin_http_service(&self) -> AddinHttpService {
+        AddinHttpService::from_config(&self.config)
     }
 
     fn route_request(

@@ -1,3 +1,4 @@
+pub mod addin_http;
 pub mod addin_rpc;
 pub mod evidence_fixture;
 pub mod http_wire;
