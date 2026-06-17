@@ -1,5 +1,6 @@
 pub mod addin_http;
 pub mod addin_rpc;
+pub(crate) mod addin_rpc_message;
 pub mod addin_tool_response;
 pub mod evidence_fixture;
 pub(crate) mod evidence_fixture_config;

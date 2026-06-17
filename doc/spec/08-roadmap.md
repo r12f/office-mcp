@@ -380,7 +380,10 @@ module so ownership is visible from the directory tree.
       `tray/controller.rs` focused on controller behavior and platform adapter
       contracts. Configuration environment override parsing now lives in
       `common/config_env.rs`, leaving `common/config_service.rs` focused on
-      building and validating the daemon config object. The item remains open until the
+      building and validating the daemon config object. Add-in JSON-RPC params
+      parsing and register reply serialization now live in
+      `runtime/addin_rpc_message.rs`, leaving `runtime/addin_rpc.rs` focused on
+      dispatching parsed add-in methods into channel and registry services. The item remains open until the
       remaining production files above the review threshold are audited for
       single-concept ownership.
 - [x] Move inline Rust unit tests into sibling files named after the production
