@@ -9,6 +9,7 @@ pub mod mcp_response;
 pub mod mcp_rpc;
 pub mod mcp_tool_arguments;
 pub mod mcp_tool_audit;
+pub mod runtime_request_router;
 pub mod runtime_seed_state;
 pub mod server;
 pub mod server_config;
