@@ -7,6 +7,7 @@ pub(crate) mod config_paths;
 pub mod config_service;
 pub mod config_toml;
 pub mod logger;
+pub mod logger_record;
 pub(crate) mod logger_redaction;
 
 pub use audit_log::{AuditLog, AuditLogError, AuditRecord};
@@ -20,4 +21,5 @@ pub use config_model::{
 };
 pub use config_service::DaemonConfigService;
 pub use config_toml::{RawTomlValue, parse_toml};
-pub use logger::{LogLevel as LoggerLogLevel, LogRecord, Logger, LoggerError, TracingLogGuard};
+pub use logger::{Logger, LoggerError, TracingLogGuard};
+pub use logger_record::{LogLevel as LoggerLogLevel, LogRecord};
