@@ -11,9 +11,6 @@ use crate::addin_mgr::{
     ToolResponse,
 };
 use crate::addin_mgr::{WebSocketCodec, WebSocketCodecError, WebSocketFrame};
-use crate::addin_mgr::{
-    default_office_ctl_common_dir, default_office_ctl_host_public_dir, static_asset_content_type,
-};
 use crate::api::{
     CommandFailure, UiSnapshotEndpoints, UiSnapshotService, UiStateOptions, UiStateStore,
 };
@@ -26,12 +23,12 @@ use crate::mcp::{
     tool_success, word_resource_catalog_for_session, word_resource_templates,
 };
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
+use crate::runtime::static_response::StaticResponseService;
 pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
-use crate::ui::{UiAssetStore, UiRuntimeFile};
+use crate::ui::UiRuntimeFile;
 use native_tls::{TlsAcceptor, TlsStream};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
-use std::fs;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
@@ -536,13 +533,13 @@ impl RuntimeServer {
         if matches!(request.path.as_str(), "/ui" | "/ui/" | "/ui/index.html")
             && request.method == HttpMethod::Get
         {
-            return Self::serve_ui_asset("index.html");
+            return self.static_response_service().serve_ui_asset("index.html");
         }
         if request.path == "/ui/app.css" && request.method == HttpMethod::Get {
-            return Self::serve_ui_asset("app.css");
+            return self.static_response_service().serve_ui_asset("app.css");
         }
         if request.path == "/ui/app.js" && request.method == HttpMethod::Get {
-            return Self::serve_ui_asset("app.js");
+            return self.static_response_service().serve_ui_asset("app.js");
         }
         if request.path == "/ui/state" && request.method == HttpMethod::Get {
             if let Some(origin) = request.headers.get("origin")
@@ -579,7 +576,8 @@ impl RuntimeServer {
         if request.method != HttpMethod::Get {
             return WireHttpResponse::text(405, "Method not allowed".to_string());
         }
-        self.serve_static(&request.path)
+        self.static_response_service()
+            .serve_addin_asset(&request.path)
     }
 
     fn route_websocket_upgrade(&self, request: &WireHttpRequest) -> WireHttpResponse {
@@ -628,76 +626,8 @@ impl RuntimeServer {
             && request.headers.contains_key("sec-websocket-key")
     }
 
-    fn serve_ui_asset(name: &str) -> WireHttpResponse {
-        let Ok(asset) = UiAssetStore::default().read(name) else {
-            return WireHttpResponse::text(404, "Not found".to_string());
-        };
-        WireHttpResponse::binary(
-            200,
-            asset.content_type,
-            asset.content,
-            BTreeMap::from([("Cache-Control".to_string(), "no-store".to_string())]),
-        )
-    }
-    fn serve_static(&self, path: &str) -> WireHttpResponse {
-        if path == "/assets/icon-32.png" || path == "/assets/icon-80.png" {
-            return WireHttpResponse::binary(
-                200,
-                "image/png",
-                ONE_PIXEL_PNG.to_vec(),
-                BTreeMap::from([("Cache-Control".to_string(), "no-store".to_string())]),
-            );
-        }
-        if let Some(common_path) = path.strip_prefix("/common/") {
-            return Self::serve_common_asset(common_path);
-        }
-        let (host_root, relative) = if let Some(relative) = path.strip_prefix("/excel/") {
-            (default_office_ctl_host_public_dir("excel"), relative)
-        } else if let Some(relative) = path.strip_prefix("/word/") {
-            (default_office_ctl_host_public_dir("word"), relative)
-        } else {
-            let relative = if path == "/" {
-                "taskpane.html"
-            } else {
-                path.trim_start_matches('/')
-            };
-            (Some(self.config.addin_public_dir.clone()), relative)
-        };
-        if relative.contains("..") || relative.contains('\\') || relative.is_empty() {
-            return WireHttpResponse::text(403, "Forbidden".to_string());
-        }
-        let Some(host_root) = host_root else {
-            return WireHttpResponse::text(404, "Not found".to_string());
-        };
-        let file_path = host_root.join(relative);
-        let Ok(content) = fs::read(&file_path) else {
-            return WireHttpResponse::text(404, "Not found".to_string());
-        };
-        WireHttpResponse::binary(
-            200,
-            static_asset_content_type(&file_path),
-            content,
-            BTreeMap::from([("Cache-Control".to_string(), "no-store".to_string())]),
-        )
-    }
-
-    fn serve_common_asset(relative: &str) -> WireHttpResponse {
-        if relative.contains("..") || relative.contains('\\') || relative.is_empty() {
-            return WireHttpResponse::text(403, "Forbidden".to_string());
-        }
-        let Some(common_dir) = default_office_ctl_common_dir() else {
-            return WireHttpResponse::text(404, "Not found".to_string());
-        };
-        let file_path = common_dir.join(relative);
-        let Ok(content) = fs::read(&file_path) else {
-            return WireHttpResponse::text(404, "Not found".to_string());
-        };
-        WireHttpResponse::binary(
-            200,
-            static_asset_content_type(&file_path),
-            content,
-            BTreeMap::from([("Cache-Control".to_string(), "no-store".to_string())]),
-        )
+    fn static_response_service(&self) -> StaticResponseService {
+        StaticResponseService::new(self.config.addin_public_dir.clone())
     }
 
     fn route_request(
@@ -1680,11 +1610,6 @@ fn nested_string_array(value: &Value, object: &str, name: &str) -> Vec<String> {
         .map_or_else(Vec::new, |nested| string_array_field(nested, name))
 }
 
-const ONE_PIXEL_PNG: &[u8] = &[
-    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0,
-    0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 218, 99, 252, 207, 192, 80, 15, 0, 5,
-    131, 2, 127, 151, 169, 73, 235, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
-];
 fn render_ui_snapshot(
     ui_state: &Arc<Mutex<UiStateStore>>,
     registry: &Arc<Mutex<SessionRegistry>>,
