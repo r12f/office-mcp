@@ -12,6 +12,7 @@ use crate::runtime::json_rpc;
 use crate::runtime::mcp_response::{
     HeartbeatLoopDecision, McpHttpResponseService, RuntimeSharedState,
 };
+use crate::runtime::websocket_heartbeat::WebSocketHeartbeatState;
 pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
 use crate::ui::UiRuntimeFile;
 use native_tls::{TlsAcceptor, TlsStream};
@@ -362,19 +363,20 @@ impl RuntimeServer {
         let _ = stream
             .get_ref()
             .set_read_timeout(Some(Duration::from_millis(100)));
-        let mut next_ping_at = Instant::now() + self.config.heartbeat_interval;
-        let mut heartbeat_deadline: Option<Instant> = None;
+        let mut heartbeat = WebSocketHeartbeatState::new(
+            Instant::now(),
+            self.config.heartbeat_interval,
+            self.config.heartbeat_timeout,
+        );
         loop {
             for outbound in shared_state.connection_hub.take_outbound(&connection_id) {
                 WebSocketCodec::write_text(stream, &outbound)?;
             }
-            if let Some(deadline) = heartbeat_deadline
-                && Instant::now() >= deadline
-            {
+            let now = Instant::now();
+            if heartbeat.deadline_elapsed(now) {
                 match Self::record_heartbeat_timeout(shared_state, &connection_id)? {
                     HeartbeatLoopDecision::KeepOpen => {
-                        heartbeat_deadline = None;
-                        next_ping_at = Instant::now() + self.config.heartbeat_interval;
+                        heartbeat.mark_pong_received(now);
                     }
                     HeartbeatLoopDecision::Close => {
                         WebSocketCodec::write_close(stream, 4002, "Heartbeat timeout")?;
@@ -382,12 +384,13 @@ impl RuntimeServer {
                     }
                 }
             }
-            if heartbeat_deadline.is_none() && Instant::now() >= next_ping_at {
+            let now = Instant::now();
+            if heartbeat.should_start_ping(now) {
                 if let Some(ping) = Self::start_heartbeat_ping(shared_state, &connection_id)? {
                     WebSocketCodec::write_text(stream, &ping)?;
-                    heartbeat_deadline = Some(Instant::now() + self.config.heartbeat_timeout);
+                    heartbeat.mark_ping_sent(Instant::now());
                 } else {
-                    next_ping_at = Instant::now() + self.config.heartbeat_interval;
+                    heartbeat.mark_ping_skipped(Instant::now());
                 }
             }
             let frame = match WebSocketCodec::read_frame(stream, self.config.max_ws_frame_bytes) {
@@ -410,8 +413,7 @@ impl RuntimeServer {
             match frame {
                 WebSocketFrame::Text(text) => {
                     if Self::handle_heartbeat_response(shared_state, &connection_id, &text)? {
-                        heartbeat_deadline = None;
-                        next_ping_at = Instant::now() + self.config.heartbeat_interval;
+                        heartbeat.mark_pong_received(Instant::now());
                         continue;
                     }
                     if shared_state.connection_hub.complete_from_text(&text) {

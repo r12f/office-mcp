@@ -13,6 +13,7 @@ pub mod server;
 pub mod server_config;
 pub mod static_response;
 pub mod ui_http;
+pub mod websocket_heartbeat;
 
 pub use evidence_fixture::{UiFixtureOptions, run_ui_fixture};
 pub use server::{RuntimeSeedState, RuntimeServer};
