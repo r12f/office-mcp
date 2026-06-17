@@ -217,6 +217,9 @@ Rust daemon implementation MUST follow these style rules:
 - Error investigations should use structured logs first. Do not rely on guessing
   from symptoms when the daemon can record the failing boundary, request ID,
   session ID, and error code.
+- Each completed Rust implementation task must be committed and pushed before
+  starting the next task. Keep commits scoped to one verified task or reviewable
+  slice so daemon changes remain auditable and reversible.
 
 - **Lifetime**: starts at user login (Windows Scheduled Task / macOS launchd
   agent / Linux systemd `--user` unit). Runs until the user logs out or the
