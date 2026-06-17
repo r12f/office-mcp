@@ -5,6 +5,8 @@ use super::{
 };
 use crate::addin_mgr::{AddInInfo, DocumentInfo, HostInfo, SessionPatch, SessionRegistry};
 use crate::addin_mgr::{CancelCommand, QueuedCommand};
+use crate::common::{Logger, LoggerLogLevel};
+use std::fs::{read_to_string, remove_dir_all};
 use std::time::{Duration, SystemTime};
 
 #[test]
@@ -235,6 +237,81 @@ fn builds_tool_invoke_and_cancel_payloads() {
     assert_eq!(cancel.id, None);
     assert_eq!(cancel.method.as_deref(), Some("tool.cancel"));
     assert_eq!(cancel.params["reason"], "timeout");
+}
+
+#[test]
+fn writes_structured_tracing_events_for_addin_session_lifecycle() {
+    let dir = std::env::temp_dir().join(format!(
+        "office-mcp-addin-channel-log-{}",
+        std::process::id()
+    ));
+    let path = dir.join("office-mcp.log");
+    let (subscriber, guard) =
+        Logger::tracing_file_default(LoggerLogLevel::Debug, &path).expect("init tracing");
+    let now = SystemTime::UNIX_EPOCH + Duration::from_secs(10);
+    let mut server = AddinChannelServer::new();
+    let mut registry = SessionRegistry::new();
+
+    tracing::subscriber::with_default(subscriber, || {
+        server
+            .validate_upgrade("/addin", Some("https://example.invalid"))
+            .expect_err("origin rejected");
+        server
+            .register_runtime(
+                &mut registry,
+                "connection-1".to_string(),
+                register_request("instance-1", ADDIN_PROTOCOL_VERSION),
+                now,
+            )
+            .expect("register");
+        server
+            .add_session(
+                &mut registry,
+                "connection-1",
+                SessionAddedEvent {
+                    session_id: "session-1".to_string(),
+                    instance_id: "instance-1".to_string(),
+                    document: DocumentInfo::default(),
+                    available_tools: vec!["word.get_text".to_string()],
+                    is_active: Some(true),
+                },
+                now,
+            )
+            .expect("session added");
+        server
+            .update_session(
+                &mut registry,
+                SessionUpdatedEvent {
+                    session_id: "session-1".to_string(),
+                    patch: SessionPatch {
+                        is_active: Some(Some(false)),
+                        ..SessionPatch::default()
+                    },
+                },
+            )
+            .expect("session updated");
+        server
+            .remove_session(
+                &mut registry,
+                SessionRemovedEvent {
+                    session_id: "session-1".to_string(),
+                    reason: SessionRemovedReason::Closed,
+                },
+            )
+            .expect("session removed");
+    });
+    drop(guard);
+
+    let contents = read_to_string(&path).expect("read tracing log file");
+    assert!(contents.contains("rejected add-in websocket origin"));
+    assert!(contents.contains("registered add-in runtime"));
+    assert!(contents.contains("added add-in document session"));
+    assert!(contents.contains("updated add-in document session"));
+    assert!(contents.contains("removed add-in document session"));
+    assert!(contents.contains("\"component\":\"addin_channel\""));
+    assert!(contents.contains("instance-1"));
+    assert!(contents.contains("session-1"));
+    let _ = remove_dir_all(dir);
 }
 
 fn register_request(instance_id: &str, protocol_version: &str) -> RegisterRequest {

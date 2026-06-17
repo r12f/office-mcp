@@ -48,13 +48,32 @@ impl AddinChannelServer {
         origin: Option<&str>,
     ) -> Result<(), AddinChannelError> {
         if path != "/addin" {
+            tracing::warn!(
+                component = "addin_channel",
+                path = %path,
+                origin = ?origin,
+                "rejected add-in websocket upgrade path"
+            );
             return Err(AddinChannelError::InvalidUpgradePath(path.to_string()));
         }
         if origin != Some(self.config.origin.as_str()) {
+            tracing::warn!(
+                component = "addin_channel",
+                path = %path,
+                origin = ?origin,
+                expected_origin = %self.config.origin,
+                "rejected add-in websocket origin"
+            );
             return Err(AddinChannelError::ForbiddenOrigin(
                 origin.unwrap_or_default().to_string(),
             ));
         }
+        tracing::debug!(
+            component = "addin_channel",
+            path = %path,
+            origin = ?origin,
+            "accepted add-in websocket upgrade"
+        );
         Ok(())
     }
 
@@ -75,9 +94,24 @@ impl AddinChannelServer {
             || request.host.app.is_empty()
             || request.add_in.protocol_version.is_empty()
         {
+            tracing::warn!(
+                component = "addin_channel",
+                connection_id = %connection_id,
+                instance_id = %request.instance_id,
+                host_app = %request.host.app,
+                "rejected malformed add-in register request"
+            );
             return Err(AddinChannelError::MalformedRegister);
         }
         if !same_major(&request.add_in.protocol_version, ADDIN_PROTOCOL_VERSION) {
+            tracing::warn!(
+                component = "addin_channel",
+                connection_id = %connection_id,
+                instance_id = %request.instance_id,
+                offered = %request.add_in.protocol_version,
+                supported = %ADDIN_PROTOCOL_VERSION,
+                "rejected add-in protocol version"
+            );
             return Err(AddinChannelError::ProtocolVersionMismatch {
                 offered: request.add_in.protocol_version,
                 supported: ADDIN_PROTOCOL_VERSION.to_string(),
@@ -98,6 +132,15 @@ impl AddinChannelServer {
                 pending_ping_id: None,
                 missed_pongs: 0,
             },
+        );
+        tracing::info!(
+            component = "addin_channel",
+            instance_id = %runtime.instance_id,
+            host_app = %runtime.host.app,
+            host_platform = ?runtime.host.platform,
+            addin_version = %runtime.add_in.version,
+            protocol_version = %runtime.add_in.protocol_version,
+            "registered add-in runtime"
         );
         Ok(JsonRpcEnvelope::success(
             request.id,
@@ -130,14 +173,29 @@ impl AddinChannelServer {
             .get_mut(connection_id)
             .ok_or_else(|| AddinChannelError::UnknownConnection(connection_id.to_string()))?;
         if event.instance_id != connection.instance_id {
+            tracing::warn!(
+                component = "addin_channel",
+                connection_id = %connection_id,
+                expected_instance_id = %connection.instance_id,
+                actual_instance_id = %event.instance_id,
+                session_id = %event.session_id,
+                "rejected add-in session for wrong instance"
+            );
             return Err(AddinChannelError::InstanceMismatch {
                 expected: connection.instance_id.clone(),
                 actual: event.instance_id,
             });
         }
         if event.session_id.is_empty() {
+            tracing::warn!(
+                component = "addin_channel",
+                connection_id = %connection_id,
+                instance_id = %connection.instance_id,
+                "rejected malformed add-in session added event"
+            );
             return Err(AddinChannelError::MalformedSessionEvent);
         }
+        let tool_count = event.available_tools.len();
         let session = registry.add_session(
             NewSessionInfo {
                 session_id: event.session_id.clone(),
@@ -149,6 +207,15 @@ impl AddinChannelServer {
             now,
         );
         connection.session_id = Some(session.session_id);
+        tracing::info!(
+            component = "addin_channel",
+            connection_id = %connection_id,
+            instance_id = %connection.instance_id,
+            session_id = %event.session_id,
+            tool_count = tool_count,
+            is_active = ?event.is_active,
+            "added add-in document session"
+        );
         Ok(())
     }
 
@@ -163,11 +230,25 @@ impl AddinChannelServer {
         event: SessionUpdatedEvent,
     ) -> Result<(), AddinChannelError> {
         if event.session_id.is_empty() {
+            tracing::warn!(
+                component = "addin_channel",
+                "rejected malformed add-in session updated event"
+            );
             return Err(AddinChannelError::MalformedSessionEvent);
         }
         if registry.update_session(&event.session_id, event.patch) {
+            tracing::debug!(
+                component = "addin_channel",
+                session_id = %event.session_id,
+                "updated add-in document session"
+            );
             Ok(())
         } else {
+            tracing::warn!(
+                component = "addin_channel",
+                session_id = %event.session_id,
+                "rejected update for unknown add-in session"
+            );
             Err(AddinChannelError::UnknownSession(event.session_id))
         }
     }
@@ -183,6 +264,11 @@ impl AddinChannelServer {
         event: SessionRemovedEvent,
     ) -> Result<(), AddinChannelError> {
         if event.session_id.is_empty() {
+            tracing::warn!(
+                component = "addin_channel",
+                reason = ?event.reason,
+                "rejected malformed add-in session removed event"
+            );
             return Err(AddinChannelError::MalformedSessionEvent);
         }
         for connection in self.connections.values_mut() {
@@ -191,8 +277,20 @@ impl AddinChannelServer {
             }
         }
         if registry.remove_session(&event.session_id) {
+            tracing::info!(
+                component = "addin_channel",
+                session_id = %event.session_id,
+                reason = ?event.reason,
+                "removed add-in document session"
+            );
             Ok(())
         } else {
+            tracing::warn!(
+                component = "addin_channel",
+                session_id = %event.session_id,
+                reason = ?event.reason,
+                "rejected removal for unknown add-in session"
+            );
             Err(AddinChannelError::UnknownSession(event.session_id))
         }
     }
@@ -206,7 +304,16 @@ impl AddinChannelServer {
         let Some(connection) = self.connections.remove(connection_id) else {
             return false;
         };
-        registry.remove_runtime(&connection.instance_id, stale_since)
+        let removed = registry.remove_runtime(&connection.instance_id, stale_since);
+        tracing::info!(
+            component = "addin_channel",
+            connection_id = %connection_id,
+            instance_id = %connection.instance_id,
+            had_session = connection.session_id.is_some(),
+            removed_runtime = removed,
+            "removed add-in connection"
+        );
+        removed
     }
 
     /// Builds the next heartbeat ping request for an add-in connection.
@@ -272,9 +379,24 @@ impl AddinChannelServer {
         connection.pending_ping_id = None;
         connection.missed_pongs += 1;
         if connection.missed_pongs < 2 {
+            tracing::warn!(
+                component = "addin_channel",
+                connection_id = %connection_id,
+                instance_id = %connection.instance_id,
+                missed_pongs = connection.missed_pongs,
+                "add-in heartbeat missed"
+            );
             return Ok(HeartbeatDecision::KeepOpen);
         }
         registry.mark_instance_stale(&connection.instance_id, stale_since);
+        tracing::warn!(
+            component = "addin_channel",
+            connection_id = %connection_id,
+            instance_id = %connection.instance_id,
+            missed_pongs = connection.missed_pongs,
+            close_code = 4002,
+            "closing stale add-in connection after heartbeat misses"
+        );
         Ok(HeartbeatDecision::Close { code: 4002 })
     }
 
