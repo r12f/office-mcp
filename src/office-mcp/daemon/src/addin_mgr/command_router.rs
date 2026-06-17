@@ -1,6 +1,10 @@
+use crate::addin_mgr::command_completion::{
+    CLIENT_CANCELLED_REASON, DEADLINE_EXPIRED_REASON, cancelled_failure, duration_millis,
+    result_from_tool_response, timeout_failure,
+};
 use crate::addin_mgr::{
-    CancelCommand, CommandRouterError, PartialEffect, QueuedCommand, SessionCommandQueue,
-    SessionRegistry, ToolCallRequest, ToolResponse,
+    CancelCommand, CommandRouterError, QueuedCommand, SessionCommandQueue, SessionRegistry,
+    ToolCallRequest, ToolResponse,
 };
 use crate::api::{CommandFailure, CommandResult, StartCommandInput, UiStateStore};
 use std::collections::BTreeMap;
@@ -172,10 +176,7 @@ impl CommandRouter {
             CommandRouterError::UnknownRequest(request_id.to_string())
         })?;
         let response = self.validate_response_size(&command, response)?;
-        let result = match &response {
-            ToolResponse::Success { .. } => CommandResult::Success,
-            ToolResponse::Failure(failure) => CommandResult::Failure(failure.clone()),
-        };
+        let result = result_from_tool_response(&response);
         ui_state.finish_command(&command.command_id, result, completed_at);
         match &response {
             ToolResponse::Success { .. } => tracing::info!(
@@ -245,13 +246,7 @@ impl CommandRouter {
         let command = self.remove_command(session_id, request_id)?;
         ui_state.finish_command(
             &command.command_id,
-            CommandResult::Failure(CommandFailure {
-                office_mcp_code: "CANCELLED".to_string(),
-                message: "The client cancelled the command.".to_string(),
-                tool: Some(command.tool.clone()),
-                retriable: true,
-                partial_effect: Some(PartialEffect::Unknown),
-            }),
+            CommandResult::Failure(cancelled_failure(&command)),
             completed_at,
         );
         tracing::info!(
@@ -264,7 +259,7 @@ impl CommandRouter {
         );
         Some(CancelCommand {
             request_id: command.request_id,
-            reason: "client_cancelled".to_string(),
+            reason: CLIENT_CANCELLED_REASON.to_string(),
         })
     }
 
@@ -286,17 +281,7 @@ impl CommandRouter {
                     let tool = command.tool.clone();
                     ui_state.finish_command(
                         &command.command_id,
-                        CommandResult::Failure(CommandFailure {
-                            office_mcp_code: "TIMEOUT".to_string(),
-                            message: format!(
-                                "Tool {} timed out after {}ms.",
-                                command.tool,
-                                duration_millis(command.timeout)
-                            ),
-                            tool: Some(command.tool),
-                            retriable: true,
-                            partial_effect: Some(PartialEffect::Unknown),
-                        }),
+                        CommandResult::Failure(timeout_failure(&command)),
                         now,
                     );
                     tracing::warn!(
@@ -310,7 +295,7 @@ impl CommandRouter {
                     );
                     expired.push(CancelCommand {
                         request_id,
-                        reason: "deadline_expired".to_string(),
+                        reason: DEADLINE_EXPIRED_REASON.to_string(),
                     });
                 }
             }
@@ -370,10 +355,6 @@ impl Default for CommandRouter {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn duration_millis(duration: Duration) -> u64 {
-    duration.as_millis().try_into().unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]
