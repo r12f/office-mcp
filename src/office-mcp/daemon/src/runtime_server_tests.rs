@@ -239,6 +239,8 @@ fn serves_daemon_ui_assets_over_addin_listener() {
     assert!(js.contains("RelativeTimeFormat"));
     assert!(js.contains("config_path"));
     assert!(js.contains("last_error"));
+    assert!(js.contains("emptyState('No documents connected'"));
+    assert!(js.contains("fallbackCopy"));
 }
 
 #[test]

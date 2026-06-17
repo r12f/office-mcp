@@ -25,8 +25,8 @@
           <div><dt>Running</dt><dd id="taskCount">0</dd></div>
         </dl>
         <div class="endpoints" aria-label="Endpoints">
-          <button type="button" class="copy" data-copy="mcpEndpoint"><span>MCP</span><code id="mcpEndpoint">-</code></button>
-          <button type="button" class="copy" data-copy="addinEndpoint"><span>Add-in</span><code id="addinEndpoint">-</code></button>
+          <button type="button" class="copy" data-copy="mcpEndpoint" aria-label="Copy MCP endpoint"><span>MCP</span><code id="mcpEndpoint">-</code></button>
+          <button type="button" class="copy" data-copy="addinEndpoint" aria-label="Copy add-in endpoint"><span>Add-in</span><code id="addinEndpoint">-</code></button>
         </div>
       </header>
 
@@ -44,7 +44,7 @@
         <aside class="panel navigation" aria-labelledby="documentsHeading">
           <div class="panel-head">
             <h2 id="documentsHeading">Documents</h2>
-            <input id="search" type="search" placeholder="Filter sessions" autocomplete="off" />
+            <label class="field-label" for="search">Filter sessions</label><input id="search" name="session-filter" type="search" placeholder="Word, Excel, session..." autocomplete="off" />
           </div>
           <div id="documents" class="stack"></div>
           <h3>Clients</h3>
@@ -54,7 +54,7 @@
         <section id="activity" class="panel activity" aria-labelledby="activityHeading">
           <div class="panel-head">
             <h2 id="activityHeading">Activity</h2>
-            <select id="resultFilter" aria-label="Filter command history">
+            <select id="resultFilter" name="result-filter" aria-label="Filter command history">
               <option value="all">All results</option>
               <option value="success">Succeeded</option>
               <option value="failure">Failed</option>
@@ -71,7 +71,7 @@
         <aside class="panel inspector" aria-labelledby="inspectorHeading">
           <div class="panel-head">
             <h2 id="inspectorHeading">Inspector</h2>
-            <button id="clearInspector" type="button">Clear</button>
+            <button id="clearInspector" type="button" class="secondary-action">Clear</button>
           </div>
           <pre id="inspector">Select a row.</pre>
         </aside>

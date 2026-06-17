@@ -53,3 +53,24 @@ fn default_store_finds_repo_daemon_ui_assets() {
     assert_eq!(html.content_type, "text/html; charset=utf-8");
     assert!(String::from_utf8_lossy(&html.content).contains("Office MCP"));
 }
+
+#[test]
+fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
+    let store = UiAssetStore::default();
+    let html =
+        String::from_utf8(store.read("index.html").expect("html").content).expect("html utf8");
+    let css = String::from_utf8(store.read("app.css").expect("css").content).expect("css utf8");
+    let js = String::from_utf8(store.read("app.js").expect("js").content).expect("js utf8");
+
+    assert!(html.contains("aria-label=\"Copy MCP endpoint\""));
+    assert!(html.contains("aria-label=\"Copy add-in endpoint\""));
+    assert!(html.contains("name=\"session-filter\""));
+    assert!(html.contains("aria-live=\"polite\""));
+    assert!(css.contains("minmax(0, 1fr)"));
+    assert!(css.contains("content-visibility: auto"));
+    assert!(css.contains(".empty strong"));
+    assert!(!css.contains("transition: all"));
+    assert!(js.contains("emptyState('No documents connected'"));
+    assert!(js.contains("fallbackCopy"));
+    assert!(js.contains("announceStatus"));
+}

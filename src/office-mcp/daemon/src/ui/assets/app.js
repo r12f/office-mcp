@@ -1,8 +1,10 @@
-const state = { snapshot: null, search: '', result: 'all', expandedDocuments: new Set() };
+const state = { snapshot: null, search: '', result: 'all', expandedDocuments: new Set(), previousStatus: null };
 const $ = (id) => document.getElementById(id);
+
 $('search').addEventListener('input', (event) => { state.search = event.target.value.toLowerCase(); render(); });
 $('resultFilter').addEventListener('change', (event) => { state.result = event.target.value; render(); });
-$('clearInspector').addEventListener('click', () => { $('inspector').textContent = 'Select a row.'; });
+$('clearInspector').addEventListener('click', () => { $('inspector').textContent = 'Select a row.'; announce('Inspector cleared'); });
+
 document.addEventListener('click', async (event) => {
   const copy = event.target.closest('[data-copy]');
   if (copy) await copyText($(copy.dataset.copy).textContent, copy);
@@ -11,6 +13,7 @@ document.addEventListener('click', async (event) => {
   const inspect = event.target.closest('[data-inspect]');
   if (inspect) inspectRow(inspect);
 });
+
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' && event.key !== ' ') return;
   const target = event.target.closest('[data-key-activate]');
@@ -18,21 +21,26 @@ document.addEventListener('keydown', (event) => {
   event.preventDefault();
   target.click();
 });
+
 refresh();
 setInterval(refresh, 2000);
+
 async function refresh() {
   try {
     const response = await fetch('/ui/state', { cache: 'no-store' });
     if (!response.ok) throw new Error('UI state returned ' + response.status);
     state.snapshot = await response.json();
     window.__OFFICE_MCP_UI__ = state.snapshot;
+    announceStatus(snapshotStatus(state.snapshot));
     render();
   } catch (error) {
     $('healthBadge').textContent = 'Down';
     $('healthBadge').className = 'badge danger';
     $('daemonMeta').textContent = error.message || 'UI state unavailable';
+    announce('Daemon UI state is unavailable');
   }
 }
+
 function render() {
   const snapshot = state.snapshot;
   if (!snapshot) return;
@@ -57,9 +65,10 @@ function render() {
   const history = (snapshot.recent_commands || []).filter((command) => state.result === 'all' || command.status === state.result);
   renderCommands('history', history, false);
 }
+
 function renderDocuments(groups) {
   const rows = [];
-  const document_command_history = state.snapshot?.document_command_history || {};
+  const documentCommandHistory = state.snapshot?.document_command_history || {};
   for (const [app, docs] of Object.entries(groups)) {
     const visible = docs.filter((doc) => matches(JSON.stringify(doc)));
     if (!visible.length) continue;
@@ -70,30 +79,58 @@ function renderDocuments(groups) {
       const expanded = state.expandedDocuments.has(doc.session_id);
       const detailId = `document-detail-${safeId(doc.session_id)}`;
       rows.push(`<button class="row ${esc(app)}" type="button" data-key-activate data-document-toggle="${esc(doc.session_id)}" data-inspect='${attr(doc)}' aria-expanded="${expanded}" aria-controls="${detailId}"><strong>${esc(label)}</strong><span>${esc(connection)} | ${esc(doc.session_id)}</span><span class="meta">${expanded ? 'Hide details' : 'Show details'} | ${esc(doc.host?.version || '-')} | ${esc(doc.available_tool_count || 0)} tools | queue ${esc(doc.queue_depth || 0)}</span></button>`);
-      rows.push(renderDocumentHistory(doc.session_id, document_command_history[doc.session_id] || [], expanded, detailId));
+      rows.push(renderDocumentHistory(doc.session_id, documentCommandHistory[doc.session_id] || [], expanded, detailId));
     }
   }
-  $('documents').innerHTML = rows.join('') || '<p class="empty">No documents connected. Open Word and load the add-in.</p>';
+  $('documents').innerHTML = rows.join('') || emptyState('No documents connected', 'Open Word or Excel and load the Office MCP add-in.', state.snapshot?.daemon?.addin_endpoint);
 }
+
 function renderDocumentHistory(sessionId, commands, expanded, detailId) {
   const hidden = expanded ? '' : ' hidden';
-  if (!commands.length) return `<div id="${detailId}" class="doc-history" aria-label="Command history for ${esc(sessionId)}"${hidden}><p class="empty">No recent commands for this document.</p></div>`;
+  if (!commands.length) return `<div id="${detailId}" class="doc-history" aria-label="Command history for ${esc(sessionId)}"${hidden}>${emptyState('No recent commands for this document', 'Completed commands for this document appear here.')}</div>`;
   const rows = commands.slice(0, 10).map((command) => `<button class="history-row" type="button" data-inspect='${attr(command)}'><span><strong>${esc(command.tool)}</strong><small>${esc(relative(command.completed_at || command.started_at))}</small></span><span class="pill ${tone(command.status)}">${esc(title(command.status))}</span><small>${esc(command.error?.office_mcp_code || '')}</small></button>`).join('');
   return `<div id="${detailId}" class="doc-history" aria-label="Command history for ${esc(sessionId)}"${hidden}>${rows}</div>`;
 }
+
 function renderClients(clients) {
-  $('clients').innerHTML = clients.map((client) => `<button class="row" type="button" data-inspect='${attr(client)}'><strong>${esc(client.name || client.client_id)}</strong><span>${esc(client.transport)} | in flight ${esc(client.in_flight_request_count || 0)}</span></button>`).join('') || '<p class="empty">No MCP clients connected.</p>';
+  $('clients').innerHTML = clients.map((client) => `<button class="row" type="button" data-inspect='${attr(client)}'><strong>${esc(client.name || client.client_id)}</strong><span>${esc(client.transport)} | in flight ${esc(client.in_flight_request_count || 0)}</span></button>`).join('') || emptyState('No MCP clients connected', 'Connect an MCP client using this endpoint.', state.snapshot?.daemon?.mcp_endpoint);
 }
+
 function renderCommands(target, commands, running) {
-  if (!commands.length) { $(target).innerHTML = `<p class="empty">${running ? 'No command is running.' : 'No command history yet.'}</p>`; return; }
+  if (!commands.length) {
+    $(target).innerHTML = running ? emptyState('No command is running', 'New tool calls appear here while they are in flight.') : emptyState('No command history yet', 'Completed, failed, cancelled, and timed-out commands appear here.');
+    return;
+  }
   const rows = commands.map((command) => `<tr tabindex="0" role="button" aria-label="Inspect ${esc(command.tool)} ${esc(title(command.status))}" data-key-activate data-inspect='${attr(command)}'><td><strong>${esc(command.tool)}</strong><br><small>${esc(command.session_id || '-')}</small></td><td>${esc(command.client_name || command.client_id || '-')}</td><td><span class="pill ${tone(command.status)}">${esc(title(command.status))}</span></td><td>${running ? duration(Date.now() - (command.started_at || Date.now())) : duration(command.elapsed_ms || 0)}</td><td>${esc(command.error?.office_mcp_code || '')}<br><small>${esc(command.error?.message || '')}</small></td></tr>`).join('');
   $(target).innerHTML = `<table><thead><tr><th>Tool</th><th>Client</th><th>Status</th><th>Time</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
+
 function inspectRow(element) { $('inspector').textContent = JSON.stringify(JSON.parse(element.dataset.inspect), null, 2); }
+
 async function copyText(text, button) {
-  await navigator.clipboard?.writeText(text);
-  $('announcer').textContent = 'Copied ' + (button.querySelector('span')?.textContent || 'value');
+  if (!text || text === '-') return;
+  if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+  else fallbackCopy(text);
+  announce('Copied ' + (button.querySelector('span')?.textContent || 'value'));
 }
+
+function emptyState(titleText, bodyText, codeText) {
+  const code = codeText ? `<code>${esc(codeText)}</code>` : '';
+  return `<p class="empty"><strong>${esc(titleText)}</strong>${esc(bodyText)}${code}</p>`;
+}
+
+function fallbackCopy(text) {
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand('copy');
+  area.remove();
+}
+
 function matches(text) { return !state.search || text.toLowerCase().includes(state.search); }
 function documentConnectionLabel(status) { return status === 'stale' ? 'stale | reconnecting' : (status || 'active'); }
 function toggleDocument(sessionId) {
@@ -108,6 +145,9 @@ function duration(ms) { if (!ms) return '0s'; const seconds = ms / 1000; if (sec
 function relative(value) { if (!value) return 'now'; const delta = Math.round((Number(value) - Date.now()) / 1000); const abs = Math.abs(delta); const unit = abs < 60 ? 'second' : abs < 3600 ? 'minute' : 'hour'; const divisor = unit === 'second' ? 1 : unit === 'minute' ? 60 : 3600; return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(Math.round(delta / divisor), unit); }
 function title(value) { return String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()); }
 function tone(value) { return value === 'up' || value === 'success' ? 'success' : value === 'degraded' || value === 'running' ? 'warning' : value === 'down' || value === 'failure' || value === 'timeout' ? 'danger' : 'neutral'; }
+function snapshotStatus(snapshot) { return snapshot?.daemon?.status || 'down'; }
+function announceStatus(status) { if (state.previousStatus === status) return; state.previousStatus = status; announce('Daemon status ' + title(status)); }
+function announce(message) { $('announcer').textContent = message; }
 function esc(value) { return String(value ?? '').replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]); }
 function attr(value) { return esc(JSON.stringify(value)).replace(/'/g, '&#39;'); }
 function safeId(value) { return String(value || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '-'); }
