@@ -7,6 +7,7 @@ pub(crate) mod config_paths;
 pub mod config_service;
 pub mod config_toml;
 pub mod logger;
+pub(crate) mod logger_redaction;
 
 pub use audit_log::{AuditLog, AuditLogError, AuditRecord};
 pub use client_config::ClaudeDesktopConfigBuilder;
