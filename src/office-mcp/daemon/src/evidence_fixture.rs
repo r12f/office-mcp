@@ -101,6 +101,8 @@ pub fn run_ui_fixture(options: UiFixtureOptions) -> Result<(), RuntimeServerErro
         heartbeat_interval: Duration::from_secs(config.addin.heartbeat_interval_sec),
         heartbeat_timeout: Duration::from_secs(config.addin.heartbeat_timeout_sec),
         requests_per_minute: config.limits.requests_per_minute,
+        config_path: None,
+        log_path: Some(config.logging.file.clone()),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
     });

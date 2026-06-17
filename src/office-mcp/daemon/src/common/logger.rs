@@ -4,6 +4,8 @@ use std::fs::{OpenOptions, create_dir_all};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Logger {
@@ -94,6 +96,37 @@ impl Logger {
     pub fn error(&self, message: &str) -> Result<Option<String>, LoggerError> {
         self.write(&LogRecord::new(LogLevel::Error, message))
     }
+
+    /// Installs the process-wide tracing subscriber and writes tracing events to a file.
+    ///
+    /// The returned guard must be kept alive for the lifetime of the daemon so
+    /// buffered log records are flushed on shutdown.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the log directory cannot be created or when a
+    /// process-wide tracing subscriber has already been installed.
+    pub fn init_tracing_file(
+        min_level: LogLevel,
+        file: impl AsRef<Path>,
+    ) -> Result<TracingLogGuard, LoggerError> {
+        let file = file.as_ref();
+        if let Some(parent) = file.parent() {
+            create_dir_all(parent)?;
+        }
+        let appender = OpenOptions::new().create(true).append(true).open(file)?;
+        let (writer, guard) = tracing_appender::non_blocking(appender);
+        let filter = EnvFilter::new(min_level.as_str());
+        tracing_subscriber::fmt()
+            .json()
+            .with_env_filter(filter)
+            .with_writer(writer)
+            .with_current_span(false)
+            .with_span_list(false)
+            .try_init()
+            .map_err(|error| LoggerError::TracingInit(error.to_string()))?;
+        Ok(TracingLogGuard { _guard: guard })
+    }
 }
 
 impl Default for Logger {
@@ -129,6 +162,11 @@ pub struct LogRecord {
     pub level: LogLevel,
     pub message: String,
     pub fields: BTreeMap<String, String>,
+}
+
+#[derive(Debug)]
+pub struct TracingLogGuard {
+    _guard: WorkerGuard,
 }
 
 impl LogRecord {
@@ -176,12 +214,14 @@ impl LogRecord {
 #[derive(Debug)]
 pub enum LoggerError {
     Io(std::io::Error),
+    TracingInit(String),
 }
 
 impl Display for LoggerError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Io(error) => write!(formatter, "{error}"),
+            Self::TracingInit(message) => formatter.write_str(message),
         }
     }
 }

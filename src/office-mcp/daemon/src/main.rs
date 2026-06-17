@@ -2,6 +2,7 @@ use office_mcp_daemon::OfficeMcpDaemon;
 use office_mcp_daemon::api::DaemonController;
 use office_mcp_daemon::common::{
     ClaudeDesktopConfigBuilder, DaemonConfig, DaemonConfigService, LoadConfigOptions,
+    Logger as DaemonLogger, LoggerLogLevel,
 };
 use office_mcp_daemon::evidence_fixture::{UiFixtureOptions, run_ui_fixture};
 use office_mcp_daemon::mcp::McpManagementClient;
@@ -92,20 +93,49 @@ fn serve_daemon() {
     }) {
         Ok(config) => match RuntimeServer::from_daemon_config(&config) {
             Ok(server) => {
+                let _log_guard = match DaemonLogger::init_tracing_file(
+                    logger_level_from_config(config.logging.level),
+                    &config.logging.file,
+                ) {
+                    Ok(guard) => Some(guard),
+                    Err(error) => {
+                        eprintln!("office-mcp-daemon failed to initialize tracing log: {error}");
+                        None
+                    }
+                };
                 let endpoints = config.endpoints();
                 eprintln!("office-mcp-daemon MCP listening on {}", endpoints.mcp);
                 eprintln!(
                     "office-mcp-daemon add-in listening on {}",
                     endpoints.addin_origin
                 );
+                tracing::info!(
+                    mcp_endpoint = %endpoints.mcp,
+                    addin_origin = %endpoints.addin_origin,
+                    log_path = %config.logging.file,
+                    "office-mcp-daemon started"
+                );
                 let runtime_file = UiRuntimeFile::from_config(&config);
                 if let Err(error) = server.serve_forever_with_runtime_file(&runtime_file) {
+                    tracing::error!(%error, "office-mcp-daemon stopped with error");
                     exit_error(error);
                 }
             }
             Err(error) => exit_error(error),
         },
         Err(error) => exit_error(error),
+    }
+}
+
+const fn logger_level_from_config(
+    level: office_mcp_daemon::common::ConfigLogLevel,
+) -> LoggerLogLevel {
+    match level {
+        office_mcp_daemon::common::ConfigLogLevel::Trace => LoggerLogLevel::Trace,
+        office_mcp_daemon::common::ConfigLogLevel::Debug => LoggerLogLevel::Debug,
+        office_mcp_daemon::common::ConfigLogLevel::Info => LoggerLogLevel::Info,
+        office_mcp_daemon::common::ConfigLogLevel::Warn => LoggerLogLevel::Warn,
+        office_mcp_daemon::common::ConfigLogLevel::Error => LoggerLogLevel::Error,
     }
 }
 

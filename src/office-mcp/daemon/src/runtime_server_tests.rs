@@ -10,6 +10,9 @@ use crate::addin_mgr::{
 use crate::addin_mgr::{AddinChannelConfig, AddinChannelServer};
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
+use crate::common::{
+    AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
+};
 use crate::mcp::McpHttpFrontend;
 use native_tls::TlsConnector;
 use serde_json::Value;
@@ -194,6 +197,19 @@ fn serves_redacted_ui_state_over_addin_listener() {
     assert!(response.contains("\"clients\":[]"));
     assert!(response.contains("\"documents\""));
     assert!(response.contains("\"recent_commands\""));
+}
+
+#[test]
+fn ui_state_exposes_configured_log_path_for_debugging() {
+    let config = daemon_config_with_log_path("C:\\logs\\office-mcp.log");
+    let server = RuntimeServer::from_daemon_config(&config).expect("server config");
+    let ui_state = server.ui_state_store();
+    let snapshot = ui_state.snapshot(&[], std::time::SystemTime::now());
+
+    assert_eq!(
+        snapshot.daemon.log_path.as_deref(),
+        Some("C:\\logs\\office-mcp.log")
+    );
 }
 
 #[test]
@@ -1303,6 +1319,41 @@ fn registry_with_word_session() -> SessionRegistry {
         "word.get_selection",
         "word.save",
     ])
+}
+
+fn daemon_config_with_log_path(log_path: &str) -> DaemonConfig {
+    DaemonConfig {
+        addin: AddinConfig {
+            host: "localhost".to_string(),
+            port: 8765,
+            origin: "https://localhost:8765".to_string(),
+            pfx_path: "cert.pfx".to_string(),
+            pfx_passphrase: "office-mcp-localhost".to_string(),
+            heartbeat_interval_sec: 30,
+            heartbeat_timeout_sec: 10,
+            session_grace_sec: 60,
+            max_pending_per_session: 4,
+        },
+        mcp: McpConfig {
+            host: "127.0.0.1".to_string(),
+            port: 8800,
+        },
+        limits: LimitsConfig {
+            max_response_bytes: 1024 * 1024,
+            max_request_bytes: 16 * 1024 * 1024,
+            max_ws_frame_bytes: 16 * 1024 * 1024,
+            default_tool_timeout_ms: 30_000,
+            requests_per_minute: 120,
+        },
+        audit: AuditConfig {
+            enabled: false,
+            path: String::new(),
+        },
+        logging: LoggingConfig {
+            level: ConfigLogLevel::Info,
+            file: log_path.to_string(),
+        },
+    }
 }
 
 fn registry_with_word_session_with_tools(tools: Vec<&str>) -> SessionRegistry {

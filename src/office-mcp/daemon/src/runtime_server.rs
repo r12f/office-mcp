@@ -5,7 +5,7 @@ use crate::addin_mgr::{
     SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
 };
 use crate::addin_mgr::{CommandRouter, ToolCallRequest, ToolResponse};
-use crate::api::{CommandFailure, UiStateStore};
+use crate::api::{CommandFailure, UiStateOptions, UiStateStore};
 use crate::common::DaemonConfig;
 use crate::common::{AuditLog, AuditRecord};
 use crate::mcp::{HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
@@ -78,6 +78,8 @@ impl RuntimeServer {
             heartbeat_interval: Duration::from_secs(config.addin.heartbeat_interval_sec),
             heartbeat_timeout: Duration::from_secs(config.addin.heartbeat_timeout_sec),
             requests_per_minute: config.limits.requests_per_minute,
+            config_path: None,
+            log_path: Some(config.logging.file.clone()),
             audit_log: if config.audit.enabled {
                 AuditLog::enabled(&config.audit.path)
             } else {
@@ -119,6 +121,7 @@ impl RuntimeServer {
         runtime_file.write()?;
         let result = self.serve_bound_forever(&mcp_listener, &addin_listener);
         if let Err(error) = runtime_file.remove() {
+            tracing::warn!(%error, "failed to remove daemon UI runtime file");
             eprintln!("{error}");
         }
         result
@@ -132,9 +135,23 @@ impl RuntimeServer {
         self.serve_bound_with_state_forever(
             mcp_listener,
             addin_listener,
-            UiStateStore::new(),
+            self.ui_state_store(),
             SessionRegistry::with_limits(self.config.max_pending_per_session),
         )
+    }
+
+    fn ui_state_store(&self) -> UiStateStore {
+        UiStateStore::with_options(UiStateOptions {
+            mcp_endpoint: format!(
+                "http://{}:{}/mcp",
+                self.config.mcp_host, self.config.mcp_port
+            ),
+            addin_endpoint: format!("{}/addin", self.config.addin_origin),
+            config_path: self.config.config_path.clone(),
+            log_path: self.config.log_path.clone(),
+            now: SystemTime::now(),
+            ..UiStateOptions::default()
+        })
     }
 
     /// Runs already-bound listeners with a caller-provided initial UI and
@@ -184,6 +201,7 @@ impl RuntimeServer {
                     &addin_tls_acceptor,
                     &addin_shared_state,
                 ) {
+                    tracing::warn!(%error, "ignored malformed add-in client connection");
                     eprintln!(
                         "office-mcp-daemon ignored malformed add-in client connection: {error}"
                     );
@@ -194,6 +212,7 @@ impl RuntimeServer {
             if let Err(error) =
                 self.serve_next_mcp(mcp_listener, &frontend, &ui_state, &shared_state)
             {
+                tracing::warn!(%error, "ignored malformed MCP client connection");
                 eprintln!("office-mcp-daemon ignored malformed MCP client connection: {error}");
             }
         }
@@ -285,6 +304,7 @@ impl RuntimeServer {
                 server.handle_addin_tls_stream(&mut stream, &ui_state, &shared_state)
             })();
             if let Err(error) = result {
+                tracing::warn!(%error, "ignored malformed add-in TLS client connection");
                 eprintln!("office-mcp-daemon ignored malformed add-in client connection: {error}");
             }
         });
@@ -753,6 +773,8 @@ pub struct RuntimeServerConfig {
     pub heartbeat_interval: Duration,
     pub heartbeat_timeout: Duration,
     pub requests_per_minute: u64,
+    pub config_path: Option<String>,
+    pub log_path: Option<String>,
     pub audit_log: AuditLog,
     pub image_fetcher: ImageFetcher,
 }
@@ -815,6 +837,8 @@ impl Default for RuntimeServerConfig {
             heartbeat_interval: Duration::from_secs(30),
             heartbeat_timeout: Duration::from_secs(10),
             requests_per_minute: 120,
+            config_path: None,
+            log_path: None,
             audit_log: AuditLog::new(),
             image_fetcher: ImageFetcher::new(),
         }
@@ -2452,6 +2476,7 @@ fn record_tool_audit(
         }
     };
     if let Err(error) = audit_log.record(&record) {
+        tracing::error!(%error, "failed to write audit record");
         eprintln!("office-mcp-daemon failed to write audit record: {error}");
     }
 }
@@ -2473,6 +2498,7 @@ fn record_failure_audit(
         &failure.message,
     );
     if let Err(error) = audit_log.record(&record) {
+        tracing::error!(%error, "failed to write audit record");
         eprintln!("office-mcp-daemon failed to write audit record: {error}");
     }
 }

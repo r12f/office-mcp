@@ -54,3 +54,23 @@ fn logger_appends_jsonl_file() {
     assert!(contents.contains("daemon"));
     let _ = remove_dir_all(dir);
 }
+
+#[test]
+fn tracing_file_subscriber_writes_json_events_with_level_filter() {
+    let dir = std::env::temp_dir().join(format!(
+        "office-mcp-tracing-log-rust-{}",
+        std::process::id()
+    ));
+    let path = dir.join("office-mcp-tracing.log");
+
+    let guard = Logger::init_tracing_file(LogLevel::Warn, &path).expect("init tracing");
+    tracing::info!(component = "daemon", "hidden info");
+    tracing::warn!(component = "daemon", "visible warning");
+    drop(guard);
+
+    let contents = read_to_string(&path).expect("read tracing log file");
+    assert!(contents.contains("visible warning"));
+    assert!(contents.contains("\"level\":\"WARN\""));
+    assert!(!contents.contains("hidden info"));
+    let _ = remove_dir_all(dir);
+}
