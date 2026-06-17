@@ -1,5 +1,6 @@
 pub mod daemon_control;
 pub mod state_store;
+pub mod ui_snapshot_renderer;
 
 pub use daemon_control::{DaemonControlError, DaemonController, PowerShellExecutor};
 
@@ -8,3 +9,4 @@ pub use state_store::{
     UiClientTransport, UiCommandError, UiCommandRecord, UiCommandStatus, UiDaemonSnapshot,
     UiHealth, UiSnapshot, UiStateOptions, UiStateStore,
 };
+pub use ui_snapshot_renderer::UiSnapshotRenderer;

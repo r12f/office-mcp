@@ -10,7 +10,7 @@ use crate::addin_mgr::{
 use crate::addin_mgr::{
     WebSocketCodec, WebSocketCodecError, WebSocketFrame, WebSocketProtocolError,
 };
-use crate::api::{CommandFailure, UiStateOptions, UiStateStore};
+use crate::api::{CommandFailure, UiSnapshotRenderer, UiStateOptions, UiStateStore};
 use crate::common::DaemonConfig;
 use crate::common::{AuditLog, AuditRecord};
 use crate::mcp::{
@@ -2054,113 +2054,13 @@ fn render_ui_snapshot(
         .lock()
         .map(|registry| registry.list_sessions())
         .unwrap_or_default();
-    let snapshot = ui_state.lock().map_or_else(
+    let mut snapshot = ui_state.lock().map_or_else(
         |_| UiStateStore::new().snapshot(&sessions, SystemTime::now()),
         |ui_state| ui_state.snapshot(&sessions, SystemTime::now()),
     );
-    json!({
-        "daemon": {
-            "status": ui_health_json(snapshot.daemon.status),
-            "version": snapshot.daemon.version,
-            "uptime_ms": snapshot.daemon.uptime_ms,
-            "mcp_endpoint": format!("http://{}:{}/mcp", config.mcp_host, config.mcp_port),
-            "addin_endpoint": format!("{}/addin", config.addin_origin),
-            "config_path": snapshot.daemon.config_path,
-            "log_path": snapshot.daemon.log_path,
-            "last_error": snapshot.daemon.last_error,
-        },
-        "clients": snapshot.clients.iter().map(ui_client_json).collect::<Vec<_>>(),
-        "documents": snapshot.documents.iter().map(|(app, sessions)| {
-            (app.clone(), sessions.iter().map(session_descriptor_json).collect::<Vec<_>>())
-        }).collect::<BTreeMap<_, _>>(),
-        "current_tasks": snapshot.current_tasks.iter().map(ui_command_json).collect::<Vec<_>>(),
-        "recent_commands": snapshot.recent_commands.iter().map(ui_command_json).collect::<Vec<_>>(),
-        "document_command_history": snapshot.document_command_history.iter().map(|(session_id, commands)| {
-            (session_id.clone(), commands.iter().map(ui_command_json).collect::<Vec<_>>())
-        }).collect::<BTreeMap<_, _>>(),
-    })
-    .to_string()
-}
-
-fn ui_health_json(value: crate::api::UiHealth) -> &'static str {
-    match value {
-        crate::api::UiHealth::Up => "up",
-        crate::api::UiHealth::Degraded => "degraded",
-        crate::api::UiHealth::Down => "down",
-    }
-}
-
-fn ui_command_status_json(value: crate::api::UiCommandStatus) -> &'static str {
-    match value {
-        crate::api::UiCommandStatus::Running => "running",
-        crate::api::UiCommandStatus::Success => "success",
-        crate::api::UiCommandStatus::Failure => "failure",
-        crate::api::UiCommandStatus::Cancelled => "cancelled",
-        crate::api::UiCommandStatus::Timeout => "timeout",
-    }
-}
-
-fn ui_client_transport_json(value: crate::api::UiClientTransport) -> &'static str {
-    match value {
-        crate::api::UiClientTransport::Http => "http",
-        crate::api::UiClientTransport::StdioBridge => "stdio-bridge",
-    }
-}
-
-fn ui_client_json(client: &crate::api::UiClientRecord) -> Value {
-    json!({
-        "client_id": client.client_id,
-        "transport": ui_client_transport_json(client.transport),
-        "name": client.name,
-        "connected_at": system_time_millis(client.connected_at),
-        "last_activity_at": system_time_millis(client.last_activity_at),
-        "in_flight_request_count": client.in_flight_request_count,
-    })
-}
-
-fn ui_command_json(command: &crate::api::UiCommandRecord) -> Value {
-    json!({
-        "command_id": command.command_id,
-        "mcp_request_id": command.mcp_request_id,
-        "client_id": command.client_id,
-        "client_name": command.client_name,
-        "session_id": command.session_id,
-        "host_app": command.host_app,
-        "tool": command.tool,
-        "user_intent": command.user_intent,
-        "status": ui_command_status_json(command.status),
-        "started_at": system_time_millis(command.started_at),
-        "deadline_at": command.deadline_at.map(system_time_millis),
-        "timeout_ms": command.timeout_ms,
-        "completed_at": command.completed_at.map(system_time_millis),
-        "elapsed_ms": command.elapsed_ms,
-        "error": command.error.as_ref().map(ui_command_error_json),
-    })
-}
-
-fn ui_command_error_json(error: &crate::api::UiCommandError) -> Value {
-    json!({
-        "office_mcp_code": error.office_mcp_code,
-        "message": error.message,
-        "tool": error.tool,
-        "retriable": error.retriable,
-        "partial_effect": error.partial_effect.map(partial_effect_json),
-    })
-}
-
-fn partial_effect_json(value: crate::addin_mgr::PartialEffect) -> &'static str {
-    match value {
-        crate::addin_mgr::PartialEffect::None => "none",
-        crate::addin_mgr::PartialEffect::Possible => "possible",
-        crate::addin_mgr::PartialEffect::Unknown => "unknown",
-    }
-}
-
-fn system_time_millis(value: SystemTime) -> u128 {
-    value
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
+    snapshot.daemon.mcp_endpoint = format!("http://{}:{}/mcp", config.mcp_host, config.mcp_port);
+    snapshot.daemon.addin_endpoint = format!("{}/addin", config.addin_origin);
+    UiSnapshotRenderer::new().render_text(&snapshot)
 }
 
 fn content_type(path: &Path) -> &'static str {
