@@ -47,9 +47,24 @@ impl CommandRouter {
         request: ToolCallRequest,
         now: SystemTime,
     ) -> Result<QueuedCommand, CommandRouterError> {
-        let permit = registry
-            .prepare_invocation(&request.session_id, &request.tool, request.check_capability)
-            .map_err(CommandRouterError::Preflight)?;
+        let permit = match registry.prepare_invocation(
+            &request.session_id,
+            &request.tool,
+            request.check_capability,
+        ) {
+            Ok(permit) => permit,
+            Err(error) => {
+                tracing::warn!(
+                    component = "command_router",
+                    session_id = %request.session_id,
+                    tool = %request.tool,
+                    client_id = ?request.client_id,
+                    code = %error.failure.office_mcp_code.as_str(),
+                    "rejected tool command during preflight"
+                );
+                return Err(CommandRouterError::Preflight(error));
+            }
+        };
         let request_id = request
             .request_id
             .unwrap_or_else(|| self.next_protocol_request_id());
@@ -88,14 +103,47 @@ impl CommandRouter {
             .entry(queued.session_id.clone())
             .or_default()
             .push(queued.clone());
+        tracing::info!(
+            component = "command_router",
+            command_id = %queued.command_id,
+            request_id = %queued.request_id,
+            session_id = %queued.session_id,
+            instance_id = %queued.instance_id,
+            tool = %queued.tool,
+            sequence = queued.sequence,
+            timeout_ms = duration_millis(queued.timeout),
+            "queued tool command"
+        );
         Ok(queued)
     }
 
     pub fn mark_dispatched(&mut self, session_id: &str, request_id: &str) -> bool {
         let Some(queue) = self.queues_by_session.get_mut(session_id) else {
+            tracing::warn!(
+                component = "command_router",
+                session_id = %session_id,
+                request_id = %request_id,
+                "failed to mark missing command queue dispatched"
+            );
             return false;
         };
-        queue.mark_dispatched(request_id)
+        let dispatched = queue.mark_dispatched(request_id);
+        if dispatched {
+            tracing::debug!(
+                component = "command_router",
+                session_id = %session_id,
+                request_id = %request_id,
+                "marked tool command dispatched"
+            );
+        } else {
+            tracing::warn!(
+                component = "command_router",
+                session_id = %session_id,
+                request_id = %request_id,
+                "failed to mark unknown tool command dispatched"
+            );
+        }
+        dispatched
     }
 
     /// Completes a queued command and records the result in UI state.
@@ -112,15 +160,41 @@ impl CommandRouter {
         response: ToolResponse,
         completed_at: SystemTime,
     ) -> Result<ToolResponse, CommandRouterError> {
-        let command = self
-            .remove_command(session_id, request_id)
-            .ok_or_else(|| CommandRouterError::UnknownRequest(request_id.to_string()))?;
-        let response = self.validate_response_size(response)?;
+        let command = self.remove_command(session_id, request_id).ok_or_else(|| {
+            tracing::warn!(
+                component = "command_router",
+                session_id = %session_id,
+                request_id = %request_id,
+                "received completion for unknown tool command"
+            );
+            CommandRouterError::UnknownRequest(request_id.to_string())
+        })?;
+        let response = self.validate_response_size(&command, response)?;
         let result = match &response {
             ToolResponse::Success { .. } => CommandResult::Success,
             ToolResponse::Failure(failure) => CommandResult::Failure(failure.clone()),
         };
         ui_state.finish_command(&command.command_id, result, completed_at);
+        match &response {
+            ToolResponse::Success { .. } => tracing::info!(
+                component = "command_router",
+                command_id = %command.command_id,
+                request_id = %command.request_id,
+                session_id = %command.session_id,
+                tool = %command.tool,
+                "completed tool command successfully"
+            ),
+            ToolResponse::Failure(failure) => tracing::warn!(
+                component = "command_router",
+                command_id = %command.command_id,
+                request_id = %command.request_id,
+                session_id = %command.session_id,
+                tool = %command.tool,
+                code = %failure.office_mcp_code,
+                retriable = failure.retriable,
+                "completed tool command with failure"
+            ),
+        }
         Ok(response)
     }
 
@@ -133,12 +207,28 @@ impl CommandRouter {
         completed_at: SystemTime,
     ) -> bool {
         let Some(command) = self.remove_command(session_id, request_id) else {
+            tracing::warn!(
+                component = "command_router",
+                session_id = %session_id,
+                request_id = %request_id,
+                "failed unknown tool command"
+            );
             return false;
         };
+        let code = failure.office_mcp_code.clone();
         ui_state.finish_command(
             &command.command_id,
             CommandResult::Failure(failure),
             completed_at,
+        );
+        tracing::warn!(
+            component = "command_router",
+            command_id = %command.command_id,
+            request_id = %command.request_id,
+            session_id = %command.session_id,
+            tool = %command.tool,
+            code = %code,
+            "failed tool command"
         );
         true
     }
@@ -162,6 +252,14 @@ impl CommandRouter {
             }),
             completed_at,
         );
+        tracing::info!(
+            component = "command_router",
+            command_id = %command.command_id,
+            request_id = %command.request_id,
+            session_id = %command.session_id,
+            tool = %command.tool,
+            "cancelled tool command"
+        );
         Some(CancelCommand {
             request_id: command.request_id,
             reason: "client_cancelled".to_string(),
@@ -183,6 +281,7 @@ impl CommandRouter {
                 .unwrap_or_default();
             for request_id in request_ids {
                 if let Some(command) = self.remove_command(&session_id, &request_id) {
+                    let tool = command.tool.clone();
                     ui_state.finish_command(
                         &command.command_id,
                         CommandResult::Failure(CommandFailure {
@@ -197,6 +296,15 @@ impl CommandRouter {
                             partial_effect: Some(PartialEffect::Unknown),
                         }),
                         now,
+                    );
+                    tracing::warn!(
+                        component = "command_router",
+                        command_id = %command.command_id,
+                        request_id = %request_id,
+                        session_id = %session_id,
+                        tool = %tool,
+                        timeout_ms = duration_millis(command.timeout),
+                        "expired tool command timeout"
                     );
                     expired.push(CancelCommand {
                         request_id,
@@ -217,12 +325,23 @@ impl CommandRouter {
 
     fn validate_response_size(
         &self,
+        command: &QueuedCommand,
         response: ToolResponse,
     ) -> Result<ToolResponse, CommandRouterError> {
         let bytes = response.estimated_json_bytes();
         if bytes <= self.max_response_bytes {
             return Ok(response);
         }
+        tracing::warn!(
+            component = "command_router",
+            command_id = %command.command_id,
+            request_id = %command.request_id,
+            session_id = %command.session_id,
+            tool = %command.tool,
+            max_response_bytes = self.max_response_bytes,
+            actual_bytes = bytes,
+            "rejected oversized tool response"
+        );
         Err(CommandRouterError::ResponseTooLarge {
             max_response_bytes: self.max_response_bytes,
             actual_bytes: bytes,

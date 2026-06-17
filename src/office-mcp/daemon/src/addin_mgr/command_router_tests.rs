@@ -3,6 +3,8 @@ use crate::addin_mgr::{
     AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, OfficeMcpCode, RuntimeInfo, SessionRegistry,
 };
 use crate::api::{RegisterClientInput, UiClientTransport, UiCommandStatus, UiStateStore};
+use crate::common::{Logger, LoggerLogLevel};
+use std::fs::{read_to_string, remove_dir_all};
 use std::time::{Duration, SystemTime};
 
 #[test]
@@ -162,6 +164,76 @@ fn timeout_expires_command_and_returns_cancel_message() {
         ui_state.snapshot(&[], now).recent_commands[0].status,
         UiCommandStatus::Timeout
     );
+}
+
+#[test]
+fn writes_structured_tracing_events_for_command_lifecycle() {
+    let dir = std::env::temp_dir().join(format!(
+        "office-mcp-command-router-log-{}",
+        std::process::id()
+    ));
+    let path = dir.join("office-mcp.log");
+    let (subscriber, guard) =
+        Logger::tracing_file_default(LoggerLogLevel::Debug, &path).expect("init tracing");
+    let now = SystemTime::UNIX_EPOCH + Duration::from_secs(10);
+    let registry = registry_with_session(now);
+    let mut ui_state = UiStateStore::new();
+    let mut router = CommandRouter::new();
+
+    tracing::subscriber::with_default(subscriber, || {
+        let queued = router
+            .enqueue(
+                &registry,
+                &mut ui_state,
+                request("session-1", "word.get_text", None),
+                now,
+            )
+            .expect("enqueue");
+        assert!(router.mark_dispatched("session-1", &queued.request_id));
+        router
+            .complete(
+                &mut ui_state,
+                "session-1",
+                &queued.request_id,
+                ToolResponse::Success {
+                    json: "{\"ok\":true}".to_string(),
+                },
+                now + Duration::from_secs(1),
+            )
+            .expect("complete");
+        router
+            .enqueue(
+                &SessionRegistry::new(),
+                &mut ui_state,
+                request("missing", "word.get_text", None),
+                now,
+            )
+            .expect_err("preflight rejected");
+        let timed_out = router
+            .enqueue(
+                &registry,
+                &mut ui_state,
+                ToolCallRequest {
+                    timeout: Some(Duration::from_millis(5)),
+                    ..request("session-1", "word.get_text", None)
+                },
+                now,
+            )
+            .expect("enqueue timeout");
+        let cancels = router.expire_timeouts(&mut ui_state, now + Duration::from_millis(6));
+        assert_eq!(cancels[0].request_id, timed_out.request_id);
+    });
+    drop(guard);
+
+    let contents = read_to_string(&path).expect("read tracing log file");
+    assert!(contents.contains("queued tool command"));
+    assert!(contents.contains("marked tool command dispatched"));
+    assert!(contents.contains("completed tool command successfully"));
+    assert!(contents.contains("rejected tool command during preflight"));
+    assert!(contents.contains("expired tool command timeout"));
+    assert!(contents.contains("\"component\":\"command_router\""));
+    assert!(contents.contains("word.get_text"));
+    let _ = remove_dir_all(dir);
 }
 
 fn registry_with_session(now: SystemTime) -> SessionRegistry {
