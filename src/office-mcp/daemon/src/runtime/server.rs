@@ -2,16 +2,14 @@ use crate::addin_mgr::SessionRegistry;
 use crate::api::{UiStateOptions, UiStateStore};
 use crate::common::DaemonConfig;
 use crate::mcp::McpHttpFrontend;
-use crate::runtime::addin_http::AddinHttpService;
-use crate::runtime::http_wire::WireHttpRequest;
 use crate::runtime::mcp_response::RuntimeSharedState;
-use crate::runtime::runtime_request_router::RuntimeRequestRouter;
 use crate::runtime::runtime_shared_state_factory::RuntimeSharedStateFactory;
-use crate::runtime::websocket_session::RuntimeWebSocketSession;
+use crate::runtime::server_connection::RuntimeConnectionHandler;
 pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
 use crate::ui::UiRuntimeFile;
-use native_tls::{TlsAcceptor, TlsStream};
-use std::io::Write;
+use native_tls::TlsAcceptor;
+#[cfg(test)]
+use native_tls::TlsStream;
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -236,31 +234,17 @@ impl RuntimeServer {
                 let mut stream = tls_acceptor
                     .accept(stream)
                     .map_err(|error| RuntimeServerError::Tls(error.to_string()))?;
-                server.handle_addin_tls_stream(&mut stream, &ui_state, &shared_state)
+                server.connection_handler().handle_addin_tls_stream(
+                    &mut stream,
+                    &ui_state,
+                    &shared_state,
+                )
             })();
             if let Err(error) = result {
                 tracing::warn!(%error, "ignored malformed add-in TLS client connection");
                 eprintln!("office-mcp-daemon ignored malformed add-in client connection: {error}");
             }
         });
-        Ok(())
-    }
-
-    fn handle_addin_tls_stream(
-        &self,
-        stream: &mut TlsStream<TcpStream>,
-        ui_state: &Arc<Mutex<UiStateStore>>,
-        shared_state: &Arc<RuntimeSharedState>,
-    ) -> Result<(), RuntimeServerError> {
-        let request = WireHttpRequest::read_from(stream, self.config.max_request_bytes)?;
-        let addin_http = self.addin_http_service();
-        let websocket_upgrade = addin_http.is_valid_websocket_upgrade(&request);
-        let response = addin_http.route_request(ui_state, &shared_state.registry, &request);
-        stream.write_all(&response.to_bytes())?;
-        stream.flush()?;
-        if websocket_upgrade && response.status == 101 {
-            self.handle_websocket_messages(stream, shared_state)?;
-        }
         Ok(())
     }
 
@@ -279,18 +263,14 @@ impl RuntimeServer {
         shared_state: &Arc<RuntimeSharedState>,
         remote_addr: Option<String>,
     ) -> Result<(), RuntimeServerError> {
-        let request = WireHttpRequest::read_from(stream, self.config.max_request_bytes)?;
-        let response = RuntimeRequestRouter::route(
+        self.connection_handler().handle_mcp_stream(
+            stream,
             frontend,
             ui_state,
             registry,
             shared_state,
             remote_addr,
-            request,
-        );
-        stream.write_all(&response.to_bytes())?;
-        stream.flush()?;
-        Ok(())
+        )
     }
 
     /// Handles a single add-in/static/UI HTTP request on a stream.
@@ -304,27 +284,23 @@ impl RuntimeServer {
         stream: &mut TcpStream,
         ui_state: &UiStateStore,
     ) -> Result<(), RuntimeServerError> {
-        let request = WireHttpRequest::read_from(stream, self.config.max_request_bytes)?;
-        let registry = Arc::new(Mutex::new(SessionRegistry::new()));
-        let ui_state = Arc::new(Mutex::new(ui_state.clone()));
-        let response = self
-            .addin_http_service()
-            .route_request(&ui_state, &registry, &request);
-        stream.write_all(&response.to_bytes())?;
-        stream.flush()?;
-        Ok(())
+        self.connection_handler()
+            .handle_addin_stream(stream, ui_state)
     }
 
-    fn handle_websocket_messages(
+    #[cfg(test)]
+    fn handle_addin_tls_stream(
         &self,
         stream: &mut TlsStream<TcpStream>,
+        ui_state: &Arc<Mutex<UiStateStore>>,
         shared_state: &Arc<RuntimeSharedState>,
     ) -> Result<(), RuntimeServerError> {
-        RuntimeWebSocketSession::from_config(&self.config).handle(stream, shared_state)
+        self.connection_handler()
+            .handle_addin_tls_stream(stream, ui_state, shared_state)
     }
 
-    fn addin_http_service(&self) -> AddinHttpService {
-        AddinHttpService::from_config(&self.config)
+    fn connection_handler(&self) -> RuntimeConnectionHandler<'_> {
+        RuntimeConnectionHandler::new(&self.config)
     }
 }
 

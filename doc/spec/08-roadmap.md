@@ -370,9 +370,10 @@ module so ownership is visible from the directory tree.
       `*_tests.rs` coverage. Recent slices also extracted add-in registration
       policy and add-in session event handling from `addin_channel.rs`, plus
       command completion helpers from `command_router.rs`, and MCP forwarded
-      tool invocation from `runtime/mcp_rpc.rs`. Remaining large files still
-      needing review include `runtime/evidence_fixture.rs`, `common/logger.rs`,
-      `runtime/server.rs`, and `mcp/catalog.rs`.
+      tool invocation from `runtime/mcp_rpc.rs`, and runtime connection
+      handling from `runtime/server.rs`. Remaining large files still needing
+      review include `runtime/evidence_fixture.rs`, `common/logger.rs`, and
+      `mcp/catalog.rs`.
 - [x] Move inline Rust unit tests into sibling files named after the production
       file, such as `logger_tests.rs` for `logger.rs`. Keep only minimal
       compile-only inline test modules when a sibling file is not useful.
