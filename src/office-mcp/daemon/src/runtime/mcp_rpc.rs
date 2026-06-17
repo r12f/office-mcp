@@ -12,6 +12,7 @@ use crate::mcp::{
 use crate::runtime::addin_tool_response::AddinToolResponseMapper;
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_catalog_response::McpCatalogResponder;
+use crate::runtime::mcp_tool_arguments::McpToolArgumentPreprocessor;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -178,10 +179,11 @@ impl McpJsonRpcRuntime {
             .get("id")
             .and_then(Value::as_str)
             .map(str::to_string);
-        let arguments = match preprocess_tool_arguments(context.image_fetcher, tool, arguments) {
-            Ok(arguments) => arguments,
-            Err(failure) => return tool_failure_from_command(&failure),
-        };
+        let arguments =
+            match McpToolArgumentPreprocessor::preprocess(context.image_fetcher, tool, arguments) {
+                Ok(arguments) => arguments,
+                Err(failure) => return tool_failure_from_command(&failure),
+            };
         let arguments_json = arguments.to_string();
         let queued = {
             let mut router = context.command_router.lock().expect("command router lock");
@@ -330,45 +332,6 @@ impl McpJsonRpcRuntime {
             "available_tools": info.available_tools
         }))
     }
-}
-
-fn preprocess_tool_arguments(
-    image_fetcher: &ImageFetcher,
-    tool: &str,
-    arguments: &Value,
-) -> Result<Value, CommandFailure> {
-    if tool != "word.insert_image" {
-        return Ok(arguments.clone());
-    }
-    let Some(image) = arguments.get("image") else {
-        return Ok(arguments.clone());
-    };
-    let processed = if let Some(base64) = image.get("base64").and_then(Value::as_str) {
-        image_fetcher.validate_base64(base64)
-    } else if let Some(url) = image.get("url").and_then(Value::as_str) {
-        image_fetcher.fetch_url(url)
-    } else {
-        return Ok(arguments.clone());
-    };
-    let fetched = processed.map_err(|error| CommandFailure {
-        office_mcp_code: "IMAGE_FETCH_FAILED".to_string(),
-        message: error.to_string(),
-        tool: Some(tool.to_string()),
-        retriable: false,
-        partial_effect: Some(crate::addin_mgr::PartialEffect::None),
-    })?;
-    let mut updated = arguments.clone();
-    if let Some(object) = updated.as_object_mut() {
-        object.insert(
-            "image".to_string(),
-            json!({
-                "base64": fetched.base64,
-                "mime_type": fetched.mime_type.as_str(),
-                "byte_length": fetched.byte_length
-            }),
-        );
-    }
-    Ok(updated)
 }
 
 fn record_tool_audit(
