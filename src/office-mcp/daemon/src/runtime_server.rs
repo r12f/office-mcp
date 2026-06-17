@@ -6,9 +6,7 @@ use crate::audit_log::{AuditLog, AuditRecord};
 use crate::command_router::{CommandRouter, ToolCallRequest, ToolResponse};
 use crate::config_service::DaemonConfig;
 use crate::image_fetcher::ImageFetcher;
-use crate::mcp_http_frontend::{
-    HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest,
-};
+use crate::mcp::{HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
 use crate::session_registry::{AddInInfo, DocumentInfo, HostInfo, SessionPatch, SessionRegistry};
 use crate::ui::{CommandFailure, UiStateStore};
 use crate::ui::{UiRuntimeError, UiRuntimeFile};
@@ -3051,7 +3049,7 @@ mod tests {
     use crate::audit_log::AuditLog;
     use crate::command_router::CommandRouter;
     use crate::image_fetcher::ImageFetcher;
-    use crate::mcp_http_frontend::McpHttpFrontend;
+    use crate::mcp::McpHttpFrontend;
     use crate::session_registry::{
         AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionRegistry,
     };
@@ -3099,8 +3097,8 @@ mod tests {
                 body
             ),
             |frontend, ui_state| {
-                let initialize = crate::mcp_http_frontend::McpHttpRequest {
-                    method: crate::mcp_http_frontend::HttpMethod::Post,
+                let initialize = crate::mcp::McpHttpRequest {
+                    method: crate::mcp::HttpMethod::Post,
                     headers: std::collections::BTreeMap::new(),
                     remote_addr: Some("127.0.0.1".to_string()),
                     body_bytes: 0,

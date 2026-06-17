@@ -3,7 +3,7 @@ use crate::audit_log::AuditLog;
 use crate::command_router::CommandRouter;
 use crate::config_service::DaemonConfigService;
 use crate::logger::Logger;
-use crate::mcp_http_frontend::McpHttpFrontend;
+use crate::mcp::McpHttpFrontend;
 use crate::parity::ParityPlan;
 use crate::runtime_server::RuntimeServer;
 use crate::session_registry::SessionRegistry;

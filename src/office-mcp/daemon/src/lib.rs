@@ -8,12 +8,10 @@ pub mod daemon_control;
 pub mod evidence_fixture;
 pub mod image_fetcher;
 pub mod logger;
-pub mod mcp_http_frontend;
-pub mod mcp_management_client;
+pub mod mcp;
 pub mod parity;
 pub mod runtime_server;
 pub mod session_registry;
-pub mod stdio_bridge;
 pub mod tray;
 pub mod ui;
 
