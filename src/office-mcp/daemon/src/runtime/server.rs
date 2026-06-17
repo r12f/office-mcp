@@ -1,5 +1,5 @@
+use crate::addin_mgr::AddinChannelServer;
 use crate::addin_mgr::SessionRegistry;
-use crate::addin_mgr::{AddinChannelServer, HeartbeatDecision};
 use crate::addin_mgr::{AddinConnectionHub, CommandRouter};
 use crate::addin_mgr::{WebSocketCodec, WebSocketCodecError, WebSocketFrame};
 use crate::api::{UiStateOptions, UiStateStore};
@@ -8,15 +8,14 @@ use crate::mcp::{HttpMethod, McpHttpFrontend, McpHttpRequest};
 use crate::runtime::addin_http::AddinHttpService;
 use crate::runtime::addin_rpc::AddinJsonRpcRuntime;
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
-use crate::runtime::json_rpc;
 use crate::runtime::mcp_response::{
     HeartbeatLoopDecision, McpHttpResponseService, RuntimeSharedState,
 };
 use crate::runtime::websocket_heartbeat::WebSocketHeartbeatState;
+use crate::runtime::websocket_heartbeat_service::WebSocketHeartbeatService;
 pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
 use crate::ui::UiRuntimeFile;
 use native_tls::{TlsAcceptor, TlsStream};
-use serde_json::Value;
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
@@ -374,7 +373,7 @@ impl RuntimeServer {
             }
             let now = Instant::now();
             if heartbeat.deadline_elapsed(now) {
-                match Self::record_heartbeat_timeout(shared_state, &connection_id)? {
+                match WebSocketHeartbeatService::record_timeout(shared_state, &connection_id)? {
                     HeartbeatLoopDecision::KeepOpen => {
                         heartbeat.mark_pong_received(now);
                     }
@@ -386,7 +385,9 @@ impl RuntimeServer {
             }
             let now = Instant::now();
             if heartbeat.should_start_ping(now) {
-                if let Some(ping) = Self::start_heartbeat_ping(shared_state, &connection_id)? {
+                if let Some(ping) =
+                    WebSocketHeartbeatService::start_ping(shared_state, &connection_id)?
+                {
                     WebSocketCodec::write_text(stream, &ping)?;
                     heartbeat.mark_ping_sent(Instant::now());
                 } else {
@@ -412,7 +413,11 @@ impl RuntimeServer {
             };
             match frame {
                 WebSocketFrame::Text(text) => {
-                    if Self::handle_heartbeat_response(shared_state, &connection_id, &text)? {
+                    if WebSocketHeartbeatService::handle_response(
+                        shared_state,
+                        &connection_id,
+                        &text,
+                    )? {
                         heartbeat.mark_pong_received(Instant::now());
                         continue;
                     }
@@ -449,66 +454,6 @@ impl RuntimeServer {
             .connection_hub
             .remove_connection(&connection_id);
         Ok(())
-    }
-
-    fn start_heartbeat_ping(
-        shared_state: &RuntimeSharedState,
-        connection_id: &str,
-    ) -> Result<Option<String>, RuntimeServerError> {
-        let mut addin_channel = shared_state.addin_channel.lock().map_err(|_| {
-            RuntimeServerError::Internal("Add-in channel lock poisoned.".to_string())
-        })?;
-        match addin_channel.start_ping(connection_id, SystemTime::now()) {
-            Ok(ping) => Ok(Some(json_rpc::envelope_to_text(&ping))),
-            Err(crate::addin_mgr::AddinChannelError::UnknownConnection(_)) => Ok(None),
-            Err(error) => Err(RuntimeServerError::Internal(error.to_string())),
-        }
-    }
-
-    fn handle_heartbeat_response(
-        shared_state: &RuntimeSharedState,
-        connection_id: &str,
-        text: &str,
-    ) -> Result<bool, RuntimeServerError> {
-        let Ok(value) = serde_json::from_str::<Value>(text) else {
-            return Ok(false);
-        };
-        if value.get("method").is_some() || value.get("result").is_none() {
-            return Ok(false);
-        }
-        let Some(response_id) = value.get("id").and_then(Value::as_str) else {
-            return Ok(false);
-        };
-        let mut addin_channel = shared_state.addin_channel.lock().map_err(|_| {
-            RuntimeServerError::Internal("Add-in channel lock poisoned.".to_string())
-        })?;
-        addin_channel
-            .handle_pong(connection_id, response_id)
-            .map_err(|error| RuntimeServerError::Internal(error.to_string()))
-    }
-
-    fn record_heartbeat_timeout(
-        shared_state: &RuntimeSharedState,
-        connection_id: &str,
-    ) -> Result<HeartbeatLoopDecision, RuntimeServerError> {
-        let mut registry = shared_state.registry.lock().map_err(|_| {
-            RuntimeServerError::Internal("Session registry lock poisoned.".to_string())
-        })?;
-        let mut addin_channel = shared_state.addin_channel.lock().map_err(|_| {
-            RuntimeServerError::Internal("Add-in channel lock poisoned.".to_string())
-        })?;
-        match addin_channel.record_heartbeat_timeout(
-            &mut registry,
-            connection_id,
-            SystemTime::now(),
-        ) {
-            Ok(HeartbeatDecision::KeepOpen) => Ok(HeartbeatLoopDecision::KeepOpen),
-            Ok(HeartbeatDecision::Close { .. }) => Ok(HeartbeatLoopDecision::Close),
-            Err(crate::addin_mgr::AddinChannelError::UnknownConnection(_)) => {
-                Ok(HeartbeatLoopDecision::KeepOpen)
-            }
-            Err(error) => Err(RuntimeServerError::Internal(error.to_string())),
-        }
     }
 
     fn addin_http_service(&self) -> AddinHttpService {
