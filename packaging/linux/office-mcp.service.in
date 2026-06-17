@@ -1,0 +1,14 @@
+[Unit]
+Description=Office MCP daemon
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=OFFICE_MCP_INSTALL_ROOT={{INSTALL_ROOT}}
+Environment=OFFICE_MCP_CONFIG_PATH={{CONFIG_PATH}}
+ExecStart={{INSTALL_ROOT}}/office-mcp-daemon daemon run
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

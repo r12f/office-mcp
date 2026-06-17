@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  server:
-    name: Server (${{ matrix.os }})
+  daemon:
+    name: Rust daemon (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -18,22 +18,83 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Lint daemon
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test daemon
+        run: cargo test --workspace
+
+  evidence:
+    name: Evidence harness
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: |
-            mcp-server/package-lock.json
-            addin/package-lock.json
+          cache-dependency-path: src/office-mcp/daemon/evidence/package-lock.json
 
-      - name: Install server dependencies
-        working-directory: mcp-server
+      - name: Install evidence dependencies
+        working-directory: src/office-mcp/daemon/evidence
         run: npm ci
 
-      - name: Build and test server
-        working-directory: mcp-server
+      - name: Type-check evidence harness
+        working-directory: src/office-mcp/daemon/evidence
         run: npm run check
+
+  packaging-smoke:
+    name: Packaging smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packaging/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install packaging dependencies
+        working-directory: packaging
+        run: npm ci
+
+      - name: Run packaging smoke checks
+        working-directory: packaging
+        run: npm run check
+
+      - name: Run native tray probe
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/office-mcp-ui-state.json" <<'JSON'
+          {"daemon":{"status":"up"},"clients":[{"client_id":"ci-client"}],"documents":{"word":[{"session_id":"ci-word"}],"excel":[{"session_id":"ci-excel"}]},"current_tasks":[]}
+          JSON
+          cargo run -q -p office-mcp-daemon -- tray --probe --probe-state-path "$RUNNER_TEMP/office-mcp-ui-state.json" > "$RUNNER_TEMP/office-mcp-tray-probe.json"
+          cat "$RUNNER_TEMP/office-mcp-tray-probe.json"
+          grep -q '"native_host":true' "$RUNNER_TEMP/office-mcp-tray-probe.json"
+          grep -q '"state_fetch_ok":true' "$RUNNER_TEMP/office-mcp-tray-probe.json"
 
   addin:
     name: Add-in validation
@@ -48,20 +109,20 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: addin/package-lock.json
+          cache-dependency-path: src/office-ctl/word/package-lock.json
 
       - name: Install add-in dependencies
-        working-directory: addin
+        working-directory: src/office-ctl/word
         run: npm ci
 
       - name: Validate Word add-in
-        working-directory: addin
+        working-directory: src/office-ctl/word
         run: npm run check
 
       - name: Check Windows bootstrap scripts syntax
         shell: pwsh
         run: |
-          $paths = @('packaging/windows/install-windows.ps1', 'packaging/windows/uninstall-windows.ps1', 'packaging/windows/build-windows-msi.ps1', 'packaging/homebrew/render-formula.ps1', 'addin/scripts/render-hosted-manifest.ps1', 'addin/scripts/build-appsource-package.ps1')
+          $paths = @('packaging/windows/install-windows.ps1', 'packaging/windows/uninstall-windows.ps1', 'packaging/windows/build-windows-msi.ps1', 'packaging/windows/export-localhost-dev-cert.ps1', 'packaging/homebrew/render-formula.ps1', 'src/office-ctl/word/scripts/render-hosted-manifest.ps1', 'src/office-ctl/word/scripts/build-appsource-package.ps1')
           foreach ($path in $paths) {
             $errors = $null
             [System.Management.Automation.PSParser]::Tokenize((Get-Content -Raw $path), [ref]$errors) | Out-Null
@@ -79,20 +140,36 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: mcp-server/package-lock.json
+          cache-dependency-path: |
+            src/office-mcp/daemon/evidence/package-lock.json
+            src/office-ctl/word/package-lock.json
+            packaging/package-lock.json
 
-      - name: Install server dependencies
-        working-directory: mcp-server
+      - name: Install evidence dependencies
+        working-directory: src/office-mcp/daemon/evidence
         run: npm ci
 
       - name: Install add-in dependencies
-        working-directory: addin
+        working-directory: src/office-ctl/word
         run: npm ci
+
+      - name: Install packaging dependencies
+        working-directory: packaging
+        run: npm ci
+
+      - name: Check packaging scripts
+        working-directory: packaging
+        run: npm run check
 
       - name: Build MSI
         shell: pwsh

@@ -5,15 +5,13 @@ class OfficeMcp < Formula
   sha256 "{{TARBALL_SHA256}}"
   license "MIT"
 
-  depends_on "node@22"
-
   def install
     libexec.install Dir["*"]
     (bin/"office-mcp").write <<~EOS
       #!/bin/bash
       export OFFICE_MCP_INSTALL_ROOT="#{libexec}"
       export OFFICE_MCP_CONFIG_PATH="${OFFICE_MCP_CONFIG_PATH:-#{etc}/office-mcp/config.toml}"
-      exec "#{Formula["node@22"].opt_bin}/node" "#{libexec}/mcp-server/dist/src/cli.js" "$@"
+      exec "#{libexec}/office-mcp-daemon" "$@"
     EOS
   end
 
@@ -22,8 +20,11 @@ class OfficeMcp < Formula
       office-mcp runs as a long-lived per-user daemon. Start it with:
         brew services start office-mcp
 
+      Show the native menu-bar controller with:
+        office-mcp tray
+
       The Word add-in bundle is installed at:
-        #{libexec}/addin
+        #{libexec}/office-ctl/word
 
       macOS Office trusted catalog registration and localhost certificate trust
       remain explicit first-run steps for the user or an enterprise deployment tool.

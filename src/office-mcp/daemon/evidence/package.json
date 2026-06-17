@@ -1,0 +1,34 @@
+{
+  "name": "office-mcp-evidence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Runtime and UI evidence harnesses for the office-mcp daemon.",
+  "scripts": {
+    "check": "tsc -p tsconfig.json && npm test",
+    "check:ui": "npm run evidence:ui && npm run evidence:validate-ui -- --input ../../../../artifacts/ui-runtime-evidence.json",
+    "evidence:irm": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (-not $env:OFFICE_MCP_IRM_DOCUMENT_PATH) { $env:OFFICE_MCP_IRM_DOCUMENT_PATH = 'C:\\Users\\riffjiang\\Downloads\\Document 2026-05-31 (6).docx' }; & .\\node_modules\\.bin\\tsx.cmd runtime-evidence.ts --output ../../../../artifacts/runtime-evidence-irm.json --irm-mode protected-read --wait-for-session-ms 120000\"",
+    "evidence:excel": "tsx runtime-evidence.ts --output ../../../../artifacts/runtime-evidence-excel.json --include-excel-smoke --wait-for-session-ms 120000",
+    "evidence:runtime": "tsx runtime-evidence.ts",
+    "evidence:ui": "tsx ui-runtime-evidence.ts",
+    "evidence:record-agent-client": "tsx record-agent-client-evidence.ts",
+    "evidence:validate": "tsx validate-runtime-evidence.ts",
+    "evidence:validate-ui": "tsx validate-runtime-evidence.ts --ui",
+    "smoke:mcp": "tsx mcp-smoke.ts",
+    "smoke:ui": "tsx ui-browser-smoke.ts",
+    "test": "node --test --import tsx *.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "ws": "8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.0.3",
+    "@types/ws": "8.18.1",
+    "tsx": "4.22.4",
+    "typescript": "5.8.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

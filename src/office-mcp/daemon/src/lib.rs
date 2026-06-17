@@ -1,0 +1,23 @@
+pub mod addin_channel;
+pub mod audit_log;
+pub mod client_config;
+pub mod command_router;
+pub mod config_service;
+pub mod daemon;
+pub mod daemon_control;
+pub mod evidence_fixture;
+pub mod image_fetcher;
+pub mod logger;
+pub mod mcp_http_frontend;
+pub mod mcp_management_client;
+pub mod parity;
+pub mod runtime_server;
+pub mod session_registry;
+pub mod stdio_bridge;
+pub mod tray_controller;
+pub mod tray_host;
+pub mod ui_runtime;
+pub mod ui_state_store;
+
+pub use daemon::OfficeMcpDaemon;
+pub use parity::{ParityGate, ParityPlan};

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Office MCP</title>
+    <link rel="stylesheet" href="/ui/app.css" />
+    <script defer src="/ui/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#activity">Skip to activity</a>
+    <main class="shell">
+      <header class="status-strip" aria-label="Daemon status">
+        <div class="identity">
+          <span id="healthBadge" class="badge neutral">Loading</span>
+          <div>
+            <h1>Office MCP</h1>
+            <p id="daemonMeta">Waiting for daemon state</p>
+          </div>
+        </div>
+        <dl class="metrics" aria-label="Connection counts">
+          <div><dt>Clients</dt><dd id="clientCount">0</dd></div>
+          <div><dt>Documents</dt><dd id="documentCount">0</dd></div>
+          <div><dt>Running</dt><dd id="taskCount">0</dd></div>
+        </dl>
+        <div class="endpoints" aria-label="Endpoints">
+          <button type="button" class="copy" data-copy="mcpEndpoint"><span>MCP</span><code id="mcpEndpoint">-</code></button>
+          <button type="button" class="copy" data-copy="addinEndpoint"><span>Add-in</span><code id="addinEndpoint">-</code></button>
+        </div>
+      </header>
+
+      <section class="details" aria-label="Daemon details">
+        <dl>
+          <div><dt>Version</dt><dd id="daemonVersion">-</dd></div>
+          <div><dt>Uptime</dt><dd id="daemonUptime">-</dd></div>
+          <div><dt>Config</dt><dd id="configPath">Not configured</dd></div>
+          <div><dt>Log</dt><dd id="logPath">Not configured</dd></div>
+          <div><dt>Last error</dt><dd id="lastError">None</dd></div>
+        </dl>
+      </section>
+
+      <section class="workspace">
+        <aside class="panel navigation" aria-labelledby="documentsHeading">
+          <div class="panel-head">
+            <h2 id="documentsHeading">Documents</h2>
+            <input id="search" type="search" placeholder="Filter sessions" autocomplete="off" />
+          </div>
+          <div id="documents" class="stack"></div>
+          <h3>Clients</h3>
+          <div id="clients" class="stack compact"></div>
+        </aside>
+
+        <section id="activity" class="panel activity" aria-labelledby="activityHeading">
+          <div class="panel-head">
+            <h2 id="activityHeading">Activity</h2>
+            <select id="resultFilter" aria-label="Filter command history">
+              <option value="all">All results</option>
+              <option value="success">Succeeded</option>
+              <option value="failure">Failed</option>
+              <option value="timeout">Timed out</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <h3>Current tasks</h3>
+          <div id="currentTasks" class="table-region"></div>
+          <h3>Recent command history</h3>
+          <div id="history" class="table-region"></div>
+        </section>
+
+        <aside class="panel inspector" aria-labelledby="inspectorHeading">
+          <div class="panel-head">
+            <h2 id="inspectorHeading">Inspector</h2>
+            <button id="clearInspector" type="button">Clear</button>
+          </div>
+          <pre id="inspector">Select a row.</pre>
+        </aside>
+      </section>
+      <p id="announcer" class="sr-only" aria-live="polite"></p>
+    </main>
+  </body>
+</html>

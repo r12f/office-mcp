@@ -2,7 +2,7 @@
 
 **A bridge between AI assistants and live Microsoft Office applications via in-process add-ins.**
 
-`office-mcp` exposes Word (and eventually Excel, PowerPoint, Outlook) as MCP tools by running an
+`office-mcp` exposes Word and Excel (with PowerPoint and Outlook planned) as MCP tools by running an
 add-in inside each Office instance. The add-in reverse-connects to a single long-lived MCP server
 process, which multiplexes MCP clients across all running Office windows.
 
@@ -45,7 +45,7 @@ MVP implementation is in place for Word desktop on Windows:
 - Local HTTPS task pane and WSS add-in channel at `https://localhost:8765`.
 - Word task pane add-in that reverse-registers one document session.
 - MCP server catalog covers the full Word v1 tool surface from
-  `docs/spec/04-word-capabilities.md`.
+  `doc/spec/04-word-capabilities.md` and the Excel v1 tools in the roadmap.
 - The current Word add-in runtime advertises and executes all 27 Word v1 tools: discovery, read, insert, edit, table, structure, review, tracked-change, and save operations.
 - The daemon also exposes the Word v1 resource surface, including document text, structure, paragraph, comments, tracked changes, and selection.
 
@@ -57,9 +57,16 @@ CI runs on Windows, macOS, and Linux for the server package, plus Windows add-in
 manifest and task pane syntax validation. The equivalent local checks are:
 
 ```powershell
-cd .\mcp-server
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cd .\src\office-mcp\daemon\evidence
+npm install
 npm run check
-cd ..\addin
+npm run check:ui
+cd ..\..\..\office-ctl\word
+npm run check
+cd ..\..\..\packaging
 npm run check
 ```
 
@@ -67,14 +74,20 @@ npm run check
 
 | Path | Owner |
 |---|---|
-| `mcp-server/` | Long-running local service: MCP frontend, HTTPS/WSS add-in channel, session registry, service tests, and service-owned scripts. |
-| `addin/` | Word add-in package: XML manifest, task pane static bundle, add-in validation scripts, and Word catalog registration script. |
+| `src/office-mcp/daemon/` | Native Rust daemon service and daemon-owned state/API. |
+| `src/office-mcp/daemon/evidence/` | Runtime, UI, smoke, and validation evidence harnesses for daemon parity and release gates. |
+| `src/office-mcp/ui/` | Web UI assets for the tray-opened daemon console. |
+| `src/office-ctl/common/` | Shared TypeScript add-in utilities: config, logging, channel/protocol helpers, redaction, and reusable UI primitives. |
+| `src/office-ctl/word/` | Word add-in package: XML manifest, task pane static bundle, add-in validation scripts, and Word catalog registration script. |
+| `src/office-ctl/excel/` | Excel add-in entry point and host-specific command surface. |
 | `packaging/` | Cross-component packaging assets: Windows bootstrap scripts and WiX MSI source. |
-| `docs/spec/` | Product and protocol design. |
+| `doc/spec/` | Product and protocol design. |
 
 The repository root intentionally does not contain a top-level Node package.
-Run server commands from `mcp-server/` and add-in commands from `addin/` so the
-daemon and Office add-in stay independently buildable and packageable.
+Run Rust daemon commands from the repository root, evidence/smoke commands from
+`src/office-mcp/daemon/evidence/`, add-in commands from `src/office-ctl/word/`,
+and packaging checks from `packaging/` so the daemon, evidence harnesses,
+Office add-in, and installers stay independently buildable and packageable.
 Historical feasibility spikes and generated installer/runtime evidence belong
 under `artifacts/`, not as parallel source packages at the root.
 
@@ -82,33 +95,41 @@ under `artifacts/`, not as parallel source packages at the root.
 
 | Doc | Purpose |
 |---|---|
-| [00-overview.md](docs/spec/00-overview.md) | Goals, non-goals, glossary |
-| [01-architecture.md](docs/spec/01-architecture.md) | Process model, transports, lifecycle |
-| [02-registration-protocol.md](docs/spec/02-registration-protocol.md) | Add-in ↔ server JSON-RPC wire protocol |
-| [03-mcp-tool-surface.md](docs/spec/03-mcp-tool-surface.md) | MCP tools, resources, prompts exposed to clients |
-| [04-word-capabilities.md](docs/spec/04-word-capabilities.md) | Word-specific tool catalog (v1) |
-| [05-security.md](docs/spec/05-security.md) | Auth, sandbox, IRM, trust boundaries |
-| [06-error-model.md](docs/spec/06-error-model.md) | Error codes, retry, partial-failure semantics |
-| [07-deployment.md](docs/spec/07-deployment.md) | Installation, sideloading, distribution |
-| [08-roadmap.md](docs/spec/08-roadmap.md) | Milestones, Excel/PPT/Outlook follow-on |
-| [09-ui.md](docs/spec/09-ui.md) | Daemon tray/main window and add-in task pane UI |
+| [00-overview.md](doc/spec/00-overview.md) | Goals, non-goals, glossary |
+| [01-architecture.md](doc/spec/01-architecture.md) | Process model, transports, lifecycle |
+| [02-registration-protocol.md](doc/spec/02-registration-protocol.md) | Add-in ↔ server JSON-RPC wire protocol |
+| [03-mcp-tool-surface.md](doc/spec/03-mcp-tool-surface.md) | MCP tools, resources, prompts exposed to clients |
+| [04-word-capabilities.md](doc/spec/04-word-capabilities.md) | Word-specific tool catalog (v1) |
+| [04-excel-capabilities.md](doc/spec/04-excel-capabilities.md) | Excel-specific tool catalog (v1) |
+| [05-security.md](doc/spec/05-security.md) | Security model, sandbox, IRM, trust boundaries |
+| [06-error-model.md](doc/spec/06-error-model.md) | Error codes, retry, partial-failure semantics |
+| [07-deployment.md](doc/spec/07-deployment.md) | Installation, sideloading, distribution |
+| [08-roadmap.md](doc/spec/08-roadmap.md) | Milestones, Excel/PPT/Outlook follow-on |
+| [09-ui.md](doc/spec/09-ui.md) | Daemon tray/main window and add-in task pane UI |
 
 ## Run the MVP locally
 
 Prerequisites:
 
 - Windows with Word desktop installed.
+- Rust toolchain matching `rust-toolchain.toml`.
 - Node.js 22 or newer.
 - A trusted current-user `CN=localhost` HTTPS certificate. The daemon reads a
   PFX file; it does not import root certificates during startup.
 
-Install service dependencies and verify the build:
+Verify the Rust daemon, evidence harnesses, Word add-in, and packaging checks:
 
 ```powershell
-cd .\mcp-server
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cd .\src\office-mcp\daemon\evidence
 npm install
 npm run check
-cd ..\addin
+cd ..\..\..\office-ctl\word
+npm install
+npm run check
+cd ..\..\..\packaging
 npm install
 npm run check
 ```
@@ -117,20 +138,20 @@ Export the already trusted localhost certificate to the daemon's default PFX
 path:
 
 ```powershell
-cd ..\mcp-server
-powershell -ExecutionPolicy Bypass -File .\scripts\export-localhost-dev-cert.ps1
+cd ..\..\..
+powershell -ExecutionPolicy Bypass -File .\packaging\windows\export-localhost-dev-cert.ps1
 ```
 
-Start the daemon from `mcp-server/`:
+Start the Rust daemon from the repository root:
 
 ```powershell
-npm run daemon
+cargo run -p office-mcp-daemon -- daemon run
 ```
 
 Launch the add-in in Word, then open the **office-mcp > Open** ribbon command
 so the task pane can connect and register the current document session.
 
-Smoke-test a connected Word session from another terminal in `mcp-server/`:
+Smoke-test a connected Word session from another terminal in `src/office-mcp/daemon/evidence/`:
 
 ```powershell
 npm run smoke:mcp -- http://127.0.0.1:8800/mcp sessions
@@ -148,8 +169,17 @@ For structured evidence that can be attached to a release or validation issue,
 run:
 
 ```powershell
-npm run evidence:runtime -- --endpoint http://127.0.0.1:8800/mcp --output ..\artifacts\runtime-evidence-full.json --include-mutation --include-full-word-smoke --include-tracked-changes --include-com-tracked-changes
-npm run evidence:validate -- --input ..\artifacts\runtime-evidence-full.json --require-mutation --require-full-word-smoke --require-com-tracked-changes
+npm run evidence:runtime -- --endpoint http://127.0.0.1:8800/mcp --output ..\..\..\..\artifacts\runtime-evidence-full.json --include-mutation --include-full-word-smoke --include-tracked-changes --include-com-tracked-changes
+npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-full.json --require-mutation --require-full-word-smoke --require-com-tracked-changes
+```
+
+For a connected Excel workbook, run:
+
+```powershell
+# Optional when the daemon MCP port is not 8800:
+# $env:OFFICE_MCP_MCP_ENDPOINT = 'http://127.0.0.1:8801/mcp'
+npm run evidence:excel
+npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-excel.json --require-excel-smoke
 ```
 
 Against a representative protected document, add `--irm-document-path` for a
@@ -158,14 +188,14 @@ protected-edit` once that same document has a connected add-in session:
 
 ```powershell
 npm run evidence:irm
-npm run evidence:validate -- --input ..\artifacts\runtime-evidence-irm.json --require-irm-preflight --require-irm
+npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-irm.json --require-irm-preflight --require-irm
 ```
 
 For another protected document, use the explicit form:
 
 ```powershell
-npm run evidence:runtime -- --endpoint http://127.0.0.1:8800/mcp --output ..\artifacts\runtime-evidence-irm.json --include-mutation --irm-document-path "C:\path\to\protected.docx" --irm-mode protected-read --wait-for-session-ms 120000
-npm run evidence:validate -- --input ..\artifacts\runtime-evidence-irm.json --require-irm-preflight --require-irm
+npm run evidence:runtime -- --endpoint http://127.0.0.1:8800/mcp --output ..\..\..\..\artifacts\runtime-evidence-irm.json --include-mutation --irm-document-path "C:\path\to\protected.docx" --irm-mode protected-read --wait-for-session-ms 120000
+npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-irm.json --require-irm-preflight --require-irm
 ```
 
 Start the evidence command before opening the task pane if needed. With
@@ -180,8 +210,8 @@ evidence:
 
 ```powershell
 npm run evidence:record-agent-client -- --prompt "what does paragraph 1 of my open Word doc say?" --expected-substring "<expected text from Word>" --observed-answer "<agent answer>" --document-title "<open Word document>" --session-id "<session_id>"
-npm run evidence:runtime -- --endpoint http://127.0.0.1:8800/mcp --output ..\artifacts\runtime-evidence-agent-client.json --agent-client-evidence-path ..\artifacts\agent-client-evidence.json
-npm run evidence:validate -- --input ..\artifacts\runtime-evidence-agent-client.json --require-agent-client-prompt
+npm run evidence:runtime -- --endpoint http://127.0.0.1:8800/mcp --output ..\..\..\..\artifacts\runtime-evidence-agent-client.json --agent-client-evidence-path ..\..\..\..\artifacts\agent-client-evidence.json
+npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-agent-client.json --require-agent-client-prompt
 ```
 
 The report records Word runtime, full Word tool smoke, stdio bridge,
@@ -195,17 +225,17 @@ The endpoints are:
 - Add-in task pane: `https://localhost:8765/taskpane.html`
 - Add-in WSS: `wss://localhost:8765/addin`
 
-For stdio-only MCP clients, keep the daemon running and use the stdio bridge:
+For stdio-only MCP clients, keep the daemon running and use the Rust stdio
+bridge:
 
 ```powershell
-npm run build
-node .\dist\src\cli.js stdio
+cargo run -p office-mcp-daemon -- stdio
 ```
 
-Claude Desktop-style config can be generated from `mcp-server/` with:
+Claude Desktop-style config can be generated from the repository root with:
 
 ```powershell
-npx tsx src\cli.ts config claude-desktop
+cargo run -p office-mcp-daemon -- config claude-desktop
 ```
 
 For an MSI-installed copy, generate a config that points at the installed
@@ -219,17 +249,32 @@ The installed launcher sets `OFFICE_MCP_INSTALL_ROOT`, so the generated config
 points back to the current install directory. Use `--install-root <path>` only
 when generating config for another install location.
 
-Register the Word shared-folder catalog:
+Register the shared-folder catalog for source-checkout development:
 
 ```powershell
 cd ..
-powershell -ExecutionPolicy Bypass -File .\addin\scripts\register-word-catalog.ps1
+powershell -ExecutionPolicy Bypass -File .\src\office-ctl\common\scripts\register-office-catalog.ps1
 ```
 
-The catalog URL shown by the script is the local folder path to use in Word's
-trusted add-in catalog settings if Word does not pick up the registry entry.
-After restarting Word, open **Insert > My Add-ins > Shared Folder** and add
-`office-mcp`.
+If another local process already owns `https://localhost:8765`, start the
+daemon with a different add-in port and render the catalog manifests for that
+same origin:
+
+```powershell
+$env:OFFICE_MCP_ADDIN_CHANNEL__PORT = '8766'
+$env:OFFICE_MCP_MCP_HTTP__PORT = '8801'
+$env:OFFICE_MCP_MCP_ENDPOINT = 'http://127.0.0.1:8801/mcp'
+powershell -ExecutionPolicy Bypass -File .\src\office-ctl\common\scripts\register-office-catalog.ps1 -BaseUrl https://localhost:8766
+cargo run -p office-mcp-daemon -- daemon run
+```
+
+The catalog URL shown by the script is the local folder path to use in Office's
+trusted add-in catalog settings if Office does not pick up the registry entry.
+The Windows bootstrap and MSI install a broader catalog under
+`%LOCALAPPDATA%\office-mcp\addin-catalog\` with Word and Excel manifests placed
+directly at the catalog root as `office-mcp-word.xml` and
+`office-mcp-excel.xml`. After restarting Office, open **Insert > My Add-ins >
+Shared Folder** in Word or Excel and add `office-mcp`.
 
 For a repeatable Windows developer bootstrap that also registers a logon
 Scheduled Task and local add-in catalog, run:
@@ -252,20 +297,18 @@ powershell -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-msi.p
 ```
 
 The MSI build stages the same split layout under `artifacts\msi-stage\`:
-`mcp-server/` for the long-running daemon, `addin/` for the Word task pane
-bundle, and `addin-catalog/` for the sideload manifest. It installs production
-server dependencies there, copies a local `node.exe`, generates the WiX payload
-fragment, and asserts that the daemon, add-in bundle, catalog manifest,
-launcher scripts, and runtime dependencies are present before building the
-final MSI.
+`office-mcp-daemon.exe` for the Rust daemon runtime, `office-mcp/ui/` for the
+daemon web console, `office-ctl/word/` and `office-ctl/excel/` for the Office task pane bundles,
+`scripts/` for installer helper scripts, and `addin-catalog/` for the sideload
+manifests. It generates the WiX payload fragment and asserts that the Rust
+daemon, UI assets, add-in bundles, catalog manifests, and launcher scripts are
+present before building the final MSI.
 
 `office-mcp daemon start|stop` works with the developer Scheduled Task bootstrap
 and with the MSI launcher layout.
 
 ## License
 
-TBD (likely MIT, matching the surrounding Office add-in ecosystem).
-
-
+MIT.
 
 

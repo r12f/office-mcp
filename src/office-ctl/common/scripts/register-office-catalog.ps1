@@ -1,0 +1,176 @@
+param(
+  [string]$CatalogPath = "",
+  [string]$RepoRoot = "",
+  [string]$BaseUrl = "https://localhost:8765",
+  [switch]$SkipRegistry
+)
+
+$ErrorActionPreference = "Stop"
+
+function Get-ParentPath {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][int]$Levels
+  )
+
+  $current = $Path
+  for ($i = 0; $i -lt $Levels; $i++) {
+    $current = Split-Path -Parent $current
+  }
+  return $current
+}
+
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+  $RepoRoot = Get-ParentPath -Path $PSScriptRoot -Levels 4
+}
+
+if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
+  $CatalogPath = Join-Path $RepoRoot "addin-catalog"
+}
+
+if ($BaseUrl -notmatch '^https://localhost:[0-9]+$') {
+  throw "BaseUrl must be a local HTTPS origin such as https://localhost:8765."
+}
+
+function Set-DefaultValue([xml]$Document, [System.Xml.XmlNamespaceManager]$NamespaceManager, [string]$XPath, [string]$Value) {
+  $node = $Document.SelectSingleNode($XPath, $NamespaceManager)
+  if (-not $node) { throw "Manifest node not found: $XPath" }
+  $node.SetAttribute("DefaultValue", $Value)
+}
+
+function Write-LocalManifest {
+  param(
+    [Parameter(Mandatory = $true)][string]$SourcePath,
+    [Parameter(Mandatory = $true)][string]$DestinationPath,
+    [Parameter(Mandatory = $true)][string]$Origin
+  )
+
+  [xml]$manifest = Get-Content -Raw -LiteralPath $SourcePath
+  $ns = New-Object System.Xml.XmlNamespaceManager($manifest.NameTable)
+  $ns.AddNamespace("o", "http://schemas.microsoft.com/office/appforoffice/1.1")
+  $ns.AddNamespace("bt", "http://schemas.microsoft.com/office/officeappbasictypes/1.0")
+
+  $appDomain = $manifest.SelectSingleNode("/o:OfficeApp/o:AppDomains/o:AppDomain", $ns)
+  if (-not $appDomain) { throw "Manifest node not found: /o:OfficeApp/o:AppDomains/o:AppDomain" }
+  $appDomain.InnerText = $Origin
+
+  foreach ($xpath in @(
+      "/o:OfficeApp/o:IconUrl",
+      "//bt:Image[@id='Icon.16x16']",
+      "//bt:Image[@id='Icon.32x32']"
+    )) {
+    Set-DefaultValue $manifest $ns $xpath "$Origin/assets/icon-32.png"
+  }
+  foreach ($xpath in @(
+      "/o:OfficeApp/o:HighResolutionIconUrl",
+      "//bt:Image[@id='Icon.80x80']"
+    )) {
+    Set-DefaultValue $manifest $ns $xpath "$Origin/assets/icon-80.png"
+  }
+
+  $taskpane = $manifest.SelectSingleNode("/o:OfficeApp/o:DefaultSettings/o:SourceLocation", $ns).GetAttribute("DefaultValue")
+  $relativeTaskpane = ([uri]$taskpane).PathAndQuery.TrimStart('/')
+  Set-DefaultValue $manifest $ns "/o:OfficeApp/o:DefaultSettings/o:SourceLocation" "$Origin/$relativeTaskpane"
+  Set-DefaultValue $manifest $ns "//bt:Url[@id='Taskpane.Url']" "$Origin/$relativeTaskpane"
+
+  $settings = New-Object System.Xml.XmlWriterSettings
+  $settings.Encoding = New-Object System.Text.UTF8Encoding($false)
+  $settings.Indent = $true
+  $settings.OmitXmlDeclaration = $false
+  $writer = [System.Xml.XmlWriter]::Create($DestinationPath, $settings)
+  try {
+    $manifest.Save($writer)
+  } finally {
+    $writer.Dispose()
+  }
+}
+
+function Remove-LegacyHostCatalogFolders {
+  param(
+    [Parameter(Mandatory = $true)][string]$CatalogRoot
+  )
+
+  $resolvedCatalogRoot = [System.IO.Path]::GetFullPath($CatalogRoot)
+  foreach ($legacyHost in @("word", "excel")) {
+    $legacyPath = Join-Path $resolvedCatalogRoot $legacyHost
+    if (-not (Test-Path -LiteralPath $legacyPath)) { continue }
+
+    $resolvedLegacyPath = [System.IO.Path]::GetFullPath($legacyPath)
+    $catalogPrefix = $resolvedCatalogRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $resolvedLegacyPath.StartsWith($catalogPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+      throw "Refusing to remove legacy catalog folder outside catalog root: $resolvedLegacyPath"
+    }
+    Remove-Item -LiteralPath $resolvedLegacyPath -Recurse -Force
+  }
+}
+function Remove-DeveloperDebugRegistration {
+  param(
+    [Parameter(Mandatory = $true)][string]$AddinId
+  )
+
+  $developerRoot = "HKCU:\Software\Microsoft\Office\16.0\WEF\Developer"
+  $developerValue = Get-ItemProperty -LiteralPath $developerRoot -Name $AddinId -ErrorAction SilentlyContinue
+  if ($developerValue) {
+    Remove-ItemProperty -LiteralPath $developerRoot -Name $AddinId -Force
+  }
+
+  $developerKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\Developer\$AddinId"
+  if (Test-Path -LiteralPath $developerKey) {
+    Remove-Item -LiteralPath $developerKey -Recurse -Force
+  }
+}
+
+function ConvertTo-OfficeCatalogUrl {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  $resolvedPath = [System.IO.Path]::GetFullPath($Path)
+  if ($resolvedPath.StartsWith("\\", [System.StringComparison]::Ordinal)) {
+    return $resolvedPath
+  }
+
+  $root = [System.IO.Path]::GetPathRoot($resolvedPath)
+  if ([string]::IsNullOrWhiteSpace($root) -or $root.Length -lt 2 -or $root[1] -ne ':') {
+    throw "CatalogPath must be an absolute drive path or UNC path: $Path"
+  }
+
+  $drive = $root.Substring(0, 1).ToUpperInvariant()
+  $relativePath = $resolvedPath.Substring($root.Length).TrimStart('\', '/')
+  return "\\localhost\$drive`$\$relativePath"
+}
+
+$hosts = @(
+  @{ Name = "Word"; CatalogFile = "office-mcp-word.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\word\manifest.xml"; AddinId = "11111111-aaaa-bbbb-cccc-222222222222" },
+  @{ Name = "Excel"; CatalogFile = "office-mcp-excel.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\excel\manifest.xml"; AddinId = "33333333-aaaa-bbbb-cccc-444444444444" }
+)
+
+New-Item -ItemType Directory -Force -Path $CatalogPath | Out-Null
+Remove-LegacyHostCatalogFolders -CatalogRoot $CatalogPath
+
+foreach ($officeHost in $hosts) {
+  if (-not (Test-Path -LiteralPath $officeHost.Manifest)) {
+    throw "Cannot find $($officeHost.Name) manifest: $($officeHost.Manifest)"
+  }
+  Write-LocalManifest -SourcePath $officeHost.Manifest -DestinationPath (Join-Path $CatalogPath $officeHost.CatalogFile) -Origin $BaseUrl
+}
+
+if (-not $SkipRegistry) {
+  $catalogUrl = ConvertTo-OfficeCatalogUrl -Path $CatalogPath
+  $key = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp"
+  New-Item -Path $key -Force | Out-Null
+  Set-ItemProperty -Path $key -Name Id -Value "office-mcp"
+  Set-ItemProperty -Path $key -Name Url -Value $catalogUrl
+  Set-ItemProperty -Path $key -Name Flags -Value 1 -Type DWord
+  foreach ($officeHost in $hosts) {
+    Remove-DeveloperDebugRegistration -AddinId $officeHost.AddinId
+  }
+} else {
+  $catalogUrl = ConvertTo-OfficeCatalogUrl -Path $CatalogPath
+}
+
+Write-Output "Registered Office trusted catalog: $CatalogPath"
+Write-Output "Catalog URL: $catalogUrl"
+Write-Output "Manifest origin: $BaseUrl"
+Write-Output "Word manifest: $(Join-Path $CatalogPath 'office-mcp-word.xml')"
+Write-Output "Excel manifest: $(Join-Path $CatalogPath 'office-mcp-excel.xml')"

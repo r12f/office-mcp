@@ -94,18 +94,25 @@ function ConvertTo-WixXml([string]$Value) {
 
 function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
   $requiredPaths = @(
-    "node\node.exe",
-    "mcp-server\dist\src\cli.js",
-    "mcp-server\dist\src\daemon.js",
-    "mcp-server\node_modules\@modelcontextprotocol\sdk\package.json",
-    "mcp-server\node_modules\ws\package.json",
-    "mcp-server\node_modules\zod\package.json",
-    "mcp-server\scripts\export-localhost-dev-cert.ps1",
-    "addin\manifest.xml",
-    "addin\public\taskpane.html",
-    "addin\public\taskpane.css",
-    "addin\public\taskpane.js",
-    "addin-catalog\manifest.xml",
+    "office-mcp-daemon.exe",
+    "office-mcp\ui\index.html",
+    "office-mcp\ui\app.css",
+    "office-mcp\ui\app.js",
+    "office-ctl\common\addin-channel.js",
+    "office-ctl\common\browser-ui.js",
+    "office-ctl\common\logger.js",
+    "office-ctl\common\task-history.js",
+    "scripts\export-localhost-dev-cert.ps1",
+    "office-ctl\word\manifest.xml",
+    "office-ctl\word\public\taskpane.html",
+    "office-ctl\word\public\taskpane.css",
+    "office-ctl\word\public\taskpane.js",
+    "office-ctl\excel\manifest.xml",
+    "office-ctl\excel\public\taskpane.html",
+    "office-ctl\excel\public\taskpane.css",
+    "office-ctl\excel\public\taskpane.js",
+    "addin-catalog\office-mcp-word.xml",
+    "addin-catalog\office-mcp-excel.xml",
     "office-mcp-env.ps1",
     "config.toml",
     "office-mcp-daemon.ps1",
@@ -121,22 +128,22 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
   }
 
   $daemonLauncher = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-daemon.ps1")
-  if ($daemonLauncher -notmatch "office-mcp-env\.ps1" -or $daemonLauncher -notmatch "node\\node\.exe" -or $daemonLauncher -notmatch "daemon run") {
-    throw "Daemon launcher must use the packaged node.exe and run the daemon."
+  if ($daemonLauncher -notmatch "office-mcp-env\.ps1" -or $daemonLauncher -notmatch "office-mcp-daemon\.exe" -or $daemonLauncher -notmatch "daemon run") {
+    throw "Daemon launcher must use the packaged Rust daemon and run it."
   }
 
   $cliLauncher = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp.ps1")
-  if ($cliLauncher -notmatch "office-mcp-env\.ps1" -or $cliLauncher -notmatch "node\\node\.exe" -or $cliLauncher -notmatch "@args") {
-    throw "CLI launcher must use the packaged node.exe and forward arguments."
+  if ($cliLauncher -notmatch "office-mcp-env\.ps1" -or $cliLauncher -notmatch "office-mcp-daemon\.exe" -or $cliLauncher -notmatch "@args") {
+    throw "CLI launcher must use the packaged Rust daemon and forward arguments."
   }
 
   $trayLauncher = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-tray.ps1")
-  if ($trayLauncher -notmatch "NotifyIcon" -or $trayLauncher -notmatch "Show Office MCP" -or $trayLauncher -notmatch "Quit Office MCP") {
-    throw "Tray launcher must expose the required notification-area menu."
+  if ($trayLauncher -notmatch "office-mcp-daemon\.exe" -or $trayLauncher -notmatch "tray" -or $trayLauncher -notmatch "--probe") {
+    throw "Tray launcher must delegate to the native Rust tray host."
   }
 
   $generatedWxs = Get-Content -Raw -LiteralPath $GeneratedWxsPath
-  foreach ($needle in @("node.exe", "cli.js", "@modelcontextprotocol", "taskpane.js", "addin-catalog", "office-mcp-env.ps1", "office-mcp-daemon.ps1")) {
+  foreach ($needle in @("office-mcp-daemon.exe", "index.html", "app.js", "taskpane.js", "addin-catalog", "office-mcp-env.ps1", "office-mcp-daemon.ps1")) {
     if (-not $generatedWxs.Contains($needle)) {
       throw "Generated WiX payload is missing expected entry: $needle"
     }
@@ -157,8 +164,12 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
 }
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$serverRoot = Join-Path $repoRoot "mcp-server"
-$addinRoot = Join-Path $repoRoot "addin"
+$rustDaemonRoot = Join-Path $repoRoot "src\office-mcp\daemon"
+$evidenceRoot = Join-Path $repoRoot "src\office-mcp\daemon\evidence"
+$uiRoot = Join-Path $repoRoot "src\office-mcp\ui"
+$commonRoot = Join-Path $repoRoot "src\office-ctl\common"
+$addinRoot = Join-Path $repoRoot "src\office-ctl\word"
+$excelAddinRoot = Join-Path $repoRoot "src\office-ctl\excel"
 $wxsPath = Join-Path $repoRoot "packaging\wix\Product.wxs"
 $outputPath = Join-Path $OutputDir "office-mcp-setup-$Version-x64.msi"
 $stageRoot = Join-Path $OutputDir "msi-stage"
@@ -170,10 +181,10 @@ if (-not (Test-Path $wxsPath)) {
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
-Push-Location $serverRoot
+Push-Location $evidenceRoot
 try {
   if (-not $SkipNpmInstall) {
-    if (Test-Path (Join-Path $serverRoot "node_modules")) {
+    if (Test-Path (Join-Path $evidenceRoot "node_modules")) {
       npm install
       Assert-LastExitCode "npm install"
     } else {
@@ -183,6 +194,14 @@ try {
   }
   npm run check
   Assert-LastExitCode "npm run check"
+} finally {
+  Pop-Location
+}
+
+Push-Location $repoRoot
+try {
+  cargo build --release -p office-mcp-daemon
+  Assert-LastExitCode "cargo build --release -p office-mcp-daemon"
 } finally {
   Pop-Location
 }
@@ -199,36 +218,39 @@ try {
   Pop-Location
 }
 
-Reset-DirectoryInside -Path $stageRoot -Parent $OutputDir
-
-$stageServerRoot = Join-Path $stageRoot "mcp-server"
-$stageAddinRoot = Join-Path $stageRoot "addin"
-$stageCatalogRoot = Join-Path $stageRoot "addin-catalog"
-$stageNodeRoot = Join-Path $stageRoot "node"
-New-Item -ItemType Directory -Force -Path $stageServerRoot, $stageAddinRoot, $stageCatalogRoot, $stageNodeRoot | Out-Null
-
-$nodeCommand = Get-Command node.exe -ErrorAction SilentlyContinue
-if (-not $nodeCommand) {
-  throw "node.exe must be available on PATH to build the Windows MSI runtime payload."
-}
-Copy-Item -Force -Path $nodeCommand.Source -Destination (Join-Path $stageNodeRoot "node.exe")
-
-Copy-Item -Force -Path (Join-Path $serverRoot "package.json") -Destination $stageServerRoot
-Copy-Item -Force -Path (Join-Path $serverRoot "package-lock.json") -Destination $stageServerRoot
-Copy-Item -Recurse -Force -Path (Join-Path $serverRoot "dist") -Destination $stageServerRoot
-Copy-Item -Recurse -Force -Path (Join-Path $serverRoot "scripts") -Destination $stageServerRoot
-
-Push-Location $stageServerRoot
+Push-Location $excelAddinRoot
 try {
-  npm install --omit=dev --ignore-scripts
-  Assert-LastExitCode "npm install --omit=dev --ignore-scripts"
+  if (-not $SkipNpmInstall) {
+    npm ci
+    Assert-LastExitCode "npm ci"
+  }
+  npm run check
+  Assert-LastExitCode "npm run check"
 } finally {
   Pop-Location
 }
 
+Reset-DirectoryInside -Path $stageRoot -Parent $OutputDir
+
+$stageUiRoot = Join-Path $stageRoot "office-mcp\ui"
+$stageCommonRoot = Join-Path $stageRoot "office-ctl\common"
+$stageAddinRoot = Join-Path $stageRoot "office-ctl\word"
+$stageExcelAddinRoot = Join-Path $stageRoot "office-ctl\excel"
+$stageCatalogRoot = Join-Path $stageRoot "addin-catalog"
+$stageScriptsRoot = Join-Path $stageRoot "scripts"
+New-Item -ItemType Directory -Force -Path $stageScriptsRoot, $stageUiRoot, $stageCommonRoot, $stageAddinRoot, $stageExcelAddinRoot, $stageCatalogRoot | Out-Null
+
+Copy-Item -Force -Path (Join-Path $repoRoot "target\release\office-mcp-daemon.exe") -Destination (Join-Path $stageRoot "office-mcp-daemon.exe")
+Copy-Item -Recurse -Force -Path (Join-Path $uiRoot "*") -Destination $stageUiRoot
+Copy-Item -Recurse -Force -Path (Join-Path $commonRoot "*") -Destination $stageCommonRoot
+Copy-Item -Force -Path (Join-Path $repoRoot "packaging\windows\export-localhost-dev-cert.ps1") -Destination (Join-Path $stageScriptsRoot "export-localhost-dev-cert.ps1")
+
 Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination $stageAddinRoot
 Copy-Item -Recurse -Force -Path (Join-Path $addinRoot "public") -Destination $stageAddinRoot
-Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination (Join-Path $stageCatalogRoot "manifest.xml")
+Copy-Item -Force -Path (Join-Path $excelAddinRoot "manifest.xml") -Destination $stageExcelAddinRoot
+Copy-Item -Recurse -Force -Path (Join-Path $excelAddinRoot "public") -Destination $stageExcelAddinRoot
+Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination (Join-Path $stageCatalogRoot "office-mcp-word.xml")
+Copy-Item -Force -Path (Join-Path $excelAddinRoot "manifest.xml") -Destination (Join-Path $stageCatalogRoot "office-mcp-excel.xml")
 Copy-Item -Force -Path (Join-Path $repoRoot "packaging\windows\office-mcp-tray.ps1") -Destination (Join-Path $stageRoot "office-mcp-tray.ps1")
 
 @'
@@ -239,13 +261,11 @@ heartbeat_interval_sec = 30
 heartbeat_timeout_sec = 10
 session_grace_sec = 60
 max_pending_per_session = 4
-shared_secret = ""
 certificate_path = ""
 
 [mcp_http]
 bind = "127.0.0.1"
 port = 8800
-api_key = ""
 
 [limits]
 max_response_bytes = 1048576
@@ -282,26 +302,22 @@ $env:OFFICE_MCP_MCP_HTTP__PORT = '8800'
 $ErrorActionPreference = 'Stop'
 $installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $installRoot 'office-mcp-env.ps1')
-$serverRoot = Join-Path $installRoot 'mcp-server'
-$nodeExe = Join-Path $installRoot 'node\node.exe'
+$daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
 $pfxPath = Join-Path $installRoot '.office-mcp-localhost.pfx'
 
 if (-not (Test-Path -LiteralPath $pfxPath)) {
-  & (Join-Path $serverRoot 'scripts\export-localhost-dev-cert.ps1') -OutputPath $pfxPath
+  & (Join-Path $installRoot 'scripts\export-localhost-dev-cert.ps1') -OutputPath $pfxPath
 }
 
-Set-Location $serverRoot
-& $nodeExe .\dist\src\cli.js daemon run
+& $daemonExe daemon run
 '@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "office-mcp-daemon.ps1")
 
 @'
 $ErrorActionPreference = 'Stop'
 $installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $installRoot 'office-mcp-env.ps1')
-$serverRoot = Join-Path $installRoot 'mcp-server'
-$nodeExe = Join-Path $installRoot 'node\node.exe'
-Set-Location $serverRoot
-& $nodeExe .\dist\src\cli.js @args
+$daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
+& $daemonExe @args
 '@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "office-mcp.ps1")
 
 New-WixPayloadFragment -StageRoot $stageRoot -OutputPath $generatedWxsPath
