@@ -12,6 +12,7 @@ pub mod command_router_error;
 pub mod connection_hub;
 pub mod document_info;
 pub mod image_fetcher;
+pub mod invocation_error;
 pub mod session_descriptor_view;
 pub mod session_info;
 pub mod session_registry;
@@ -35,12 +36,12 @@ pub use command_router_error::CommandRouterError;
 pub use connection_hub::{AddinConnectionHub, AddinConnectionHubError};
 pub use document_info::{DocumentDescriptor, DocumentInfo, ProtectionInfo};
 pub use image_fetcher::{FetchedImage, ImageFetchError, ImageFetcher};
+pub use invocation_error::{OfficeMcpCode, PartialEffect, ToolFailure, ToolInvocationError};
 pub use session_descriptor_view::SessionDescriptorView;
 pub use session_info::SessionInfo;
 pub use session_registry::{
-    AddInInfo, HostDescriptor, HostInfo, InvocationPermit, NewSessionInfo, OfficeMcpCode,
-    PartialEffect, RegistrationOutcome, RuntimeInfo, SessionDescriptor, SessionDetails,
-    SessionPatch, SessionRegistry, SessionStatus, ToolFailure, ToolInvocationError,
+    AddInInfo, HostDescriptor, HostInfo, InvocationPermit, NewSessionInfo, RegistrationOutcome,
+    RuntimeInfo, SessionDescriptor, SessionDetails, SessionPatch, SessionRegistry, SessionStatus,
 };
 pub use static_assets::{
     default_addin_public_dir, default_office_ctl_common_dir, default_office_ctl_host_public_dir,
