@@ -14,8 +14,7 @@ pub mod parity;
 pub mod runtime_server;
 pub mod session_registry;
 pub mod stdio_bridge;
-pub mod tray_controller;
-pub mod tray_host;
+pub mod tray;
 pub mod ui_runtime;
 pub mod ui_state_store;
 

@@ -1,5 +1,5 @@
 use crate::daemon_control::DaemonController;
-use crate::tray_controller::{TrayController, TrayPlatformError, TraySnapshot};
+use crate::tray::{TrayController, TrayPlatformError, TraySnapshot};
 use crate::ui_runtime::UiRuntimeFile;
 use serde_json::Value;
 use std::path::PathBuf;
@@ -173,7 +173,7 @@ fn run_platform_tray(_options: &TrayHostOptions) -> Result<(), TrayPlatformError
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 mod native_tray {
     use super::{TrayHostOptions, open_ui_from_runtime, read_ui_state, stop_daemon};
-    use crate::tray_controller::{
+    use crate::tray::{
         QuitConfirmation, TrayController, TrayMenuItem, TrayPlatformAdapter, TrayPlatformError,
         TraySnapshot,
     };
@@ -443,7 +443,8 @@ mod tests {
     fn native_tray_quit_uses_platform_confirmation_dialogs() {
         let source_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("src")
-            .join("tray_host.rs");
+            .join("tray")
+            .join("host.rs");
         let source = fs::read_to_string(source_path).expect("read source");
 
         assert!(source.contains("confirm_quit(&surface.snapshot.quit_confirmation)"));

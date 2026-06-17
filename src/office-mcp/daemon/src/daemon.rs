@@ -7,7 +7,7 @@ use crate::mcp_http_frontend::McpHttpFrontend;
 use crate::parity::ParityPlan;
 use crate::runtime_server::RuntimeServer;
 use crate::session_registry::SessionRegistry;
-use crate::tray_controller::TrayController;
+use crate::tray::TrayController;
 use crate::ui_state_store::UiStateStore;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

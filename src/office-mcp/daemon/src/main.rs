@@ -6,7 +6,7 @@ use office_mcp_daemon::evidence_fixture::{UiFixtureOptions, run_ui_fixture};
 use office_mcp_daemon::mcp_management_client::McpManagementClient;
 use office_mcp_daemon::runtime_server::RuntimeServer;
 use office_mcp_daemon::stdio_bridge::StdioBridge;
-use office_mcp_daemon::tray_host::{TrayHost, TrayHostOptions};
+use office_mcp_daemon::tray::{TrayHost, TrayHostOptions};
 use office_mcp_daemon::ui_runtime::{UiRuntimeError, UiRuntimeFile};
 use std::path::PathBuf;
 
@@ -327,10 +327,8 @@ mod tests {
 
     #[test]
     fn ui_command_reads_runtime_file_url_instead_of_config_defaults() {
-        let dir = std::env::temp_dir().join(format!(
-            "office-mcp-ui-command-test-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("office-mcp-ui-command-test-{}", std::process::id()));
         let path = dir.join("ui-runtime.json");
         std::fs::create_dir_all(&dir).expect("temp dir");
         std::fs::write(
