@@ -299,7 +299,7 @@ module so ownership is visible from the directory tree.
 - [x] Create `src/office-mcp/daemon/src/mcp/` for MCP-only code: Streamable HTTP
       frontend, stdio bridge, MCP management client, resources, prompts, tool
       catalog, MCP request validation, and MCP error translation.
-- [ ] Create `src/office-mcp/daemon/src/addin_mgr/` for add-in-facing code:
+- [x] Create `src/office-mcp/daemon/src/addin_mgr/` for add-in-facing code:
       local HTTPS/WSS channel, exact `Origin` validation, add-in JSON-RPC,
       registration, heartbeat, session registry, command router, image fetch
       preprocessing for add-in calls, and stale-session handling.
