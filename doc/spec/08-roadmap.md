@@ -8,6 +8,12 @@
   a separate commit after its relevant verification passes.
 - Push after each completed task commit. Do not batch multiple completed tasks
   into one large commit.
+- The next task MUST NOT start until the current completed task has been
+  committed and pushed, unless the current task is explicitly blocked and the
+  working tree remains isolated from the next slice.
+- Implementation agents must keep each commit scoped to exactly one completed
+  task or reviewable slice. Drive-by refactors, unrelated formatting, and
+  speculative cleanup must be deferred to their own task commits.
 - Large migrations, especially M6.5.0, M6.5.1, and M6.6.1, must be decomposed
   into reviewable slices with one commit and push per slice.
 - Commit messages should name the task and, when useful, include the local check
