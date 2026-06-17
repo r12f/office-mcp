@@ -1,6 +1,8 @@
 use crate::addin_mgr::ImageFetcher;
 use crate::addin_mgr::websocket_accept_key;
-use crate::addin_mgr::{AddInInfo, DocumentInfo, HostInfo, SessionPatch, SessionRegistry};
+use crate::addin_mgr::{
+    AddInInfo, DocumentInfo, HostInfo, SessionDescriptorView, SessionPatch, SessionRegistry,
+};
 use crate::addin_mgr::{
     AddinChannelConfig, AddinChannelServer, HeartbeatDecision, JsonRpcId, RegisterRequest,
     SessionAddedEvent, SessionRemovedEvent, SessionRemovedReason, SessionUpdatedEvent,
@@ -1166,7 +1168,7 @@ impl McpJsonRpcRuntime {
                                 .registry
                                 .list_sessions()
                                 .iter()
-                                .map(session_descriptor_json)
+                                .map(|session| SessionDescriptorView::new(session).to_json())
                                 .collect::<Vec<_>>()
                         }).to_string()
                     }]
@@ -1242,7 +1244,7 @@ impl McpJsonRpcRuntime {
                     .registry
                     .list_sessions()
                     .iter()
-                    .map(session_descriptor_json)
+                    .map(|session| SessionDescriptorView::new(session).to_json())
                     .collect::<Vec<_>>()
             })),
             "office.get_session_info" => Self::get_session_info(context.registry, arguments),
@@ -1441,7 +1443,7 @@ impl McpJsonRpcRuntime {
             );
         };
         tool_success(&json!({
-            "descriptor": session_descriptor_json(&info.descriptor),
+            "descriptor": SessionDescriptorView::new(&info.descriptor).to_json(),
             "available_tools": info.available_tools
         }))
     }
@@ -1861,48 +1863,6 @@ fn json_rpc_envelope_to_text(envelope: &crate::addin_mgr::JsonRpcEnvelope) -> St
         value["params"] = Value::Object(params);
     }
     value.to_string()
-}
-
-fn session_descriptor_json(session: &crate::addin_mgr::SessionDescriptor) -> Value {
-    json!({
-        "session_id": session.session_id,
-        "instance_id": session.instance_id,
-        "app": session.app,
-        "host": {
-            "app": session.host.app,
-            "version": session.host.version,
-            "platform": session.host.platform,
-            "build": session.host.build
-        },
-        "document": {
-            "title": session.document.title,
-            "url": session.document.url,
-            "filename": session.document.filename,
-            "is_dirty": session.document.is_dirty,
-            "is_read_only": session.document.is_read_only,
-            "is_protected": session.document.is_protected,
-            "protection_kind": session.document.protection_kind,
-            "rights": session.document.rights,
-            "rights_source": session.document.rights_source
-        },
-        "is_active": session.is_active,
-        "capability_tiers": session.capability_tiers,
-        "available_tool_count": session.available_tool_count,
-        "queue_depth": session.queue_depth,
-        "registered_at": format_unix_time(session.registered_at),
-        "status": match session.status {
-            crate::addin_mgr::SessionStatus::Active => "active",
-            crate::addin_mgr::SessionStatus::Stale => "stale",
-        }
-    })
-}
-
-fn format_unix_time(value: SystemTime) -> String {
-    let seconds = value
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    format!("unix:{seconds}")
 }
 
 fn json_rpc_id(value: &Value) -> JsonRpcId {

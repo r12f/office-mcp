@@ -2,6 +2,7 @@ pub mod addin_channel;
 pub mod command_router;
 pub mod connection_hub;
 pub mod image_fetcher;
+pub mod session_descriptor_view;
 pub mod session_registry;
 pub mod static_assets;
 pub mod websocket_codec;
@@ -17,6 +18,7 @@ pub use command_router::{
 };
 pub use connection_hub::{AddinConnectionHub, AddinConnectionHubError};
 pub use image_fetcher::{FetchedImage, ImageFetchError, ImageFetcher};
+pub use session_descriptor_view::SessionDescriptorView;
 pub use session_registry::{
     AddInInfo, DocumentDescriptor, DocumentInfo, HostDescriptor, HostInfo, InvocationPermit,
     NewSessionInfo, OfficeMcpCode, PartialEffect, ProtectionInfo, RegistrationOutcome, RuntimeInfo,
