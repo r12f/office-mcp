@@ -11,13 +11,11 @@ design contract kept under [doc/spec/](doc/spec/).
 
 ## Repository layout
 
-- `src/office-mcp/daemon/` is the native Rust daemon package. Run Rust build,
+- `src/office-mcp/daemon/` is the native Rust daemon package and owns the daemon UI source/assets. Run Rust build,
   test, and lint commands from the repository root.
 - `src/office-mcp/daemon/evidence/` contains runtime, UI, smoke, and validation
   evidence harnesses. Run evidence commands from this directory.
 
-- `src/office-mcp/ui/` is a transitional daemon web console location. Target
-  ownership is `src/office-mcp/daemon/src/ui/`.
 - `src/office-ctl/common/` contains shared TypeScript add-in utilities.
 - `src/office-ctl/word/` is the Word add-in package. Run manifest validation and task pane
   checks from this directory.

@@ -28,10 +28,9 @@ catalog registration — is in §6, not here. §1 is just the artifact list.
 
 The production daemon is the native Rust executable built from
 `src/office-mcp/daemon`. Its main-window web assets are owned by the daemon's
-`ui` module and packaged beside the executable. The sibling
-`src/office-mcp/ui` path is transitional and should be removed after the UI
-source is merged into `src/office-mcp/daemon/src/ui`. Installers MUST stage the
-Rust daemon as the runtime and keep using the protocol, runtime, UI, tray,
+`ui` module under `src/office-mcp/daemon/src/ui/assets` and packaged beside the
+executable. Installers MUST stage the Rust daemon as the runtime and keep using
+the protocol, runtime, UI, tray,
 redaction, and packaging evidence gates as release checks.
 
 ## 3. Add-in distribution

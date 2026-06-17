@@ -70,9 +70,9 @@ packaging/                      # Installers, release packaging, catalog/bootstr
 folders such as `word` and `excel` may depend on `common`, but `common` MUST NOT
 depend on a specific Office host. `src/office-mcp/daemon` owns the local daemon
 process, all server-side session management, and the daemon UI it serves. The
-current sibling `src/office-mcp/ui` directory is a transitional location and
-SHOULD be merged into `src/office-mcp/daemon/src/ui` so daemon UI source,
-runtime-file handling, and UI-serving code live under one ownership boundary.
+daemon UI source/assets, runtime-file handling, and UI-serving code live under
+`src/office-mcp/daemon/src/ui` so daemon UI ownership stays inside the daemon
+boundary.
 The UI may consume only redacted daemon status/control APIs from `api`; it must
 not own protocol routing, session mutation, or Office command execution.
 `packaging` owns installation and release assembly only; it must not become a

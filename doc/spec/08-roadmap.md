@@ -245,9 +245,8 @@ effect.
 
 - [x] Normalize the source tree away from legacy top-level packages into
       `doc/`, `src/office-ctl/{common,word,excel}`, `src/office-mcp/daemon`,
-      and `packaging/`. The current sibling `src/office-mcp/ui` path is now
-      transitional; M6.6.1 moves daemon UI ownership into
-      `src/office-mcp/daemon/src/ui`.
+      and `packaging/`. Daemon UI ownership now lives in
+      `src/office-mcp/daemon/src/ui`, including static web console assets.
 - [x] Add the Rust daemon under `src/office-mcp/daemon` and preserve protocol
       parity through Rust unit tests plus evidence harnesses.
 - [x] Move the daemon web console out of legacy top-level runtime paths. It may
@@ -306,9 +305,10 @@ module so ownership is visible from the directory tree.
 - [x] Create `src/office-mcp/daemon/src/common/` for shared config, logger,
       audit log, redaction, limits, shared errors, and utility code. `common`
       must not depend on product-facing modules.
-- [ ] Create `src/office-mcp/daemon/src/ui/` and merge the sibling
-      `src/office-mcp/ui` source/assets into it. The old sibling path should be
-      removed after packaging and evidence paths are updated.
+- [x] Create `src/office-mcp/daemon/src/ui/` and merge the former sibling
+      daemon UI source/assets into it. Daemon web console assets now
+      live in `src/office-mcp/daemon/src/ui/assets`, and the old sibling path is
+      removed.
 - [x] Create `src/office-mcp/daemon/src/api/` for daemon UI/control APIs:
       status, sessions, current tasks, recent history, config display/control,
       UI runtime file lookup, and UI event streams.
@@ -348,9 +348,10 @@ module so ownership is visible from the directory tree.
       configured file, redact sensitive values, include request/session/tool
       context when available, and preserve useful levels. Rust unit tests cover
       file output, level filtering, redaction, and UI log-path exposure.
-- [ ] Update packaging, evidence harnesses, static asset serving, docs, and tests
-      so no production code references the removed sibling `src/office-mcp/ui`
-      path.
+- [x] Update packaging, evidence harnesses, static asset serving, docs, and tests
+      so no production code references the removed sibling daemon UI
+      path. Static serving now resolves daemon UI assets from the daemon `ui`
+      module ownership boundary.
 - [x] Add a source-layout test or lint script that fails if new daemon service
       modules are added directly under `src/office-mcp/daemon/src` instead of
       one of `common`, `ui`, `api`, `mcp`, `addin_mgr`, or `tray`.

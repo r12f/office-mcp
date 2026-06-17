@@ -2316,7 +2316,10 @@ fn default_ui_asset_path(name: &str) -> Option<PathBuf> {
         let candidate = ancestor
             .join("src")
             .join("office-mcp")
+            .join("daemon")
+            .join("src")
             .join("ui")
+            .join("assets")
             .join(name);
         if candidate.is_file() {
             return Some(candidate);

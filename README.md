@@ -74,9 +74,8 @@ npm run check
 
 | Path | Owner |
 |---|---|
-| `src/office-mcp/daemon/` | Native Rust daemon service, daemon-owned state/API, and daemon UI source. |
+| `src/office-mcp/daemon/` | Native Rust daemon service, daemon-owned state/API, and daemon UI source/assets. |
 | `src/office-mcp/daemon/evidence/` | Runtime, UI, smoke, and validation evidence harnesses for daemon parity and release gates. |
-| `src/office-mcp/ui/` | Transitional daemon web UI asset location; target ownership is `src/office-mcp/daemon/src/ui/`. |
 | `src/office-ctl/common/` | Shared TypeScript add-in utilities: config, logging, channel/protocol helpers, redaction, and reusable UI primitives. |
 | `src/office-ctl/word/` | Word add-in package: XML manifest, task pane static bundle, add-in validation scripts, and Word catalog registration script. |
 | `src/office-ctl/excel/` | Excel add-in entry point and host-specific command surface. |
