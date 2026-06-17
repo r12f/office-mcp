@@ -1,12 +1,11 @@
 use crate::addin_mgr::addin_heartbeat::AddinHeartbeatTimeout;
 use crate::addin_mgr::{
-    AddInInfo, AddinChannelConfig, AddinConnectionState, DocumentInfo, HostInfo, NewSessionInfo,
-    RuntimeInfo, SessionPatch, SessionRegistry,
+    AddInInfo, AddinChannelConfig, AddinChannelError, AddinConnectionState, DocumentInfo, HostInfo,
+    NewSessionInfo, RuntimeInfo, SessionPatch, SessionRegistry,
 };
 use crate::addin_mgr::{CancelCommand, QueuedCommand};
 use crate::addin_mgr::{JsonRpcEnvelope, JsonRpcId, RegisterResult};
 use std::collections::BTreeMap;
-use std::fmt::{Display, Formatter};
 use std::time::SystemTime;
 
 pub const SERVER_VERSION: &str = "0.1.0";
@@ -481,43 +480,6 @@ pub enum HeartbeatDecision {
     KeepOpen,
     Close { code: u16 },
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AddinChannelError {
-    InvalidUpgradePath(String),
-    ForbiddenOrigin(String),
-    MalformedRegister,
-    ProtocolVersionMismatch { offered: String, supported: String },
-    UnknownConnection(String),
-    InstanceMismatch { expected: String, actual: String },
-    MalformedSessionEvent,
-    UnknownSession(String),
-}
-
-impl Display for AddinChannelError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::InvalidUpgradePath(path) => write!(formatter, "Invalid add-in path {path}."),
-            Self::ForbiddenOrigin(origin) => write!(formatter, "Forbidden add-in origin {origin}."),
-            Self::MalformedRegister => formatter.write_str("Malformed register request."),
-            Self::ProtocolVersionMismatch { offered, supported } => write!(
-                formatter,
-                "Protocol version mismatch: server supports {supported}, add-in offered {offered}."
-            ),
-            Self::UnknownConnection(connection_id) => {
-                write!(formatter, "Unknown add-in connection {connection_id}.")
-            }
-            Self::InstanceMismatch { expected, actual } => write!(
-                formatter,
-                "Add-in instance mismatch: expected {expected}, got {actual}."
-            ),
-            Self::MalformedSessionEvent => formatter.write_str("Malformed session event."),
-            Self::UnknownSession(session_id) => write!(formatter, "Unknown session {session_id}."),
-        }
-    }
-}
-
-impl std::error::Error for AddinChannelError {}
 
 fn same_major(left: &str, right: &str) -> bool {
     left.split('.').next() == right.split('.').next()
