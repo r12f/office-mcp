@@ -5,7 +5,6 @@ pub mod common;
 pub mod daemon;
 pub mod daemon_control;
 pub mod evidence_fixture;
-pub mod image_fetcher;
 pub mod mcp;
 pub mod parity;
 pub mod runtime_server;

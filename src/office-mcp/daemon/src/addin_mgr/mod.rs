@@ -1,5 +1,6 @@
 pub mod addin_channel;
 pub mod command_router;
+pub mod image_fetcher;
 pub mod session_registry;
 
 pub use addin_channel::{
@@ -10,6 +11,7 @@ pub use addin_channel::{
 pub use command_router::{
     CancelCommand, CommandRouter, CommandRouterError, QueuedCommand, ToolCallRequest, ToolResponse,
 };
+pub use image_fetcher::{FetchedImage, ImageFetchError, ImageFetcher};
 pub use session_registry::{
     AddInInfo, DocumentDescriptor, DocumentInfo, HostDescriptor, HostInfo, InvocationPermit,
     NewSessionInfo, OfficeMcpCode, PartialEffect, ProtectionInfo, RegistrationOutcome, RuntimeInfo,

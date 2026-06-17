@@ -1,3 +1,4 @@
+use crate::addin_mgr::ImageFetcher;
 use crate::addin_mgr::{AddInInfo, DocumentInfo, HostInfo, SessionPatch, SessionRegistry};
 use crate::addin_mgr::{
     AddinChannelConfig, AddinChannelServer, HeartbeatDecision, JsonRpcId, RegisterRequest,
@@ -7,7 +8,6 @@ use crate::addin_mgr::{CommandRouter, ToolCallRequest, ToolResponse};
 use crate::api::{CommandFailure, UiStateStore};
 use crate::common::DaemonConfig;
 use crate::common::{AuditLog, AuditRecord};
-use crate::image_fetcher::ImageFetcher;
 use crate::mcp::{HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
 use crate::ui::{UiRuntimeError, UiRuntimeFile};
 use native_tls::{Identity, TlsAcceptor, TlsStream};
@@ -3046,13 +3046,13 @@ mod tests {
         WebSocketFrame,
     };
     use crate::addin_mgr::CommandRouter;
+    use crate::addin_mgr::ImageFetcher;
     use crate::addin_mgr::{
         AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionRegistry,
     };
     use crate::addin_mgr::{AddinChannelConfig, AddinChannelServer};
     use crate::api::UiStateStore;
     use crate::common::AuditLog;
-    use crate::image_fetcher::ImageFetcher;
     use crate::mcp::McpHttpFrontend;
     use native_tls::TlsConnector;
     use serde_json::Value;
