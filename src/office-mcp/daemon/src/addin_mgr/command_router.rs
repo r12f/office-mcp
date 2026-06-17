@@ -1,7 +1,6 @@
-use crate::addin_mgr::{PartialEffect, SessionCommandQueue, SessionRegistry, ToolInvocationError};
+use crate::addin_mgr::{CommandRouterError, PartialEffect, SessionCommandQueue, SessionRegistry};
 use crate::api::{CommandFailure, CommandResult, StartCommandInput, UiStateStore};
 use std::collections::BTreeMap;
-use std::fmt::{Display, Formatter};
 use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -419,67 +418,6 @@ pub struct CancelCommand {
     pub request_id: String,
     pub reason: String,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CommandRouterError {
-    Preflight(ToolInvocationError),
-    UnknownRequest(String),
-    ResponseTooLarge {
-        max_response_bytes: usize,
-        actual_bytes: usize,
-    },
-}
-
-impl CommandRouterError {
-    #[must_use]
-    pub fn as_command_failure(&self, tool: &str) -> CommandFailure {
-        match self {
-            Self::Preflight(error) => CommandFailure {
-                office_mcp_code: error.failure.office_mcp_code.as_str().to_string(),
-                message: error.failure.message.clone(),
-                tool: Some(tool.to_string()),
-                retriable: error.failure.retriable,
-                partial_effect: error.failure.partial_effect,
-            },
-            Self::UnknownRequest(request_id) => CommandFailure {
-                office_mcp_code: "INTERNAL_BUG".to_string(),
-                message: format!("Unknown command request {request_id}."),
-                tool: Some(tool.to_string()),
-                retriable: false,
-                partial_effect: None,
-            },
-            Self::ResponseTooLarge {
-                max_response_bytes, ..
-            } => CommandFailure {
-                office_mcp_code: "MAX_RESPONSE_SIZE".to_string(),
-                message: format!("Tool response exceeds {max_response_bytes} bytes."),
-                tool: Some(tool.to_string()),
-                retriable: false,
-                partial_effect: Some(PartialEffect::None),
-            },
-        }
-    }
-}
-
-impl Display for CommandRouterError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Preflight(error) => write!(formatter, "{error}"),
-            Self::UnknownRequest(request_id) => {
-                write!(formatter, "Unknown command request {request_id}.")
-            }
-            Self::ResponseTooLarge {
-                max_response_bytes,
-                actual_bytes,
-            } => write!(
-                formatter,
-                "Response exceeded {max_response_bytes} bytes: {actual_bytes} bytes."
-            ),
-        }
-    }
-}
-
-impl std::error::Error for CommandRouterError {}
 
 fn duration_millis(duration: Duration) -> u64 {
     duration.as_millis().try_into().unwrap_or(u64::MAX)

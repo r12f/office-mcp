@@ -3,6 +3,7 @@ pub mod addin_heartbeat;
 pub mod addin_json_rpc;
 pub(crate) mod command_queue;
 pub mod command_router;
+pub mod command_router_error;
 pub mod connection_hub;
 pub mod image_fetcher;
 pub mod session_descriptor_view;
@@ -18,8 +19,9 @@ pub use addin_channel::{
 pub use addin_json_rpc::{JsonRpcEnvelope, JsonRpcId, RegisterResult};
 pub(crate) use command_queue::SessionCommandQueue;
 pub use command_router::{
-    CancelCommand, CommandRouter, CommandRouterError, QueuedCommand, ToolCallRequest, ToolResponse,
+    CancelCommand, CommandRouter, QueuedCommand, ToolCallRequest, ToolResponse,
 };
+pub use command_router_error::CommandRouterError;
 pub use connection_hub::{AddinConnectionHub, AddinConnectionHubError};
 pub use image_fetcher::{FetchedImage, ImageFetchError, ImageFetcher};
 pub use session_descriptor_view::SessionDescriptorView;

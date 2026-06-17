@@ -1,6 +1,7 @@
-use super::{CommandRouter, CommandRouterError, ToolCallRequest, ToolResponse};
+use super::{CommandRouter, ToolCallRequest, ToolResponse};
 use crate::addin_mgr::{
-    AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, OfficeMcpCode, RuntimeInfo, SessionRegistry,
+    AddInInfo, CommandRouterError, DocumentInfo, HostInfo, NewSessionInfo, OfficeMcpCode,
+    RuntimeInfo, SessionRegistry,
 };
 use crate::api::{RegisterClientInput, UiClientTransport, UiCommandStatus, UiStateStore};
 use crate::common::{Logger, LoggerLogLevel};
