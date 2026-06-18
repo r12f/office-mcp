@@ -403,14 +403,21 @@ Latest UI feedback to preserve in implementation planning:
       performed from Office's real installed surfaces, not only manifest XML, so
       a valid manifest can still fail when Office renders the title, icon, or
       category as a half-finished sideloaded add-in.
-- [ ] Replace prototype add-in identity copy everywhere it can appear in Office:
+- [x] Replace prototype add-in identity copy everywhere it can appear in Office:
       manifest `DisplayName`, provider, description, support metadata, ribbon
       group, primary command label, task pane title/chrome, catalog title, and
       catalog type/category. The release identity should read as a finished
       local desktop control product, not a lowercase package slug, raw MCP
       protocol adapter, internal scaffold, or generic `Task Pane` add-in. The
       add-in title, icon, and type/category must be changed and validated
-      together; updating only one of those fields is not enough.
+      together; updating only one of those fields is not enough. Current static
+      implementation evidence covers Word, Excel, and PowerPoint manifests,
+      task pane chrome, generated product icons, catalog metadata, hosted
+      manifest/AppSource metadata, and Windows catalog staging. Evidence:
+      `npm run check` in `src/office-ctl/word`, `src/office-ctl/excel`, and
+      `src/office-ctl/powerpoint`, plus `npm test` in `packaging`. Final live
+      Office catalog/ribbon screenshots remain tracked by the first-run visual
+      evidence items below.
 - [ ] Replace any tray placeholder/default icon and non-native-looking menu
       surface in the normal daemon launch path. Right-click must open a real
       OS-native notification-area context menu with native separators,
