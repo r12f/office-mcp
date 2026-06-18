@@ -356,12 +356,14 @@ test('runtime evidence validator can require product visual evidence', () => {
       broken.tray_menu_surface_native = false;
       broken.manual_tray_evidence.tray_menu_surface_kind = 'html';
       broken.manual_tray_evidence.tray_menu_surface_native = false;
+      broken.manual_tray_evidence.tray_surface_screenshots_distinct = false;
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /mature local productivity automation\/control type metadata/);
       assert.match(outputText(result.stdout), /tray menu surface is not native/);
       assert.match(outputText(result.stdout), /Embedded manual tray evidence surface is not native/);
+      assert.match(outputText(result.stdout), /Embedded manual tray evidence reuses one screenshot for multiple tray surfaces/);
       assert.match(outputText(result.stdout), /Word mature local productivity automation\/control type metadata/);
     });
   });
@@ -652,10 +654,12 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
       broken.tray_menu_surface_kind = 'webview';
       broken.tray_menu_surface_native = false;
+      broken.tray_surface_screenshots_distinct = false;
       writeFileSync(manualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /Manual tray evidence surface is not native/);
+      assert.match(outputText(result.stdout), /Manual tray evidence reuses one screenshot for multiple tray surfaces/);
       assert.match(outputText(result.stdout), /native tray menu surface/);
     });
   });
@@ -1099,6 +1103,7 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     tray_surface_screenshot_paths: traySurfaceScreenshotPaths(screenshotPath),
     tray_surface_screenshots_exist: Object.fromEntries(trayVisualSurfaces().map((surface) => [surface, passed])),
     tray_surface_screenshots_ready: passed,
+    tray_surface_screenshots_distinct: passed,
     screenshot_exists: passed,
     daemon_context: manualTrayDaemonContext() as ReturnType<typeof manualTrayDaemonContext> | undefined,
     daemon_context_ready: passed,

@@ -23,6 +23,7 @@ test('manual tray evidence recorder requires product tooltip', () => {
     assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_tooltip, true);
     assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_quit_confirmation, true);
     assert.equal(evidence.tray_menu_surface_kind, 'native');
+    assert.equal(evidence.tray_surface_screenshots_distinct, true);
     assert.equal(evidence.tray_menu_surface_native, true);
     assert.equal(evidence.menu_anchored_to_tray_icon, true);
     assert.equal(evidence.os_native_menu_behavior_reviewed, true);
@@ -137,6 +138,26 @@ test('manual tray evidence recorder rejects truncated screenshots', () => {
   });
 });
 
+test('manual tray evidence recorder rejects reused tray surface screenshots', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'reused-tray-surfaces.json');
+    const sharedSurface = writeSurfaceScreenshot(dir, 'shared-tray-surface.png');
+    const result = runRecorder(
+      output,
+      screenshotPath,
+      '--tooltip', 'Office MCP - Up - 0 clients - 0 documents',
+      '--daemon-bin', daemonBin,
+      '--shared-tray-surface-screenshot', sharedSurface
+    );
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.tray_surface_screenshots_ready, true);
+    assert.equal(evidence.tray_surface_screenshots_distinct, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('manual tray evidence recorder reads daemon and screenshot paths from environment', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -173,6 +194,7 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
   const skipNativeMenuReviewFlags = extra.includes('--skip-native-menu-review-flags');
   const skipTraySurfaceScreenshots = extra.includes('--skip-tray-surface-screenshots');
   const skipScreenshotArgs = extra.includes('--skip-screenshot-args');
+  const sharedTraySurfaceScreenshot = optionValue(extra, '--shared-tray-surface-screenshot');
   const envDaemonBin = optionValue(extra, '--env-daemon-bin');
   const envScreenshotPath = optionValue(extra, '--env-screenshot-path');
   const envTrayIconScreenshot = optionValue(extra, '--env-tray-icon-screenshot');
@@ -183,10 +205,12 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
   const filteredExtra = extra.filter((item, index) => {
     const previous = extra[index - 1];
     if (previous?.startsWith('--env-')) return false;
+    if (previous === '--shared-tray-surface-screenshot') return false;
     return item !== '--skip-native-menu-review-flags'
       && item !== '--skip-tray-surface-screenshots'
       && item !== '--skip-daemon-bin-arg'
       && item !== '--skip-screenshot-args'
+      && item !== '--shared-tray-surface-screenshot'
       && !item.startsWith('--env-');
   });
   const reviewArgs = skipNativeMenuReviewFlags ? [] : [
@@ -208,10 +232,10 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
     '--show-ui-opened', 'true',
     ...(skipScreenshotArgs ? [] : ['--screenshot-path', screenshotPath]),
     ...(skipTraySurfaceScreenshots || skipScreenshotArgs ? [] : [
-      '--tray-icon-screenshot', trayIconScreenshot,
-      '--tray-native-menu-screenshot', trayNativeMenuScreenshot,
-      '--tray-tooltip-screenshot', trayTooltipScreenshot,
-      '--tray-quit-confirmation-screenshot', trayQuitConfirmationScreenshot
+      '--tray-icon-screenshot', sharedTraySurfaceScreenshot ?? trayIconScreenshot,
+      '--tray-native-menu-screenshot', sharedTraySurfaceScreenshot ?? trayNativeMenuScreenshot,
+      '--tray-tooltip-screenshot', sharedTraySurfaceScreenshot ?? trayTooltipScreenshot,
+      '--tray-quit-confirmation-screenshot', sharedTraySurfaceScreenshot ?? trayQuitConfirmationScreenshot
     ]),
     '--menu-item', 'Status: Up',
     '--menu-item', 'Clients: 0',

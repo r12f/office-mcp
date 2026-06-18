@@ -34,12 +34,13 @@ const traySurfaceScreenshotsExist = Object.fromEntries(
   Object.entries(traySurfaceScreenshots).map(([surface, path]) => [surface, typeof path === 'string' && screenshotFileLooksLikeImage(resolve(path))])
 );
 const traySurfaceScreenshotsReady = Object.values(traySurfaceScreenshotsExist).every(Boolean);
+const traySurfaceScreenshotsDistinct = screenshotPathsAreDistinct(traySurfaceScreenshots);
 const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
 const trayMenuSurfaceNative = trayMenuSurfaceKind === 'native';
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
 const nativeTrayInteractionReady = menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && menuAnchoredToTrayIcon && osNativeMenuBehaviorReviewed && keyboardMenuAccessReviewed && nativeQuitConfirmationReviewed;
-const passed = visibleIcon && rightClickMenu && nativeTrayInteractionReady && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && traySurfaceScreenshotsReady && daemonContextReady;
+const passed = visibleIcon && rightClickMenu && nativeTrayInteractionReady && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && traySurfaceScreenshotsReady && traySurfaceScreenshotsDistinct && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -69,6 +70,7 @@ const evidence = {
   tray_surface_screenshot_paths: traySurfaceScreenshots,
   tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
   tray_surface_screenshots_ready: traySurfaceScreenshotsReady,
+  tray_surface_screenshots_distinct: traySurfaceScreenshotsDistinct,
   daemon_context: daemonContext,
   daemon_context_ready: daemonContextReady,
   notes,
@@ -107,6 +109,12 @@ function traySurfaceScreenshotPaths(): Record<string, string | undefined> {
     tray_tooltip: normalizedOptionPath('--tray-tooltip-screenshot') ?? normalizedEnvPath('OFFICE_MCP_TRAY_TOOLTIP_SCREENSHOT_PATH'),
     tray_quit_confirmation: normalizedOptionPath('--tray-quit-confirmation-screenshot') ?? normalizedEnvPath('OFFICE_MCP_TRAY_QUIT_CONFIRMATION_SCREENSHOT_PATH')
   };
+}
+
+function screenshotPathsAreDistinct(paths: Record<string, string | undefined>): boolean {
+  const values = Object.values(paths).filter((path): path is string => typeof path === 'string');
+  if (values.length !== Object.keys(paths).length) return false;
+  return new Set(values.map((path) => resolve(path).toLowerCase())).size === values.length;
 }
 
 function normalizedOptionPath(name: string): string | undefined {
