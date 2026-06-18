@@ -65,6 +65,7 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.match(buildScript, /office-ctl\\excel\\public\\taskpane\.js/);
   assert.match(buildScript, /office-ctl\\powerpoint\\manifest\.xml/);
   assert.match(buildScript, /office-ctl\\powerpoint\\public\\taskpane\.js/);
+  assert.match(buildScript, /Push-Location \$powerPointAddinRoot[\s\S]*npm ci[\s\S]*npm run check/);
   assert.match(buildScript, /addin-catalog\\office-mcp-word\.xml/);
   assert.match(buildScript, /addin-catalog\\office-mcp-excel\.xml/);
   assert.match(buildScript, /addin-catalog\\office-mcp-powerpoint\.xml/);
@@ -90,6 +91,7 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.match(installScript, /office-ctl\\powerpoint/);
   assert.match(installScript, /installedWordRoot/);
   assert.match(installScript, /installedPowerPointRoot/);
+  assert.match(installScript, /Push-Location \$powerPointAddinRoot[\s\S]*npm ci[\s\S]*npm run check/);
   assert.match(installScript, /register-office-catalog\.ps1/);
   assert.match(installScript, /-CatalogPath \$catalogPath/);
   assert.match(installScript, /-ClearOfficeCache/);

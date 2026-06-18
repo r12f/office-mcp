@@ -94,6 +94,7 @@ try {
 
 Push-Location $powerPointAddinRoot
 try {
+  npm ci
   npm run check
 } finally {
   Pop-Location

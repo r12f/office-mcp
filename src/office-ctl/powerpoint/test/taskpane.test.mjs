@@ -8,6 +8,11 @@ const ADDIN_ROOT = process.cwd();
 test('PowerPoint add-in manifest targets presentation host and product identity', () => {
   const manifest = readFileSync(join(ADDIN_ROOT, 'manifest.xml'), 'utf8');
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
+  const packageJson = JSON.parse(readFileSync(join(ADDIN_ROOT, 'package.json'), 'utf8'));
+
+  assert.equal(packageJson.scripts['validate:manifest'], 'office-addin-manifest validate manifest.xml');
+  assert.match(packageJson.scripts.check, /^npm run validate:manifest && npm run check:taskpane && npm test$/);
+  assert.equal(packageJson.devDependencies['office-addin-manifest'], '2.1.5');
 
   assert.match(manifest, /<Host Name="Presentation" \/>/);
   assert.match(manifest, /<Set Name="PowerPointApi" MinVersion="1\.1" \/>/);

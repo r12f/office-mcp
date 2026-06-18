@@ -243,6 +243,10 @@ try {
 
 Push-Location $powerPointAddinRoot
 try {
+  if (-not $SkipNpmInstall) {
+    npm ci
+    Assert-LastExitCode "npm ci"
+  }
   npm run check
   Assert-LastExitCode "npm run check"
 } finally {

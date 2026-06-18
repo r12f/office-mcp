@@ -4,9 +4,13 @@
   "private": true,
   "description": "Office MCP Control for PowerPoint: a local productivity automation control utility.",
   "scripts": {
-    "check": "npm run check:taskpane && npm test",
+    "check": "npm run validate:manifest && npm run check:taskpane && npm test",
     "check:taskpane": "node --check public/taskpane.js",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "validate:manifest": "office-addin-manifest validate manifest.xml"
+  },
+  "devDependencies": {
+    "office-addin-manifest": "2.1.5"
   },
   "engines": {
     "node": ">=22"
