@@ -20,10 +20,12 @@ impl DaemonStatusReporter {
             .as_ref()
             .and_then(|status| status.pid)
             .is_some_and(process_exists);
+        let runtime_stale = runtime.is_some() && !running;
         format!(
             concat!(
                 "{{\n",
                 "  \"running\": {},\n",
+                "  \"runtimeStale\": {},\n",
                 "  \"runtimePath\": \"{}\",\n",
                 "  \"pid\": {},\n",
                 "  \"uiUrl\": {},\n",
@@ -33,32 +35,18 @@ impl DaemonStatusReporter {
                 "}}"
             ),
             running,
+            runtime_stale,
             json_escape(&self.runtime_path.display().to_string()),
-            runtime
-                .as_ref()
-                .and_then(|status| status.pid)
-                .map_or_else(|| "null".to_string(), |pid| pid.to_string()),
-            runtime
-                .as_ref()
-                .and_then(|status| status.ui_url.as_ref())
-                .map_or_else(
-                    || "null".to_string(),
-                    |url| format!("\"{}\"", json_escape(url))
-                ),
-            runtime
-                .as_ref()
-                .and_then(|status| status.state_url.as_ref())
-                .map_or_else(
-                    || "null".to_string(),
-                    |url| format!("\"{}\"", json_escape(url))
-                ),
-            runtime
-                .as_ref()
-                .and_then(|status| status.log_path.as_ref())
-                .map_or_else(
-                    || "null".to_string(),
-                    |path| format!("\"{}\"", json_escape(path))
-                )
+            active_value(running, runtime.as_ref().and_then(|status| status.pid)),
+            active_string(running, runtime.as_ref().and_then(|status| status.ui_url.as_deref())),
+            active_string(
+                running,
+                runtime.as_ref().and_then(|status| status.state_url.as_deref())
+            ),
+            active_string(
+                running,
+                runtime.as_ref().and_then(|status| status.log_path.as_deref())
+            )
         )
     }
 }
@@ -126,6 +114,25 @@ fn json_escape(value: &str) -> String {
         .replace('\n', "\\n")
         .replace('\r', "\\r")
         .replace('\t', "\\t")
+}
+
+fn active_value(running: bool, value: Option<u32>) -> String {
+    if running {
+        value.map_or_else(|| "null".to_string(), |pid| pid.to_string())
+    } else {
+        "null".to_string()
+    }
+}
+
+fn active_string(running: bool, value: Option<&str>) -> String {
+    if running {
+        value.map_or_else(
+            || "null".to_string(),
+            |text| format!("\"{}\"", json_escape(text)),
+        )
+    } else {
+        "null".to_string()
+    }
 }
 
 #[cfg(test)]
