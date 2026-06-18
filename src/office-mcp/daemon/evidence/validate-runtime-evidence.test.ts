@@ -242,6 +242,28 @@ test('runtime evidence validator can require product visual evidence', () => {
       assert.match(outputText(result.stdout), /concrete Excel editable\/read-only\/protected state/);
     });
   });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.daemon_context = undefined as unknown as ReturnType<typeof manualTrayDaemonContext>;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /missing daemon context/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.daemon_context = manualTrayDaemonContext(['Status: Up', 'Clients: 0']);
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual daemon context live missing menu item: Documents:/);
+    });
+  });
 });
 test('runtime evidence validator can require manual Windows tray evidence', () => {
   const ui = uiReport();
@@ -451,6 +473,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       document_state_ready: passed,
       density_ready: passed
     },
+    daemon_context: manualTrayDaemonContext(),
     passed
   };
 }

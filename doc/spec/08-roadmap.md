@@ -415,15 +415,18 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       native menu roles, disabled status rows, separator position, tray action
       IDs, product visual evidence recording, and product visual evidence
       validation. Live Windows ribbon/tray screenshots remain tracked by the
-      final visual evidence item.
+      final visual evidence item. Product visual evidence now also has to bind
+      the screenshots to the same local daemon binary under test by recording
+      `daemon status` and `tray --probe` output; the validator rejects product
+      visual evidence without that daemon context.
 - [ ] Capture visual evidence for the finished identity on Windows: Word ribbon
       command, Word catalog entry including type/category and icon, Word task
       pane title/icon, Excel equivalents, visible notification-area tray icon,
       native right-click menu opened from that icon, and tray tooltip/
       confirmation dialog. The evidence must be recorded with
-      `npm run evidence:record-product-visual`, tied to the same local daemon
-      build under test, validated with `--require-product-visual`, and stored as
-      release-checkable artifacts.
+      `npm run evidence:record-product-visual -- --daemon-bin <path>`, tied to
+      the same local daemon build under test, validated with
+      `--require-product-visual`, and stored as release-checkable artifacts.
 
 **Exit criterion**: Word and Excel show a mature product add-in name and icon in
 the ribbon/catalog; the task pane title and chrome match the product identity;

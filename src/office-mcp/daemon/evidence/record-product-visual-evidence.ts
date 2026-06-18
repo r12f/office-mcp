@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +8,7 @@ const repoRoot = resolve(evidenceRoot, '../../../..');
 const outputPath = resolve(readOption('--output') ?? join(repoRoot, 'artifacts/product-visual-evidence.json'));
 const tester = readOption('--tester') ?? process.env.USERNAME ?? process.env.USER ?? 'unknown';
 const notes = readOption('--notes');
+const daemonBin = readOption('--daemon-bin');
 
 const requiredSurfaces = [
   'word_ribbon_command',
@@ -38,6 +40,7 @@ const excelToolsPermissionsMerged = booleanFlag('--excel-tools-permissions-merge
 const excelInlineSettings = booleanFlag('--excel-inline-settings');
 const excelServerProtocolRow = readOption('--excel-server-protocol-row');
 const excelDocumentState = readOption('--excel-document-state');
+const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 
 const productTextReady = requiredSurfaces.filter((surface) => surface !== 'tray_tooltip').every((surface) => typeof observations[surface] === 'string' && (observations[surface] as string).includes(productName));
 const allScreenshotsExist = Object.values(screenshotsExist).every(Boolean);
@@ -78,6 +81,7 @@ const evidence = {
     document_state_ready: excelDocumentStateReady,
     density_ready: excelTaskpaneDensityReady
   },
+  daemon_context: daemonContext,
   notes,
   passed
 };
@@ -101,4 +105,35 @@ function readOption(name: string): string | undefined {
   const index = process.argv.indexOf(name);
   if (index === -1) return undefined;
   return process.argv[index + 1];
+}
+
+function readDaemonContext(binaryPath: string): Record<string, unknown> {
+  return {
+    binary_path: binaryPath,
+    status: runJson(binaryPath, ['daemon', 'status']),
+    tray_probe: runJson(binaryPath, ['tray', '--probe'])
+  };
+}
+
+function runJson(binaryPath: string, args: string[]): Record<string, unknown> {
+  const result = spawnSync(binaryPath, args, { encoding: 'utf8', shell: process.platform === 'win32' && binaryPath.toLowerCase().endsWith('.cmd') });
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      error: result.error instanceof Error ? result.error.message : undefined,
+      exit_code: result.status,
+      stderr: result.stderr?.trim() ?? '',
+      stdout: result.stdout?.trim() ?? ''
+    };
+  }
+  try {
+    const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
+    return { ok: true, ...parsed };
+  } catch (error) {
+    return {
+      ok: false,
+      parse_error: error instanceof Error ? error.message : String(error),
+      stdout: result.stdout.trim()
+    };
+  }
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -40,6 +40,23 @@ test('product visual evidence recorder requires all product surfaces', () => {
     const failed = JSON.parse(outputText(missingTray.stdout)) as Record<string, unknown>;
     assert.equal(failed.passed, false);
     assert.equal((failed.screenshots_exist as Record<string, unknown>).tray_native_menu, false);
+  });
+});
+
+test('product visual evidence recorder can bind evidence to daemon context', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
+    writeFileSync(daemonBin, fakeDaemonScript());
+    chmodSync(daemonBin, 0o755);
+
+    const output = join(dir, 'product-visual-evidence.json');
+    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
+    assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    const context = evidence.daemon_context as Record<string, unknown>;
+    assert.equal(context.binary_path, resolve(daemonBin));
+    assert.equal((context.status as Record<string, unknown>).running, true);
+    assert.equal((context.tray_probe as Record<string, unknown>).native_host, true);
   });
 });
 
@@ -85,4 +102,27 @@ function withScreenshots(callback: (dir: string, screenshots: Record<string, str
 
 function outputText(value: string | Buffer): string {
   return typeof value === 'string' ? value : value.toString('utf8');
+}
+
+function fakeDaemonScript(): string {
+  const status = JSON.stringify({ running: true, uiUrl: 'https://localhost:8765/ui/' });
+  const trayProbe = JSON.stringify({
+    native_host: true,
+    snapshot: {
+      tooltip: 'Office MCP - Up - 0 clients - 0 documents',
+      menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP'],
+      menu: [
+        { kind: 'read_only', enabled: false, label: 'Status: Up' },
+        { kind: 'read_only', enabled: false, label: 'Clients: 0' },
+        { kind: 'read_only', enabled: false, label: 'Documents: 0' },
+        { kind: 'separator', enabled: false, label: '---' },
+        { kind: 'action', enabled: true, label: 'Show Office MCP', action: 'show_ui' },
+        { kind: 'action', enabled: true, label: 'Quit Office MCP', action: 'quit' }
+      ]
+    }
+  });
+  if (process.platform === 'win32') {
+    return `@echo off\r\nif "%1"=="daemon" echo ${status}\r\nif "%1"=="tray" echo ${trayProbe}\r\n`;
+  }
+  return `#!/bin/sh\nif [ "$1" = "daemon" ]; then printf '%s\\n' '${status}'; fi\nif [ "$1" = "tray" ]; then printf '%s\\n' '${trayProbe}'; fi\n`;
 }

@@ -214,6 +214,7 @@ function validateProductVisualEvidence(): void {
   validateProductVisualScreenshots(visual.screenshot_paths);
   validateProductVisualObservations(visual.observations);
   validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
+  validateProductVisualDaemonContext(visual.daemon_context);
 }
 
 function validateProductVisualScreenshots(paths: unknown): void {
@@ -261,6 +262,28 @@ function validateExcelTaskpaneVisualEvidence(taskpane: unknown): void {
     failures.push('Product visual evidence missing concrete Excel editable/read-only/protected state.');
   }
   if (taskpane.density_ready !== true) failures.push('Product visual evidence missing Excel task pane density pass flag.');
+}
+
+function validateProductVisualDaemonContext(context: unknown): void {
+  if (!isRecord(context)) {
+    failures.push('Product visual evidence missing daemon context for the local build under test.');
+    return;
+  }
+  const status = context.status;
+  if (!isRecord(status) || status.ok !== true || status.running !== true || typeof status.uiUrl !== 'string') {
+    failures.push('Product visual evidence daemon context missing running daemon status.');
+  }
+  const trayProbe = context.tray_probe;
+  if (!isRecord(trayProbe) || trayProbe.ok !== true || trayProbe.native_host !== true) {
+    failures.push('Product visual evidence daemon context missing native tray probe success.');
+    return;
+  }
+  const snapshot = trayProbe.snapshot;
+  const menuItems = isRecord(snapshot) && Array.isArray(snapshot.menu_items)
+    ? snapshot.menu_items.filter((item): item is string => typeof item === 'string')
+    : [];
+  validateTrayMenuLabels(menuItems, 'Product visual daemon context live');
+  validateStructuredTraySnapshot(snapshot, 'Product visual daemon context live');
 }
 
 function productVisualSurfaces(): string[] {
