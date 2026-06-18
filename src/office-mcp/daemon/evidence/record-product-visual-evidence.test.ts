@@ -68,6 +68,18 @@ test('product visual evidence recorder requires tray probe live state', () => {
   });
 });
 
+test('product visual evidence recorder requires live tray menu snapshot', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir, true, ['Status: Up', 'Clients: 0']);
+    const output = join(dir, 'missing-menu-items.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.daemon_context_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('product visual evidence recorder can bind evidence to daemon context', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -127,21 +139,21 @@ function outputText(value: string | Buffer): string {
   return typeof value === 'string' ? value : value.toString('utf8');
 }
 
-function writeFakeDaemon(dir: string, stateFetchOk = true): string {
+function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']): string {
   const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
-  writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk));
+  writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk, menuItems));
   chmodSync(daemonBin, 0o755);
   return daemonBin;
 }
 
-function fakeDaemonScript(stateFetchOk: boolean): string {
+function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[]): string {
   const status = JSON.stringify({ running: true, uiUrl: 'https://localhost:8765/ui/' });
   const trayProbe = JSON.stringify({
     native_host: true,
     state_fetch_ok: stateFetchOk,
     snapshot: {
       tooltip: 'Office MCP - Up - 0 clients - 0 documents',
-      menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP'],
+      menu_items: menuItems,
       menu: [
         { kind: 'read_only', enabled: false, label: 'Status: Up' },
         { kind: 'read_only', enabled: false, label: 'Clients: 0' },

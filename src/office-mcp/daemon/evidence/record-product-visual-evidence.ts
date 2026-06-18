@@ -145,9 +145,19 @@ function daemonContextLooksReady(context: Record<string, unknown> | undefined): 
   const status = context.status;
   const trayProbe = context.tray_probe;
   return isRecord(status) && status.ok === true && status.running === true && typeof status.uiUrl === 'string'
-    && isRecord(trayProbe) && trayProbe.ok === true && trayProbe.native_host === true && trayProbe.state_fetch_ok === true;
+    && isRecord(trayProbe) && trayProbe.ok === true && trayProbe.native_host === true && trayProbe.state_fetch_ok === true
+    && traySnapshotLooksReady(trayProbe.snapshot);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function traySnapshotLooksReady(snapshot: unknown): boolean {
+  if (!isRecord(snapshot)) return false;
+  const tooltipReady = typeof snapshot.tooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(snapshot.tooltip);
+  const menuItems = Array.isArray(snapshot.menu_items) ? snapshot.menu_items.filter((item): item is string => typeof item === 'string') : [];
+  const menuReady = ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP']
+    .every((expected) => menuItems.some((item) => item.includes(expected)));
+  return tooltipReady && menuReady;
 }
