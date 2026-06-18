@@ -131,7 +131,7 @@ test('Office catalog registration can sync its origin from running daemon status
   }
 });
 
-test('Office catalog registration writes a local folder URL to the trusted catalog registry', () => {
+test('Office catalog registration writes a shared folder URL to the trusted catalog registry', () => {
   const catalogPath = mkdtempSync(join(tmpdir(), 'office-mcp-catalog-registry-'));
 
   try {
@@ -155,9 +155,9 @@ test('Office catalog registration writes a local folder URL to the trusted catal
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /REGISTRY_URL=[A-Z]:\\/i);
+    assert.match(result.stdout, /REGISTRY_URL=\\\\localhost\\[A-Z]\$\\/);
     assert.match(result.stdout, new RegExp(catalogPath.split(/[\\/]/).at(-1)));
-    assert.doesNotMatch(result.stdout, /REGISTRY_URL=\\\\localhost/);
+    assert.doesNotMatch(result.stdout, /REGISTRY_URL=[A-Z]:\\/i);
   } finally {
     rmSync(catalogPath, { force: true, recursive: true });
   }

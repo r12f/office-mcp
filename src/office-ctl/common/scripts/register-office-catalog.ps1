@@ -158,11 +158,7 @@ function ConvertTo-OfficeCatalogRegistryUrl {
     [Parameter(Mandatory = $true)][string]$Path
   )
 
-  $resolvedPath = [System.IO.Path]::GetFullPath($Path)
-  if ($resolvedPath.StartsWith("\\", [System.StringComparison]::Ordinal)) {
-    return $resolvedPath
-  }
-  return $resolvedPath
+  return ConvertTo-OfficeCatalogUrl -Path $Path
 }
 
 $hosts = @(
