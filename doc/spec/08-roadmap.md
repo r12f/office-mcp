@@ -368,6 +368,14 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       reproducible generated raster assets, `brand-design.md`, Word/Excel
       add-in identity tests, and Rust tray icon tests. Final real rendered
       screenshot evidence remains tracked by the visual evidence item below.
+- [ ] Capture a rendered-size logo review for the final asset set. The review
+      must inspect the mark at 16 px tray size, 32 px ribbon size, catalog
+      thumbnail size, daemon title-bar size, and installer/package metadata
+      size. The result must prove the icon still reads as office work under
+      user control with a mature, slightly futuristic product feel, not as a
+      Microsoft Office clone, generic document, gear/settings icon, debug glyph,
+      placeholder tile, or abstract mark unrelated to office control. Store the
+      review screenshots with the product visual evidence artifact.
 - [x] Update Word and Excel add-in manifests/catalog rendering so release and
       sideloaded builds use mature product metadata: stable add-in title,
       provider, description, support URL, ribbon group label, action label, and
@@ -403,6 +411,13 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       catalog registration origin sync for Word and Excel. Final real Office
       catalog/ribbon screenshots remain tracked by the visual evidence item
       below.
+- [ ] Capture live Word and Excel first-run add-in identity evidence. The
+      screenshots must show each host's catalog entry, ribbon command, task pane
+      title/chrome, icon, provider, concise description, and type/category as a
+      coherent product surface. A passing run must show mature software naming
+      and iconography on all visible surfaces at once; partial polish, such as a
+      good title with a missing icon or a good icon with experimental
+      type/category text, does not satisfy this item.
 - [x] Replace the current tray placeholder/missing icon with the generated
       tray glyph in normal daemon and installed launch paths. The icon must be
       visible in the Windows notification area and visually deliberate beside
@@ -426,6 +441,14 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       native look and interaction. A browser window, webview, frameless HTML
       menu, CSS-styled popup, or manually positioned floating panel must fail
       acceptance even if it resembles a Windows menu.
+- [ ] Capture tray product polish evidence from a normal interactive Windows
+      launch. The artifact must show the notification-area icon, product
+      tooltip, right-click native menu opened from the actual tray icon, native
+      separator/read-only row behavior, `Show Office MCP`, `Quit Office MCP`,
+      and the native quit confirmation dialog. The tray must use the generated
+      product glyph and product-consistent labels, with no missing/default icon,
+      debug wording, browser/webview menu, frameless HTML panel, or custom-drawn
+      menu imitation.
 - [x] Polish the automated tray product surface model so normal Windows users
       are expected to see a deliberate app icon, native tooltip/title, native
       context menu text, disabled status rows, and confirmation dialogs that
@@ -469,10 +492,13 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       headers are rejected by both the recorder and validator.
 
 **Exit criterion**: Word and Excel show a mature product add-in name and icon in
-the ribbon/catalog; the task pane title and chrome match the product identity;
-the logo communicates office productivity and user control without using Office
+the ribbon/catalog; the add-in title, icon, provider, command label,
+description, and type/category read as one finished product; the task pane title
+and chrome match the product identity; the logo communicates office productivity
+and user control with a mature, slightly futuristic feel without using Office
 owned marks; the tray has a visible original glyph, native tooltip, native
-right-click menu, and product-consistent labels; packaged builds carry the same
+right-click menu opened from the actual notification-area icon, native quit
+confirmation, and product-consistent labels; packaged builds carry the same
 assets without blank placeholders, generic debug names, or Microsoft-owned
 marks.
 
