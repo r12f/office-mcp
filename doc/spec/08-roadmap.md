@@ -342,19 +342,28 @@ Latest UI feedback to preserve in implementation planning:
   preferred direction is a mature, slightly futuristic control-surface mark:
   document/window panes, routing geometry, layered surfaces, and an explicit
   operator/control affordance that remains legible at tray and ribbon sizes. It
-  must not read as a generic settings/file/debug/AI icon.
+  must not read as a generic settings/file/debug/AI icon. The latest visual
+  direction is future office control: precise geometry, layered operational
+  surfaces, and restrained control affordances without Office-owned app marks,
+  Office tile silhouettes, terminal/debug motifs, neon effects, or decorative
+  AI styling.
 - The add-in first-run surface must be treated as one product impression. Title,
   icon, provider, description, ribbon command, catalog type/category, and task
   pane chrome must all change together; a polished title paired with a missing
   icon or experimental type/category is still a release failure. The installed
   Word, Excel, and PowerPoint catalogs must all show the same mature identity
   after a fresh install; disappearing catalog entries or stale generated
-  manifests are installer bugs.
+  manifests are installer bugs. The add-in must not look like a sideloaded
+  experiment before the task pane opens: catalog title, catalog type/category,
+  icon, ribbon command, provider, and task pane chrome must read as one finished
+  local control product.
 - The tray must look like native desktop software. A missing/default tray icon,
   non-native-looking right-click surface, webview/HTML imitation menu, or debug
   wording makes the product feel unfinished and must remain blocked until live
   Windows visual evidence proves a real native notification-area icon and native
-  context menu.
+  context menu. The normal Windows launch must show a deliberate tray glyph,
+  native tooltip, right-click menu anchored to the actual notification-area
+  icon, OS-native spacing/hover/keyboard behavior, and native quit confirmation.
 
 - [ ] Redesign or formally re-approve the product logo against the latest
       feedback. The accepted mark must not use Office logos or near-logo
@@ -364,7 +373,11 @@ Latest UI feedback to preserve in implementation planning:
       rationale, rendered-size review images, and explicit rejection of generic
       file/settings/debug/AI-only marks. The review must judge the icon from the
       sizes users actually see in Office catalogs, ribbon commands, task pane
-      chrome, Windows tray, installer metadata, and the daemon title bar.
+      chrome, Windows tray, installer metadata, and the daemon title bar. The
+      design review must explicitly answer why the icon feels like future office
+      control without borrowing Office logos, Office tile language, Microsoft
+      app-color identity, terminal/debug metaphors, or decorative AI/neon
+      styling.
 - [ ] Re-audit every add-in first-contact surface after install: title, icon,
       provider, description, ribbon command, task pane chrome, and catalog
       type/category for Word, Excel, and PowerPoint. The installed catalog must
@@ -374,20 +387,27 @@ Latest UI feedback to preserve in implementation planning:
       a stale daemon origin, or shows mismatched title/type metadata. This item
       includes the generated Word catalog, which must remain present and show
       the correct product title, icon, description, provider, and local
-      productivity automation/control type after reinstall.
+      productivity automation/control type after reinstall. The review must be
+      performed from Office's real installed surfaces, not only manifest XML, so
+      a valid manifest can still fail when Office renders the title, icon, or
+      category as a half-finished sideloaded add-in.
 - [ ] Replace prototype add-in identity copy everywhere it can appear in Office:
       manifest `DisplayName`, provider, description, support metadata, ribbon
       group, primary command label, task pane title/chrome, catalog title, and
       catalog type/category. The release identity should read as a finished
       local desktop control product, not a lowercase package slug, raw MCP
-      protocol adapter, internal scaffold, or generic `Task Pane` add-in.
+      protocol adapter, internal scaffold, or generic `Task Pane` add-in. The
+      add-in title, icon, and type/category must be changed and validated
+      together; updating only one of those fields is not enough.
 - [ ] Replace any tray placeholder/default icon and non-native-looking menu
       surface in the normal daemon launch path. Right-click must open a real
       OS-native notification-area context menu with native separators,
       disabled/read-only status rows, hover/selection behavior, keyboard access,
       tooltip text, `Show Office MCP`, `Quit Office MCP`, and native quit
       confirmation. A webview, frameless HTML panel, CSS popup, or toolkit-demo
-      menu fails this item even if automated probes pass.
+      menu fails this item even if automated probes pass. The visual evidence
+      must prove the menu is opened from the visible tray icon and looks native
+      beside normal Windows tray applications, not like an embedded web UI.
 - [ ] Replace any tray implementation path that draws its own menu surface. The
       Windows build must use native notification-area and menu primitives for
       the visible user interaction, including the right-click menu opened from
