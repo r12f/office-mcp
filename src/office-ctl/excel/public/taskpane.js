@@ -1,5 +1,5 @@
 (() => {
-  const ADDIN_VERSION = '0.1.6';
+  const ADDIN_VERSION = '0.1.7';
   const PROTOCOL_VERSION = '1.0';
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
   const {
@@ -127,7 +127,10 @@
   function isExcelHost(info) {
     const host = String(info?.host || '').toLowerCase();
     const expected = String(Office.HostType?.Excel || 'Excel').toLowerCase();
-    return host === expected || host === 'excel';
+    const diagnosticsHost = String(Office.context?.diagnostics?.host || '').toLowerCase();
+    const hasExcelRuntime = typeof window.Excel?.run === 'function';
+    const hasExcelRequirementSet = Office.context?.requirements?.isSetSupported?.('ExcelApi', '1.1') === true;
+    return host === expected || host === 'excel' || diagnosticsHost === 'excel' || hasExcelRuntime || hasExcelRequirementSet;
   }
 
   function connect() {

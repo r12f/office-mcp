@@ -12,12 +12,12 @@ test('Excel add-in manifest targets workbook host and versioned task pane', () =
 
   assert.match(manifest, /<Host Name="Workbook" \/>/);
   assert.match(manifest, /<Set Name="ExcelApi" MinVersion="1\.1" \/>/);
-  assert.match(manifest, /excel\/taskpane\.html\?v=0\.1\.6/);
-  assert.match(html, /excel\/taskpane\.css\?v=0\.1\.6/);
-  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.6/);
-  assert.match(html, /excel\/taskpane\.js\?v=0\.1\.6/);
+  assert.match(manifest, /excel\/taskpane\.html\?v=0\.1\.7/);
+  assert.match(html, /excel\/taskpane\.css\?v=0\.1\.7/);
+  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.7/);
+  assert.match(html, /excel\/taskpane\.js\?v=0\.1\.7/);
   assert.match(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
-  assert.match(js, /ADDIN_VERSION = '0\.1\.6'/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.7'/);
 });
 
 test('Excel task pane uses common channel and registers Excel runtime metadata', () => {
@@ -70,6 +70,9 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /TOOL_DISABLED_BY_USER/);
   assert.match(js, /function isExcelHost\(info\)/);
   assert.match(js, /Office\.HostType\?\.Excel/);
+  assert.match(js, /Office\.context\?\.diagnostics\?\.host/);
+  assert.match(js, /window\.Excel\?\.run/);
+  assert.match(js, /isSetSupported\?\.\('ExcelApi', '1\.1'\)/);
   assert.match(js, /app: 'excel'/);
   assert.match(js, /clearEndpointOverride/);
   assert.match(js, /currentOriginEndpoint/);
