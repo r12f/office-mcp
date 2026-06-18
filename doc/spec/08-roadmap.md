@@ -571,6 +571,22 @@ Latest UI feedback to preserve in implementation planning:
       and type/category metadata are validated before product visual evidence can
       pass. This item remains open until those manifest-derived fields are also
       matched by live Office catalog/ribbon/task pane screenshots.
+- [ ] Redesign the product logo as a deliberate future-office-control identity,
+      not as an Office logo variant, framework icon, placeholder mark, gear-only
+      settings symbol, or developer/debug badge. The task must produce reviewed
+      concept directions, choose an original mark that communicates office
+      productivity plus user control, document why it is visually distinct from
+      Microsoft-owned Office marks, export the full icon family, and validate the
+      rendered result at tray, ribbon, catalog, installer, and daemon title-bar
+      sizes.
+- [ ] Rework every add-in first-contact identity field so Word, Excel, and
+      PowerPoint look like mature installable software after a clean install.
+      Title, icon, provider, command label, short description, type/category,
+      catalog card, ribbon command, task pane title/chrome, installer metadata,
+      and generated catalog output must be updated together. Any surface that
+      still shows generic `Add-in`, `Task Pane`, `MCP`, `Debug`, host-only
+      scaffold names, missing icons, or prototype type/category wording keeps
+      this item open.
 - [x] Replace the current tray placeholder/missing icon with the generated
       tray glyph in normal daemon and installed launch paths. The icon must be
       visible in the Windows notification area and visually deliberate beside
@@ -594,6 +610,13 @@ Latest UI feedback to preserve in implementation planning:
       native look and interaction. A browser window, webview, frameless HTML
       menu, CSS-styled popup, or manually positioned floating panel must fail
       acceptance even if it resembles a Windows menu.
+- [ ] Replace any remaining tray prototype presentation with a finished native
+      Windows tray surface. A normal daemon launch must show the accepted product
+      tray glyph, product tooltip, and OS-native right-click menu. Missing tray
+      icon, blank/default/toolkit sample icon, non-product tooltip text,
+      webview/custom-drawn menu, or a menu that feels visually non-native is a
+      release blocker. Evidence must come from a real interactive Windows launch,
+      not only `tray --probe` model output.
 - [ ] Capture tray product polish evidence from a normal interactive Windows
       launch. The artifact must show the notification-area icon, product
       tooltip, right-click native menu opened from the actual tray icon, native
