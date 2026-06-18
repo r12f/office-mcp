@@ -100,7 +100,16 @@ test('README product visual evidence command matches current PowerPoint gates', 
     '--powerpoint-catalog-entry-screenshot',
     '--powerpoint-taskpane-title',
     '--powerpoint-taskpane-title-screenshot',
-    '--powerpoint-first-run-identity-reviewed'
+    '--logo-quality-reviewed',
+    '--final-logo-user-surface-reviewed',
+    '--rendered-size-logo-reviewed',
+    '--addin-identity-reviewed',
+    '--addin-installable-surface-reviewed',
+    '--word-first-run-identity-reviewed',
+    '--excel-first-run-identity-reviewed',
+    '--powerpoint-first-run-identity-reviewed',
+    '--tray-product-polish-reviewed',
+    '--tray-normal-windows-launch-reviewed'
   ]) {
     assert.match(commandLine, new RegExp(required));
   }
