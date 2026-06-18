@@ -44,6 +44,18 @@ fn daemon_run_has_startup_config_and_shutdown_tracing() {
     assert!(source.contains("log_path = %config.logging.file"));
 }
 
+#[test]
+fn default_description_uses_product_language_not_scaffold_wording() {
+    let source = read_main_source();
+
+    assert!(source.contains("Office MCP Control daemon"));
+    assert!(source.contains("Local Office automation control server for live add-in sessions."));
+    assert!(source.contains("Usage: office-mcp-daemon daemon run [--no-tray|--with-tray]"));
+    assert!(source.contains("Components:"));
+    assert!(!source.to_ascii_lowercase().contains("reference scaffold"));
+    assert!(!source.to_ascii_lowercase().contains("debug daemon"));
+}
+
 fn read_main_source() -> String {
     let source_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")

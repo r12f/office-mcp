@@ -176,9 +176,12 @@ fn run_tray(args: &[String]) {
 }
 
 fn print_description(daemon: &OfficeMcpDaemon) {
-    println!("office-mcp-daemon rust reference scaffold");
+    println!("Office MCP Control daemon");
+    println!("Local Office automation control server for live add-in sessions.");
+    println!("Usage: office-mcp-daemon daemon run [--no-tray|--with-tray]");
+    println!("Components:");
     for component in daemon.component_descriptions() {
-        println!("{}: {}", component.name(), component.description());
+        println!("- {}: {}", component.name(), component.description());
     }
 }
 
