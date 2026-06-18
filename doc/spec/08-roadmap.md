@@ -380,13 +380,23 @@ Latest UI feedback to preserve in implementation planning:
       `validate-runtime-evidence.ts` reject product visual evidence that omits
       the concept pass. Verified with `npm run check` in
       `src/office-ctl/word` and `src/office-mcp/daemon/evidence`.
-- [ ] Rework and verify all add-in first-impression metadata as one product
+- [x] Rework and verify all add-in first-impression metadata as one product
       surface for Word, Excel, and PowerPoint after a clean install. The visible
       add-in title, icon, provider, description, ribbon command, task pane
       title/chrome, catalog title, and catalog type/category must read as one
       mature local productivity automation/control product. A host still showing
       a missing/default icon, raw package name, generic `Add-in`/`Task Pane`
       type, sample/debug wording, or stale catalog entry keeps this item open.
+      Current static clean-install evidence: `register-office-catalog.ps1`
+      stages fresh Word, Excel, and PowerPoint catalog manifests with synced
+      daemon origin and generated icon URLs, and
+      `record-catalog-identity-review.mjs` emits a structured
+      `catalog_identity_review` artifact proving display name, provider,
+      description, command label, task pane URL, generated icon URLs, shared
+      origin, and product type/category are coherent. Word tests cover both the
+      passing clean catalog and prototype-metadata rejection. Final live Office
+      catalog/ribbon/task pane visual re-audit remains tracked by the live
+      first-contact evidence items below.
 - [ ] Rework and verify the Windows tray first-impression surface as native
       desktop software. The normal daemon launch must show the generated product
       glyph in the notification area, product-consistent tooltip text, a native

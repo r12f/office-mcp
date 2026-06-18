@@ -79,6 +79,7 @@ test('Office catalog registration wrapper delegates to shared Office catalog scr
 
 test('Office catalog registration script stages Office host manifests without registry mutation', () => {
   const catalogPath = mkdtempSync(join(tmpdir(), 'office-mcp-catalog-'));
+  const reviewPath = join(catalogPath, 'catalog-identity-review.json');
   mkdirSync(join(catalogPath, 'word'), { recursive: true });
   mkdirSync(join(catalogPath, 'excel'), { recursive: true });
   mkdirSync(join(catalogPath, 'powerpoint'), { recursive: true });
@@ -160,6 +161,83 @@ test('Office catalog registration script stages Office host manifests without re
     assert.throws(() => readFileSync(join(catalogPath, 'word', 'manifest.xml'), 'utf8'));
     assert.throws(() => readFileSync(join(catalogPath, 'excel', 'manifest.xml'), 'utf8'));
     assert.throws(() => readFileSync(join(catalogPath, 'powerpoint', 'manifest.xml'), 'utf8'));
+
+    const review = spawnSync(
+      process.execPath,
+      [
+        join(ADDIN_ROOT, '..', 'common', 'scripts', 'record-catalog-identity-review.mjs'),
+        '--catalog-path',
+        catalogPath,
+        '--output',
+        reviewPath
+      ],
+      { cwd: join(ADDIN_ROOT, '..', '..', '..'), encoding: 'utf8' }
+    );
+    assert.equal(review.status, 0, review.stderr || review.stdout);
+    const report = JSON.parse(readFileSync(reviewPath, 'utf8'));
+    assert.equal(report.kind, 'catalog_identity_review');
+    assert.equal(report.product_name, 'Office MCP Control');
+    assert.equal(report.catalog_type, 'Local productivity automation control utility');
+    assert.equal(report.shared_origin, 'https://localhost:8766');
+    assert.equal(report.ready, true);
+    assert.deepEqual(report.failures, []);
+    for (const host of ['word', 'excel', 'powerpoint']) {
+      assert.equal(report.hosts[host].display_name, 'Office MCP Control');
+      assert.equal(report.hosts[host].provider, 'Office MCP Control');
+      assert.equal(report.hosts[host].command_label, 'Open Control Panel');
+      assert.equal(report.hosts[host].ready, true);
+      assert.match(report.hosts[host].description, /local productivity automation control utility/i);
+      assert.match(report.hosts[host].icon_url, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
+      assert.match(report.hosts[host].high_resolution_icon_url, /https:\/\/localhost:8766\/assets\/icon-80\.png/);
+    }
+  } finally {
+    rmSync(catalogPath, { force: true, recursive: true });
+  }
+});
+
+test('Office catalog identity review rejects prototype first-impression metadata', () => {
+  const catalogPath = mkdtempSync(join(tmpdir(), 'office-mcp-catalog-review-bad-'));
+  const reviewPath = join(catalogPath, 'catalog-identity-review.json');
+  try {
+    for (const [host, taskpane] of [
+      ['word', '/word/taskpane.html'],
+      ['excel', '/excel/taskpane.html'],
+      ['powerpoint', '/powerpoint/taskpane.html']
+    ]) {
+      writeFileSync(join(catalogPath, `office-mcp-${host}.xml`), `<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp>
+  <ProviderName>${host === 'word' ? 'office-mcp' : 'Office MCP Control'}</ProviderName>
+  <DisplayName DefaultValue="${host === 'word' ? 'office-mcp-word' : 'Office MCP Control'}" />
+  <Description DefaultValue="${host === 'excel' ? 'Experimental protocol bridge debug panel.' : 'Control live documents through a local productivity automation control utility.'}" />
+  <IconUrl DefaultValue="https://localhost:8766/assets/${host === 'powerpoint' ? 'blank.png' : 'icon-32.png'}" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:8766/assets/icon-80.png" />
+  <bt:String id="OfficeMcp.OpenPane.Label" DefaultValue="${host === 'word' ? 'Open' : 'Open Control Panel'}" />
+  <bt:String id="OfficeMcp.OpenPane.Tooltip" DefaultValue="Open Office MCP Control." />
+  <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:8766${taskpane}?v=0.1.0" />
+</OfficeApp>`);
+    }
+
+    const review = spawnSync(
+      process.execPath,
+      [
+        join(ADDIN_ROOT, '..', 'common', 'scripts', 'record-catalog-identity-review.mjs'),
+        '--catalog-path',
+        catalogPath,
+        '--output',
+        reviewPath,
+        '--catalog-type',
+        'Task Pane Add-in protocol bridge'
+      ],
+      { cwd: join(ADDIN_ROOT, '..', '..', '..'), encoding: 'utf8' }
+    );
+    assert.notEqual(review.status, 0);
+    const report = JSON.parse(readFileSync(reviewPath, 'utf8'));
+    assert.equal(report.ready, false);
+    assert.match(report.failures.join('\n'), /Word: display name must be Office MCP Control/);
+    assert.match(report.failures.join('\n'), /Word: provider must be Office MCP Control/);
+    assert.match(report.failures.join('\n'), /Excel: description must describe a local productivity automation control utility/);
+    assert.match(report.failures.join('\n'), /PowerPoint: catalog\/ribbon icon URL must use generated icon-32\.png/);
+    assert.match(report.failures.join('\n'), /Catalog type is not product-ready/);
   } finally {
     rmSync(catalogPath, { force: true, recursive: true });
   }
