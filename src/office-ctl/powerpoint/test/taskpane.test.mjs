@@ -68,6 +68,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);
   assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
   assert.match(css, /\.control-glyph \{[\s\S]*width: 18px;[\s\S]*stroke: currentColor;/);
+  assert.match(css, /\.tool-permission-row\.is-mutating \{[\s\S]*border-left: 3px solid var\(--powerpoint\);/);
   assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
   assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
@@ -96,6 +97,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /TOOL_DISABLED_BY_USER/);
   assert.match(js, /function effectiveTools\(\)/);
   assert.match(js, /function updateToolPermission\(tool, enabled\)/);
+  assert.match(js, /rowStateClass = `\$\{enabled \? '' : ' is-disabled'\}\$\{meta\.sideEffect === 'mutating' \? ' is-mutating' : ''\}`/);
   assert.match(js, /const id = `toolPermission-\$\{tool\.replace\(\/\[\^a-z0-9_-\]\/gi, '-'\)\}`/);
   assert.match(js, /for="\$\{id\}"/);
   assert.match(js, /<input id="\$\{id\}" class="tool-toggle"/);
