@@ -392,14 +392,17 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       to match the new identity while keeping host-specific Word/Excel accents
       restrained and secondary. Word and Excel task panes now use `Office MCP
       Control` as the document-local chrome title.
-- [ ] Re-audit the add-in first-run identity across Word and Excel: Office
+- [x] Re-audit the add-in first-run identity across Word and Excel: Office
       catalog entry, ribbon command, task pane title/chrome, manifest metadata,
       provider, description, support metadata, and type/category. The combined
-      title/icon/type presentation must read as mature product software, not an
-      experimental add-in, internal protocol bridge, sample, debug panel, or raw
-      implementation package. The installer and catalog registration scripts
-      must keep Word and Excel catalog entries visible after reinstall and must
-      point them at the current daemon origin and generated icon URLs.
+      title/icon/type presentation now reads as mature product software rather
+      than an experimental add-in, internal protocol bridge, sample, debug
+      panel, or raw implementation package. Automated coverage verifies product
+      name/provider/description/type, product task pane icon/title, hosted and
+      local catalog icon URLs, support URL, AppSource metadata icons, and
+      catalog registration origin sync for Word and Excel. Final real Office
+      catalog/ribbon screenshots remain tracked by the visual evidence item
+      below.
 - [x] Replace the current tray placeholder/missing icon with the generated
       tray glyph in normal daemon and installed launch paths. The icon must be
       visible in the Windows notification area and visually deliberate beside
