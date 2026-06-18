@@ -325,18 +325,59 @@ test('product visual evidence recorder can bind evidence to daemon context', () 
   });
 });
 
+test('product visual evidence recorder reads evidence artifact paths from environment', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const excelRuntimeEvidencePath = writeExcelRuntimeEvidence(dir);
+    const manualTrayEvidencePath = writeManualTrayEvidence(dir);
+    const output = join(dir, 'product-visual-env-evidence.json');
+    const result = runRecorder(
+      output,
+      screenshots,
+      '--daemon-bin', daemonBin,
+      '--skip-logo-surface-args',
+      '--skip-tray-surface-args',
+      '--env-rendered-logo-review-path', renderedLogoReviewPath,
+      '--env-excel-runtime-evidence-path', excelRuntimeEvidencePath,
+      '--env-manual-tray-evidence-path', manualTrayEvidencePath
+    );
+
+    assert.equal(result.status, 0, outputText(result.stderr) || outputText(result.stdout));
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.rendered_logo_review_ready, true);
+    assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
+    assert.equal(evidence.manual_tray_evidence_ready, true);
+    assert.equal(evidence.passed, true);
+  });
+});
+
 function runRecorder(output: string, screenshots: Record<string, string>, ...extra: string[]): ReturnType<typeof spawnSync> {
   const skipProductReviewFlags = extra.includes('--skip-product-review-flags');
   const skipRenderedLogoAndFirstRunFlags = extra.includes('--skip-rendered-logo-and-first-run-flags');
   const skipLogoSurfaceArgs = extra.includes('--skip-logo-surface-args');
   const skipTraySurfaceArgs = extra.includes('--skip-tray-surface-args');
   const skipManualTrayEvidence = extra.includes('--skip-manual-tray-evidence');
+  const envRenderedLogoReviewPath = optionValue(extra, '--env-rendered-logo-review-path');
+  const envExcelRuntimeEvidencePath = optionValue(extra, '--env-excel-runtime-evidence-path');
+  const envManualTrayEvidencePath = optionValue(extra, '--env-manual-tray-evidence-path');
   const explicitTrayMenuSurfaceKind = extra.includes('--tray-menu-surface-kind');
   const explicitCatalogType = extra.includes('--catalog-type');
   const explicitWordCatalogType = extra.includes('--word-catalog-type');
   const explicitExcelCatalogType = extra.includes('--excel-catalog-type');
   const explicitPowerPointCatalogType = extra.includes('--powerpoint-catalog-type');
-  const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags' && item !== '--skip-rendered-logo-and-first-run-flags' && item !== '--skip-logo-surface-args' && item !== '--skip-tray-surface-args' && item !== '--skip-manual-tray-evidence');
+  const filteredExtra = extra.filter((item, index) => {
+    const previous = extra[index - 1];
+    if (previous === '--env-rendered-logo-review-path' || previous === '--env-excel-runtime-evidence-path' || previous === '--env-manual-tray-evidence-path') return false;
+    return item !== '--skip-product-review-flags'
+      && item !== '--skip-rendered-logo-and-first-run-flags'
+      && item !== '--skip-logo-surface-args'
+      && item !== '--skip-tray-surface-args'
+      && item !== '--skip-manual-tray-evidence'
+      && item !== '--env-rendered-logo-review-path'
+      && item !== '--env-excel-runtime-evidence-path'
+      && item !== '--env-manual-tray-evidence-path';
+  });
   const hasWordManifest = filteredExtra.includes('--word-manifest-path');
   const hasExcelManifest = filteredExtra.includes('--excel-manifest-path');
   const hasPowerPointManifest = filteredExtra.includes('--powerpoint-manifest-path');
@@ -396,7 +437,18 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     args.push(`--${surface}-screenshot`, screenshots[surface]);
   }
   args.push(...filteredExtra);
-  return spawnSync(process.execPath, args, { cwd: process.cwd(), encoding: 'utf8' });
+  const env = {
+    ...process.env,
+    ...(envRenderedLogoReviewPath ? { OFFICE_MCP_RENDERED_LOGO_REVIEW_PATH: envRenderedLogoReviewPath } : {}),
+    ...(envExcelRuntimeEvidencePath ? { OFFICE_MCP_EXCEL_RUNTIME_EVIDENCE_PATH: envExcelRuntimeEvidencePath } : {}),
+    ...(envManualTrayEvidencePath ? { OFFICE_MCP_TRAY_MANUAL_EVIDENCE_PATH: envManualTrayEvidencePath } : {})
+  };
+  return spawnSync(process.execPath, args, { cwd: process.cwd(), encoding: 'utf8', env });
+}
+
+function optionValue(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
 }
 
 function withScreenshots(callback: (dir: string, screenshots: Record<string, string>) => void): void {
