@@ -365,6 +365,28 @@ Latest UI feedback to preserve in implementation planning:
   native tooltip, right-click menu anchored to the actual notification-area
   icon, OS-native spacing/hover/keyboard behavior, and native quit confirmation.
 
+- [ ] Run a full product logo concept pass before accepting the final mark. The
+      pass must produce multiple original concept directions that communicate
+      office productivity plus local control without Office-owned marks, Office
+      app-color ownership, generic document thumbnails, gear-only symbols, or
+      developer/debug motifs. The accepted design must feel like mature,
+      slightly futuristic desktop software and must be reviewed at real tray,
+      ribbon, catalog, task pane, installer, and title-bar sizes before this
+      item can close.
+- [ ] Rework and verify all add-in first-impression metadata as one product
+      surface for Word, Excel, and PowerPoint after a clean install. The visible
+      add-in title, icon, provider, description, ribbon command, task pane
+      title/chrome, catalog title, and catalog type/category must read as one
+      mature local productivity automation/control product. A host still showing
+      a missing/default icon, raw package name, generic `Add-in`/`Task Pane`
+      type, sample/debug wording, or stale catalog entry keeps this item open.
+- [ ] Rework and verify the Windows tray first-impression surface as native
+      desktop software. The normal daemon launch must show the generated product
+      glyph in the notification area, product-consistent tooltip text, a native
+      right-click menu opened from that exact icon, native separators and
+      disabled status rows, keyboardable native menu behavior, and a native quit
+      confirmation. Any webview/HTML/CSS/custom-drawn or toolkit-demo-looking
+      menu surface keeps this item open even when the daemon probe passes.
 - [x] Redesign or formally re-approve the product logo against the latest
       feedback. The accepted mark must not use Office logos or near-logo
       variants, but it must visibly communicate office productivity plus local
