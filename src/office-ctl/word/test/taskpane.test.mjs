@@ -95,6 +95,42 @@ test('Office catalog registration script stages Word and Excel manifests without
   }
 });
 
+test('Office catalog registration can sync its origin from running daemon status', () => {
+  const catalogPath = mkdtempSync(join(tmpdir(), 'office-mcp-catalog-status-'));
+  const statusCommand = join(catalogPath, 'daemon-status.cmd');
+  writeFileSync(statusCommand, '@echo off\r\necho {"running":true,"uiUrl":"https://localhost:8777/ui/"}\r\n');
+
+  try {
+    const result = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        join(ADDIN_ROOT, '..', 'common', 'scripts', 'register-office-catalog.ps1'),
+        '-CatalogPath',
+        catalogPath,
+        '-DaemonStatusCommand',
+        statusCommand,
+        '-SkipRegistry'
+      ],
+      { cwd: join(ADDIN_ROOT, '..', '..', '..'), encoding: 'utf8' }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Manifest origin: https:\/\/localhost:8777/);
+    const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
+    const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
+    assert.match(wordManifest, /https:\/\/localhost:8777\/taskpane\.html\?v=0\.1\.7/);
+    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.6/);
+    assert.doesNotMatch(wordManifest, /https:\/\/localhost:8765/);
+    assert.doesNotMatch(excelManifest, /https:\/\/localhost:8765/);
+  } finally {
+    rmSync(catalogPath, { force: true, recursive: true });
+  }
+});
+
 test('Word task pane exposes product UI regions and accessible endpoint settings', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');

@@ -2,6 +2,7 @@ param(
   [string]$CatalogPath = "",
   [string]$RepoRoot = "",
   [string]$BaseUrl = "https://localhost:8765",
+  [string]$DaemonStatusCommand = "",
   [switch]$SkipRegistry
 )
 
@@ -26,6 +27,18 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 
 if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
   $CatalogPath = Join-Path $RepoRoot "addin-catalog"
+}
+
+if (-not [string]::IsNullOrWhiteSpace($DaemonStatusCommand)) {
+  $statusJson = & $DaemonStatusCommand daemon status
+  if ($LASTEXITCODE -ne 0) { throw "Daemon status command failed: $DaemonStatusCommand daemon status" }
+  $status = $statusJson | ConvertFrom-Json
+  if (-not $status.uiUrl) { throw "Daemon status output does not include uiUrl." }
+  $origin = ([Uri]$status.uiUrl).GetLeftPart([System.UriPartial]::Authority)
+  if ($origin -notmatch '^https://localhost:[0-9]+$') {
+    throw "Daemon status uiUrl must use a local HTTPS localhost origin: $($status.uiUrl)"
+  }
+  $BaseUrl = $origin
 }
 
 if ($BaseUrl -notmatch '^https://localhost:[0-9]+$') {
