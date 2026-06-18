@@ -220,7 +220,8 @@ User-reported follow-up from live daemon testing:
       of an untracked note. The final run must pass `--daemon-bin` to the
       recorder so the artifact also captures `daemon status` and live
       `tray --probe` output for the same daemon instance that was visually
-      inspected.
+      inspected; the validator now rejects required manual tray evidence that
+      is not bound to that daemon context.
 - [x] Add automated coverage that fails when production `daemon run` does not
       expose `/ui/` and when `daemon status` omits the UI URL. Covered by
       `production_bound_daemon_exposes_ui_state_and_events`,

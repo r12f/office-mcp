@@ -302,9 +302,8 @@ function productVisualSurfaces(): string[] {
 }
 
 function validateManualTrayDaemonContext(context: unknown): void {
-  if (context === undefined) return;
   if (!isRecord(context)) {
-    failures.push('Manual tray daemon context is malformed.');
+    failures.push('Manual tray evidence missing daemon context for the local build under test.');
     return;
   }
   const status = context.status;

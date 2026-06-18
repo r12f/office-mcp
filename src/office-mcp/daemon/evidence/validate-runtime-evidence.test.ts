@@ -292,6 +292,17 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
 
   withEvidenceFile(ui, (uiPath) => {
     withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.daemon_context = undefined;
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence missing daemon context/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
       const manual = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
       manual.daemon_context = manualTrayDaemonContext();
       writeFileSync(manualPath, JSON.stringify(manual, null, 2));
@@ -508,7 +519,7 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     menu_contains_required_items: passed,
     screenshot_path: screenshotPath,
     screenshot_exists: passed,
-    daemon_context: undefined as ReturnType<typeof manualTrayDaemonContext> | undefined,
+    daemon_context: manualTrayDaemonContext() as ReturnType<typeof manualTrayDaemonContext> | undefined,
     passed
   };
 }
