@@ -22,6 +22,8 @@ test('manual tray evidence recorder requires product tooltip', () => {
     assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_native_menu, true);
     assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_tooltip, true);
     assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_quit_confirmation, true);
+    assert.equal(evidence.tray_menu_surface_kind, 'native');
+    assert.equal(evidence.tray_menu_surface_native, true);
     assert.equal(evidence.passed, true);
 
     const missingTooltip = runRecorder(join(dir, 'missing-tooltip.json'), screenshotPath, '--daemon-bin', daemonBin);
@@ -32,6 +34,19 @@ test('manual tray evidence recorder requires product tooltip', () => {
   });
 });
 
+
+test('manual tray evidence recorder rejects non-native menu surface kind', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'webview-menu-surface.json');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin, '--menu-surface-kind', 'webview');
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.tray_menu_surface_kind, 'webview');
+    assert.equal(evidence.tray_menu_surface_native, false);
+    assert.equal(evidence.passed, false);
+  });
+});
 test('manual tray evidence recorder requires daemon context before passing', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     const output = join(dir, 'missing-daemon-context.json');
@@ -120,6 +135,7 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
   const trayQuitConfirmationScreenshot = writeSurfaceScreenshot(dir, 'tray-quit-confirmation.png');
   const skipNativeMenuReviewFlags = extra.includes('--skip-native-menu-review-flags');
   const skipTraySurfaceScreenshots = extra.includes('--skip-tray-surface-screenshots');
+  const explicitMenuSurfaceKind = extra.includes('--menu-surface-kind');
   const filteredExtra = extra.filter((item) => item !== '--skip-native-menu-review-flags' && item !== '--skip-tray-surface-screenshots');
   const reviewArgs = skipNativeMenuReviewFlags ? [] : [
     '--menu-opened-from-tray-icon', 'true',
@@ -132,6 +148,7 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
     '--visible-icon', 'true',
     '--right-click-menu', 'true',
     ...reviewArgs,
+    ...(explicitMenuSurfaceKind ? [] : ['--menu-surface-kind', 'native']),
     '--show-ui-opened', 'true',
     '--screenshot-path', screenshotPath,
     ...(skipTraySurfaceScreenshots ? [] : [

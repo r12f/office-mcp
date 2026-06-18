@@ -52,6 +52,8 @@ const trayTooltip = readOption('--tray-tooltip');
 const catalogType = readOption('--catalog-type');
 const catalogIconVisible = booleanFlag('--catalog-icon-visible');
 const trayMenuNative = booleanFlag('--tray-menu-native');
+const trayMenuSurfaceKind = readOption('--tray-menu-surface-kind') ?? (typeof manualTrayEvidence?.tray_menu_surface_kind === 'string' ? manualTrayEvidence.tray_menu_surface_kind : undefined);
+const trayMenuSurfaceNative = trayMenuSurfaceKind === 'native';
 const trayIconVisible = booleanFlag('--tray-icon-visible');
 const quitConfirmationVisible = booleanFlag('--quit-confirmation-visible');
 const logoQualityReviewed = booleanFlag('--logo-quality-reviewed');
@@ -86,7 +88,7 @@ const powerPointManifestIdentity = readManifestIdentity(powerPointManifestPath);
 const productTextReady = requiredSurfaces.filter((surface) => surface !== 'tray_tooltip').every((surface) => typeof observations[surface] === 'string' && (observations[surface] as string).includes(productName));
 const allScreenshotsExist = Object.values(screenshotsExist).every(Boolean);
 const trayTooltipReady = typeof trayTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(trayTooltip);
-const catalogTypeReady = typeof catalogType === 'string' && /local productivity automation control utility/i.test(catalogType);
+const catalogTypeReady = productCatalogTypeLooksReady(catalogType);
 const wordFirstRunIdentity = firstRunIdentity(wordManifestIdentity, wordCatalogProvider, wordCatalogDescription, wordCatalogType, catalogType);
 const excelFirstRunIdentity = firstRunIdentity(excelManifestIdentity, excelCatalogProvider, excelCatalogDescription, excelCatalogType, catalogType);
 const powerPointFirstRunIdentity = firstRunIdentity(powerPointManifestIdentity, powerPointCatalogProvider, powerPointCatalogDescription, powerPointCatalogType, catalogType);
@@ -97,7 +99,7 @@ const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady && excelRuntimeEvidenceReady;
 const productIdentityReviewReady = logoQualityReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && trayProductPolishReviewed;
-const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && excelTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && daemonContextReady;
+const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && excelTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -118,6 +120,8 @@ const evidence = {
   tray_tooltip_ready: trayTooltipReady,
   tray_icon_visible: trayIconVisible,
   tray_menu_native: trayMenuNative,
+  tray_menu_surface_kind: trayMenuSurfaceKind,
+  tray_menu_surface_native: trayMenuSurfaceNative,
   quit_confirmation_visible: quitConfirmationVisible,
   manual_tray_evidence: manualTrayEvidence,
   manual_tray_evidence_ready: manualTrayEvidenceReady,
@@ -244,12 +248,16 @@ function catalogIdentityLooksReady(identity: Record<string, unknown>): boolean {
   return typeof identity.display_name === 'string' && identity.display_name.includes(productName)
     && typeof identity.provider === 'string' && identity.provider.includes(productName)
     && typeof identity.description === 'string' && /local/i.test(identity.description) && /(productivity|office)/i.test(identity.description) && /(automation|control)/i.test(identity.description)
-    && typeof identity.type === 'string' && /local productivity automation control utility/i.test(identity.type)
+    && productCatalogTypeLooksReady(identity.type)
     && typeof identity.icon_url === 'string' && /\/assets\/icon-32\.png/.test(identity.icon_url)
     && typeof identity.high_resolution_icon_url === 'string' && /\/assets\/icon-80\.png/.test(identity.high_resolution_icon_url)
     && identity.manifest_ready === true;
 }
 
+function productCatalogTypeLooksReady(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  return /local productivity automation control utility/i.test(value) && !/(add-in|task pane|developer tool|mcp server|protocol bridge|sample|debug|experimental|office-mcp-(word|excel|powerpoint))/i.test(value);
+}
 function readManifestIdentity(path: string): Record<string, unknown> {
   try {
     const xml = readFileSync(path, 'utf8');
@@ -374,7 +382,7 @@ function readManualTrayEvidence(path: string): Record<string, unknown> {
 function manualTrayEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
   if (!evidence) return false;
   if (evidence.ok !== true || evidence.schema_version !== 1 || evidence.kind !== 'tray_manual_evidence' || evidence.platform !== 'win32' || evidence.passed !== true) return false;
-  if (evidence.visible_icon !== true || evidence.right_click_menu !== true || evidence.menu_opened_from_tray_icon !== true || evidence.native_menu_appearance_reviewed !== true || evidence.show_ui_opened !== true) return false;
+  if (evidence.visible_icon !== true || evidence.right_click_menu !== true || evidence.menu_opened_from_tray_icon !== true || evidence.native_menu_appearance_reviewed !== true || evidence.tray_menu_surface_native !== true || evidence.tray_menu_surface_kind !== 'native' || evidence.show_ui_opened !== true) return false;
   if (typeof evidence.observed_tooltip !== 'string' || !/^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(evidence.observed_tooltip)) return false;
   if (typeof evidence.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(evidence.screenshot_path))) return false;
   const items = Array.isArray(evidence.observed_menu_items) ? evidence.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];

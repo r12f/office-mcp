@@ -333,6 +333,24 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.catalog_type = 'Local productivity automation control utility protocol bridge debug panel';
+      broken.first_run_identity.word.type = 'Local productivity automation control utility sample debug add-in';
+      broken.tray_menu_surface_kind = 'webview';
+      broken.tray_menu_surface_native = false;
+      broken.manual_tray_evidence.tray_menu_surface_kind = 'html';
+      broken.manual_tray_evidence.tray_menu_surface_native = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /mature local productivity automation\/control type metadata/);
+      assert.match(outputText(result.stdout), /tray menu surface is not native/);
+      assert.match(outputText(result.stdout), /Embedded manual tray evidence surface is not native/);
+      assert.match(outputText(result.stdout), /Word mature local productivity automation\/control type metadata/);
+    });
+  });
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.daemon_context = undefined as unknown as ReturnType<typeof manualTrayDaemonContext>;
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -419,7 +437,7 @@ test('runtime evidence validator can require product visual evidence', () => {
       assert.match(outputText(result.stdout), /rendered-size logo review/);
       assert.match(outputText(result.stdout), /rendered logo review ready flag/);
       assert.match(outputText(result.stdout), /Word first-run identity ready flag/);
-      assert.match(outputText(result.stdout), /Word local productivity automation\/control type metadata/);
+      assert.match(outputText(result.stdout), /Word mature local productivity automation\/control type metadata/);
     });
   });
 
@@ -572,6 +590,18 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
   withEvidenceFile(ui, (uiPath) => {
     withManualTrayEvidence(true, (manualPath) => {
       const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.tray_menu_surface_kind = 'webview';
+      broken.tray_menu_surface_native = false;
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence surface is not native/);
+      assert.match(outputText(result.stdout), /native tray menu surface/);
+    });
+  });
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
       broken.menu_opened_from_tray_icon = false;
       broken.native_menu_appearance_reviewed = false;
       writeFileSync(manualPath, JSON.stringify(broken, null, 2));
@@ -712,6 +742,8 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     tray_tooltip_ready: passed,
     tray_icon_visible: passed,
     tray_menu_native: passed,
+    tray_menu_surface_kind: passed ? 'native' : 'webview',
+    tray_menu_surface_native: passed,
     quit_confirmation_visible: passed,
     manual_tray_evidence: manualTrayReport(passed, screenshots.tray_icon),
     manual_tray_evidence_ready: passed,
@@ -871,6 +903,8 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     right_click_menu: passed,
     menu_opened_from_tray_icon: passed,
     native_menu_appearance_reviewed: passed,
+    tray_menu_surface_kind: passed ? 'native' : 'webview',
+    tray_menu_surface_native: passed,
     show_ui_opened: passed,
     observed_menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP'],
     observed_tooltip: 'Office MCP - Up - 0 clients - 0 documents',

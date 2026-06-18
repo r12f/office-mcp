@@ -189,6 +189,7 @@ function validateManualTrayEvidence(): void {
   if (manual.schema_version !== 1) failures.push(`Unsupported manual tray schema_version: ${manual.schema_version}`);
   if (manual.kind !== 'tray_manual_evidence') failures.push(`Unsupported manual tray evidence kind: ${manual.kind ?? 'missing'}`);
   if (manual.platform !== 'win32') failures.push(`Manual tray evidence platform is ${manual.platform}, expected win32.`);
+  if (manual.tray_menu_surface_kind !== 'native' || manual.tray_menu_surface_native !== true) failures.push('Manual tray evidence surface is not native.');
   const observedMenuItems = Array.isArray(manual.observed_menu_items) ? manual.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];
   validateTrayMenuLabels(observedMenuItems, 'Manual tray evidence');
   if (typeof manual.observed_tooltip !== 'string' || !trayTooltipLooksProductReady(manual.observed_tooltip)) {
@@ -208,6 +209,7 @@ function validateManualTrayEvidence(): void {
     ['right_click_menu', 'right-click menu'],
     ['menu_opened_from_tray_icon', 'right-click menu opened from the notification-area tray icon'],
     ['native_menu_appearance_reviewed', 'native tray menu appearance review'],
+    ['tray_menu_surface_native', 'native tray menu surface'],
     ['show_ui_opened', 'Show Office MCP opened UI'],
     ['passed', 'manual tray evidence passed']
   ] as const) {
@@ -241,8 +243,11 @@ function validateProductVisualEvidence(): void {
     failures.push('Product visual evidence missing product tray tooltip text.');
   }
   validateEmbeddedManualTrayEvidence(visual.manual_tray_evidence, visual.manual_tray_evidence_ready);
-  if (typeof visual.catalog_type !== 'string' || !/local productivity automation control utility/i.test(visual.catalog_type)) {
-    failures.push('Product visual evidence missing local productivity automation/control type metadata.');
+  if (!productCatalogTypeLooksReady(visual.catalog_type)) {
+    failures.push('Product visual evidence missing mature local productivity automation/control type metadata.');
+  }
+  if (visual.tray_menu_surface_kind !== 'native' || visual.tray_menu_surface_native !== true) {
+    failures.push('Product visual evidence tray menu surface is not native.');
   }
   validateProductVisualScreenshots(visual.screenshot_paths);
   validateDistinctProductVisualScreenshots(visual.screenshot_paths);
@@ -264,6 +269,7 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
     return;
   }
   if (manual.ok !== true) failures.push('Embedded manual tray evidence was not read successfully.');
+  if (manual.tray_menu_surface_kind !== 'native' || manual.tray_menu_surface_native !== true) failures.push('Embedded manual tray evidence surface is not native.');
   if (manual.schema_version !== 1) failures.push(`Unsupported embedded manual tray schema_version: ${manual.schema_version}`);
   if (manual.kind !== 'tray_manual_evidence') failures.push(`Unsupported embedded manual tray evidence kind: ${manual.kind ?? 'missing'}`);
   if (manual.platform !== 'win32') failures.push(`Embedded manual tray evidence platform is ${manual.platform}, expected win32.`);
@@ -280,6 +286,7 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
     ['right_click_menu', 'right-click menu'],
     ['menu_opened_from_tray_icon', 'right-click menu opened from the notification-area tray icon'],
     ['native_menu_appearance_reviewed', 'native tray menu appearance review'],
+    ['tray_menu_surface_native', 'native tray menu surface'],
     ['show_ui_opened', 'Show Office MCP opened UI'],
     ['passed', 'manual tray evidence passed']
   ] as const) {
@@ -383,8 +390,8 @@ function validateHostFirstRunIdentity(identity: unknown, host: string): void {
   if (typeof identity.description !== 'string' || !/local/i.test(identity.description) || !/(productivity|office)/i.test(identity.description) || !/(automation|control)/i.test(identity.description)) {
     failures.push(`Product visual evidence missing ${host} local productivity automation/control description.`);
   }
-  if (typeof identity.type !== 'string' || !/local productivity automation control utility/i.test(identity.type)) {
-    failures.push(`Product visual evidence missing ${host} local productivity automation/control type metadata.`);
+  if (!productCatalogTypeLooksReady(identity.type)) {
+    failures.push(`Product visual evidence missing ${host} mature local productivity automation/control type metadata.`);
   }
   if (typeof identity.icon_url !== 'string' || !/\/assets\/icon-32\.png/.test(identity.icon_url)) {
     failures.push(`Product visual evidence missing ${host} first-run icon URL.`);
@@ -393,6 +400,11 @@ function validateHostFirstRunIdentity(identity: unknown, host: string): void {
     failures.push(`Product visual evidence missing ${host} first-run high-resolution icon URL.`);
   }
   if (identity.ready !== true) failures.push(`Product visual evidence missing ${host} first-run identity ready flag.`);
+}
+
+function productCatalogTypeLooksReady(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  return /local productivity automation control utility/i.test(value) && !/(add-in|task pane|developer tool|mcp server|protocol bridge|sample|debug|experimental|office-mcp-(word|excel|powerpoint))/i.test(value);
 }
 
 function validateProductVisualScreenshots(paths: unknown): void {

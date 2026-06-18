@@ -13,6 +13,7 @@ const traySurfaceScreenshots = traySurfaceScreenshotPaths();
 const notes = readOption('--notes');
 const observedTooltip = readOption('--tooltip');
 const daemonBin = readOption('--daemon-bin');
+const trayMenuSurfaceKind = readOption('--menu-surface-kind');
 
 const visibleIcon = booleanFlag('--visible-icon');
 const rightClickMenu = booleanFlag('--right-click-menu');
@@ -30,9 +31,10 @@ const traySurfaceScreenshotsExist = Object.fromEntries(
 );
 const traySurfaceScreenshotsReady = Object.values(traySurfaceScreenshotsExist).every(Boolean);
 const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
+const trayMenuSurfaceNative = trayMenuSurfaceKind === 'native';
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
-const passed = visibleIcon && rightClickMenu && menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && traySurfaceScreenshotsReady && daemonContextReady;
+const passed = visibleIcon && rightClickMenu && menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && traySurfaceScreenshotsReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -44,6 +46,8 @@ const evidence = {
   right_click_menu: rightClickMenu,
   menu_opened_from_tray_icon: menuOpenedFromTrayIcon,
   native_menu_appearance_reviewed: nativeMenuAppearanceReviewed,
+  tray_menu_surface_kind: trayMenuSurfaceKind,
+  tray_menu_surface_native: trayMenuSurfaceNative,
   show_ui_opened: showUiOpened,
   observed_menu_items: observedMenuItems,
   observed_tooltip: observedTooltip,

@@ -57,6 +57,8 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal(evidence.product_text_ready, true);
     assert.equal(evidence.catalog_type_ready, true);
     assert.equal(evidence.tray_tooltip_ready, true);
+    assert.equal(evidence.tray_menu_surface_kind, 'native');
+    assert.equal(evidence.tray_menu_surface_native, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, true);
@@ -79,6 +81,30 @@ test('product visual evidence recorder requires all product surfaces', () => {
   });
 });
 
+
+test('product visual evidence recorder rejects experimental catalog type and non-native tray surface', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const output = join(dir, 'unfinished-product-surface.json');
+    const result = runRecorder(
+      output,
+      screenshots,
+      '--daemon-bin', daemonBin,
+      '--rendered-logo-review-path', renderedLogoReviewPath,
+      '--catalog-type', 'Local productivity automation control utility protocol bridge debug panel',
+      '--word-catalog-type', 'Local productivity automation control utility protocol bridge debug panel',
+      '--tray-menu-surface-kind', 'webview'
+    );
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.catalog_type_ready, false);
+    assert.equal(evidence.tray_menu_surface_kind, 'webview');
+    assert.equal(evidence.tray_menu_surface_native, false);
+    assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
 test('product visual evidence recorder derives logo surfaces from rendered review artifact', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -290,6 +316,11 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const skipLogoSurfaceArgs = extra.includes('--skip-logo-surface-args');
   const skipTraySurfaceArgs = extra.includes('--skip-tray-surface-args');
   const skipManualTrayEvidence = extra.includes('--skip-manual-tray-evidence');
+  const explicitTrayMenuSurfaceKind = extra.includes('--tray-menu-surface-kind');
+  const explicitCatalogType = extra.includes('--catalog-type');
+  const explicitWordCatalogType = extra.includes('--word-catalog-type');
+  const explicitExcelCatalogType = extra.includes('--excel-catalog-type');
+  const explicitPowerPointCatalogType = extra.includes('--powerpoint-catalog-type');
   const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags' && item !== '--skip-rendered-logo-and-first-run-flags' && item !== '--skip-logo-surface-args' && item !== '--skip-tray-surface-args' && item !== '--skip-manual-tray-evidence');
   const hasWordManifest = filteredExtra.includes('--word-manifest-path');
   const hasExcelManifest = filteredExtra.includes('--excel-manifest-path');
@@ -301,21 +332,22 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     TSX,
     RECORDER,
     '--output', output,
-    '--catalog-type', 'Local productivity automation control utility',
+    ...(explicitCatalogType ? [] : ['--catalog-type', 'Local productivity automation control utility']),
     '--catalog-icon-visible', 'true',
     '--tray-tooltip', 'Office MCP - Up - 0 clients - 0 documents',
     '--tray-icon-visible', 'true',
     '--tray-menu-native', 'true',
+    ...(explicitTrayMenuSurfaceKind ? [] : ['--tray-menu-surface-kind', 'native']),
     '--quit-confirmation-visible', 'true',
     '--word-catalog-provider', 'Office MCP Control',
     '--word-catalog-description', 'Local office productivity automation and control utility',
-    '--word-catalog-type', 'Local productivity automation control utility',
+    ...(explicitWordCatalogType ? [] : ['--word-catalog-type', 'Local productivity automation control utility']),
     '--excel-catalog-provider', 'Office MCP Control',
     '--excel-catalog-description', 'Local office productivity automation and control utility',
-    '--excel-catalog-type', 'Local productivity automation control utility',
+    ...(explicitExcelCatalogType ? [] : ['--excel-catalog-type', 'Local productivity automation control utility']),
     '--powerpoint-catalog-provider', 'Office MCP Control',
     '--powerpoint-catalog-description', 'Local office productivity automation and control utility',
-    '--powerpoint-catalog-type', 'Local productivity automation control utility',
+    ...(explicitPowerPointCatalogType ? [] : ['--powerpoint-catalog-type', 'Local productivity automation control utility']),
     '--excel-compact-top-block', 'true',
     '--excel-tools-permissions-merged', 'true',
     '--excel-inline-settings', 'true',
@@ -477,6 +509,8 @@ function writeManualTrayEvidence(dir: string, ready = true): string {
     right_click_menu: ready,
     menu_opened_from_tray_icon: ready,
     native_menu_appearance_reviewed: ready,
+    tray_menu_surface_kind: ready ? 'native' : 'webview',
+    tray_menu_surface_native: ready,
     show_ui_opened: ready,
     observed_menu_items: ready ? ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP'] : ['Status: Up'],
     observed_tooltip: 'Office MCP - Up - 0 clients - 0 documents',
