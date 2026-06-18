@@ -62,6 +62,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal(evidence.tray_menu_surface_native, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
+    assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).final_logo_user_surface_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).addin_installable_surface_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).tray_normal_windows_launch_reviewed, true);
@@ -137,7 +138,17 @@ test('README product visual evidence command matches current PowerPoint gates', 
     '--excel-first-run-identity-reviewed',
     '--powerpoint-first-run-identity-reviewed',
     '--tray-product-polish-reviewed',
-    '--tray-normal-windows-launch-reviewed'
+    '--tray-normal-windows-launch-reviewed',
+    '--excel-compact-top-block',
+    '--excel-tools-permissions-merged',
+    '--excel-inline-settings',
+    '--excel-server-protocol-row',
+    '--excel-document-state',
+    '--powerpoint-compact-top-block',
+    '--powerpoint-tools-permissions-merged',
+    '--powerpoint-inline-settings',
+    '--powerpoint-server-protocol-row',
+    '--powerpoint-document-state'
   ]) {
     assert.match(commandLine, new RegExp(required));
   }
@@ -458,6 +469,29 @@ test('product visual evidence recorder can bind evidence to daemon context', () 
   });
 });
 
+
+test('product visual evidence recorder requires PowerPoint task pane density review', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const output = join(dir, 'missing-powerpoint-taskpane-density.json');
+    const result = runRecorder(
+      output,
+      screenshots,
+      '--daemon-bin', daemonBin,
+      '--rendered-logo-review-path', renderedLogoReviewPath,
+      '--powerpoint-document-state', 'unknown'
+    );
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    const taskpane = evidence.powerpoint_taskpane as Record<string, unknown>;
+    assert.equal(taskpane.document_state, 'unknown');
+    assert.equal(taskpane.document_state_ready, false);
+    assert.equal(taskpane.density_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('product visual evidence recorder requires PowerPoint runtime evidence', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -501,6 +535,7 @@ test('product visual evidence recorder reads evidence artifact paths from enviro
     assert.equal(evidence.rendered_logo_review_ready, true);
     assert.equal(evidence.catalog_identity_review_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
+    assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal(evidence.powerpoint_runtime_evidence_ready, true);
     assert.equal(evidence.manual_tray_evidence_ready, true);
     assert.equal(evidence.passed, true);
@@ -540,6 +575,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const explicitWordCatalogType = extra.includes('--word-catalog-type');
   const explicitExcelCatalogType = extra.includes('--excel-catalog-type');
   const explicitPowerPointCatalogType = extra.includes('--powerpoint-catalog-type');
+  const explicitPowerPointDocumentState = extra.includes('--powerpoint-document-state');
   const filteredExtra = extra.filter((item, index) => {
     const previous = extra[index - 1];
     if (previous === '--env-rendered-logo-review-path' || previous === '--env-excel-runtime-evidence-path' || previous === '--env-powerpoint-runtime-evidence-path' || previous === '--env-manual-tray-evidence-path' || previous === '--env-catalog-identity-review-path') return false;
@@ -587,7 +623,12 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     '--excel-tools-permissions-merged', 'true',
     '--excel-inline-settings', 'true',
     '--excel-server-protocol-row', 'Server 0.1.0 / Protocol 1.0',
-    '--excel-document-state', 'Editable'
+    '--excel-document-state', 'Editable',
+    '--powerpoint-compact-top-block', 'true',
+    '--powerpoint-tools-permissions-merged', 'true',
+    '--powerpoint-inline-settings', 'true',
+    '--powerpoint-server-protocol-row', 'Server 0.1.0 / Protocol 1.0',
+    ...(explicitPowerPointDocumentState ? [] : ['--powerpoint-document-state', 'Editable'])
   ];
   if (!hasWordManifest) args.push('--word-manifest-path', writeManifest(outputDir, 'word'));
   if (!hasExcelManifest) args.push('--excel-manifest-path', writeManifest(outputDir, 'excel'));
@@ -605,8 +646,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
       '--tray-product-polish-reviewed', 'true',
       '--tray-normal-windows-launch-reviewed', 'true'
     );
-  }
-  if (!skipRenderedLogoAndFirstRunFlags) {
+  }  if (!skipRenderedLogoAndFirstRunFlags) {
     args.push(
       '--rendered-size-logo-reviewed', 'true',
       '--word-first-run-identity-reviewed', 'true',

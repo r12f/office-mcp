@@ -84,6 +84,11 @@ const excelToolsPermissionsMerged = booleanFlag('--excel-tools-permissions-merge
 const excelInlineSettings = booleanFlag('--excel-inline-settings');
 const excelServerProtocolRow = readOption('--excel-server-protocol-row');
 const excelDocumentState = readOption('--excel-document-state');
+const powerPointCompactTopBlock = booleanFlag('--powerpoint-compact-top-block');
+const powerPointToolsPermissionsMerged = booleanFlag('--powerpoint-tools-permissions-merged');
+const powerPointInlineSettings = booleanFlag('--powerpoint-inline-settings');
+const powerPointServerProtocolRow = readOption('--powerpoint-server-protocol-row');
+const powerPointDocumentState = readOption('--powerpoint-document-state');
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
 const excelRuntimeEvidence = excelRuntimeEvidencePath ? readExcelRuntimeEvidence(resolve(excelRuntimeEvidencePath)) : undefined;
@@ -107,8 +112,11 @@ const powerPointFirstRunIdentityReady = powerPointFirstRunIdentityReviewed && ca
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady && excelRuntimeEvidenceReady;
+const powerPointServerProtocolReady = typeof powerPointServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(powerPointServerProtocolRow);
+const powerPointDocumentStateReady = typeof powerPointDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(powerPointDocumentState) && !/unknown/i.test(powerPointDocumentState);
+const powerPointTaskpaneDensityReady = powerPointCompactTopBlock && powerPointToolsPermissionsMerged && powerPointInlineSettings && powerPointServerProtocolReady && powerPointDocumentStateReady;
 const productIdentityReviewReady = logoQualityReviewed && finalLogoUserSurfaceReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinInstallableSurfaceReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNormalWindowsLaunchReviewed;
-const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && excelTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
+const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -186,6 +194,16 @@ const evidence = {
     runtime_evidence: excelRuntimeEvidence,
     runtime_evidence_ready: excelRuntimeEvidenceReady,
     density_ready: excelTaskpaneDensityReady
+  },
+  powerpoint_taskpane: {
+    compact_top_block: powerPointCompactTopBlock,
+    tools_permissions_merged: powerPointToolsPermissionsMerged,
+    inline_settings: powerPointInlineSettings,
+    server_protocol_row: powerPointServerProtocolRow,
+    server_protocol_row_ready: powerPointServerProtocolReady,
+    document_state: powerPointDocumentState,
+    document_state_ready: powerPointDocumentStateReady,
+    density_ready: powerPointTaskpaneDensityReady
   },
   daemon_context: daemonContext,
   daemon_context_ready: daemonContextReady,

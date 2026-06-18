@@ -264,6 +264,7 @@ function validateProductVisualEvidence(): void {
   validateFirstRunIdentity(visual.first_run_identity);
   validatePowerPointRuntimeEvidence(visual.powerpoint_runtime_evidence, visual.powerpoint_runtime_evidence_ready);
   validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
+  validatePowerPointTaskpaneVisualEvidence(visual.powerpoint_taskpane);
   if (visual.daemon_context_ready !== true) {
     failures.push('Product visual evidence daemon context is not recorder-ready.');
   }
@@ -577,27 +578,34 @@ function validatePowerPointRuntimeEvidence(evidence: unknown, ready: unknown): v
 }
 
 function validateExcelTaskpaneVisualEvidence(taskpane: unknown): void {
+  validateTaskpaneDensityEvidence(taskpane, 'Excel');
+  if (isRecord(taskpane)) validateExcelRuntimeEvidence(taskpane.runtime_evidence, taskpane.runtime_evidence_ready);
+}
+
+function validatePowerPointTaskpaneVisualEvidence(taskpane: unknown): void {
+  validateTaskpaneDensityEvidence(taskpane, 'PowerPoint');
+}
+
+function validateTaskpaneDensityEvidence(taskpane: unknown, label: 'Excel' | 'PowerPoint'): void {
   if (!isRecord(taskpane)) {
-    failures.push('Product visual evidence missing Excel task pane details.');
+    failures.push(`Product visual evidence missing ${label} task pane details.`);
     return;
   }
-  for (const [key, label] of [
+  for (const [key, fieldLabel] of [
     ['compact_top_block', 'compact top block'],
     ['tools_permissions_merged', 'merged tools and permissions surface'],
     ['inline_settings', 'inline settings']
   ] as const) {
-    if (taskpane[key] !== true) failures.push(`Product visual evidence missing Excel ${label}.`);
+    if (taskpane[key] !== true) failures.push(`Product visual evidence missing ${label} ${fieldLabel}.`);
   }
   if (typeof taskpane.server_protocol_row !== 'string' || !/^Server .+ \/ Protocol .+$/.test(taskpane.server_protocol_row)) {
-    failures.push('Product visual evidence missing Excel combined server/protocol row.');
+    failures.push(`Product visual evidence missing ${label} combined server/protocol row.`);
   }
   if (typeof taskpane.document_state !== 'string' || !/^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(taskpane.document_state) || /unknown/i.test(taskpane.document_state)) {
-    failures.push('Product visual evidence missing concrete Excel editable/read-only/protected state.');
+    failures.push(`Product visual evidence missing concrete ${label} editable/read-only/protected state.`);
   }
-  validateExcelRuntimeEvidence(taskpane.runtime_evidence, taskpane.runtime_evidence_ready);
-  if (taskpane.density_ready !== true) failures.push('Product visual evidence missing Excel task pane density pass flag.');
+  if (taskpane.density_ready !== true) failures.push(`Product visual evidence missing ${label} task pane density pass flag.`);
 }
-
 function validateExcelRuntimeEvidence(evidence: unknown, ready: unknown): void {
   if (ready !== true) failures.push('Product visual evidence missing Excel runtime evidence ready flag.');
   if (!isRecord(evidence)) {
