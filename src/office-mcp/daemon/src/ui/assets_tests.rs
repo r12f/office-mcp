@@ -75,6 +75,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("aria-live=\"polite\""));
     assert!(css.contains("grid-template-columns: 32px auto minmax(0, 1fr)"));
     assert!(css.contains(".product-mark { width: 32px; height: 32px;"));
+    assert!(css.contains("--powerpoint: #b7472a;"));
+    assert!(css.contains(".row.powerpoint { border-left-color: var(--powerpoint); }"));
     assert!(css.contains("minmax(0, 1fr)"));
     assert!(css.contains("content-visibility: auto"));
     assert!(css.contains(".empty strong"));

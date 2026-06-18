@@ -12,6 +12,7 @@
   --danger: #c9352b;
   --word: #2b579a;
   --excel: #217346;
+  --powerpoint: #b7472a;
   --other: #6b7280;
 }
 * { box-sizing: border-box; }
@@ -62,6 +63,7 @@ dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .row:hover { border-color: var(--focus); }
 .row.word { border-left-color: var(--word); }
 .row.excel { border-left-color: var(--excel); }
+.row.powerpoint { border-left-color: var(--powerpoint); }
 .row strong, .row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-history { display: grid; gap: 5px; margin: -4px 0 4px 10px; padding-left: 10px; border-left: 1px solid var(--border); }
 .history-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); padding: 7px; text-align: left; cursor: pointer; }
