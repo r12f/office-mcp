@@ -352,6 +352,27 @@ Latest UI feedback to preserve in implementation planning:
   Windows visual evidence proves a real native notification-area icon and native
   context menu.
 
+- [ ] Redesign or formally re-approve the product logo against the latest
+      feedback. The accepted mark must not use Office logos or near-logo
+      variants, but it must visibly communicate office productivity plus local
+      user control with a mature, slightly futuristic control-surface feel. The
+      task must produce source artwork, generated icon assets, a short design
+      rationale, rendered-size review images, and explicit rejection of generic
+      file/settings/debug/AI-only marks.
+- [ ] Re-audit every add-in first-contact surface after install: title, icon,
+      provider, description, ribbon command, task pane chrome, and catalog
+      type/category for Word, Excel, and PowerPoint. The installed catalog must
+      look like mature product software, not an experimental add-in, sample,
+      debug panel, protocol bridge, or raw package. The install/catalog scripts
+      must be fixed whenever a host entry disappears, loses its icon, points at
+      a stale daemon origin, or shows mismatched title/type metadata.
+- [ ] Replace any tray placeholder/default icon and non-native-looking menu
+      surface in the normal daemon launch path. Right-click must open a real
+      OS-native notification-area context menu with native separators,
+      disabled/read-only status rows, hover/selection behavior, keyboard access,
+      tooltip text, `Show Office MCP`, `Quit Office MCP`, and native quit
+      confirmation. A webview, frameless HTML panel, CSS popup, or toolkit-demo
+      menu fails this item even if automated probes pass.
 - [x] Design an original office-control product logo and icon system. It must
       avoid Microsoft Office product marks while still communicating office
       productivity, local automation, and user control with a mature, slightly
