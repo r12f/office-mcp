@@ -86,6 +86,34 @@ test('product visual evidence recorder requires all product surfaces', () => {
   });
 });
 
+
+test('README manual tray evidence command matches current native tray gates', () => {
+  const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
+  const commandLine = readme.split('\n').find((line) => line.includes('npm run evidence:record-tray-manual')) ?? '';
+
+  for (const required of [
+    '--daemon-bin',
+    '--visible-icon',
+    '--right-click-menu',
+    '--menu-opened-from-tray-icon',
+    '--native-menu-appearance-reviewed',
+    '--menu-anchored-to-tray-icon',
+    '--os-native-menu-behavior-reviewed',
+    '--keyboard-menu-access-reviewed',
+    '--native-quit-confirmation-reviewed',
+    '--menu-surface-kind native',
+    '--show-ui-opened',
+    '--tooltip',
+    '--screenshot-path',
+    '--tray-icon-screenshot',
+    '--tray-native-menu-screenshot',
+    '--tray-tooltip-screenshot',
+    '--tray-quit-confirmation-screenshot'
+  ]) {
+    assert.match(commandLine, new RegExp(required));
+  }
+});
+
 test('README product visual evidence command matches current PowerPoint gates', () => {
   const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
   const commandLine = readme.split('\n').find((line) => line.includes('npm run evidence:record-product-visual')) ?? '';
