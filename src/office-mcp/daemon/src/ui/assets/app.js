@@ -82,7 +82,7 @@ function renderDocuments(groups) {
       rows.push(renderDocumentHistory(doc.session_id, documentCommandHistory[doc.session_id] || [], expanded, detailId));
     }
   }
-  $('documents').innerHTML = rows.join('') || emptyState('No documents connected', 'Open Word, Excel, or PowerPoint and load the Office MCP add-in.', state.snapshot?.daemon?.addin_endpoint);
+  $('documents').innerHTML = rows.join('') || emptyState('No documents connected', 'Open Word, Excel, or PowerPoint, then open Office MCP Control.', state.snapshot?.daemon?.addin_endpoint);
 }
 
 function renderDocumentHistory(sessionId, commands, expanded, detailId) {

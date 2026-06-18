@@ -77,7 +77,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".empty strong"));
     assert!(!css.contains("transition: all"));
     assert!(js.contains("emptyState('No documents connected'"));
-    assert!(js.contains("Open Word, Excel, or PowerPoint and load the Office MCP add-in."));
+    assert!(js.contains("Open Word, Excel, or PowerPoint, then open Office MCP Control."));
+    assert!(!js.contains("load the Office MCP add-in"));
     assert!(js.contains("fallbackCopy"));
     assert!(js.contains("announceStatus"));
 }
