@@ -180,6 +180,8 @@ function validateManualTrayEvidence(): void {
   for (const [key, label] of [
     ['visible_icon', 'visible tray icon'],
     ['right_click_menu', 'right-click menu'],
+    ['menu_opened_from_tray_icon', 'right-click menu opened from the notification-area tray icon'],
+    ['native_menu_appearance_reviewed', 'native tray menu appearance review'],
     ['show_ui_opened', 'Show Office MCP opened UI'],
     ['passed', 'manual tray evidence passed']
   ] as const) {

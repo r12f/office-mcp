@@ -39,6 +39,25 @@ test('manual tray evidence recorder requires daemon context before passing', () 
   });
 });
 
+test('manual tray evidence recorder requires native tray menu review', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'missing-native-menu-review.json');
+    const result = runRecorder(
+      output,
+      screenshotPath,
+      '--tooltip', 'Office MCP - Up - 0 clients - 0 documents',
+      '--daemon-bin', daemonBin,
+      '--skip-native-menu-review-flags'
+    );
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.menu_opened_from_tray_icon, false);
+    assert.equal(evidence.native_menu_appearance_reviewed, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('manual tray evidence recorder requires tray probe live state', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     const daemonBin = writeFakeDaemon(dir, false);
@@ -77,12 +96,19 @@ test('manual tray evidence recorder rejects truncated screenshots', () => {
 });
 
 function runRecorder(output: string, screenshotPath: string, ...extra: string[]): ReturnType<typeof spawnSync> {
+  const skipNativeMenuReviewFlags = extra.includes('--skip-native-menu-review-flags');
+  const filteredExtra = extra.filter((item) => item !== '--skip-native-menu-review-flags');
+  const reviewArgs = skipNativeMenuReviewFlags ? [] : [
+    '--menu-opened-from-tray-icon', 'true',
+    '--native-menu-appearance-reviewed', 'true'
+  ];
   return spawnSync(process.execPath, [
     TSX,
     RECORDER,
     '--output', output,
     '--visible-icon', 'true',
     '--right-click-menu', 'true',
+    ...reviewArgs,
     '--show-ui-opened', 'true',
     '--screenshot-path', screenshotPath,
     '--menu-item', 'Status: Up',
@@ -90,7 +116,7 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
     '--menu-item', 'Documents: 0',
     '--menu-item', 'Show Office MCP',
     '--menu-item', 'Quit Office MCP',
-    ...extra
+    ...filteredExtra
   ], { cwd: process.cwd(), encoding: 'utf8' });
 }
 

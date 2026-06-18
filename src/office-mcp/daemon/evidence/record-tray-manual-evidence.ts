@@ -15,6 +15,8 @@ const daemonBin = readOption('--daemon-bin');
 
 const visibleIcon = booleanFlag('--visible-icon');
 const rightClickMenu = booleanFlag('--right-click-menu');
+const menuOpenedFromTrayIcon = booleanFlag('--menu-opened-from-tray-icon');
+const nativeMenuAppearanceReviewed = booleanFlag('--native-menu-appearance-reviewed');
 const showUiOpened = booleanFlag('--show-ui-opened');
 const expectedItems = ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'];
 const observedMenuItems = readRepeatedOption('--menu-item');
@@ -25,7 +27,7 @@ const screenshotExists = screenshotPath ? screenshotFileLooksLikeImage(resolve(s
 const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
-const passed = visibleIcon && rightClickMenu && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && daemonContextReady;
+const passed = visibleIcon && rightClickMenu && menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -35,6 +37,8 @@ const evidence = {
   platform: process.platform,
   visible_icon: visibleIcon,
   right_click_menu: rightClickMenu,
+  menu_opened_from_tray_icon: menuOpenedFromTrayIcon,
+  native_menu_appearance_reviewed: nativeMenuAppearanceReviewed,
   show_ui_opened: showUiOpened,
   observed_menu_items: observedMenuItems,
   observed_tooltip: observedTooltip,

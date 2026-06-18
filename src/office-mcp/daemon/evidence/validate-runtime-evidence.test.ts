@@ -422,6 +422,19 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       assert.match(outputText(result.stdout), /Manual tray evidence daemon context is not recorder-ready/);
     });
   });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.menu_opened_from_tray_icon = false;
+      broken.native_menu_appearance_reviewed = false;
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /right-click menu opened from the notification-area tray icon/);
+      assert.match(outputText(result.stdout), /native tray menu appearance review/);
+    });
+  });
 });
 
 test('runtime evidence validator rejects missing or failed required gates', () => {
@@ -597,6 +610,8 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     platform: 'win32',
     visible_icon: passed,
     right_click_menu: passed,
+    menu_opened_from_tray_icon: passed,
+    native_menu_appearance_reviewed: passed,
     show_ui_opened: passed,
     observed_menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP'],
     observed_tooltip: 'Office MCP - Up - 0 clients - 0 documents',
