@@ -104,6 +104,25 @@ test('README product visual evidence command matches current PowerPoint gates', 
   }
 });
 
+test('README describes current Word Excel and PowerPoint product surface', () => {
+  const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
+
+  assert.match(readme, /exposes Word, Excel, and PowerPoint \(with Outlook planned\)/);
+  assert.match(readme, /implementation is in place for Word, Excel, and PowerPoint/);
+  assert.match(readme, /Word, Excel, and PowerPoint task pane add-ins/);
+  assert.match(readme, /doc\/spec\/04-excel-capabilities\.md/);
+  assert.match(readme, /PowerPoint v1 presentation tools/);
+  assert.match(readme, /cd \.\.\\excel\s+npm run check\s+cd \.\.\\powerpoint\s+npm run check/);
+  assert.match(readme, /src\/office-ctl\/powerpoint\/` \| PowerPoint add-in package/);
+  assert.match(readme, /Word task pane: `https:\/\/localhost:8765\/word\/taskpane\.html`/);
+  assert.match(readme, /Excel task pane: `https:\/\/localhost:8765\/excel\/taskpane\.html`/);
+  assert.match(readme, /PowerPoint task pane: `https:\/\/localhost:8765\/powerpoint\/taskpane\.html`/);
+  assert.match(readme, /`office-ctl\/word\/`, `office-ctl\/excel\/`, and\s+`office-ctl\/powerpoint\/`/);
+  assert.doesNotMatch(readme, /PowerPoint add-in scaffold/);
+  assert.doesNotMatch(readme, /PowerPoint and Outlook planned/);
+  assert.doesNotMatch(readme, /Add-in task pane: `https:\/\/localhost:8765\/taskpane\.html`/);
+});
+
 
 test('product visual evidence recorder rejects experimental catalog type and non-native tray surface', () => {
   withScreenshots((dir, screenshots) => {

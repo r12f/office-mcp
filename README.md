@@ -2,7 +2,7 @@
 
 **A bridge between AI assistants and live Microsoft Office applications via in-process add-ins.**
 
-`office-mcp` exposes Word and Excel (with PowerPoint and Outlook planned) as MCP tools by running an
+`office-mcp` exposes Word, Excel, and PowerPoint (with Outlook planned) as MCP tools by running an
 add-in inside each Office instance. The add-in reverse-connects to a single long-lived MCP server
 process, which multiplexes MCP clients across all running Office windows.
 
@@ -39,14 +39,17 @@ process, which multiplexes MCP clients across all running Office windows.
 
 ## Status
 
-MVP implementation is in place for Word desktop on Windows:
+The Windows desktop implementation is in place for Word, Excel, and PowerPoint:
 
 - Local MCP Streamable HTTP endpoint at `http://127.0.0.1:8800/mcp`.
 - Local HTTPS task pane and WSS add-in channel at `https://localhost:8765`.
-- Word task pane add-in that reverse-registers one document session.
+- Word, Excel, and PowerPoint task pane add-ins that reverse-register one live document/workbook/presentation session.
 - MCP server catalog covers the full Word v1 tool surface from
-  `doc/spec/04-word-capabilities.md` and the Excel v1 tools in the roadmap.
+  `doc/spec/04-word-capabilities.md`, the Excel v1 tool surface from
+  `doc/spec/04-excel-capabilities.md`, and the PowerPoint v1 tools in the roadmap.
 - The current Word add-in runtime advertises and executes all 27 Word v1 tools: discovery, read, insert, edit, table, structure, review, tracked-change, and save operations.
+- The current Excel add-in runtime advertises and executes the Excel v1 workbook tools: range read/write, sheet creation, formula setting, formatting, table creation, and chart creation.
+- The current PowerPoint add-in runtime advertises and executes the PowerPoint v1 presentation tools: add slide, replace text, insert image, apply layout, and PDF export where the host supports it.
 - The daemon also exposes the Word v1 resource surface, including document text, structure, paragraph, comments, tracked changes, and selection.
 
 The design docs remain the source of truth for the broader v1 surface.
@@ -66,6 +69,10 @@ npm run check
 npm run check:ui
 cd ..\..\..\office-ctl\word
 npm run check
+cd ..\excel
+npm run check
+cd ..\powerpoint
+npm run check
 cd ..\..\..\packaging
 npm run check
 ```
@@ -79,7 +86,7 @@ npm run check
 | `src/office-ctl/common/` | Shared TypeScript add-in utilities: config, logging, channel/protocol helpers, redaction, and reusable UI primitives. |
 | `src/office-ctl/word/` | Word add-in package: XML manifest, task pane static bundle, add-in validation scripts, and Word catalog registration script. |
 | `src/office-ctl/excel/` | Excel add-in entry point and host-specific command surface. |
-| `src/office-ctl/powerpoint/` | PowerPoint add-in scaffold: XML manifest, compact task pane static bundle, and presentation-session registration. |
+| `src/office-ctl/powerpoint/` | PowerPoint add-in package: XML manifest, compact task pane static bundle, presentation-session registration, add-in validation scripts, and PowerPoint command handlers. |
 | `packaging/` | Cross-component packaging assets: Windows bootstrap scripts and WiX MSI source. |
 | `doc/spec/` | Product and protocol design. |
 
@@ -242,7 +249,9 @@ prompt evidence, and IRM gates as `passed`, `failed`, `skipped`, or
 The endpoints are:
 
 - MCP: `http://127.0.0.1:8800/mcp`
-- Add-in task pane: `https://localhost:8765/taskpane.html`
+- Word task pane: `https://localhost:8765/word/taskpane.html`
+- Excel task pane: `https://localhost:8765/excel/taskpane.html`
+- PowerPoint task pane: `https://localhost:8765/powerpoint/taskpane.html`
 - Add-in WSS: `wss://localhost:8765/addin`
 
 For stdio-only MCP clients, keep the daemon running and use the Rust stdio
@@ -319,7 +328,8 @@ powershell -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-msi.p
 
 The MSI build stages the same split layout under `artifacts\msi-stage\`:
 `office-mcp-daemon.exe` for the Rust daemon runtime, daemon-owned UI assets for
-the daemon web console, `office-ctl/word/` and `office-ctl/excel/` for the Office task pane bundles,
+the daemon web console, `office-ctl/word/`, `office-ctl/excel/`, and
+`office-ctl/powerpoint/` for the Office task pane bundles,
 `scripts/` for installer helper scripts, and `addin-catalog/` for the sideload
 manifests. It generates the WiX payload fragment and asserts that the Rust
 daemon, UI assets, add-in bundles, catalog manifests, and launcher scripts are
