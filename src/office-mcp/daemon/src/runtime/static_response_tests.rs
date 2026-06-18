@@ -62,7 +62,9 @@ fn serves_powerpoint_taskpane_static_assets() {
     assert!(js.contains("function isPowerPointHost"));
     assert!(js.contains("Office.HostType?.PowerPoint"));
     assert!(js.contains("sessionAddedNotification"));
-    assert!(js.contains("available_tools: []"));
+    assert!(js.contains("available_tools: effectiveTools()"));
+    assert!(js.contains("async function addSlide"));
+    assert!(js.contains("async function exportPdf"));
 
     let css = response_text(&service().serve_addin_asset("/powerpoint/taskpane.css"));
     assert!(css.starts_with("HTTP/1.1 200 OK"));

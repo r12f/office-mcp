@@ -20,13 +20,14 @@
     runtimeIds,
     saveEndpointOverride: storeEndpointOverride,
     sessionAddedNotification,
+    sessionUpdatedNotification,
     sendJsonRpc,
     validateEndpoint
   } = window.OfficeCtlAddinChannel;
   const { AddinLogger } = window.OfficeCtlLogger;
   const { TaskHistoryStore } = window.OfficeCtlTaskHistory;
 
-  const PLANNED_TOOLS = [
+  const AVAILABLE_TOOLS = [
     'powerpoint.add_slide',
     'powerpoint.replace_text',
     'powerpoint.insert_image',
@@ -47,6 +48,7 @@
   ]);
 
   const { instanceId, sessionId } = runtimeIds();
+  const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.powerpoint.tool-permissions.${sessionId}`;
   const logger = new AddinLogger({ redactText });
   const taskStore = new TaskHistoryStore({ redactText });
   let socket;
@@ -56,6 +58,7 @@
   let suppressNextSettingsClick = false;
   let serverInfo = { serverVersion: 'Unknown', protocolVersion: PROTOCOL_VERSION };
   let documentInfo = null;
+  let toolPermissions = loadToolPermissions();
   let sessionAnnounced = false;
 
   const connectionBadgeEl = document.getElementById('connectionBadge');
@@ -188,7 +191,7 @@
       session_id: sessionId,
       instance_id: instanceId,
       document: presentation,
-      available_tools: [],
+      available_tools: effectiveTools(),
       is_active: null
     }));
     sessionEl.textContent = sessionId;
@@ -257,16 +260,297 @@
     const started = performance.now();
     const requestId = message.params?.request_id || String(message.id);
     const tool = message.params?.tool || 'powerpoint.unknown';
+    const args = message.params?.args || {};
     taskStore.start(requestId, tool, message.params || {}, message.params?.timeout_ms);
     renderCurrentTask();
-    const error = Object.assign(new Error(`${tool} is declared by the daemon contract but is not implemented in the PowerPoint add-in yet.`), {
-      officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE',
+    try {
+      if (!isToolEnabled(tool)) throw toolDisabledError(tool);
+      if (taskStore.isCancelled(requestId)) throw cancelledError(tool);
+      let data;
+      switch (tool) {
+        case 'powerpoint.add_slide':
+          data = await addSlide(args);
+          break;
+        case 'powerpoint.replace_text':
+          data = await replaceText(args);
+          break;
+        case 'powerpoint.insert_image':
+          data = await insertImage(args);
+          break;
+        case 'powerpoint.apply_layout':
+          data = await applyLayout(args);
+          break;
+        case 'powerpoint.export_pdf':
+          data = await exportPdf(args);
+          break;
+        default:
+          throw Object.assign(new Error(`Unsupported tool ${tool}`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+      }
+      if (taskStore.consumeCancellation(requestId)) throw cancelledError(tool);
+      const elapsedMs = Math.round(performance.now() - started);
+      taskStore.finish(requestId, 'success', elapsedMs);
+      renderCurrentTask();
+      renderHistory();
+      reply(message.id, { ok: true, data, elapsed_ms: elapsedMs });
+    } catch (error) {
+      const mapped = mapError(error, tool);
+      taskStore.finish(requestId, mapped.office_mcp_code === 'CANCELLED' ? 'cancelled' : 'failure', Math.round(performance.now() - started), mapped);
+      renderCurrentTask();
+      renderHistory();
+      throw error;
+    }
+  }
+
+  function cancelledError(tool) {
+    return Object.assign(new Error(`Tool ${tool} was cancelled.`), { officeMcpCode: 'CANCELLED', partialEffect: 'unknown' });
+  }
+
+  function toolDisabledError(tool) {
+    return Object.assign(new Error(`Tool ${tool} is disabled by task pane settings.`), {
+      officeMcpCode: 'TOOL_DISABLED_BY_USER',
       partialEffect: 'none'
     });
-    taskStore.finish(requestId, 'failure', Math.round(performance.now() - started), mapError(error, tool));
-    renderCurrentTask();
-    renderHistory();
-    throw error;
+  }
+
+  async function addSlide(args) {
+    return PowerPoint.run(async (context) => {
+      const slides = context.presentation.slides;
+      const beforeCount = slides.getCount();
+      await context.sync();
+      slides.add(slideOptions(args));
+      await context.sync();
+      slides.load('items/id,index');
+      await context.sync();
+      const added = slides.items.find((slide) => slide.index === beforeCount.value) || slides.items[slides.items.length - 1];
+      if (!added) throw Object.assign(new Error('PowerPoint did not report the added slide.'), { officeMcpCode: 'HOST_ERROR', partialEffect: 'unknown' });
+      const title = stringArg(args, 'title');
+      const content = stringArg(args, 'content');
+      if (title || content) {
+        if (title) added.shapes.addTextBox(title, shapeOptions(args.title_box, { left: 48, top: 48, width: 600, height: 60 }));
+        if (content) added.shapes.addTextBox(content, shapeOptions(args.content_box, { left: 72, top: 132, width: 576, height: 260 }));
+        await context.sync();
+      }
+      return { slide_id: added.id, slide_index: added.index, added: true };
+    });
+  }
+
+  async function replaceText(args) {
+    const search = requiredString(args, 'search', 'powerpoint.replace_text requires search text.');
+    const replacement = requiredString(args, 'replacement', 'powerpoint.replace_text requires replacement text.');
+    const matchCase = Boolean(args.match_case);
+    return PowerPoint.run(async (context) => {
+      const slides = targetSlides(context, args);
+      if (slides.load) slides.load('items/id,index');
+      for (const slide of slides.items || []) slide.load('id,index');
+      await context.sync();
+      for (const slide of slides.items) {
+        slide.shapes.load('items/id,textFrame/hasText,textFrame/textRange/text');
+      }
+      await context.sync();
+      const touchedShapes = [];
+      let replacements = 0;
+      for (const slide of slides.items) {
+        for (const shape of slide.shapes.items || []) {
+          const range = shape.textFrame?.textRange;
+          if (!shape.textFrame?.hasText || !range || typeof range.text !== 'string') continue;
+          const nextText = replaceAllText(range.text, search, replacement, matchCase);
+          if (nextText === range.text) continue;
+          replacements += countMatches(range.text, search, matchCase);
+          range.text = nextText;
+          touchedShapes.push({ slide_id: slide.id, shape_id: shape.id });
+        }
+      }
+      await context.sync();
+      return { replacements, touched_shapes: touchedShapes };
+    });
+  }
+
+  async function insertImage(args) {
+    const base64 = imageBase64(args);
+    await officeAsync((callback) => Office.context.document.setSelectedDataAsync(base64, imageInsertOptions(args), callback));
+    return { inserted_image: true, placement: 'selection', width: numberOrNull(args.width), height: numberOrNull(args.height) };
+  }
+
+  async function applyLayout(args) {
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      const layout = await resolveLayout(context, args);
+      slide.applyLayout(layout);
+      slide.load('id,index');
+      layout.load('id,name,type');
+      await context.sync();
+      return { slide_id: slide.id, slide_index: slide.index, layout_id: layout.id, layout_name: layout.name, layout_type: layout.type };
+    });
+  }
+
+  async function exportPdf(args) {
+    const file = await officeAsync((callback) => Office.context.document.getFileAsync(Office.FileType.Pdf, { sliceSize: positiveInteger(args.slice_size, 4 * 1024 * 1024) }, callback));
+    try {
+      const chunks = [];
+      for (let index = 0; index < file.sliceCount; index += 1) {
+        const slice = await officeAsync((callback) => file.getSliceAsync(index, callback));
+        chunks.push(sliceDataToBytes(slice.data));
+      }
+      return { mime_type: 'application/pdf', base64: bytesToBase64(concatBytes(chunks)), size: file.size, slice_count: file.sliceCount };
+    } finally {
+      await officeAsync((callback) => file.closeAsync(callback)).catch((error) => logger.warn('pdf.close.failed', error));
+    }
+  }
+
+  function slideOptions(args) {
+    const options = {};
+    const layoutId = stringArg(args, 'layout_id') || stringArg(args, 'layoutId');
+    const slideMasterId = stringArg(args, 'slide_master_id') || stringArg(args, 'slideMasterId');
+    if (layoutId) options.layoutId = layoutId;
+    if (slideMasterId) options.slideMasterId = slideMasterId;
+    return Object.keys(options).length ? options : undefined;
+  }
+
+  function shapeOptions(input, defaults) {
+    const source = input && typeof input === 'object' ? input : {};
+    const options = { ...defaults };
+    for (const key of ['left', 'top', 'width', 'height']) {
+      const value = numberOrNull(source[key]);
+      if (value !== null) options[key] = value;
+    }
+    return options;
+  }
+
+  function targetSlides(context, args) {
+    if (Array.isArray(args.slide_ids) && args.slide_ids.length > 0) {
+      return { items: args.slide_ids.map((id) => context.presentation.slides.getItem(String(id))) };
+    }
+    if (Array.isArray(args.slide_indexes) && args.slide_indexes.length > 0) {
+      return { items: args.slide_indexes.map((index) => context.presentation.slides.getItemAt(Number(index))) };
+    }
+    const slideId = stringArg(args, 'slide_id') || stringArg(args, 'slideId');
+    if (slideId) return { items: [context.presentation.slides.getItem(slideId)] };
+    const index = numberOrNull(args.slide_index ?? args.slideIndex);
+    if (index !== null) return { items: [context.presentation.slides.getItemAt(index)] };
+    return context.presentation.slides;
+  }
+
+  function targetSlide(context, args) {
+    const slideId = stringArg(args, 'slide_id') || stringArg(args, 'slideId');
+    if (slideId) return context.presentation.slides.getItem(slideId);
+    const index = numberOrNull(args.slide_index ?? args.slideIndex);
+    if (index !== null) return context.presentation.slides.getItemAt(index);
+    return context.presentation.getSelectedSlides().getItemAt(0);
+  }
+
+  async function resolveLayout(context, args) {
+    const layoutId = stringArg(args, 'layout_id') || stringArg(args, 'layoutId');
+    const layoutName = stringArg(args, 'layout_name') || stringArg(args, 'layoutName');
+    const layoutType = stringArg(args, 'layout_type') || stringArg(args, 'layoutType') || stringArg(args, 'layout');
+    if (!layoutId && !layoutName && !layoutType) {
+      throw Object.assign(new Error('powerpoint.apply_layout requires layout_id, layout_name, or layout_type.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    const masters = context.presentation.slideMasters;
+    masters.load('items/id,name,layouts/items/id,name,type');
+    await context.sync();
+    const normalizedName = layoutName ? layoutName.toLowerCase() : '';
+    const normalizedType = layoutType ? layoutType.toLowerCase() : '';
+    for (const master of masters.items || []) {
+      for (const layout of master.layouts.items || []) {
+        if (layoutId && layout.id === layoutId) return master.layouts.getItem(layout.id);
+        if (normalizedName && String(layout.name || '').toLowerCase() === normalizedName) return master.layouts.getItem(layout.id);
+        if (normalizedType && String(layout.type || '').toLowerCase() === normalizedType) return master.layouts.getItem(layout.id);
+      }
+    }
+    throw Object.assign(new Error('Requested PowerPoint slide layout was not found.'), { officeMcpCode: 'NOT_FOUND', partialEffect: 'none' });
+  }
+
+  function imageBase64(args) {
+    const raw = requiredString(args, 'base64', 'powerpoint.insert_image requires base64 image data.');
+    const value = raw.includes(',') ? raw.split(',').pop() : raw;
+    if (!/^[A-Za-z0-9+/=\s]+$/.test(value)) {
+      throw Object.assign(new Error('powerpoint.insert_image base64 data is invalid.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return value.replace(/\s+/g, '');
+  }
+
+  function imageInsertOptions(args) {
+    const options = { coercionType: Office.CoercionType.Image };
+    const mapping = { left: 'imageLeft', top: 'imageTop', width: 'imageWidth', height: 'imageHeight' };
+    for (const [source, target] of Object.entries(mapping)) {
+      const value = numberOrNull(args[source]);
+      if (value !== null) options[target] = value;
+    }
+    return options;
+  }
+
+  function officeAsync(start) {
+    return new Promise((resolve, reject) => {
+      start((result) => {
+        if (result.status === Office.AsyncResultStatus.Succeeded) {
+          resolve(result.value);
+          return;
+        }
+        reject(Object.assign(new Error(result.error?.message || 'Office async operation failed.'), {
+          officeMcpCode: 'HOST_ERROR',
+          partialEffect: 'unknown'
+        }));
+      });
+    });
+  }
+
+  function sliceDataToBytes(data) {
+    if (typeof data === 'string') return Uint8Array.from(atob(data), (char) => char.charCodeAt(0));
+    return Uint8Array.from(Array.isArray(data) ? data : Array.from(data || []));
+  }
+
+  function concatBytes(chunks) {
+    const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return bytes;
+  }
+
+  function bytesToBase64(bytes) {
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  }
+
+  function requiredString(args, key, message) {
+    const value = stringArg(args, key);
+    if (!value) throw Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    return value;
+  }
+
+  function stringArg(args, key) {
+    const value = args?.[key];
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  function numberOrNull(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const number = Number(value);
+    if (!Number.isFinite(number)) return null;
+    return number;
+  }
+
+  function positiveInteger(value, fallback) {
+    const number = Number(value || fallback);
+    return Number.isInteger(number) && number > 0 ? number : fallback;
+  }
+
+  function replaceAllText(source, search, replacement, matchCase) {
+    if (matchCase) return source.split(search).join(replacement);
+    return source.replace(new RegExp(escapeRegExp(search), 'gi'), replacement);
+  }
+
+  function countMatches(source, search, matchCase) {
+    const flags = matchCase ? 'g' : 'gi';
+    return Array.from(source.matchAll(new RegExp(escapeRegExp(search), flags))).length;
+  }
+
+  function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   async function getPresentationInfo() {
@@ -287,7 +571,7 @@
 
   function probeRequirementSets() {
     const sets = [];
-    for (const version of ['1.1', '1.2', '1.3']) {
+    for (const version of ['1.1', '1.2', '1.3', '1.4', '1.8', '1.10']) {
       try {
         if (Office.context?.requirements?.isSetSupported?.('PowerPointApi', version)) sets.push(`PowerPointApi ${version}`);
       } catch (error) {
@@ -308,16 +592,63 @@
   }
 
   function renderToolSummary() {
-    toolCountEl.textContent = `Available 0 of ${PLANNED_TOOLS.length}`;
+    const effective = effectiveTools();
+    toolCountEl.textContent = `Enabled ${effective.length} of ${AVAILABLE_TOOLS.length}`;
     toolListEl.innerHTML = TOOL_GROUPS.map((group) => {
-      const rows = group.tools.map((tool) => toolRowMarkup(tool)).join('');
-      return `<details class="tool-group" open><summary class="tool-group-title"><span>${escapeHtml(group.label)}</span><span>0 of ${group.tools.length}</span></summary>${rows}</details>`;
+      const enabledInGroup = group.tools.filter((tool) => isToolEnabled(tool));
+      const rows = group.tools.map((tool) => toolControlMarkup(tool)).join('');
+      return `<details class="tool-group" open><summary class="tool-group-title"><span>${escapeHtml(group.label)}</span><span>Enabled ${enabledInGroup.length} of ${group.tools.length}</span></summary>${rows}</details>`;
     }).join('');
+    for (const checkbox of toolListEl.querySelectorAll('input[data-tool]')) {
+      checkbox.addEventListener('change', () => updateToolPermission(checkbox.dataset.tool, checkbox.checked));
+    }
   }
 
-  function toolRowMarkup(tool) {
+  function toolControlMarkup(tool) {
     const meta = TOOL_METADATA.get(tool) || { sideEffect: 'unknown', description: 'No metadata.' };
-    return `<div class="tool-permission-row is-disabled"><div><strong>${escapeHtml(tool)}</strong><span>${escapeHtml(meta.description)}</span></div><span class="tool-side-effect">${escapeHtml(titleCase(meta.sideEffect))}</span></div>`;
+    const enabled = isToolEnabled(tool);
+    const sideEffectClass = meta.sideEffect === 'mutating' ? ' mutating' : '';
+    return `<label class="tool-permission-row${enabled ? '' : ' is-disabled'}"><input class="tool-toggle" type="checkbox" data-tool="${escapeHtml(tool)}" ${enabled ? 'checked' : ''} /><span class="tool-permission-main"><span class="tool-permission-title"><span class="tool-permission-name">${escapeHtml(tool)}</span><span class="side-effect-pill${sideEffectClass}">${escapeHtml(titleCase(meta.sideEffect))}</span></span><span class="tool-permission-meta">${escapeHtml(meta.description)}</span></span></label>`;
+  }
+
+  function effectiveTools() {
+    return AVAILABLE_TOOLS.filter((tool) => isToolEnabled(tool));
+  }
+
+  function isToolEnabled(tool) {
+    return toolPermissions[tool] !== false;
+  }
+
+  function updateToolPermission(tool, enabled) {
+    if (!AVAILABLE_TOOLS.includes(tool)) return;
+    toolPermissions = { ...toolPermissions, [tool]: Boolean(enabled) };
+    saveToolPermissions();
+    renderToolSummary();
+    if (sessionAnnounced) {
+      send(sessionUpdatedNotification({
+        session_id: sessionId,
+        patch: { available_tools: effectiveTools() }
+      }));
+    }
+  }
+
+  function loadToolPermissions() {
+    try {
+      const raw = window.localStorage?.getItem(TOOL_PERMISSION_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function saveToolPermissions() {
+    try {
+      window.localStorage?.setItem(TOOL_PERMISSION_STORAGE_KEY, JSON.stringify(toolPermissions));
+    } catch (error) {
+      logger.warn('tool_permissions.save.failed', error);
+    }
   }
 
   function renderDocumentState() {
@@ -425,6 +756,7 @@
     const opening = settingsPanelEl.hidden;
     if (!opening && endpointDirty && !confirm('Discard unsaved endpoint changes?')) return;
     settingsPanelEl.hidden = !opening;
+    toolListEl.classList.toggle('is-editing-tools', opening);
     settingsToggleEl.setAttribute('aria-expanded', String(opening));
     settingsToggleEl.setAttribute('aria-label', opening ? 'Close Settings' : 'Open Settings');
     if (opening) endpointInputEl.focus();

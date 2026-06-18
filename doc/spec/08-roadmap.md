@@ -736,9 +736,9 @@ Catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
       Presentation manifest metadata, mature product identity, compact task pane
       UI, shared channel/logger/task-history usage, PowerPoint runtime
       registration, session announcement, Windows catalog staging, packaging
-      inclusion, and daemon static serving under `/powerpoint/*`. The scaffold
-      intentionally announces no available `powerpoint.*` tools until each
-      Office.js handler has implementation and tests.
+      inclusion, and daemon static serving under `/powerpoint/*`. The initial
+      scaffold announced no tools until the handler slice below added tested
+      Office.js implementations.
 - [ ] Finish PowerPoint add-in first-run identity and catalog validation. The
       PowerPoint `DisplayName`, ribbon group, command label, task pane title,
       icon URLs, provider, description, support metadata, and type/category must
@@ -752,11 +752,16 @@ Catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
       category, generated icon references, packaged asset presence, static
       serving under `/powerpoint/*`, and product visual evidence recording
       fields for PowerPoint ribbon/catalog/task pane screenshots.
-- [ ] Implement the PowerPoint task pane handlers for `powerpoint.add_slide`,
+- [x] Implement the PowerPoint task pane handlers for `powerpoint.add_slide`,
       `powerpoint.replace_text`, `powerpoint.insert_image`,
       `powerpoint.apply_layout`, and `powerpoint.export_pdf`, with typed
       argument validation, useful error mapping, cancellation/deadline behavior,
-      and unit/static tests for each supported Office.js API path.
+      and unit/static tests for each supported Office.js API path. Current
+      implementation uses PowerPoint Office.js APIs for slide creation,
+      text-box insertion/replacement, selected-slide image insertion, slide
+      layout application, and PDF export through `getFileAsync(Pdf)`, while
+      preserving per-tool permission toggles and `session.updated` available
+      tool updates.
 - [ ] Add live PowerPoint runtime smoke evidence against a real presentation.
       The evidence must prove session registration, tool visibility after
       handler implementation, at least one read/write mutation path, and PDF

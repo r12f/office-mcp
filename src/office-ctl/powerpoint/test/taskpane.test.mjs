@@ -62,7 +62,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
 
   assert.match(js, /ADDIN_VERSION = '0\.1\.0'/);
-  assert.match(js, /const PLANNED_TOOLS = \[/);
+  assert.match(js, /const AVAILABLE_TOOLS = \[/);
   assert.match(js, /powerpoint\.add_slide/);
   assert.match(js, /powerpoint\.replace_text/);
   assert.match(js, /powerpoint\.insert_image/);
@@ -73,15 +73,55 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /Office\.context\?\.requirements\?\.isSetSupported\?\.\('PowerPointApi', '1\.1'\)/);
   assert.match(js, /app: 'powerpoint'/);
   assert.match(js, /supported_features: \['presentation\.session'\]/);
-  assert.match(js, /available_tools: \[\]/);
-  assert.match(js, /HOST_CAPABILITY_UNAVAILABLE/);
+  assert.match(js, /available_tools: effectiveTools\(\)/);
+  assert.match(js, /sessionUpdatedNotification\(\{/);
+  assert.match(js, /patch: \{ available_tools: effectiveTools\(\) \}/);
+  assert.match(js, /TOOL_PERMISSION_STORAGE_KEY/);
+  assert.match(js, /TOOL_DISABLED_BY_USER/);
+  assert.match(js, /function effectiveTools\(\)/);
+  assert.match(js, /function updateToolPermission\(tool, enabled\)/);
+  assert.match(js, /toolListEl\.classList\.toggle\('is-editing-tools', opening\)/);
   assert.match(js, /sessionAddedNotification\(\{/);
   assert.match(js, /new TaskHistoryStore\(\{ redactText \}\)/);
+  assert.match(js, /taskStore\.isCancelled\(requestId\)/);
+  assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
   assert.match(js, /clearEndpointOverride/);
   assert.match(js, /currentOriginEndpoint/);
   assert.match(js, /Office\.AutoShowTaskpaneWithDocument/);
   assert.match(js, /window\.__OFFICE_MCP_TASKPANE_READY__ = true/);
   assert.doesNotMatch(js, /console\.(log|warn|error)/);
+});
+
+test('PowerPoint task pane implements advertised tool handlers with host APIs', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+
+  assert.match(js, /case 'powerpoint\.add_slide':/);
+  assert.match(js, /case 'powerpoint\.replace_text':/);
+  assert.match(js, /case 'powerpoint\.insert_image':/);
+  assert.match(js, /case 'powerpoint\.apply_layout':/);
+  assert.match(js, /case 'powerpoint\.export_pdf':/);
+  assert.match(js, /async function addSlide\(args\)/);
+  assert.match(js, /slides\.add\(slideOptions\(args\)\)/);
+  assert.match(js, /added\.shapes\.addTextBox\(title/);
+  assert.match(js, /async function replaceText\(args\)/);
+  assert.match(js, /shape\.textFrame\?\.textRange/);
+  assert.match(js, /range\.text = nextText/);
+  assert.match(js, /async function insertImage\(args\)/);
+  assert.match(js, /Office\.context\.document\.setSelectedDataAsync\(base64, imageInsertOptions\(args\), callback\)/);
+  assert.match(js, /coercionType: Office\.CoercionType\.Image/);
+  assert.match(js, /async function applyLayout\(args\)/);
+  assert.match(js, /slide\.applyLayout\(layout\)/);
+  assert.match(js, /context\.presentation\.slideMasters/);
+  assert.match(js, /async function exportPdf\(args\)/);
+  assert.match(js, /Office\.context\.document\.getFileAsync\(Office\.FileType\.Pdf/);
+  assert.match(js, /file\.getSliceAsync\(index, callback\)/);
+  assert.match(js, /file\.closeAsync\(callback\)/);
+  assert.match(js, /mime_type: 'application\/pdf'/);
+  assert.match(js, /function requiredString\(args, key, message\)/);
+  assert.match(js, /INVALID_ARGUMENT/);
+  assert.match(js, /NOT_FOUND/);
+  assert.match(js, /PowerPoint\.run/);
+  assert.doesNotMatch(js, /declared by the daemon contract but is not implemented/);
 });
 
 function cssRule(source, selector) {
