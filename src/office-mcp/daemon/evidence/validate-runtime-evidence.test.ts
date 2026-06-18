@@ -851,6 +851,7 @@ function renderedLogoReview(passed: boolean, sheetPath: string) {
     product_name: 'Office MCP Control',
     sheet_path: sheetPath,
     ready: passed,
+    design_review: renderedLogoDesignReview(passed),
     surfaces: [
       ['logo_tray_size', 16],
       ['logo_ribbon_size', 32],
@@ -869,6 +870,16 @@ function renderedLogoReview(passed: boolean, sheetPath: string) {
   };
 }
 
+function renderedLogoDesignReview(passed: boolean) {
+  return {
+    office_productivity_metaphor: passed ? 'Abstract document panes communicate office productivity.' : '',
+    user_control_metaphor: passed ? 'Command routing and operator nodes communicate local user control.' : '',
+    futuristic_maturity: passed ? 'Mature slightly futuristic desktop utility geometry.' : '',
+    non_microsoft_distinction: passed ? 'Avoids Office logos, Microsoft 365 gradients, Word silhouettes, Excel grid marks, and gear-only artwork.' : '',
+    rejects_generic_readings: passed ? ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'] : [],
+    ready: passed
+  };
+}
 function productVisualSurfaces(): string[] {
   return [
     'word_ribbon_command',

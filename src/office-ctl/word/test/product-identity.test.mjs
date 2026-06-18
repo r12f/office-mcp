@@ -119,6 +119,12 @@ test('rendered-size logo review artifact covers first-contact product surfaces',
     assert.equal(report.product_name, PRODUCT_NAME);
     assert.equal(report.ready, true);
     assert.equal(report.sheet_path, sheet);
+    assert.equal(report.design_review.ready, true);
+    assert.match(report.design_review.office_productivity_metaphor, /document|pane/i);
+    assert.match(report.design_review.user_control_metaphor, /control|command/i);
+    assert.match(report.design_review.futuristic_maturity, /mature|futuristic/i);
+    assert.match(report.design_review.non_microsoft_distinction, /Office logos|Microsoft 365 gradients|gear-only/i);
+    assert.deepEqual(report.design_review.rejects_generic_readings, ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone']);
     assert.equal(report.surfaces.length, RENDERED_REVIEW_SURFACES.length);
     const sheetImage = parsePngRgba(readFileSync(sheet));
     assert.equal(sheetImage.width, 320 * RENDERED_REVIEW_SURFACES.length);

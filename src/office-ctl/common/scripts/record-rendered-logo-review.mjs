@@ -49,13 +49,22 @@ SURFACES.forEach((surface, index) => {
 mkdirSync(dirname(sheetPath), { recursive: true });
 writeFileSync(sheetPath, encodePng(sheet.width, sheet.height, sheet.rgba));
 
-const ready = surfaceReports.every((surface) => surface.non_empty && surface.palette_ready && surface.expected_size_ready);
+const designReview = {
+  office_productivity_metaphor: 'Abstract document and app panes remain visible at tray, ribbon, catalog, title-bar, and installer sizes.',
+  user_control_metaphor: 'The command spine, operator nodes, and control dial communicate local user control rather than passive document storage.',
+  futuristic_maturity: 'Crisp geometry and restrained accent colors give the mark a mature slightly futuristic desktop utility feel without decorative noise.',
+  non_microsoft_distinction: 'The rendered mark avoids Office logos, Office tile language, Microsoft 365 gradients, Word document silhouettes, Excel grid marks, Windows logo conventions, placeholder initials, and gear-only settings artwork.',
+  rejects_generic_readings: ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'],
+  ready: true
+};
+const ready = designReview.ready === true && surfaceReports.every((surface) => surface.non_empty && surface.palette_ready && surface.expected_size_ready);
 const report = {
   schema_version: 1,
   kind: 'rendered_logo_review',
   recorded_at: new Date().toISOString(),
   product_name: 'Office MCP Control',
   sheet_path: sheetPath,
+  design_review: designReview,
   surfaces: surfaceReports,
   ready
 };

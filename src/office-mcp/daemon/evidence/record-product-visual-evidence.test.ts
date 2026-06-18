@@ -188,6 +188,21 @@ test('product visual evidence recorder requires rendered-size and first-run iden
   });
 });
 
+test('product visual evidence recorder requires rendered logo design review', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const renderedLogoReview = JSON.parse(readFileSync(renderedLogoReviewPath, 'utf8')) as Record<string, unknown>;
+    renderedLogoReview.design_review = { ready: false, rejects_generic_readings: [] };
+    writeFileSync(renderedLogoReviewPath, JSON.stringify(renderedLogoReview, null, 2));
+    const output = join(dir, 'missing-rendered-logo-design-review.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.rendered_logo_review_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
 test('product visual evidence recorder requires rendered logo review artifact', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -435,12 +450,23 @@ function writeRenderedLogoReview(dir: string, ready = true): string {
     kind: 'rendered_logo_review',
     product_name: 'Office MCP Control',
     sheet_path: sheetPath,
+    design_review: renderedLogoDesignReview(ready),
     surfaces,
     ready
   }, null, 2));
   return path;
 }
 
+function renderedLogoDesignReview(ready: boolean) {
+  return {
+    office_productivity_metaphor: ready ? 'Abstract document panes communicate office productivity.' : '',
+    user_control_metaphor: ready ? 'Command routing and operator nodes communicate local user control.' : '',
+    futuristic_maturity: ready ? 'Mature slightly futuristic desktop utility geometry.' : '',
+    non_microsoft_distinction: ready ? 'Avoids Office logos, Microsoft 365 gradients, Word silhouettes, Excel grid marks, and gear-only artwork.' : '',
+    rejects_generic_readings: ready ? ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'] : [],
+    ready
+  };
+}
 function writeManifest(dir: string, host: 'word' | 'excel' | 'powerpoint'): string {
   const path = join(dir, `${host}-manifest.xml`);
   const context = host === 'word' ? 'Word documents' : host === 'excel' ? 'Excel workbooks' : 'PowerPoint presentations';

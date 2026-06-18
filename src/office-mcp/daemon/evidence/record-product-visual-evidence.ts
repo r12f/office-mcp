@@ -295,11 +295,21 @@ function readRenderedLogoReview(path: string): Record<string, unknown> {
 function renderedLogoReviewLooksReady(review: Record<string, unknown> | undefined): boolean {
   if (!review) return false;
   if (review.ok !== true || review.schema_version !== 1 || review.kind !== 'rendered_logo_review' || review.product_name !== productName || review.ready !== true) return false;
+  if (!renderedLogoDesignReviewLooksReady(review.design_review)) return false;
   if (typeof review.sheet_path !== 'string' || !screenshotFileLooksLikeImage(resolve(review.sheet_path))) return false;
   const surfaces = Array.isArray(review.surfaces) ? review.surfaces.filter(isRecord) : [];
   return renderedLogoSurfaceSpecs().every(([key, size]) => surfaces.some((surface) => surface.key === key && surface.rendered_size_px === size && surface.width === size && surface.height === size && surface.non_empty === true && surface.palette_ready === true && surface.expected_size_ready === true));
 }
 
+function renderedLogoDesignReviewLooksReady(review: unknown): boolean {
+  if (!isRecord(review) || review.ready !== true) return false;
+  const rejectedReadings = Array.isArray(review.rejects_generic_readings) ? review.rejects_generic_readings : [];
+  return typeof review.office_productivity_metaphor === 'string' && /document|pane|office/i.test(review.office_productivity_metaphor)
+    && typeof review.user_control_metaphor === 'string' && /control|command|operator/i.test(review.user_control_metaphor)
+    && typeof review.futuristic_maturity === 'string' && /mature|futuristic|desktop utility/i.test(review.futuristic_maturity)
+    && typeof review.non_microsoft_distinction === 'string' && /Office logos|Microsoft 365 gradients|gear-only/i.test(review.non_microsoft_distinction)
+    && ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'].every((item) => rejectedReadings.includes(item));
+}
 function renderedLogoSurfaceSpecs(): Array<[string, number]> {
   return [
     ['logo_tray_size', 16],
