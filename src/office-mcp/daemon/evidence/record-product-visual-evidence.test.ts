@@ -80,6 +80,19 @@ test('product visual evidence recorder requires live tray menu snapshot', () => 
   });
 });
 
+test('product visual evidence recorder rejects truncated screenshots', () => {
+  withScreenshots((dir, screenshots) => {
+    writeFileSync(screenshots['tray-icon'], Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'truncated-screenshot.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal((evidence.screenshots_exist as Record<string, unknown>).tray_icon, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('product visual evidence recorder can bind evidence to daemon context', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -126,7 +139,7 @@ function withScreenshots(callback: (dir: string, screenshots: Record<string, str
     const screenshots: Record<string, string> = {};
     for (const surface of SURFACES) {
       const path = join(dir, `${surface}.png`);
-      writeFileSync(path, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+      writeFileSync(path, tinyPng());
       screenshots[surface] = path;
     }
     callback(dir, screenshots);
@@ -137,6 +150,13 @@ function withScreenshots(callback: (dir: string, screenshots: Record<string, str
 
 function outputText(value: string | Buffer): string {
   return typeof value === 'string' ? value : value.toString('utf8');
+}
+
+function tinyPng(): Buffer {
+  return Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luznWQAAAABJRU5ErkJggg==',
+    'base64'
+  );
 }
 
 function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']): string {

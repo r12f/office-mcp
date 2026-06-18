@@ -62,6 +62,19 @@ test('manual tray evidence recorder requires live tray menu snapshot', () => {
   });
 });
 
+test('manual tray evidence recorder rejects truncated screenshots', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    writeFileSync(screenshotPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'truncated-screenshot.json');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.screenshot_exists, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 function runRecorder(output: string, screenshotPath: string, ...extra: string[]): ReturnType<typeof spawnSync> {
   return spawnSync(process.execPath, [
     TSX,
@@ -88,11 +101,18 @@ function withTrayScreenshot(callback: (dir: string, screenshotPath: string) => v
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-tray-recorder-test-'));
   try {
     const screenshotPath = join(dir, 'tray.png');
-    writeFileSync(screenshotPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+    writeFileSync(screenshotPath, tinyPng());
     callback(dir, screenshotPath);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+function tinyPng(): Buffer {
+  return Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luznWQAAAABJRU5ErkJggg==',
+    'base64'
+  );
 }
 
 function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']): string {

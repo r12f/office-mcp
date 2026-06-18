@@ -224,7 +224,8 @@ User-reported follow-up from live daemon testing:
       the expected product tooltip and tray menu snapshot. The recorder marks
       evidence failed and the validator rejects required manual tray evidence
       when it is not bound to that daemon context. Screenshot artifacts must be
-      real, complete image files; truncated image headers are rejected.
+      real, complete image files; truncated image headers are rejected by both
+      the recorder and validator.
 - [x] Add automated coverage that fails when production `daemon run` does not
       expose `/ui/` and when `daemon status` omits the UI URL. Covered by
       `production_bound_daemon_exposes_ui_state_and_events`,
@@ -435,7 +436,7 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       the same local daemon build under test, validated with
       `--require-product-visual`, and stored as release-checkable artifacts.
       Screenshot artifacts must be real, complete image files; truncated image
-      headers are rejected.
+      headers are rejected by both the recorder and validator.
 
 **Exit criterion**: Word and Excel show a mature product add-in name and icon in
 the ribbon/catalog; the task pane title and chrome match the product identity;
