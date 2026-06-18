@@ -176,7 +176,7 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $rustDaemonRoot = Join-Path $repoRoot "src\office-mcp\daemon"
 $evidenceRoot = Join-Path $repoRoot "src\office-mcp\daemon\evidence"
-$uiRoot = Join-Path $repoRoot "src\office-mcp\ui"
+$uiRoot = Join-Path $rustDaemonRoot "src\ui\assets"
 $commonRoot = Join-Path $repoRoot "src\office-ctl\common"
 $addinRoot = Join-Path $repoRoot "src\office-ctl\word"
 $excelAddinRoot = Join-Path $repoRoot "src\office-ctl\excel"

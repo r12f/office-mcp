@@ -50,6 +50,8 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.match(buildScript, /office-mcp-tray\.ps1/);
   assert.match(buildScript, /cargo build --release -p office-mcp-daemon/);
   assert.match(buildScript, /office-mcp-daemon\.exe/);
+  assert.match(buildScript, /\$uiRoot = Join-Path \$rustDaemonRoot "src\\ui\\assets"/);
+  assert.doesNotMatch(buildScript, /\$uiRoot = Join-Path \$repoRoot "src\\office-mcp\\ui"/);
   assert.match(buildScript, /office-mcp\\ui\\index\.html/);
   assert.match(buildScript, /office-ctl\\common\\addin-channel\.js/);
   assert.match(buildScript, /office-ctl\\common\\browser-ui\.js/);
@@ -79,6 +81,8 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.match(installScript, /office-mcp-tray\.ps1/);
   assert.match(installScript, /cargo build --release -p office-mcp-daemon/);
   assert.match(installScript, /office-mcp-daemon\.exe/);
+  assert.match(installScript, /\$uiRoot = Join-Path \$rustDaemonRoot "src\\ui\\assets"/);
+  assert.doesNotMatch(installScript, /\$uiRoot = Join-Path \$repoRoot "src\\office-mcp\\ui"/);
   assert.match(installScript, /office-mcp\\ui/);
   assert.match(installScript, /office-ctl\\common/);
   assert.match(installScript, /office-ctl\\word/);
