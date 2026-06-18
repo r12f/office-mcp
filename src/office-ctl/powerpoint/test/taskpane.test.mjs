@@ -58,6 +58,8 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(html, /Enabled 0 of 5/);
   assert.doesNotMatch(html, /Tool Permissions/);
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
+  assert.match(html, /placeholder="wss:\/\/localhost:8765\/addin…"/);
+  assert.doesNotMatch(html, /placeholder="wss:\/\/localhost:8765\/addin"/);
   assert.match(html, /aria-label="Open Settings"/);
   assert.match(html, /<svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">/);
   assert.match(html, /<circle cx="17" cy="12" r="2" \/>/);
