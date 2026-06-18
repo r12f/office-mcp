@@ -69,6 +69,17 @@ test('Office add-ins use mature product identity metadata', () => {
 test('brand design note documents the office-control visual brief', () => {
   const note = readFileSync(join(ASSET_ROOT, 'brand-design.md'), 'utf8');
   assert.match(note, /local office automation under user\s+control/i);
+  assert.match(note, /## Concept Pass/);
+  assert.match(note, /Command Console Panes/);
+  assert.match(note, /Orbiting Document Hub/);
+  assert.match(note, /Shielded Automation Badge/);
+  assert.match(note, /This direction was\s+selected/i);
+  assert.match(note, /This direction was rejected because the hub read too much like a generic sync/i);
+  assert.match(note, /This direction was rejected because it over-emphasized security/i);
+  assert.match(note, /gear-only settings marks/i);
+  assert.match(note, /Office-like app\s+tiles/i);
+  assert.match(note, /terminal\/debug glyphs/i);
+  assert.match(note, /AI sparkle motifs/i);
   assert.match(note, /abstract document or app panes/i);
   assert.match(note, /command spine/i);
   assert.match(note, /operator nodes/i);
@@ -126,6 +137,29 @@ test('rendered-size logo review artifact covers first-contact product surfaces',
     assert.equal(report.ready, true);
     assert.equal(report.sheet_path, sheet);
     assert.equal(report.design_review.ready, true);
+    assert.equal(report.design_review.concept_pass.ready, true);
+    assert.equal(report.design_review.concept_pass.selected_direction, 'Command Console Panes');
+    assert.equal(report.design_review.concept_pass.minimum_concepts_reviewed, 3);
+    assert.equal(report.design_review.concept_pass.concepts.length, 3);
+    assert.deepEqual(
+      report.design_review.concept_pass.concepts.map((concept) => [concept.name, concept.decision]),
+      [
+        ['Command Console Panes', 'selected'],
+        ['Orbiting Document Hub', 'rejected'],
+        ['Shielded Automation Badge', 'rejected']
+      ]
+    );
+    assert.match(report.design_review.concept_pass.concepts[0].rationale, /office productivity, local routing, and deliberate user control/i);
+    assert.match(report.design_review.concept_pass.concepts[1].rationale, /generic sync or cloud connector/i);
+    assert.match(report.design_review.concept_pass.concepts[2].rationale, /endpoint protection software/i);
+    assert.deepEqual(report.design_review.concept_pass.rejected_patterns, [
+      'gear-only settings mark',
+      'Office-like app tile',
+      'host-app color block',
+      'generic document thumbnail',
+      'terminal/debug glyph',
+      'AI sparkle motif'
+    ]);
     assert.match(report.design_review.future_office_control_brief, /future office control/i);
     assert.match(report.design_review.future_office_control_brief, /routing|operator|control/i);
     assert.match(report.design_review.future_office_control_brief, /without .*Office-owned app marks/i);

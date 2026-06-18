@@ -19,6 +19,33 @@ looking like a generic preferences icon.
 - Dark shell: the dark rounded square gives the tray icon and installer icon a
   stable desktop utility silhouette at small sizes.
 
+## Concept Pass
+
+The final mark was selected after reviewing three original directions against
+the future office control brief:
+
+1. **Command Console Panes**: layered abstract document panes connected by a
+   command spine, operator nodes, and a single control dial. This direction was
+   selected because it communicates office work, local routing, and deliberate
+   user control at 16 px tray size, 32 px ribbon size, catalog thumbnail size,
+   title-bar size, and installer size without borrowing Microsoft product
+   marks.
+2. **Orbiting Document Hub**: document surfaces arranged around a central hub.
+   This direction was rejected because the hub read too much like a generic sync
+   or cloud connector and lost the explicit operator-control affordance at tray
+   size.
+3. **Shielded Automation Badge**: a protected-control badge over a document
+   surface. This direction was rejected because it over-emphasized security and
+   looked closer to endpoint protection software than an office productivity
+   control utility.
+
+Rejected alternatives also included gear-only settings marks, Office-like app
+tiles, host-app color blocks, document thumbnails, terminal/debug glyphs, and
+AI sparkle motifs. The selected Command Console Panes concept keeps the product
+identity mature and slightly futuristic through precise geometry, restrained
+accent colors, and clear operator affordances rather than decorative glow or
+neon styling.
+
 ## Palette
 
 - `#0F172A`: desktop utility shell and high-contrast stroke.

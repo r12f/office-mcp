@@ -365,14 +365,21 @@ Latest UI feedback to preserve in implementation planning:
   native tooltip, right-click menu anchored to the actual notification-area
   icon, OS-native spacing/hover/keyboard behavior, and native quit confirmation.
 
-- [ ] Run a full product logo concept pass before accepting the final mark. The
+- [x] Run a full product logo concept pass before accepting the final mark. The
       pass must produce multiple original concept directions that communicate
       office productivity plus local control without Office-owned marks, Office
       app-color ownership, generic document thumbnails, gear-only symbols, or
       developer/debug motifs. The accepted design must feel like mature,
       slightly futuristic desktop software and must be reviewed at real tray,
       ribbon, catalog, task pane, installer, and title-bar sizes before this
-      item can close.
+      item can close. Current evidence: `brand-design.md` documents the
+      selected `Command Console Panes` direction plus rejected `Orbiting
+      Document Hub` and `Shielded Automation Badge` directions;
+      `record-rendered-logo-review.mjs` emits the concept-pass review into the
+      rendered-size artifact; `record-product-visual-evidence.ts` and
+      `validate-runtime-evidence.ts` reject product visual evidence that omits
+      the concept pass. Verified with `npm run check` in
+      `src/office-ctl/word` and `src/office-mcp/daemon/evidence`.
 - [ ] Rework and verify all add-in first-impression metadata as one product
       surface for Word, Excel, and PowerPoint after a clean install. The visible
       add-in title, icon, provider, description, ribbon command, task pane

@@ -311,6 +311,7 @@ function renderedLogoDesignReviewLooksReady(review: unknown): boolean {
   if (!isRecord(review) || review.ready !== true) return false;
   const rejectedReadings = Array.isArray(review.rejects_generic_readings) ? review.rejects_generic_readings : [];
   return typeof review.future_office_control_brief === 'string'
+    && renderedLogoConceptPassLooksReady(review.concept_pass)
     && /future office control/i.test(review.future_office_control_brief)
     && /routing|operator|control/i.test(review.future_office_control_brief)
     && /without .*Office-owned app marks/i.test(review.future_office_control_brief)
@@ -319,6 +320,19 @@ function renderedLogoDesignReviewLooksReady(review: unknown): boolean {
     && typeof review.futuristic_maturity === 'string' && /mature|futuristic|desktop utility/i.test(review.futuristic_maturity)
     && typeof review.non_microsoft_distinction === 'string' && /Office logos/i.test(review.non_microsoft_distinction) && /Microsoft 365 gradients/i.test(review.non_microsoft_distinction) && /PowerPoint slide silhouettes/i.test(review.non_microsoft_distinction) && /Outlook envelope marks/i.test(review.non_microsoft_distinction) && /gear-only/i.test(review.non_microsoft_distinction)
     && ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'].every((item) => rejectedReadings.includes(item));
+}
+
+function renderedLogoConceptPassLooksReady(conceptPass: unknown): boolean {
+  if (!isRecord(conceptPass) || conceptPass.ready !== true || conceptPass.selected_direction !== 'Command Console Panes') return false;
+  const minimum = typeof conceptPass.minimum_concepts_reviewed === 'number' ? conceptPass.minimum_concepts_reviewed : 3;
+  const concepts = Array.isArray(conceptPass.concepts) ? conceptPass.concepts.filter(isRecord) : [];
+  const rejectedPatterns = Array.isArray(conceptPass.rejected_patterns) ? conceptPass.rejected_patterns : [];
+  return minimum >= 3
+    && concepts.length >= minimum
+    && concepts.some((concept) => concept.name === 'Command Console Panes' && concept.decision === 'selected' && typeof concept.rationale === 'string' && /office productivity, local routing, and deliberate user control/i.test(concept.rationale))
+    && concepts.some((concept) => concept.name === 'Orbiting Document Hub' && concept.decision === 'rejected' && typeof concept.rationale === 'string' && /generic sync or cloud connector/i.test(concept.rationale))
+    && concepts.some((concept) => concept.name === 'Shielded Automation Badge' && concept.decision === 'rejected' && typeof concept.rationale === 'string' && /endpoint protection software/i.test(concept.rationale))
+    && ['gear-only settings mark', 'Office-like app tile', 'host-app color block', 'generic document thumbnail', 'terminal/debug glyph', 'AI sparkle motif'].every((item) => rejectedPatterns.includes(item));
 }
 function renderedLogoSurfaceSpecs(): Array<[string, number]> {
   return [

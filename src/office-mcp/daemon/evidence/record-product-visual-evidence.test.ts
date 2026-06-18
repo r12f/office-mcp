@@ -263,6 +263,23 @@ test('product visual evidence recorder requires rendered logo review artifact', 
   });
 });
 
+test('product visual evidence recorder requires rendered logo concept pass', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReview = JSON.parse(readFileSync(writeRenderedLogoReview(dir), 'utf8')) as Record<string, unknown>;
+    const designReview = renderedLogoReview.design_review as Record<string, unknown>;
+    designReview.concept_pass = { ready: false, concepts: [] };
+    const renderedLogoReviewPath = join(dir, 'missing-rendered-logo-concept-pass.json');
+    writeFileSync(renderedLogoReviewPath, JSON.stringify(renderedLogoReview, null, 2));
+    const output = join(dir, 'missing-rendered-logo-concept-pass-evidence.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
+
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8'));
+    assert.equal(evidence.rendered_logo_review_ready, false);
+  });
+});
+
 test('product visual evidence recorder requires Excel runtime evidence', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -580,12 +597,39 @@ function writeRenderedLogoReview(dir: string, ready = true): string {
 function renderedLogoDesignReview(ready: boolean) {
   return {
     future_office_control_brief: ready ? 'Future office control: routing geometry and operator control without Office-owned app marks.' : '',
+    concept_pass: renderedLogoConceptPass(ready),
     office_productivity_metaphor: ready ? 'Abstract document panes communicate office productivity.' : '',
     user_control_metaphor: ready ? 'Command routing and operator nodes communicate local user control.' : '',
     futuristic_maturity: ready ? 'Mature slightly futuristic desktop utility geometry.' : '',
     non_microsoft_distinction: ready ? 'Avoids Office logos, Microsoft 365 gradients, Word silhouettes, Excel grid marks, PowerPoint slide silhouettes, Outlook envelope marks, and gear-only artwork.' : '',
     rejects_generic_readings: ready ? ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'] : [],
     ready
+  };
+}
+
+function renderedLogoConceptPass(ready: boolean) {
+  return {
+    ready,
+    selected_direction: ready ? 'Command Console Panes' : '',
+    minimum_concepts_reviewed: ready ? 3 : 0,
+    concepts: ready ? [
+      {
+        name: 'Command Console Panes',
+        decision: 'selected',
+        rationale: 'Layered panes communicate office productivity, local routing, and deliberate user control at release sizes.'
+      },
+      {
+        name: 'Orbiting Document Hub',
+        decision: 'rejected',
+        rationale: 'The hub read as a generic sync or cloud connector and lost the operator-control affordance.'
+      },
+      {
+        name: 'Shielded Automation Badge',
+        decision: 'rejected',
+        rationale: 'The badge looked closer to endpoint protection software than an office control utility.'
+      }
+    ] : [],
+    rejected_patterns: ready ? ['gear-only settings mark', 'Office-like app tile', 'host-app color block', 'generic document thumbnail', 'terminal/debug glyph', 'AI sparkle motif'] : []
   };
 }
 function writeManifest(dir: string, host: 'word' | 'excel' | 'powerpoint'): string {

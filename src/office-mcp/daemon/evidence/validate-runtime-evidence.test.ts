@@ -486,6 +486,24 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.rendered_logo_review.design_review.concept_pass = {
+        ready: false,
+        selected_direction: '',
+        minimum_concepts_reviewed: 0,
+        concepts: [],
+        rejected_patterns: []
+      };
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Rendered logo concept pass is not ready/);
+      assert.match(outputText(result.stdout), /Rendered logo concept pass must review at least three concepts/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.first_run_identity.excel.display_name = 'office-mcp-excel';
       broken.first_run_identity.excel.icon_url = 'https://localhost:8765/assets/blank.png';
       broken.first_run_identity.excel.manifest_ready = false;
@@ -941,12 +959,39 @@ function renderedLogoReview(passed: boolean, sheetPath: string) {
 function renderedLogoDesignReview(passed: boolean) {
   return {
     future_office_control_brief: passed ? 'Future office control: routing geometry and operator control without Office-owned app marks.' : '',
+    concept_pass: renderedLogoConceptPass(passed),
     office_productivity_metaphor: passed ? 'Abstract document panes communicate office productivity.' : '',
     user_control_metaphor: passed ? 'Command routing and operator nodes communicate local user control.' : '',
     futuristic_maturity: passed ? 'Mature slightly futuristic desktop utility geometry.' : '',
     non_microsoft_distinction: passed ? 'Avoids Office logos, Microsoft 365 gradients, Word silhouettes, Excel grid marks, PowerPoint slide silhouettes, Outlook envelope marks, and gear-only artwork.' : '',
     rejects_generic_readings: passed ? ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'] : [],
     ready: passed
+  };
+}
+
+function renderedLogoConceptPass(passed: boolean) {
+  return {
+    ready: passed,
+    selected_direction: passed ? 'Command Console Panes' : '',
+    minimum_concepts_reviewed: passed ? 3 : 0,
+    concepts: passed ? [
+      {
+        name: 'Command Console Panes',
+        decision: 'selected',
+        rationale: 'Layered panes communicate office productivity, local routing, and deliberate user control at release sizes.'
+      },
+      {
+        name: 'Orbiting Document Hub',
+        decision: 'rejected',
+        rationale: 'The hub read as a generic sync or cloud connector and lost the operator-control affordance.'
+      },
+      {
+        name: 'Shielded Automation Badge',
+        decision: 'rejected',
+        rationale: 'The badge looked closer to endpoint protection software than an office control utility.'
+      }
+    ] : [],
+    rejected_patterns: passed ? ['gear-only settings mark', 'Office-like app tile', 'host-app color block', 'generic document thumbnail', 'terminal/debug glyph', 'AI sparkle motif'] : []
   };
 }
 function productVisualSurfaces(): string[] {

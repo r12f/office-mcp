@@ -384,6 +384,7 @@ function validateRenderedLogoDesignReview(review: unknown): void {
     return;
   }
   if (review.ready !== true) failures.push('Rendered logo design review is not ready.');
+  validateRenderedLogoConceptPass(review.concept_pass);
   if (typeof review.future_office_control_brief !== 'string' || !/future office control/i.test(review.future_office_control_brief) || !/routing|operator|control/i.test(review.future_office_control_brief) || !/without .*Office-owned app marks/i.test(review.future_office_control_brief)) {
     failures.push('Rendered logo design review missing future office control brief.');
   }
@@ -394,6 +395,25 @@ function validateRenderedLogoDesignReview(review: unknown): void {
   const rejected = Array.isArray(review.rejects_generic_readings) ? review.rejects_generic_readings : [];
   for (const item of ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone']) {
     if (!rejected.includes(item)) failures.push(`Rendered logo design review does not reject ${item}.`);
+  }
+}
+
+function validateRenderedLogoConceptPass(conceptPass: unknown): void {
+  if (!isRecord(conceptPass)) {
+    failures.push('Rendered logo design review missing concept pass.');
+    return;
+  }
+  if (conceptPass.ready !== true) failures.push('Rendered logo concept pass is not ready.');
+  if (conceptPass.selected_direction !== 'Command Console Panes') failures.push('Rendered logo concept pass missing selected Command Console Panes direction.');
+  if (typeof conceptPass.minimum_concepts_reviewed !== 'number' || conceptPass.minimum_concepts_reviewed < 3) failures.push('Rendered logo concept pass must review at least three concepts.');
+  const concepts = Array.isArray(conceptPass.concepts) ? conceptPass.concepts.filter(isRecord) : [];
+  if (concepts.length < 3) failures.push('Rendered logo concept pass missing reviewed concepts.');
+  if (!concepts.some((concept) => concept.name === 'Command Console Panes' && concept.decision === 'selected' && typeof concept.rationale === 'string' && /office productivity, local routing, and deliberate user control/i.test(concept.rationale))) failures.push('Rendered logo concept pass missing selected office-control rationale.');
+  if (!concepts.some((concept) => concept.name === 'Orbiting Document Hub' && concept.decision === 'rejected' && typeof concept.rationale === 'string' && /generic sync or cloud connector/i.test(concept.rationale))) failures.push('Rendered logo concept pass missing rejected hub rationale.');
+  if (!concepts.some((concept) => concept.name === 'Shielded Automation Badge' && concept.decision === 'rejected' && typeof concept.rationale === 'string' && /endpoint protection software/i.test(concept.rationale))) failures.push('Rendered logo concept pass missing rejected shield rationale.');
+  const rejectedPatterns = Array.isArray(conceptPass.rejected_patterns) ? conceptPass.rejected_patterns : [];
+  for (const item of ['gear-only settings mark', 'Office-like app tile', 'host-app color block', 'generic document thumbnail', 'terminal/debug glyph', 'AI sparkle motif']) {
+    if (!rejectedPatterns.includes(item)) failures.push(`Rendered logo concept pass does not reject ${item}.`);
   }
 }
 function validateFirstRunIdentity(identity: unknown): void {
