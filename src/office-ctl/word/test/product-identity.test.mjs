@@ -45,6 +45,7 @@ test('Office add-ins use mature product identity metadata', () => {
   ]) {
     const manifest = readFileSync(join(root, 'manifest.xml'), 'utf8');
     const taskpane = readFileSync(join(root, 'public', 'taskpane.html'), 'utf8');
+    const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
     assert.match(manifest, new RegExp(`<ProviderName>${PRODUCT_NAME}</ProviderName>`), `${host} provider is product branded`);
     assert.match(manifest, new RegExp(`<DisplayName DefaultValue="${PRODUCT_NAME}" \/>`), `${host} display name is product branded`);
@@ -56,6 +57,9 @@ test('Office add-ins use mature product identity metadata', () => {
     assert.match(taskpane, /<img class="product-mark" src="\/assets\/icon-32\.png" width="32" height="32" alt="" aria-hidden="true" \/>/, `${host} task pane chrome uses the product icon`);
     assert.match(taskpane, new RegExp(`<h1>${PRODUCT_NAME}</h1>`), `${host} task pane heading is product branded`);
     assert.doesNotMatch(taskpane, /<h1>\s*(Add-in|Task Pane|office-mcp)/i, `${host} task pane heading must not read as a scaffold`);
+    assert.match(packageJson.description, new RegExp(`${PRODUCT_NAME} for ${host}`), `${host} package description names the product`);
+    assert.match(packageJson.description, /local productivity automation control utility/, `${host} package description states mature product type`);
+    assert.doesNotMatch(packageJson.description, /task pane add-in for office-mcp|sample|debug|prototype|experimental/i, `${host} package description must not read as a scaffold`);
     for (const pattern of BANNED_IDENTITY_PATTERNS) {
       assert.doesNotMatch(manifest, pattern, `${host} manifest must not contain ${pattern}`);
     }

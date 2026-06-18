@@ -2,7 +2,7 @@
   "name": "office-mcp-word-addin",
   "version": "0.1.0",
   "private": true,
-  "description": "Word task pane add-in for office-mcp.",
+  "description": "Office MCP Control for Word: a local productivity automation control utility.",
   "scripts": {
     "appsource:package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-appsource-package.ps1",
     "check": "npm run validate:manifest && npm run check:taskpane && npm test",

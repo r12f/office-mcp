@@ -2,7 +2,7 @@
   "name": "office-mcp-excel-addin",
   "version": "0.1.0",
   "private": true,
-  "description": "Excel task pane add-in for office-mcp.",
+  "description": "Office MCP Control for Excel: a local productivity automation control utility.",
   "scripts": {
     "check": "npm run validate:manifest && npm run check:taskpane && npm test",
     "check:taskpane": "node --check public/taskpane.js",
