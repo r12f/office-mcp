@@ -38,14 +38,21 @@ impl DaemonStatusReporter {
             runtime_stale,
             json_escape(&self.runtime_path.display().to_string()),
             active_value(running, runtime.as_ref().and_then(|status| status.pid)),
-            active_string(running, runtime.as_ref().and_then(|status| status.ui_url.as_deref())),
             active_string(
                 running,
-                runtime.as_ref().and_then(|status| status.state_url.as_deref())
+                runtime.as_ref().and_then(|status| status.ui_url.as_deref())
             ),
             active_string(
                 running,
-                runtime.as_ref().and_then(|status| status.log_path.as_deref())
+                runtime
+                    .as_ref()
+                    .and_then(|status| status.state_url.as_deref())
+            ),
+            active_string(
+                running,
+                runtime
+                    .as_ref()
+                    .and_then(|status| status.log_path.as_deref())
             )
         )
     }

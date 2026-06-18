@@ -69,7 +69,10 @@ fn tray_status_can_be_derived_from_redacted_ui_state() {
     assert!(snapshot.quit_confirmation.body.contains("1 running tasks"));
     let probe = snapshot.probe_json();
     assert_eq!(probe["menu_items"][3], "---");
-    assert_eq!(probe["tooltip"], "Office MCP - Degraded - 1 clients - 2 documents");
+    assert_eq!(
+        probe["tooltip"],
+        "Office MCP - Degraded - 1 clients - 2 documents"
+    );
     assert_eq!(probe["menu"][0]["kind"], "read_only");
     assert_eq!(probe["menu"][0]["enabled"], false);
     assert_eq!(probe["menu"][3]["kind"], "separator");
@@ -100,7 +103,10 @@ fn tray_product_surface_has_no_scaffold_or_debug_labels() {
     assert!(!rendered.to_ascii_lowercase().contains("prototype"));
     assert!(!rendered.to_ascii_lowercase().contains("placeholder"));
     assert!(!rendered.to_ascii_lowercase().contains("test tray"));
-    assert_eq!(probe["tooltip"], "Office MCP - Up - 0 clients - 0 documents");
+    assert_eq!(
+        probe["tooltip"],
+        "Office MCP - Up - 0 clients - 0 documents"
+    );
     assert_eq!(probe["menu"][0]["kind"], "read_only");
     assert_eq!(probe["menu"][0]["enabled"], false);
     assert_eq!(probe["menu"][3]["kind"], "separator");
@@ -109,8 +115,14 @@ fn tray_product_surface_has_no_scaffold_or_debug_labels() {
     assert_eq!(probe["menu"][5]["kind"], "action");
     assert_eq!(probe["menu"][5]["enabled"], true);
     assert_eq!(probe["quit_confirmation"]["title"], "Quit Office MCP");
-    assert_eq!(probe["quit_confirmation"]["primary_action"], "Quit Office MCP");
-    assert_eq!(probe["quit_confirmation"]["secondary_action"], "Keep Running");
+    assert_eq!(
+        probe["quit_confirmation"]["primary_action"],
+        "Quit Office MCP"
+    );
+    assert_eq!(
+        probe["quit_confirmation"]["secondary_action"],
+        "Keep Running"
+    );
 }
 
 #[test]
