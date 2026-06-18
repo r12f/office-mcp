@@ -217,7 +217,10 @@ User-reported follow-up from live daemon testing:
       `npm run evidence:record-tray-manual` and validator gate
       `npm run evidence:validate-ui -- --require-manual-tray` now exist so the
       final desktop run can be captured as structured release evidence instead
-      of an untracked note.
+      of an untracked note. The final run must pass `--daemon-bin` to the
+      recorder so the artifact also captures `daemon status` and live
+      `tray --probe` output for the same daemon instance that was visually
+      inspected.
 - [x] Add automated coverage that fails when production `daemon run` does not
       expose `/ui/` and when `daemon status` omits the UI URL. Covered by
       `production_bound_daemon_exposes_ui_state_and_events`,
