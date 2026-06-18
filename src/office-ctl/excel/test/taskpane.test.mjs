@@ -203,6 +203,7 @@ test('Excel task pane keeps settings inline and compact at narrow widths', () =>
   assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);
   assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
   assert.match(css, /\.empty-state \{[\s\S]*padding: 10px;/);
+  assert.match(css, /#documentTitle \{[\s\S]*display: -webkit-box;[\s\S]*-webkit-line-clamp: 2;/);
   assert.match(css, /@media \(min-width: 380px\)/);
   assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
   assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);

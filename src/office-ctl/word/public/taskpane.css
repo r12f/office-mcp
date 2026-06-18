@@ -301,6 +301,13 @@ dd {
   overflow-wrap: anywhere;
 }
 
+#documentTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 dd,
 .task-meta {
   text-wrap: pretty;
