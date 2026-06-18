@@ -458,14 +458,23 @@ Latest design feedback from the current visible build:
       developer/debug badge, or loud decorative graphic. This review must inspect
       the add-in catalog, ribbon, task pane chrome, tray, installer, and daemon
       title-bar renderings.
-- [ ] Redesign or materially refine the current logo if the live rendered
-      surfaces still fail the future-office-control brief. The new pass must
-      produce an original mark that avoids Office-owned logos and tile language
-      while clearly suggesting office work, command routing, and local user
-      control. It must be reviewed at 16 px tray size, 32 px ribbon size,
-      catalog thumbnail size, task pane/title-bar size, and installer size. This
-      item remains open if the icon feels generic, weak, placeholder-like,
-      debug-oriented, gear-only, or visually unrelated to office control.
+- [x] Redesign or materially refine the current logo if the live rendered
+      surfaces still fail the future-office-control brief. The implemented
+      refinement keeps the selected `Command Console Panes` direction but
+      redraws the mark as three layered control-console document/app panes, a
+      command rail, operator nodes, and a yellow control reticle. It avoids
+      Office-owned logos and tile language while more clearly suggesting office
+      work, command routing, and local user control at 16 px tray size, 32 px
+      ribbon size, catalog thumbnail size, title-bar size, and installer size.
+      Current evidence: `brand: refine office control mark`, regenerated
+      `brand-mark.svg` and icon PNGs, `brand-design.md`,
+      `generate-brand-assets.mjs`, `record-rendered-logo-review.mjs`,
+      `npm run check` in Word/Excel/PowerPoint add-ins,
+      `npm test -- --test-name-pattern "rendered logo|product visual evidence"`
+      in `src/office-mcp/daemon/evidence`, and Rust
+      `cargo test -p office-mcp-daemon product_tray_icon static_response` run
+      as separate filtered commands. Final real Office/tray user-surface review
+      remains tracked by the live visual evidence items.
 - [ ] Re-audit every add-in first-contact surface after install: title, icon,
       provider, description, ribbon command, task pane chrome, and catalog
       type/category for Word, Excel, and PowerPoint. The installed catalog must
@@ -561,16 +570,18 @@ Latest design feedback from the current visible build:
       `src/office-ctl/common/scripts/generate-brand-assets.mjs`; Rust tray
       glyph coverage verifies the native 32 px mark is not blank or single-color.
 - [x] Re-review and redesign the logo/icon direction against the stricter
-      product-quality brief. The current mark uses abstract document panes, a
-      visible command spine, operator nodes, and a yellow control dial so it
-      communicates office productivity plus user control with a mature, slightly
-      futuristic desktop utility feel. It avoids Microsoft Office logos, Office
-      tile language, Microsoft 365 gradients, Word/Excel silhouettes, Windows
-      app-icon conventions, placeholder initials, generic document icons, and a
-      gear-only settings mark. Covered by updated source artwork,
-      reproducible generated raster assets, `brand-design.md`, Word/Excel
-      add-in identity tests, and Rust tray icon tests. Final real rendered
-      screenshot evidence remains tracked by the visual evidence item below.
+      product-quality brief. The current mark uses abstract control-console
+      document/app panes, a visible command rail, operator nodes, and a yellow
+      control reticle so it communicates office productivity plus user control
+      with a mature, slightly futuristic desktop utility feel. It avoids
+      Microsoft Office logos, Office tile language, Microsoft 365 gradients,
+      Word/Excel/PowerPoint silhouettes, Windows app-icon conventions,
+      placeholder initials, generic document icons, and a gear-only settings
+      mark. Covered by updated source artwork, reproducible generated raster
+      assets, `brand-design.md`, Word/Excel/PowerPoint add-in identity tests,
+      rendered-logo review tests, daemon product visual evidence tests, and
+      Rust tray icon tests. Final real rendered screenshot evidence remains
+      tracked by the visual evidence item below.
 - [ ] Capture a rendered-size logo review for the final asset set. The review
       must inspect the mark at 16 px tray size, 32 px ribbon size, catalog
       thumbnail size, daemon title-bar size, and installer/package metadata
@@ -635,15 +646,15 @@ Latest design feedback from the current visible build:
       not as an Office logo variant, framework icon, placeholder mark, gear-only
       settings symbol, or developer/debug badge. The current mark is the
       selected `Command Console Panes` concept after three documented concept
-      directions, and uses abstract document panes, a command spine, operator
-      nodes, and a control dial to communicate office productivity plus user
-      control. `brand-design.md` documents the selected/rejected concepts,
-      palette, minimum sizes, and non-Microsoft distinction. Generated icon
-      assets cover 16, 20, 24, 32, 48, 64, 80, 128, and 256 px, and
-      `record-rendered-logo-review.mjs` plus product identity tests validate the
-      rendered tray, ribbon, catalog, daemon title-bar, and installer sizes.
-      Final live Office/tray visual evidence remains tracked by the separate
-      product visual evidence items below.
+      directions, and uses abstract control-console document/app panes, a
+      command rail, operator nodes, and a control reticle to communicate office
+      productivity plus user control. `brand-design.md` documents the
+      selected/rejected concepts, palette, minimum sizes, and non-Microsoft
+      distinction. Generated icon assets cover 16, 20, 24, 32, 48, 64, 80, 128,
+      and 256 px, and `record-rendered-logo-review.mjs` plus product identity
+      tests validate the rendered tray, ribbon, catalog, daemon title-bar, and
+      installer sizes. Final live Office/tray visual evidence remains tracked by
+      the separate product visual evidence items below.
 - [x] Rework every add-in first-contact identity field so Word, Excel, and
       PowerPoint look like mature installable software after a clean install.
       Title, icon, provider, command label, short description, type/category,
