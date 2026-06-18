@@ -19,6 +19,8 @@ const powerPointManifestPath = resolve(readOption('--powerpoint-manifest-path') 
 const productName = readOption('--product-name') ?? 'Office MCP Control';
 const renderedLogoReview = renderedLogoReviewPath ? readRenderedLogoReview(resolve(renderedLogoReviewPath)) : undefined;
 const renderedLogoReviewReady = renderedLogoReviewLooksReady(renderedLogoReview);
+const manualTrayEvidence = manualTrayEvidencePath ? readManualTrayEvidence(resolve(manualTrayEvidencePath)) : undefined;
+const manualTrayEvidenceReady = manualTrayEvidenceLooksReady(manualTrayEvidence);
 
 const requiredSurfaces = [
   'word_ribbon_command',
@@ -77,8 +79,6 @@ const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefi
 const daemonContextReady = daemonContextLooksReady(daemonContext);
 const excelRuntimeEvidence = excelRuntimeEvidencePath ? readExcelRuntimeEvidence(resolve(excelRuntimeEvidencePath)) : undefined;
 const excelRuntimeEvidenceReady = excelRuntimeEvidenceLooksReady(excelRuntimeEvidence);
-const manualTrayEvidence = manualTrayEvidencePath ? readManualTrayEvidence(resolve(manualTrayEvidencePath)) : undefined;
-const manualTrayEvidenceReady = manualTrayEvidenceLooksReady(manualTrayEvidence);
 const wordManifestIdentity = readManifestIdentity(wordManifestPath);
 const excelManifestIdentity = readManifestIdentity(excelManifestPath);
 const powerPointManifestIdentity = readManifestIdentity(powerPointManifestPath);
@@ -181,13 +181,27 @@ function observationFor(surface: string): string | undefined {
   const explicit = readOption(`--${surface.replaceAll('_', '-')}`);
   if (explicit) return explicit;
   const logoSurface = renderedLogoReviewSurface(surface);
-  if (!logoSurface) return undefined;
-  const label = typeof logoSurface.label === 'string' ? logoSurface.label : surface.replaceAll('_', ' ');
-  return `${productName} rendered logo review ${label}`;
+  if (logoSurface) {
+    const label = typeof logoSurface.label === 'string' ? logoSurface.label : surface.replaceAll('_', ' ');
+    return `${productName} rendered logo review ${label}`;
+  }
+  if (manualTrayEvidenceReady && isTraySurface(surface)) return `${productName} manual tray evidence ${surface.replaceAll('_', ' ')}`;
+  return undefined;
 }
 
 function screenshotPathFor(surface: string): string | undefined {
-  return readOption(`--${surface.replaceAll('_', '-')}-screenshot`) ?? renderedLogoReviewScreenshotPath(surface);
+  return readOption(`--${surface.replaceAll('_', '-')}-screenshot`) ?? renderedLogoReviewScreenshotPath(surface) ?? manualTrayScreenshotPath(surface);
+}
+
+function manualTrayScreenshotPath(surface: string): string | undefined {
+  if (!manualTrayEvidenceReady || !isTraySurface(surface)) return undefined;
+  const paths = isRecord(manualTrayEvidence?.tray_surface_screenshot_paths) ? manualTrayEvidence.tray_surface_screenshot_paths : undefined;
+  const path = paths?.[surface];
+  return typeof path === 'string' ? path : undefined;
+}
+
+function isTraySurface(surface: string): boolean {
+  return ['tray_icon', 'tray_native_menu', 'tray_tooltip', 'tray_quit_confirmation'].includes(surface);
 }
 
 function renderedLogoReviewScreenshotPath(surface: string): string | undefined {

@@ -269,6 +269,7 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
   validateTrayMenuLabels(observedMenuItems, 'Embedded manual tray evidence');
   if (typeof manual.observed_tooltip !== 'string' || !trayTooltipLooksProductReady(manual.observed_tooltip)) failures.push('Embedded manual tray evidence missing product tray tooltip.');
   if (typeof manual.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(manual.screenshot_path))) failures.push('Embedded manual tray evidence screenshot file does not exist.');
+  validateEmbeddedManualTraySurfaceScreenshots(manual.tray_surface_screenshot_paths, manual.tray_surface_screenshots_exist);
   if (manual.daemon_context_ready !== true) failures.push('Embedded manual tray evidence daemon context is not recorder-ready.');
   validateManualTrayDaemonContext(manual.daemon_context);
   for (const [key, label] of [
@@ -280,6 +281,24 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
     ['passed', 'manual tray evidence passed']
   ] as const) {
     if (manual[key] !== true) failures.push(`Embedded manual tray evidence missing ${label}.`);
+  }
+}
+
+function validateEmbeddedManualTraySurfaceScreenshots(paths: unknown, exists: unknown): void {
+  if (!isRecord(paths)) {
+    failures.push('Embedded manual tray evidence missing tray surface screenshot paths.');
+    return;
+  }
+  if (!isRecord(exists)) {
+    failures.push('Embedded manual tray evidence missing tray surface screenshot existence flags.');
+    return;
+  }
+  for (const surface of trayVisualSurfaces()) {
+    const path = paths[surface];
+    if (typeof path !== 'string' || !screenshotFileLooksLikeImage(resolve(path))) {
+      failures.push(`Embedded manual tray evidence missing or invalid tray surface screenshot: ${surface}.`);
+    }
+    if (exists[surface] !== true) failures.push(`Embedded manual tray evidence missing ready flag for tray surface screenshot: ${surface}.`);
   }
 }
 
@@ -492,6 +511,15 @@ function validateProductVisualDaemonContext(context: unknown): void {
     : [];
   validateTrayMenuLabels(menuItems, 'Product visual daemon context live');
   validateStructuredTraySnapshot(snapshot, 'Product visual daemon context live');
+}
+
+function trayVisualSurfaces(): string[] {
+  return [
+    'tray_icon',
+    'tray_native_menu',
+    'tray_tooltip',
+    'tray_quit_confirmation'
+  ];
 }
 
 function productVisualSurfaces(): string[] {

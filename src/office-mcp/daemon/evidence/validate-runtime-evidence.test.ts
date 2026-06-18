@@ -681,6 +681,7 @@ function withProductVisualEvidence(passed: boolean, callback: (path: string) => 
       if (passed) writeFileSync(screenshotPath, tinyPng());
       screenshots[surface] = screenshotPath;
     }
+    if (passed) for (const path of Object.values(traySurfaceScreenshotPaths(screenshots.tray_icon))) writeFileSync(path, tinyPng());
     const path = join(dir, 'product-visual-evidence.json');
     writeFileSync(path, JSON.stringify(productVisualReport(passed, screenshots), null, 2));
     callback(path);
@@ -875,11 +876,28 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     expected_menu_items: ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'],
     menu_contains_required_items: passed,
     screenshot_path: screenshotPath,
+    tray_surface_screenshot_paths: traySurfaceScreenshotPaths(screenshotPath),
+    tray_surface_screenshots_exist: Object.fromEntries(trayVisualSurfaces().map((surface) => [surface, passed])),
     screenshot_exists: passed,
     daemon_context: manualTrayDaemonContext() as ReturnType<typeof manualTrayDaemonContext> | undefined,
     daemon_context_ready: passed,
     passed
   };
+}
+
+function traySurfaceScreenshotPaths(basePath: string): Record<string, string> {
+  const extensionIndex = basePath.toLowerCase().lastIndexOf('.png');
+  const prefix = extensionIndex === -1 ? basePath : basePath.slice(0, extensionIndex);
+  return Object.fromEntries(trayVisualSurfaces().map((surface) => [surface, `${prefix}-${surface}.png`]));
+}
+
+function trayVisualSurfaces(): string[] {
+  return [
+    'tray_icon',
+    'tray_native_menu',
+    'tray_tooltip',
+    'tray_quit_confirmation'
+  ];
 }
 
 function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP'], stateFetchOk = true) {

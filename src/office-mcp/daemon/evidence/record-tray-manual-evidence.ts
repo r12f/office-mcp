@@ -9,6 +9,7 @@ const repoRoot = resolve(evidenceRoot, '../../../..');
 const outputPath = resolve(readOption('--output') ?? join(repoRoot, 'artifacts/tray-manual-evidence.json'));
 const tester = readOption('--tester') ?? process.env.USERNAME ?? process.env.USER ?? 'unknown';
 const screenshotPath = readOption('--screenshot-path');
+const traySurfaceScreenshots = traySurfaceScreenshotPaths();
 const notes = readOption('--notes');
 const observedTooltip = readOption('--tooltip');
 const daemonBin = readOption('--daemon-bin');
@@ -24,6 +25,9 @@ const menuContainsRequiredItems = expectedItems.every((expected) =>
   observedMenuItems.some((item) => item.includes(expected))
 );
 const screenshotExists = screenshotPath ? screenshotFileLooksLikeImage(resolve(screenshotPath)) : false;
+const traySurfaceScreenshotsExist = Object.fromEntries(
+  Object.entries(traySurfaceScreenshots).map(([surface, path]) => [surface, typeof path === 'string' && screenshotFileLooksLikeImage(resolve(path))])
+);
 const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
@@ -47,6 +51,8 @@ const evidence = {
   tooltip_product_ready: tooltipLooksProductReady,
   screenshot_path: screenshotPath ? resolve(screenshotPath) : undefined,
   screenshot_exists: screenshotExists,
+  tray_surface_screenshot_paths: traySurfaceScreenshots,
+  tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
   daemon_context: daemonContext,
   daemon_context_ready: daemonContextReady,
   notes,
@@ -76,6 +82,20 @@ function readRepeatedOption(name: string): string[] {
     if (process.argv[index] === name && process.argv[index + 1]) values.push(process.argv[index + 1]);
   }
   return values;
+}
+
+function traySurfaceScreenshotPaths(): Record<string, string | undefined> {
+  return {
+    tray_icon: normalizedOptionPath('--tray-icon-screenshot'),
+    tray_native_menu: normalizedOptionPath('--tray-native-menu-screenshot'),
+    tray_tooltip: normalizedOptionPath('--tray-tooltip-screenshot'),
+    tray_quit_confirmation: normalizedOptionPath('--tray-quit-confirmation-screenshot')
+  };
+}
+
+function normalizedOptionPath(name: string): string | undefined {
+  const value = readOption(name);
+  return value ? resolve(value) : undefined;
 }
 
 function readDaemonContext(binaryPath: string): Record<string, unknown> {

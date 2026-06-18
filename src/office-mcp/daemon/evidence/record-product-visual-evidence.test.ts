@@ -16,6 +16,13 @@ const LOGO_SURFACES = [
   'logo-installer-metadata'
 ];
 
+const TRAY_SURFACES = [
+  'tray-icon',
+  'tray-native-menu',
+  'tray-tooltip',
+  'tray-quit-confirmation'
+];
+
 const SURFACES = [
   'word-ribbon-command',
   'word-catalog-entry',
@@ -91,6 +98,33 @@ test('product visual evidence recorder derives logo surfaces from rendered revie
       assert.equal(screenshotPaths[key], sheetPath);
       assert.equal(screenshotsExist[key], true);
       assert.match(observations[key], /Office MCP Control rendered logo review/);
+    }
+    assert.equal(evidence.product_text_ready, true);
+    assert.equal(evidence.passed, true);
+  });
+});
+
+test('product visual evidence recorder derives tray surfaces from manual tray artifact', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const manualTrayEvidencePath = writeManualTrayEvidence(dir);
+    const output = join(dir, 'derived-tray-surfaces.json');
+    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--manual-tray-evidence-path', manualTrayEvidencePath, '--skip-tray-surface-args');
+    assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    const screenshotPaths = evidence.screenshot_paths as Record<string, string>;
+    const screenshotsExist = evidence.screenshots_exist as Record<string, boolean>;
+    const observations = evidence.observations as Record<string, string>;
+    const manualTray = evidence.manual_tray_evidence as Record<string, unknown>;
+    const manualPaths = manualTray.tray_surface_screenshot_paths as Record<string, string>;
+
+    for (const surface of TRAY_SURFACES) {
+      const key = surface.replaceAll('-', '_');
+      assert.equal(screenshotPaths[key], manualPaths[key]);
+      assert.equal(screenshotsExist[key], true);
+      if (key === 'tray_tooltip') assert.equal(observations[key], 'Office MCP - Up - 0 clients - 0 documents');
+      else assert.match(observations[key], /Office MCP Control manual tray evidence/);
     }
     assert.equal(evidence.product_text_ready, true);
     assert.equal(evidence.passed, true);
@@ -199,7 +233,7 @@ test('product visual evidence recorder requires tray probe live state', () => {
     const daemonBin = writeFakeDaemon(dir, false);
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const output = join(dir, 'missing-live-state.json');
-    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--skip-manual-tray-evidence');
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.daemon_context_ready, false);
@@ -212,7 +246,7 @@ test('product visual evidence recorder requires live tray menu snapshot', () => 
     const daemonBin = writeFakeDaemon(dir, true, ['Status: Up', 'Clients: 0']);
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const output = join(dir, 'missing-menu-items.json');
-    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--skip-manual-tray-evidence');
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.daemon_context_ready, false);
@@ -226,7 +260,7 @@ test('product visual evidence recorder rejects truncated screenshots', () => {
     const daemonBin = writeFakeDaemon(dir);
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const output = join(dir, 'truncated-screenshot.json');
-    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--skip-manual-tray-evidence');
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal((evidence.screenshots_exist as Record<string, unknown>).tray_icon, false);
@@ -254,7 +288,9 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const skipProductReviewFlags = extra.includes('--skip-product-review-flags');
   const skipRenderedLogoAndFirstRunFlags = extra.includes('--skip-rendered-logo-and-first-run-flags');
   const skipLogoSurfaceArgs = extra.includes('--skip-logo-surface-args');
-  const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags' && item !== '--skip-rendered-logo-and-first-run-flags' && item !== '--skip-logo-surface-args');
+  const skipTraySurfaceArgs = extra.includes('--skip-tray-surface-args');
+  const skipManualTrayEvidence = extra.includes('--skip-manual-tray-evidence');
+  const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags' && item !== '--skip-rendered-logo-and-first-run-flags' && item !== '--skip-logo-surface-args' && item !== '--skip-tray-surface-args' && item !== '--skip-manual-tray-evidence');
   const hasWordManifest = filteredExtra.includes('--word-manifest-path');
   const hasExcelManifest = filteredExtra.includes('--excel-manifest-path');
   const hasPowerPointManifest = filteredExtra.includes('--powerpoint-manifest-path');
@@ -290,7 +326,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   if (!hasExcelManifest) args.push('--excel-manifest-path', writeManifest(outputDir, 'excel'));
   if (!hasPowerPointManifest) args.push('--powerpoint-manifest-path', writeManifest(outputDir, 'powerpoint'));
   if (!hasExcelRuntimeEvidence) args.push('--excel-runtime-evidence-path', writeExcelRuntimeEvidence(outputDir));
-  if (!hasManualTrayEvidence) args.push('--manual-tray-evidence-path', writeManualTrayEvidence(outputDir));
+  if (!hasManualTrayEvidence && !skipManualTrayEvidence) args.push('--manual-tray-evidence-path', writeManualTrayEvidence(outputDir));
   if (!skipProductReviewFlags) {
     args.push(
       '--logo-quality-reviewed', 'true',
@@ -308,6 +344,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   }
   for (const surface of SURFACES) {
     if (skipLogoSurfaceArgs && LOGO_SURFACES.includes(surface)) continue;
+    if (skipTraySurfaceArgs && TRAY_SURFACES.includes(surface)) continue;
     args.push(`--${surface}`, `Office MCP Control ${surface}`);
     args.push(`--${surface}-screenshot`, screenshots[surface]);
   }
@@ -420,9 +457,17 @@ function writeExcelRuntimeEvidence(dir: string, ready = true): string {
   return path;
 }
 
+function writeSurfaceScreenshot(dir: string, name: string): string {
+  const path = join(dir, name);
+  writeFileSync(path, tinyPng());
+  return path;
+}
+
 function writeManualTrayEvidence(dir: string, ready = true): string {
   const screenshotPath = join(dir, `manual-tray-${ready ? 'ready' : 'broken'}.png`);
   writeFileSync(screenshotPath, tinyPng());
+  const traySurfaceScreenshotPaths = Object.fromEntries(TRAY_SURFACES.map((surface) => [surface.replaceAll('-', '_'), writeSurfaceScreenshot(dir, `${surface}.png`)]));
+  const traySurfaceScreenshotsExist = Object.fromEntries(TRAY_SURFACES.map((surface) => [surface.replaceAll('-', '_'), ready]));
   const path = join(dir, `manual-tray-${ready ? 'ready' : 'broken'}.json`);
   writeFileSync(path, JSON.stringify({
     schema_version: 1,
@@ -436,6 +481,8 @@ function writeManualTrayEvidence(dir: string, ready = true): string {
     observed_menu_items: ready ? ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP'] : ['Status: Up'],
     observed_tooltip: 'Office MCP - Up - 0 clients - 0 documents',
     screenshot_path: screenshotPath,
+    tray_surface_screenshot_paths: traySurfaceScreenshotPaths,
+    tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
     daemon_context: manualTrayDaemonContext(ready),
     daemon_context_ready: ready,
     passed: ready

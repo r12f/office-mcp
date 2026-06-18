@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { tinyPng } from './image-evidence.js';
 
@@ -18,6 +18,10 @@ test('manual tray evidence recorder requires product tooltip', () => {
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.tooltip_product_ready, true);
     assert.equal(evidence.daemon_context_ready, true);
+    assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_icon, true);
+    assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_native_menu, true);
+    assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_tooltip, true);
+    assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_quit_confirmation, true);
     assert.equal(evidence.passed, true);
 
     const missingTooltip = runRecorder(join(dir, 'missing-tooltip.json'), screenshotPath, '--daemon-bin', daemonBin);
@@ -96,6 +100,11 @@ test('manual tray evidence recorder rejects truncated screenshots', () => {
 });
 
 function runRecorder(output: string, screenshotPath: string, ...extra: string[]): ReturnType<typeof spawnSync> {
+  const dir = dirname(output);
+  const trayIconScreenshot = writeSurfaceScreenshot(dir, 'tray-icon.png');
+  const trayNativeMenuScreenshot = writeSurfaceScreenshot(dir, 'tray-native-menu.png');
+  const trayTooltipScreenshot = writeSurfaceScreenshot(dir, 'tray-tooltip.png');
+  const trayQuitConfirmationScreenshot = writeSurfaceScreenshot(dir, 'tray-quit-confirmation.png');
   const skipNativeMenuReviewFlags = extra.includes('--skip-native-menu-review-flags');
   const filteredExtra = extra.filter((item) => item !== '--skip-native-menu-review-flags');
   const reviewArgs = skipNativeMenuReviewFlags ? [] : [
@@ -111,6 +120,10 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
     ...reviewArgs,
     '--show-ui-opened', 'true',
     '--screenshot-path', screenshotPath,
+    '--tray-icon-screenshot', trayIconScreenshot,
+    '--tray-native-menu-screenshot', trayNativeMenuScreenshot,
+    '--tray-tooltip-screenshot', trayTooltipScreenshot,
+    '--tray-quit-confirmation-screenshot', trayQuitConfirmationScreenshot,
     '--menu-item', 'Status: Up',
     '--menu-item', 'Clients: 0',
     '--menu-item', 'Documents: 0',
@@ -118,6 +131,12 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
     '--menu-item', 'Quit Office MCP',
     ...filteredExtra
   ], { cwd: process.cwd(), encoding: 'utf8' });
+}
+
+function writeSurfaceScreenshot(dir: string, name: string): string {
+  const path = join(dir, name);
+  writeFileSync(path, tinyPng());
+  return path;
 }
 
 function outputText(value: string | Buffer): string {
