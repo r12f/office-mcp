@@ -654,6 +654,12 @@ Latest UI feedback to preserve in implementation planning:
       `npm run evidence:record-product-visual -- --daemon-bin <path>`, tied to
       the same local daemon build under test, validated with
       `--require-product-visual`, and stored as release-checkable artifacts.
+      The product visual artifact must embed a passed
+      `catalog_identity_review` generated from the clean installed catalog
+      manifests, so ribbon/catalog/task pane screenshots are tied back to the
+      exact generated title, provider, description, command label, icon URLs,
+      shared daemon origin, and local productivity automation/control type that
+      Office should render.
       The product visual artifact must include a PowerPoint runtime evidence
       artifact proving an active presentation session, available tool count,
       add-slide, replace-text, layout mutation, and PDF success or explicit host

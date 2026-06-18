@@ -86,8 +86,10 @@ test('product visual evidence recorder requires all product surfaces', () => {
 test('README product visual evidence command matches current PowerPoint gates', () => {
   const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
   const commandLine = readme.split('\n').find((line) => line.includes('npm run evidence:record-product-visual')) ?? '';
+  const catalogIdentityLine = readme.split('\n').find((line) => line.includes('record-catalog-identity-review.mjs')) ?? '';
 
   for (const required of [
+    '--catalog-identity-review-path',
     '--powerpoint-runtime-evidence-path',
     '--powerpoint-ribbon-command',
     '--powerpoint-ribbon-command-screenshot',
@@ -95,13 +97,15 @@ test('README product visual evidence command matches current PowerPoint gates', 
     '--powerpoint-catalog-entry-screenshot',
     '--powerpoint-taskpane-title',
     '--powerpoint-taskpane-title-screenshot',
-    '--powerpoint-catalog-provider',
-    '--powerpoint-catalog-description',
-    '--powerpoint-catalog-type',
     '--powerpoint-first-run-identity-reviewed'
   ]) {
     assert.match(commandLine, new RegExp(required));
   }
+  assert.doesNotMatch(commandLine, /--powerpoint-catalog-provider/);
+  assert.doesNotMatch(commandLine, /--word-catalog-type/);
+  assert.match(catalogIdentityLine, /record-catalog-identity-review\.mjs/);
+  assert.match(catalogIdentityLine, /--catalog-path/);
+  assert.match(catalogIdentityLine, /--output .*catalog-identity-review\.json/);
 });
 
 test('README describes current Word Excel and PowerPoint product surface', () => {
@@ -425,10 +429,27 @@ test('product visual evidence recorder reads evidence artifact paths from enviro
     assert.equal(result.status, 0, outputText(result.stderr) || outputText(result.stdout));
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.rendered_logo_review_ready, true);
+    assert.equal(evidence.catalog_identity_review_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal(evidence.powerpoint_runtime_evidence_ready, true);
     assert.equal(evidence.manual_tray_evidence_ready, true);
     assert.equal(evidence.passed, true);
+  });
+});
+
+test('product visual evidence recorder requires catalog identity review artifact', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'missing-catalog-identity-review.json');
+    const missing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--skip-catalog-identity-review');
+    assert.notEqual(missing.status, 0);
+    let evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.catalog_identity_review_ready, false);
+
+    const broken = runRecorder(join(dir, 'broken-catalog-identity-review.json'), screenshots, '--daemon-bin', daemonBin, '--catalog-identity-review-path', writeCatalogIdentityReview(dir, false));
+    assert.notEqual(broken.status, 0);
+    evidence = JSON.parse(readFileSync(join(dir, 'broken-catalog-identity-review.json'), 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.catalog_identity_review_ready, false);
   });
 });
 
@@ -438,10 +459,12 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const skipLogoSurfaceArgs = extra.includes('--skip-logo-surface-args');
   const skipTraySurfaceArgs = extra.includes('--skip-tray-surface-args');
   const skipManualTrayEvidence = extra.includes('--skip-manual-tray-evidence');
+  const skipCatalogIdentityReview = extra.includes('--skip-catalog-identity-review');
   const envRenderedLogoReviewPath = optionValue(extra, '--env-rendered-logo-review-path');
   const envExcelRuntimeEvidencePath = optionValue(extra, '--env-excel-runtime-evidence-path');
   const envPowerPointRuntimeEvidencePath = optionValue(extra, '--env-powerpoint-runtime-evidence-path');
   const envManualTrayEvidencePath = optionValue(extra, '--env-manual-tray-evidence-path');
+  const envCatalogIdentityReviewPath = optionValue(extra, '--env-catalog-identity-review-path');
   const explicitTrayMenuSurfaceKind = extra.includes('--tray-menu-surface-kind');
   const explicitCatalogType = extra.includes('--catalog-type');
   const explicitWordCatalogType = extra.includes('--word-catalog-type');
@@ -449,16 +472,18 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const explicitPowerPointCatalogType = extra.includes('--powerpoint-catalog-type');
   const filteredExtra = extra.filter((item, index) => {
     const previous = extra[index - 1];
-    if (previous === '--env-rendered-logo-review-path' || previous === '--env-excel-runtime-evidence-path' || previous === '--env-powerpoint-runtime-evidence-path' || previous === '--env-manual-tray-evidence-path') return false;
+    if (previous === '--env-rendered-logo-review-path' || previous === '--env-excel-runtime-evidence-path' || previous === '--env-powerpoint-runtime-evidence-path' || previous === '--env-manual-tray-evidence-path' || previous === '--env-catalog-identity-review-path') return false;
     return item !== '--skip-product-review-flags'
       && item !== '--skip-rendered-logo-and-first-run-flags'
       && item !== '--skip-logo-surface-args'
       && item !== '--skip-tray-surface-args'
       && item !== '--skip-manual-tray-evidence'
+      && item !== '--skip-catalog-identity-review'
       && item !== '--env-rendered-logo-review-path'
       && item !== '--env-excel-runtime-evidence-path'
       && item !== '--env-powerpoint-runtime-evidence-path'
-      && item !== '--env-manual-tray-evidence-path';
+      && item !== '--env-manual-tray-evidence-path'
+      && item !== '--env-catalog-identity-review-path';
   });
   const hasWordManifest = filteredExtra.includes('--word-manifest-path');
   const hasExcelManifest = filteredExtra.includes('--excel-manifest-path');
@@ -466,6 +491,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const hasExcelRuntimeEvidence = filteredExtra.includes('--excel-runtime-evidence-path');
   const hasPowerPointRuntimeEvidence = filteredExtra.includes('--powerpoint-runtime-evidence-path');
   const hasManualTrayEvidence = filteredExtra.includes('--manual-tray-evidence-path');
+  const hasCatalogIdentityReview = filteredExtra.includes('--catalog-identity-review-path');
   const outputDir = dirname(output);
   const args = [
     TSX,
@@ -499,6 +525,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   if (!hasExcelRuntimeEvidence) args.push('--excel-runtime-evidence-path', writeExcelRuntimeEvidence(outputDir));
   if (!hasPowerPointRuntimeEvidence) args.push('--powerpoint-runtime-evidence-path', writePowerPointRuntimeEvidence(outputDir));
   if (!hasManualTrayEvidence && !skipManualTrayEvidence) args.push('--manual-tray-evidence-path', writeManualTrayEvidence(outputDir));
+  if (!hasCatalogIdentityReview && !skipCatalogIdentityReview) args.push('--catalog-identity-review-path', writeCatalogIdentityReview(outputDir));
   if (!skipProductReviewFlags) {
     args.push(
       '--logo-quality-reviewed', 'true',
@@ -526,7 +553,8 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     ...(envRenderedLogoReviewPath ? { OFFICE_MCP_RENDERED_LOGO_REVIEW_PATH: envRenderedLogoReviewPath } : {}),
     ...(envExcelRuntimeEvidencePath ? { OFFICE_MCP_EXCEL_RUNTIME_EVIDENCE_PATH: envExcelRuntimeEvidencePath } : {}),
     ...(envPowerPointRuntimeEvidencePath ? { OFFICE_MCP_POWERPOINT_RUNTIME_EVIDENCE_PATH: envPowerPointRuntimeEvidencePath } : {}),
-    ...(envManualTrayEvidencePath ? { OFFICE_MCP_TRAY_MANUAL_EVIDENCE_PATH: envManualTrayEvidencePath } : {})
+    ...(envManualTrayEvidencePath ? { OFFICE_MCP_TRAY_MANUAL_EVIDENCE_PATH: envManualTrayEvidencePath } : {}),
+    ...(envCatalogIdentityReviewPath ? { OFFICE_MCP_CATALOG_IDENTITY_REVIEW_PATH: envCatalogIdentityReviewPath } : {})
   };
   return spawnSync(process.execPath, args, { cwd: process.cwd(), encoding: 'utf8', env });
 }
@@ -752,6 +780,42 @@ function writeManualTrayEvidence(dir: string, ready = true): string {
     passed: ready
   }, null, 2));
   return path;
+}
+
+function writeCatalogIdentityReview(dir: string, ready = true): string {
+  const path = join(dir, `catalog-identity-${ready ? 'ready' : 'broken'}.json`);
+  const hosts = Object.fromEntries(['word', 'excel', 'powerpoint'].map((host) => [host, catalogIdentityHost(host, ready)]));
+  writeFileSync(path, JSON.stringify({
+    schema_version: 1,
+    kind: 'catalog_identity_review',
+    product_name: 'Office MCP Control',
+    catalog_path: dir,
+    catalog_type: ready ? 'Local productivity automation control utility' : 'Task Pane Add-in protocol bridge',
+    shared_origin: ready ? 'https://localhost:8765' : null,
+    hosts,
+    ready,
+    failures: ready ? [] : ['Catalog type is not product-ready.']
+  }, null, 2));
+  return path;
+}
+
+function catalogIdentityHost(host: string, ready = true): Record<string, unknown> {
+  const taskpanePath = host === 'powerpoint' ? '/powerpoint/taskpane.html' : `/${host}/taskpane.html`;
+  return {
+    key: host,
+    label: host === 'word' ? 'Word' : host === 'excel' ? 'Excel' : 'PowerPoint',
+    display_name: ready ? 'Office MCP Control' : `office-mcp-${host}`,
+    provider: ready ? 'Office MCP Control' : 'office-mcp',
+    description: ready ? 'Control live documents through a local productivity automation control utility.' : 'Experimental protocol bridge debug panel.',
+    icon_url: ready ? 'https://localhost:8765/assets/icon-32.png' : 'https://localhost:8765/assets/blank.png',
+    high_resolution_icon_url: ready ? 'https://localhost:8765/assets/icon-80.png' : 'https://localhost:8765/assets/blank.png',
+    command_label: ready ? 'Open Control Panel' : 'Open',
+    tooltip: ready ? 'Open Office MCP Control.' : 'Open task pane.',
+    taskpane_url: `https://localhost:8765${taskpanePath}?v=0.1.0`,
+    origin: ready ? 'https://localhost:8765' : null,
+    ready,
+    failures: ready ? [] : ['Prototype metadata.']
+  };
 }
 
 function manualTrayDaemonContext(ready = true) {

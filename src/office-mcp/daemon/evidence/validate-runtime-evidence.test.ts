@@ -486,6 +486,20 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.catalog_identity_review_ready = false;
+      broken.catalog_identity_review.ready = false;
+      broken.catalog_identity_review.hosts.word.display_name = 'office-mcp-word';
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /catalog identity review ready flag/);
+      assert.match(outputText(result.stdout), /Catalog identity review missing Word product display name/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.rendered_logo_review.design_review.concept_pass = {
         ready: false,
         selected_direction: '',
@@ -790,6 +804,8 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     product_text_ready: passed,
     catalog_type: 'Local productivity automation control utility',
     catalog_type_ready: passed,
+    catalog_identity_review: catalogIdentityReview(passed),
+    catalog_identity_review_ready: passed,
     catalog_icon_visible: passed,
     tray_tooltip: 'Office MCP - Up - 0 clients - 0 documents',
     tray_tooltip_ready: passed,
@@ -866,6 +882,42 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     daemon_context: manualTrayDaemonContext(),
     daemon_context_ready: passed,
     passed
+  };
+}
+
+function catalogIdentityReview(passed: boolean) {
+  return {
+    ok: passed,
+    schema_version: 1,
+    kind: 'catalog_identity_review',
+    product_name: 'Office MCP Control',
+    catalog_path: 'C:\\catalog',
+    catalog_type: passed ? 'Local productivity automation control utility' : 'Task Pane Add-in protocol bridge',
+    shared_origin: passed ? 'https://localhost:8765' : null,
+    hosts: {
+      word: catalogIdentityHost('word', passed),
+      excel: catalogIdentityHost('excel', passed),
+      powerpoint: catalogIdentityHost('powerpoint', passed)
+    },
+    ready: passed,
+    failures: passed ? [] : ['Catalog type is not product-ready.']
+  };
+}
+
+function catalogIdentityHost(host: string, passed: boolean) {
+  const taskpanePath = host === 'powerpoint' ? '/powerpoint/taskpane.html' : `/${host}/taskpane.html`;
+  return {
+    key: host,
+    label: host === 'word' ? 'Word' : host === 'excel' ? 'Excel' : 'PowerPoint',
+    display_name: passed ? 'Office MCP Control' : `office-mcp-${host}`,
+    provider: passed ? 'Office MCP Control' : 'office-mcp',
+    description: passed ? 'Control live documents through a local productivity automation control utility.' : 'Experimental protocol bridge debug panel.',
+    command_label: passed ? 'Open Control Panel' : 'Open',
+    taskpane_url: `https://localhost:8765${taskpanePath}?v=0.1.0`,
+    icon_url: passed ? 'https://localhost:8765/assets/icon-32.png' : 'https://localhost:8765/assets/blank.png',
+    high_resolution_icon_url: passed ? 'https://localhost:8765/assets/icon-80.png' : 'https://localhost:8765/assets/blank.png',
+    ready: passed,
+    failures: passed ? [] : ['Prototype metadata.']
   };
 }
 

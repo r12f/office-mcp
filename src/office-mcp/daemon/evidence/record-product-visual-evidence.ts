@@ -14,6 +14,7 @@ const renderedLogoReviewPath = readOption('--rendered-logo-review-path') ?? proc
 const excelRuntimeEvidencePath = readOption('--excel-runtime-evidence-path') ?? process.env.OFFICE_MCP_EXCEL_RUNTIME_EVIDENCE_PATH;
 const powerPointRuntimeEvidencePath = readOption('--powerpoint-runtime-evidence-path') ?? process.env.OFFICE_MCP_POWERPOINT_RUNTIME_EVIDENCE_PATH;
 const manualTrayEvidencePath = readOption('--manual-tray-evidence-path') ?? process.env.OFFICE_MCP_TRAY_MANUAL_EVIDENCE_PATH;
+const catalogIdentityReviewPath = readOption('--catalog-identity-review-path') ?? process.env.OFFICE_MCP_CATALOG_IDENTITY_REVIEW_PATH;
 const wordManifestPath = resolve(readOption('--word-manifest-path') ?? join(repoRoot, 'src/office-ctl/word/manifest.xml'));
 const excelManifestPath = resolve(readOption('--excel-manifest-path') ?? join(repoRoot, 'src/office-ctl/excel/manifest.xml'));
 const powerPointManifestPath = resolve(readOption('--powerpoint-manifest-path') ?? join(repoRoot, 'src/office-ctl/powerpoint/manifest.xml'));
@@ -22,6 +23,8 @@ const renderedLogoReview = renderedLogoReviewPath ? readRenderedLogoReview(resol
 const renderedLogoReviewReady = renderedLogoReviewLooksReady(renderedLogoReview);
 const manualTrayEvidence = manualTrayEvidencePath ? readManualTrayEvidence(resolve(manualTrayEvidencePath)) : undefined;
 const manualTrayEvidenceReady = manualTrayEvidenceLooksReady(manualTrayEvidence);
+const catalogIdentityReview = catalogIdentityReviewPath ? readCatalogIdentityReview(resolve(catalogIdentityReviewPath)) : undefined;
+const catalogIdentityReviewReady = catalogIdentityReviewLooksReady(catalogIdentityReview);
 
 const requiredSurfaces = [
   'word_ribbon_command',
@@ -50,7 +53,7 @@ const screenshotsExist = Object.fromEntries(
   requiredSurfaces.map((surface) => [surface, typeof screenshotPaths[surface] === 'string' && screenshotFileLooksLikeImage(resolve(screenshotPaths[surface] as string))])
 );
 const trayTooltip = readOption('--tray-tooltip');
-const catalogType = readOption('--catalog-type');
+const catalogType = readOption('--catalog-type') ?? (typeof catalogIdentityReview?.catalog_type === 'string' ? catalogIdentityReview.catalog_type : undefined);
 const catalogIconVisible = booleanFlag('--catalog-icon-visible');
 const trayMenuNative = booleanFlag('--tray-menu-native');
 const trayMenuSurfaceKind = readOption('--tray-menu-surface-kind') ?? (typeof manualTrayEvidence?.tray_menu_surface_kind === 'string' ? manualTrayEvidence.tray_menu_surface_kind : undefined);
@@ -64,15 +67,15 @@ const renderedSizeLogoReviewed = booleanFlag('--rendered-size-logo-reviewed');
 const wordFirstRunIdentityReviewed = booleanFlag('--word-first-run-identity-reviewed');
 const excelFirstRunIdentityReviewed = booleanFlag('--excel-first-run-identity-reviewed');
 const powerPointFirstRunIdentityReviewed = booleanFlag('--powerpoint-first-run-identity-reviewed');
-const wordCatalogProvider = readOption('--word-catalog-provider');
-const wordCatalogDescription = readOption('--word-catalog-description');
-const wordCatalogType = readOption('--word-catalog-type');
-const excelCatalogProvider = readOption('--excel-catalog-provider');
-const excelCatalogDescription = readOption('--excel-catalog-description');
-const excelCatalogType = readOption('--excel-catalog-type');
-const powerPointCatalogProvider = readOption('--powerpoint-catalog-provider');
-const powerPointCatalogDescription = readOption('--powerpoint-catalog-description');
-const powerPointCatalogType = readOption('--powerpoint-catalog-type');
+const wordCatalogProvider = readOption('--word-catalog-provider') ?? catalogIdentityHostValue('word', 'provider');
+const wordCatalogDescription = readOption('--word-catalog-description') ?? catalogIdentityHostValue('word', 'description');
+const wordCatalogType = readOption('--word-catalog-type') ?? (catalogIdentityReviewReady ? catalogType : undefined);
+const excelCatalogProvider = readOption('--excel-catalog-provider') ?? catalogIdentityHostValue('excel', 'provider');
+const excelCatalogDescription = readOption('--excel-catalog-description') ?? catalogIdentityHostValue('excel', 'description');
+const excelCatalogType = readOption('--excel-catalog-type') ?? (catalogIdentityReviewReady ? catalogType : undefined);
+const powerPointCatalogProvider = readOption('--powerpoint-catalog-provider') ?? catalogIdentityHostValue('powerpoint', 'provider');
+const powerPointCatalogDescription = readOption('--powerpoint-catalog-description') ?? catalogIdentityHostValue('powerpoint', 'description');
+const powerPointCatalogType = readOption('--powerpoint-catalog-type') ?? (catalogIdentityReviewReady ? catalogType : undefined);
 const excelCompactTopBlock = booleanFlag('--excel-compact-top-block');
 const excelToolsPermissionsMerged = booleanFlag('--excel-tools-permissions-merged');
 const excelInlineSettings = booleanFlag('--excel-inline-settings');
@@ -118,6 +121,8 @@ const evidence = {
   product_text_ready: productTextReady,
   catalog_type: catalogType,
   catalog_type_ready: catalogTypeReady,
+  catalog_identity_review: catalogIdentityReview,
+  catalog_identity_review_ready: catalogIdentityReviewReady,
   catalog_icon_visible: catalogIconVisible,
   tray_tooltip: trayTooltip,
   tray_tooltip_ready: trayTooltipReady,
@@ -474,6 +479,43 @@ function readManualTrayEvidence(path: string): Record<string, unknown> {
   } catch (error) {
     return { path, ok: false, error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+function readCatalogIdentityReview(path: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    return { path, ok: true, ...parsed };
+  } catch (error) {
+    return { path, ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function catalogIdentityReviewLooksReady(review: Record<string, unknown> | undefined): boolean {
+  if (!review) return false;
+  if (review.ok !== true || review.schema_version !== 1 || review.kind !== 'catalog_identity_review' || review.product_name !== productName || review.ready !== true) return false;
+  if (!productCatalogTypeLooksReady(review.catalog_type)) return false;
+  if (typeof review.shared_origin !== 'string' || !/^https:\/\/localhost:\d+$/.test(review.shared_origin)) return false;
+  const hosts = isRecord(review.hosts) ? review.hosts : {};
+  return ['word', 'excel', 'powerpoint'].every((host) => catalogIdentityHostLooksReady(hosts[host]));
+}
+
+function catalogIdentityHostLooksReady(host: unknown): boolean {
+  if (!isRecord(host)) return false;
+  return host.ready === true
+    && host.display_name === productName
+    && host.provider === productName
+    && typeof host.description === 'string' && /local productivity automation control utility/i.test(host.description)
+    && host.command_label === 'Open Control Panel'
+    && typeof host.icon_url === 'string' && /\/assets\/icon-32\.png$/.test(host.icon_url)
+    && typeof host.high_resolution_icon_url === 'string' && /\/assets\/icon-80\.png$/.test(host.high_resolution_icon_url);
+}
+
+function catalogIdentityHostValue(host: string, field: string): string | undefined {
+  if (!catalogIdentityReviewReady || !isRecord(catalogIdentityReview?.hosts)) return undefined;
+  const hostReview = catalogIdentityReview.hosts[host];
+  if (!isRecord(hostReview)) return undefined;
+  const value = hostReview[field];
+  return typeof value === 'string' ? value : undefined;
 }
 
 function manualTrayEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {

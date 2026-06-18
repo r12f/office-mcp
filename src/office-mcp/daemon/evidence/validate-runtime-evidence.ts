@@ -258,6 +258,7 @@ function validateProductVisualEvidence(): void {
   validateDistinctProductVisualScreenshots(visual.screenshot_paths);
   validateProductVisualObservations(visual.observations);
   validateProductIdentityReview(visual.product_identity_review);
+  validateCatalogIdentityReview(visual.catalog_identity_review, visual.catalog_identity_review_ready);
   validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
   validateFirstRunIdentity(visual.first_run_identity);
   validatePowerPointRuntimeEvidence(visual.powerpoint_runtime_evidence, visual.powerpoint_runtime_evidence_ready);
@@ -266,6 +267,43 @@ function validateProductVisualEvidence(): void {
     failures.push('Product visual evidence daemon context is not recorder-ready.');
   }
   validateProductVisualDaemonContext(visual.daemon_context);
+}
+
+function validateCatalogIdentityReview(review: unknown, ready: unknown): void {
+  if (ready !== true) failures.push('Product visual evidence missing catalog identity review ready flag.');
+  if (!isRecord(review)) {
+    failures.push('Product visual evidence missing catalog identity review.');
+    return;
+  }
+  if (review.ok !== true) failures.push('Product visual catalog identity review was not read successfully.');
+  if (review.schema_version !== 1) failures.push(`Unsupported catalog identity review schema_version: ${review.schema_version}`);
+  if (review.kind !== 'catalog_identity_review') failures.push(`Unsupported catalog identity review kind: ${review.kind ?? 'missing'}`);
+  if (review.product_name !== 'Office MCP Control') failures.push('Catalog identity review missing Office MCP Control product name.');
+  if (review.ready !== true) failures.push('Catalog identity review is not ready.');
+  if (!productCatalogTypeLooksReady(review.catalog_type)) failures.push('Catalog identity review missing mature local productivity automation/control type metadata.');
+  if (typeof review.shared_origin !== 'string' || !/^https:\/\/localhost:\d+$/.test(review.shared_origin)) failures.push('Catalog identity review missing shared local daemon origin.');
+  if (!isRecord(review.hosts)) {
+    failures.push('Catalog identity review missing host details.');
+    return;
+  }
+  validateCatalogIdentityHost(review.hosts.word, 'Word', '/word/taskpane.html');
+  validateCatalogIdentityHost(review.hosts.excel, 'Excel', '/excel/taskpane.html');
+  validateCatalogIdentityHost(review.hosts.powerpoint, 'PowerPoint', '/powerpoint/taskpane.html');
+}
+
+function validateCatalogIdentityHost(host: unknown, label: string, taskpanePath: string): void {
+  if (!isRecord(host)) {
+    failures.push(`Catalog identity review missing ${label} details.`);
+    return;
+  }
+  if (host.ready !== true) failures.push(`Catalog identity review missing ${label} ready flag.`);
+  if (host.display_name !== 'Office MCP Control') failures.push(`Catalog identity review missing ${label} product display name.`);
+  if (host.provider !== 'Office MCP Control') failures.push(`Catalog identity review missing ${label} product provider.`);
+  if (typeof host.description !== 'string' || !/local productivity automation control utility/i.test(host.description)) failures.push(`Catalog identity review missing ${label} product description.`);
+  if (host.command_label !== 'Open Control Panel') failures.push(`Catalog identity review missing ${label} Open Control Panel command label.`);
+  if (typeof host.taskpane_url !== 'string' || !host.taskpane_url.includes(taskpanePath)) failures.push(`Catalog identity review missing ${label} task pane URL.`);
+  if (typeof host.icon_url !== 'string' || !/\/assets\/icon-32\.png$/.test(host.icon_url)) failures.push(`Catalog identity review missing ${label} generated icon URL.`);
+  if (typeof host.high_resolution_icon_url !== 'string' || !/\/assets\/icon-80\.png$/.test(host.high_resolution_icon_url)) failures.push(`Catalog identity review missing ${label} generated high-resolution icon URL.`);
 }
 
 function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): void {
