@@ -48,6 +48,7 @@ test('Word add-in uses product identity metadata and generated icons', () => {
   assert.doesNotMatch(manifest, /DefaultValue="office-mcp"/);
   assert.doesNotMatch(manifest, /DefaultValue="Open"/);
   assert.match(html, /<title>Office MCP Control<\/title>/);
+  assert.match(html, /<img class="product-mark" src="\/assets\/icon-32\.png" width="32" height="32" alt="" aria-hidden="true" \/>/);
   assert.match(html, /<h1>Office MCP Control<\/h1>/);
   for (const size of [16, 20, 24, 32, 48, 64, 80, 128, 256]) {
     const png = readFileSync(join(assetRoot, `icon-${size}.png`));
@@ -229,6 +230,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.ok(html.indexOf('id="toolList"') < html.indexOf('id="settingsPanel"'));
   assert.match(css, /:focus-visible/);
   assert.match(css, /\.summary-panel/);
+  assert.match(css, /\.identity \{[\s\S]*grid-template-columns: 32px minmax\(0, 1fr\);/);
+  assert.match(css, /\.product-mark \{[\s\S]*width: 32px;[\s\S]*height: 32px;/);
   assert.match(css, /\.tool-list/);
   assert.match(css, /\.settings-panel/);
   assert.match(css, /\.settings-panel\[hidden\] \{[\s\S]*display: none;/);

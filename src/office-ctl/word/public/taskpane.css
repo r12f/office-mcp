@@ -84,6 +84,21 @@ a:focus-visible {
 
 .identity {
   display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.product-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  flex: 0 0 auto;
+}
+
+.identity-copy {
+  display: grid;
   min-width: 0;
   gap: 4px;
 }
