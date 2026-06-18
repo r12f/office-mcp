@@ -317,6 +317,12 @@ User-reported follow-up from live Excel task pane testing:
       editable/read-only/protected state. The visual portion must be recorded
       with `npm run evidence:record-product-visual` using the Excel task pane
       density flags and then validated with `--require-product-visual`.
+      Product visual evidence now also has to bind to a passed
+      `artifacts/runtime-evidence-excel.json` smoke run, proving the screenshot
+      is tied to an active Excel session, workbook title, available tool count,
+      marker readback, and the read/write/formula/format/table/chart/sheet smoke
+      operations. This item remains open until the runtime-bound evidence also
+      includes the live Excel task pane screenshot.
 
 **Exit criterion**: In a 320 px Office task pane, a connected editable Excel
 workbook does not show duplicated tool lists or `unknown` document state; tools

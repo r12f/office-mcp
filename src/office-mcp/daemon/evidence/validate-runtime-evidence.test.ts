@@ -257,6 +257,22 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.excel_taskpane.runtime_evidence_ready = false;
+      broken.excel_taskpane.runtime_evidence.smoke_details.marker_found = false;
+      (broken.excel_taskpane.runtime_evidence.smoke_details as Record<string, unknown>).chart = {};
+      broken.excel_taskpane.density_ready = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Excel runtime evidence ready flag/);
+      assert.match(outputText(result.stdout), /Excel runtime evidence missing marker readback/);
+      assert.match(outputText(result.stdout), /Excel runtime evidence missing create_chart proof/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.daemon_context = undefined as unknown as ReturnType<typeof manualTrayDaemonContext>;
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -663,11 +679,43 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       server_protocol_row_ready: passed,
       document_state: 'Editable',
       document_state_ready: passed,
+      runtime_evidence: excelRuntimeEvidence(passed),
+      runtime_evidence_ready: passed,
       density_ready: passed
     },
     daemon_context: manualTrayDaemonContext(),
     daemon_context_ready: passed,
     passed
+  };
+}
+
+function excelRuntimeEvidence(passed: boolean) {
+  const sessionId = '11111111-2222-3333-4444-555555555555';
+  return {
+    ok: passed,
+    schema_version: 1,
+    endpoint: 'http://127.0.0.1:8800/mcp',
+    generated_at: new Date().toISOString(),
+    smoke_passed: passed,
+    ready: passed,
+    session: {
+      app: 'excel',
+      status: 'active',
+      session_id: sessionId,
+      available_tool_count: 7,
+      document: { title: 'Excel Workbook' },
+      host: { app: 'excel', platform: 'pc', version: '16.0' }
+    },
+    smoke_details: {
+      session_id: sessionId,
+      marker_found: passed,
+      write: { wrote_values: passed },
+      formula: { wrote_formula: passed },
+      format: { formatted: passed },
+      table: { table: 'OfficeMcpTable' },
+      chart: { chart: 'Chart 1' },
+      sheet: { activated: passed }
+    }
   };
 }
 

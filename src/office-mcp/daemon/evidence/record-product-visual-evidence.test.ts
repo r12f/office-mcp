@@ -30,8 +30,9 @@ test('product visual evidence recorder requires all product surfaces', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const excelRuntimeEvidencePath = writeExcelRuntimeEvidence(dir);
     const output = join(dir, 'product-visual-evidence.json');
-    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
+    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-runtime-evidence-path', excelRuntimeEvidencePath);
     assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.kind, 'product_visual_evidence');
@@ -39,6 +40,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal(evidence.catalog_type_ready, true);
     assert.equal(evidence.tray_tooltip_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
+    assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).excel.ready, true);
@@ -50,7 +52,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
 
     const missingScreenshots = { ...screenshots };
     missingScreenshots['tray-native-menu'] = join(dir, 'missing-tray-menu.png');
-    const missingTray = runRecorder(join(dir, 'missing-tray.json'), missingScreenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
+    const missingTray = runRecorder(join(dir, 'missing-tray.json'), missingScreenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-runtime-evidence-path', excelRuntimeEvidencePath);
     assert.notEqual(missingTray.status, 0);
     const failed = JSON.parse(outputText(missingTray.stdout)) as Record<string, unknown>;
     assert.equal(failed.passed, false);
@@ -103,6 +105,24 @@ test('product visual evidence recorder requires rendered logo review artifact', 
     assert.notEqual(broken.status, 0);
     evidence = JSON.parse(outputText(broken.stdout)) as Record<string, unknown>;
     assert.equal(evidence.rendered_logo_review_ready, false);
+  });
+});
+
+test('product visual evidence recorder requires Excel runtime evidence', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const output = join(dir, 'missing-excel-runtime-evidence.json');
+    const missing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-runtime-evidence-path', join(dir, 'missing-excel.json'));
+    assert.notEqual(missing.status, 0);
+    let evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
+    assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, false);
+
+    const broken = runRecorder(join(dir, 'broken-excel-runtime-evidence.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-runtime-evidence-path', writeExcelRuntimeEvidence(dir, false));
+    assert.notEqual(broken.status, 0);
+    evidence = JSON.parse(outputText(broken.stdout)) as Record<string, unknown>;
+    assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
   });
 });
 
@@ -180,6 +200,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags' && item !== '--skip-rendered-logo-and-first-run-flags');
   const hasWordManifest = filteredExtra.includes('--word-manifest-path');
   const hasExcelManifest = filteredExtra.includes('--excel-manifest-path');
+  const hasExcelRuntimeEvidence = filteredExtra.includes('--excel-runtime-evidence-path');
   const outputDir = dirname(output);
   const args = [
     TSX,
@@ -205,6 +226,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   ];
   if (!hasWordManifest) args.push('--word-manifest-path', writeManifest(outputDir, 'word'));
   if (!hasExcelManifest) args.push('--excel-manifest-path', writeManifest(outputDir, 'excel'));
+  if (!hasExcelRuntimeEvidence) args.push('--excel-runtime-evidence-path', writeExcelRuntimeEvidence(outputDir));
   if (!skipProductReviewFlags) {
     args.push(
       '--logo-quality-reviewed', 'true',
@@ -296,6 +318,39 @@ function writeManifest(dir: string, host: 'word' | 'excel'): string {
   <HighResolutionIconUrl DefaultValue="https://localhost:8765/assets/icon-80.png" />
 </OfficeApp>
 `);
+  return path;
+}
+
+function writeExcelRuntimeEvidence(dir: string, ready = true): string {
+  const path = join(dir, `excel-runtime-${ready ? 'ready' : 'broken'}.json`);
+  const sessionId = '11111111-2222-3333-4444-555555555555';
+  const sessions = ready ? [{
+    app: 'excel',
+    available_tool_count: 7,
+    document: { title: 'Excel Workbook' },
+    host: { app: 'excel', platform: 'pc', version: '16.0' },
+    session_id: sessionId,
+    status: 'active'
+  }] : [];
+  const smokeDetails = {
+    session_id: sessionId,
+    marker_found: ready,
+    write: { wrote_values: ready },
+    formula: { wrote_formula: ready },
+    format: { formatted: ready },
+    table: ready ? { table: 'OfficeMcpTable' } : {},
+    chart: ready ? { chart: 'Chart 1' } : {},
+    sheet: { activated: ready }
+  };
+  writeFileSync(path, JSON.stringify({
+    schema_version: 1,
+    generated_at: new Date().toISOString(),
+    endpoint: 'http://127.0.0.1:8800/mcp',
+    gates: [
+      { name: 'word.session_discovery', status: 'passed', details: { sessions } },
+      { name: 'excel.runtime_smoke', status: ready ? 'passed' : 'failed', details: smokeDetails }
+    ]
+  }, null, 2));
   return path;
 }
 

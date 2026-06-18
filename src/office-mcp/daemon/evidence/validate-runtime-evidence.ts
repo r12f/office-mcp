@@ -360,7 +360,40 @@ function validateExcelTaskpaneVisualEvidence(taskpane: unknown): void {
   if (typeof taskpane.document_state !== 'string' || !/^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(taskpane.document_state) || /unknown/i.test(taskpane.document_state)) {
     failures.push('Product visual evidence missing concrete Excel editable/read-only/protected state.');
   }
+  validateExcelRuntimeEvidence(taskpane.runtime_evidence, taskpane.runtime_evidence_ready);
   if (taskpane.density_ready !== true) failures.push('Product visual evidence missing Excel task pane density pass flag.');
+}
+
+function validateExcelRuntimeEvidence(evidence: unknown, ready: unknown): void {
+  if (ready !== true) failures.push('Product visual evidence missing Excel runtime evidence ready flag.');
+  if (!isRecord(evidence)) {
+    failures.push('Product visual evidence missing Excel runtime evidence details.');
+    return;
+  }
+  if (evidence.ok !== true) failures.push('Product visual Excel runtime evidence was not read successfully.');
+  if (evidence.schema_version !== 1) failures.push(`Unsupported Excel runtime evidence schema_version: ${evidence.schema_version}`);
+  if (evidence.smoke_passed !== true) failures.push('Product visual evidence missing passed Excel runtime smoke gate.');
+  if (evidence.ready !== true) failures.push('Product visual Excel runtime evidence is not ready.');
+  const session = evidence.session;
+  const details = evidence.smoke_details;
+  if (!isRecord(session) || !isRecord(details)) {
+    failures.push('Product visual Excel runtime evidence missing session or smoke details.');
+    return;
+  }
+  const document = isRecord(session.document) ? session.document : undefined;
+  const host = isRecord(session.host) ? session.host : undefined;
+  if (session.app !== 'excel' || session.status !== 'active') failures.push('Product visual Excel runtime evidence missing active Excel session.');
+  if (typeof session.session_id !== 'string' || details.session_id !== session.session_id) failures.push('Product visual Excel runtime evidence session_id mismatch.');
+  if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual Excel runtime evidence missing workbook title.');
+  if (host?.app !== 'excel') failures.push('Product visual Excel runtime evidence missing Excel host metadata.');
+  if (typeof session.available_tool_count !== 'number' || session.available_tool_count < 7) failures.push('Product visual Excel runtime evidence missing available tool count.');
+  if (details.marker_found !== true) failures.push('Product visual Excel runtime evidence missing marker readback.');
+  if (!isRecord(details.write) || details.write.wrote_values !== true) failures.push('Product visual Excel runtime evidence missing write_range proof.');
+  if (!isRecord(details.formula) || details.formula.wrote_formula !== true) failures.push('Product visual Excel runtime evidence missing set_formula proof.');
+  if (!isRecord(details.format) || details.format.formatted !== true) failures.push('Product visual Excel runtime evidence missing format_range proof.');
+  if (!isRecord(details.table) || typeof details.table.table !== 'string') failures.push('Product visual Excel runtime evidence missing create_table proof.');
+  if (!isRecord(details.chart) || typeof details.chart.chart !== 'string') failures.push('Product visual Excel runtime evidence missing create_chart proof.');
+  if (!isRecord(details.sheet) || details.sheet.activated !== true) failures.push('Product visual Excel runtime evidence missing add_sheet activation proof.');
 }
 
 function validateProductVisualDaemonContext(context: unknown): void {
