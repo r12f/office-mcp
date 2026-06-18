@@ -54,8 +54,31 @@ const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
     },
 ];
 
+const POWERPOINT_V1_TOOLS: &[PowerPointToolDefinition] = &[
+    PowerPointToolDefinition {
+        name: "powerpoint.add_slide",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.apply_layout",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.export_pdf",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.insert_image",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.replace_text",
+    },
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExcelToolDefinition {
+    pub name: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PowerPointToolDefinition {
     pub name: &'static str,
 }
 
@@ -66,6 +89,21 @@ impl ExcelToolCatalog {
     #[must_use]
     pub const fn tools() -> &'static [ExcelToolDefinition] {
         EXCEL_V1_TOOLS
+    }
+
+    #[must_use]
+    pub fn contains(name: &str) -> bool {
+        Self::tools().iter().any(|tool| tool.name == name)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PowerPointToolCatalog;
+
+impl PowerPointToolCatalog {
+    #[must_use]
+    pub const fn tools() -> &'static [PowerPointToolDefinition] {
+        POWERPOINT_V1_TOOLS
     }
 
     #[must_use]
@@ -100,6 +138,13 @@ pub fn tool_catalog_json() -> Vec<Value> {
             tool.name,
             tool.name,
             "Forward this Excel tool call to the selected Office workbook session.",
+        )
+    }));
+    tools.extend(PowerPointToolCatalog::tools().iter().map(|tool| {
+        tool_json(
+            tool.name,
+            tool.name,
+            "Forward this PowerPoint tool call to the selected Office presentation session.",
         )
     }));
     tools

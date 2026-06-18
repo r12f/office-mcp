@@ -17,6 +17,8 @@ fn tools_list_contains_office_word_and_excel_tools() {
     assert!(names.contains(&"office.list_sessions"));
     assert!(names.contains(&"word.get_text"));
     assert!(names.contains(&"excel.read_range"));
+    assert!(names.contains(&"powerpoint.add_slide"));
+    assert!(names.contains(&"powerpoint.replace_text"));
 }
 
 #[test]

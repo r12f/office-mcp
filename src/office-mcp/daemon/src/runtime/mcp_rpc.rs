@@ -5,8 +5,8 @@ use crate::addin_mgr::{
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::mcp::{
-    ExcelToolCatalog, ResourceReadRequest, WORD_V1_TOOLS, resource_request_from_uri, tool_failure,
-    tool_success,
+    ExcelToolCatalog, PowerPointToolCatalog, ResourceReadRequest, WORD_V1_TOOLS,
+    resource_request_from_uri, tool_failure, tool_success,
 };
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_catalog_response::McpCatalogResponder;
@@ -135,6 +135,9 @@ impl McpJsonRpcRuntime {
                 Self::call_forwarded_tool(context, value, tool, arguments)
             }
             tool if ExcelToolCatalog::contains(tool) => {
+                Self::call_forwarded_tool(context, value, tool, arguments)
+            }
+            tool if PowerPointToolCatalog::contains(tool) => {
                 Self::call_forwarded_tool(context, value, tool, arguments)
             }
             _ => tool_failure(

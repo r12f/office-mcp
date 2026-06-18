@@ -8,8 +8,8 @@ pub mod stdio_bridge;
 pub mod tool_result;
 
 pub use catalog::{
-    ExcelToolCatalog, WORD_V1_TOOLS, tool_catalog_json, word_resource_catalog_for_session,
-    word_resource_templates,
+    ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS, tool_catalog_json,
+    word_resource_catalog_for_session, word_resource_templates,
 };
 pub use http_frontend::McpHttpFrontend;
 pub(crate) use http_frontend_model::RateLimitWindow;

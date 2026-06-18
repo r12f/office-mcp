@@ -35,6 +35,11 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
             "excel.write_range",
             "office.get_session_info",
             "office.list_sessions",
+            "powerpoint.add_slide",
+            "powerpoint.apply_layout",
+            "powerpoint.export_pdf",
+            "powerpoint.insert_image",
+            "powerpoint.replace_text",
             "word.accept_change",
             "word.add_column",
             "word.add_comment",
@@ -396,6 +401,56 @@ fn mcp_json_rpc_forwarded_excel_tool_invokes_addin_connection() {
 }
 
 #[test]
+fn mcp_json_rpc_forwarded_powerpoint_tool_invokes_addin_connection() {
+    let registry = registry_with_powerpoint_session();
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("powerpoint-connection");
+    connection_hub.bind_instance("powerpoint-connection", "powerpoint-instance");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("powerpoint-connection");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        assert_eq!(outbound.len(), 1);
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["method"], "tool.invoke");
+        assert_eq!(invoke["params"]["session_id"], "powerpoint-session");
+        assert_eq!(invoke["params"]["tool"], "powerpoint.add_slide");
+        assert_eq!(invoke["params"]["args"]["layout"], "TitleOnly");
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"slide_id":"slide-2","layout":"TitleOnly"}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"powerpoint-call","method":"tools/call","params":{"name":"powerpoint.add_slide","arguments":{"session_id":"powerpoint-session","layout":"TitleOnly"}}}"#,
+    );
+
+    response_thread.join().expect("response thread");
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    assert_eq!(reply["result"]["structuredContent"]["slide_id"], "slide-2");
+    assert_eq!(reply["result"]["structuredContent"]["layout"], "TitleOnly");
+}
+
+#[test]
 fn mcp_json_rpc_insert_image_base64_is_validated_before_forwarding() {
     let registry = registry_with_word_session_with_tools(vec!["word.insert_image"]);
     let mut ui_state = UiStateStore::new();
@@ -664,6 +719,43 @@ fn registry_with_excel_session() -> SessionRegistry {
                 ..DocumentInfo::default()
             },
             available_tools: crate::mcp::ExcelToolCatalog::tools()
+                .iter()
+                .map(|tool| tool.name.to_string())
+                .collect(),
+            is_active: Some(true),
+        },
+        now,
+    );
+    registry
+}
+
+fn registry_with_powerpoint_session() -> SessionRegistry {
+    let now = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(10);
+    let mut registry = SessionRegistry::new();
+    registry.register_runtime(RuntimeInfo {
+        instance_id: "powerpoint-instance".to_string(),
+        host: HostInfo {
+            app: "powerpoint".to_string(),
+            version: Some("16.0".to_string()),
+            platform: Some("windows".to_string()),
+            build: Some("Desktop".to_string()),
+        },
+        add_in: AddInInfo {
+            version: "0.1.0".to_string(),
+            protocol_version: "1.0".to_string(),
+            supported_features: vec!["presentation.session".to_string()],
+        },
+        registered_at: now,
+    });
+    registry.add_session(
+        NewSessionInfo {
+            session_id: "powerpoint-session".to_string(),
+            instance_id: "powerpoint-instance".to_string(),
+            document: DocumentInfo {
+                filename: Some("Deck.pptx".to_string()),
+                ..DocumentInfo::default()
+            },
+            available_tools: crate::mcp::PowerPointToolCatalog::tools()
                 .iter()
                 .map(|tool| tool.name.to_string())
                 .collect(),
