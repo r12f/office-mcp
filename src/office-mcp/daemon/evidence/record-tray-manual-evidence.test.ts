@@ -38,6 +38,18 @@ test('manual tray evidence recorder requires daemon context before passing', () 
   });
 });
 
+test('manual tray evidence recorder requires tray probe live state', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const daemonBin = writeFakeDaemon(dir, false);
+    const output = join(dir, 'missing-live-state.json');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.daemon_context_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 function runRecorder(output: string, screenshotPath: string, ...extra: string[]): ReturnType<typeof spawnSync> {
   return spawnSync(process.execPath, [
     TSX,
@@ -71,16 +83,16 @@ function withTrayScreenshot(callback: (dir: string, screenshotPath: string) => v
   }
 }
 
-function writeFakeDaemon(dir: string): string {
+function writeFakeDaemon(dir: string, stateFetchOk = true): string {
   const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
-  writeFileSync(daemonBin, fakeDaemonScript());
+  writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk));
   chmodSync(daemonBin, 0o755);
   return daemonBin;
 }
 
-function fakeDaemonScript(): string {
+function fakeDaemonScript(stateFetchOk: boolean): string {
   const status = JSON.stringify({ running: true, uiUrl: 'https://localhost:8765/ui/' });
-  const trayProbe = JSON.stringify({ native_host: true, snapshot: { tooltip: 'Office MCP - Up - 0 clients - 0 documents' } });
+  const trayProbe = JSON.stringify({ native_host: true, state_fetch_ok: stateFetchOk, snapshot: { tooltip: 'Office MCP - Up - 0 clients - 0 documents' } });
   if (process.platform === 'win32') {
     return `@echo off\r\nif "%1"=="daemon" echo ${status}\r\nif "%1"=="tray" echo ${trayProbe}\r\n`;
   }

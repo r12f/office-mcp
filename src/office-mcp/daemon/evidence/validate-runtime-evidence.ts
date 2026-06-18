@@ -278,6 +278,9 @@ function validateProductVisualDaemonContext(context: unknown): void {
     failures.push('Product visual evidence daemon context missing native tray probe success.');
     return;
   }
+  if (trayProbe.state_fetch_ok !== true) {
+    failures.push('Product visual evidence daemon context tray probe did not read live UI state.');
+  }
   const snapshot = trayProbe.snapshot;
   const menuItems = isRecord(snapshot) && Array.isArray(snapshot.menu_items)
     ? snapshot.menu_items.filter((item): item is string => typeof item === 'string')
@@ -314,6 +317,9 @@ function validateManualTrayDaemonContext(context: unknown): void {
   if (!isRecord(trayProbe) || trayProbe.ok !== true || trayProbe.native_host !== true) {
     failures.push('Manual tray daemon context missing native tray probe success.');
     return;
+  }
+  if (trayProbe.state_fetch_ok !== true) {
+    failures.push('Manual tray daemon context tray probe did not read live UI state.');
   }
   const snapshot = trayProbe.snapshot;
   const menuItems = isRecord(snapshot) && Array.isArray(snapshot.menu_items)

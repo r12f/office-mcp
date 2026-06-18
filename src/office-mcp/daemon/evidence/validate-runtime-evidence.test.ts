@@ -264,6 +264,17 @@ test('runtime evidence validator can require product visual evidence', () => {
       assert.match(outputText(result.stdout), /Product visual daemon context live missing menu item: Documents:/);
     });
   });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.daemon_context = manualTrayDaemonContext(undefined, false);
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual evidence daemon context tray probe did not read live UI state/);
+    });
+  });
 });
 test('runtime evidence validator can require manual Windows tray evidence', () => {
   const ui = uiReport();
@@ -342,6 +353,17 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /Manual tray daemon context live missing menu item: Documents:/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.daemon_context = manualTrayDaemonContext(undefined, false);
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray daemon context tray probe did not read live UI state/);
     });
   });
 });
@@ -524,7 +546,7 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
   };
 }
 
-function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']) {
+function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP'], stateFetchOk = true) {
   return {
     binary_path: 'C:\\Code\\office-mcp\\target\\debug\\office-mcp-daemon.exe',
     status: {
@@ -536,13 +558,13 @@ function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Docum
     tray_probe: {
       ok: true,
       native_host: true,
+      state_fetch_ok: stateFetchOk,
       snapshot: {
         menu_items: menuItems,
         menu: structuredMenu(menuItems),
         tooltip: 'Office MCP - Up - 0 clients - 0 documents',
         platform: 'windows-notification-area'
-      },
-      state_fetch_ok: true
+      }
     }
   };
 }

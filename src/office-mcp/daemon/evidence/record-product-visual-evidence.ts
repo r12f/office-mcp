@@ -145,7 +145,7 @@ function daemonContextLooksReady(context: Record<string, unknown> | undefined): 
   const status = context.status;
   const trayProbe = context.tray_probe;
   return isRecord(status) && status.ok === true && status.running === true && typeof status.uiUrl === 'string'
-    && isRecord(trayProbe) && trayProbe.ok === true && trayProbe.native_host === true;
+    && isRecord(trayProbe) && trayProbe.ok === true && trayProbe.native_host === true && trayProbe.state_fetch_ok === true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

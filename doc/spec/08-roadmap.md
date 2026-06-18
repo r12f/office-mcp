@@ -220,8 +220,9 @@ User-reported follow-up from live daemon testing:
       of an untracked note. The final run must pass `--daemon-bin` to the
       recorder so the artifact also captures `daemon status` and live
       `tray --probe` output for the same daemon instance that was visually
-      inspected; the recorder marks evidence failed and the validator rejects
-      required manual tray evidence when it is not bound to that daemon context.
+      inspected; the probe must read live UI state from that daemon. The
+      recorder marks evidence failed and the validator rejects required manual
+      tray evidence when it is not bound to that daemon context.
 - [x] Add automated coverage that fails when production `daemon run` does not
       expose `/ui/` and when `daemon status` omits the UI URL. Covered by
       `production_bound_daemon_exposes_ui_state_and_events`,
@@ -420,8 +421,8 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       the screenshots to the same local daemon binary under test by recording
       `daemon status` and `tray --probe` output; the validator rejects product
       visual evidence without that daemon context, and the recorder marks the
-      artifact failed before validation when the daemon context is missing or
-      not ready.
+      artifact failed before validation when the daemon context is missing, not
+      ready, or cannot read live UI state.
 - [ ] Capture visual evidence for the finished identity on Windows: Word ribbon
       command, Word catalog entry including type/category and icon, Word task
       pane title/icon, Excel equivalents, visible notification-area tray icon,
