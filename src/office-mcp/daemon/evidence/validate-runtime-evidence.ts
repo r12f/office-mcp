@@ -25,6 +25,8 @@ const evidencePath = resolve(readOption('--input') ?? join(repoRoot, 'artifacts/
 const validateUi = hasFlag('--ui');
 const requireManualTray = hasFlag('--require-manual-tray');
 const manualTrayEvidencePath = readOption('--manual-tray-evidence-path') ?? process.env.OFFICE_MCP_TRAY_MANUAL_EVIDENCE_PATH;
+const requireProductVisual = hasFlag('--require-product-visual');
+const productVisualEvidencePath = readOption('--product-visual-evidence-path') ?? process.env.OFFICE_MCP_PRODUCT_VISUAL_EVIDENCE_PATH;
 const requireIrm = hasFlag('--require-irm');
 const requireFullWordSmoke = hasFlag('--require-full-word-smoke');
 const requireExcelSmoke = hasFlag('--require-excel-smoke');
@@ -149,6 +151,7 @@ function validateUiEvidence(): never {
     requirePassedGate(name);
   }
   if (requireManualTray) validateManualTrayEvidence();
+  if (requireProductVisual) validateProductVisualEvidence();
   emitSummary();
 }
 
@@ -178,6 +181,79 @@ function validateManualTrayEvidence(): void {
   ] as const) {
     if (manual[key] !== true) failures.push(`Manual tray evidence missing ${label}.`);
   }
+}
+
+function validateProductVisualEvidence(): void {
+  if (!productVisualEvidencePath) {
+    failures.push('Missing --product-visual-evidence-path for required product visual evidence.');
+    return;
+  }
+  const visual = JSON.parse(readFileSync(resolve(productVisualEvidencePath), 'utf8')) as Record<string, unknown>;
+  if (visual.schema_version !== 1) failures.push(`Unsupported product visual schema_version: ${visual.schema_version}`);
+  if (visual.kind !== 'product_visual_evidence') failures.push(`Unsupported product visual evidence kind: ${visual.kind ?? 'missing'}`);
+  if (visual.platform !== 'win32') failures.push(`Product visual evidence platform is ${visual.platform}, expected win32.`);
+  if (visual.product_name !== 'Office MCP Control') failures.push('Product visual evidence missing Office MCP Control product name.');
+  for (const [key, label] of [
+    ['product_text_ready', 'product text on all surfaces'],
+    ['catalog_type_ready', 'catalog type metadata'],
+    ['catalog_icon_visible', 'catalog icon'],
+    ['tray_tooltip_ready', 'tray product tooltip'],
+    ['tray_icon_visible', 'visible tray icon'],
+    ['tray_menu_native', 'native tray menu'],
+    ['quit_confirmation_visible', 'quit confirmation dialog'],
+    ['passed', 'product visual evidence passed']
+  ] as const) {
+    if (visual[key] !== true) failures.push(`Product visual evidence missing ${label}.`);
+  }
+  if (typeof visual.tray_tooltip !== 'string' || !trayTooltipLooksProductReady(visual.tray_tooltip)) {
+    failures.push('Product visual evidence missing product tray tooltip text.');
+  }
+  if (typeof visual.catalog_type !== 'string' || !/local productivity automation control utility/i.test(visual.catalog_type)) {
+    failures.push('Product visual evidence missing local productivity automation/control type metadata.');
+  }
+  validateProductVisualScreenshots(visual.screenshot_paths);
+  validateProductVisualObservations(visual.observations);
+}
+
+function validateProductVisualScreenshots(paths: unknown): void {
+  if (!isRecord(paths)) {
+    failures.push('Product visual evidence screenshot paths are malformed.');
+    return;
+  }
+  for (const surface of productVisualSurfaces()) {
+    const path = paths[surface];
+    if (typeof path !== 'string' || !screenshotFileLooksLikeImage(resolve(path))) {
+      failures.push(`Product visual evidence screenshot missing or invalid: ${surface}.`);
+    }
+  }
+}
+
+function validateProductVisualObservations(observations: unknown): void {
+  if (!isRecord(observations)) {
+    failures.push('Product visual evidence observations are malformed.');
+    return;
+  }
+  for (const surface of productVisualSurfaces()) {
+    const value = observations[surface];
+    if (typeof value !== 'string' || !value.includes('Office MCP Control')) {
+      failures.push(`Product visual evidence observation missing product name: ${surface}.`);
+    }
+  }
+}
+
+function productVisualSurfaces(): string[] {
+  return [
+    'word_ribbon_command',
+    'word_catalog_entry',
+    'word_taskpane_title',
+    'excel_ribbon_command',
+    'excel_catalog_entry',
+    'excel_taskpane_title',
+    'tray_icon',
+    'tray_native_menu',
+    'tray_tooltip',
+    'tray_quit_confirmation'
+  ];
 }
 
 function validateManualTrayDaemonContext(context: unknown): void {
@@ -274,6 +350,8 @@ function emitSummary(): never {
     gates: Object.fromEntries(report.gates.map((gate) => [gate.name, gate.status])),
     require_manual_tray: requireManualTray,
     manual_tray_evidence_path: manualTrayEvidencePath ? resolve(manualTrayEvidencePath) : undefined,
+    require_product_visual: requireProductVisual,
+    product_visual_evidence_path: productVisualEvidencePath ? resolve(productVisualEvidencePath) : undefined,
     failures
   }, null, 2));
   process.exit(failures.length > 0 ? 1 : 0);

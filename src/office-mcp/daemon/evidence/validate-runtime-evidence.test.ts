@@ -193,6 +193,43 @@ test('runtime evidence validator accepts UI runtime evidence gates', () => {
   });
 });
 
+test('runtime evidence validator can require product visual evidence', () => {
+  const ui = uiReport();
+  withEvidenceFile(ui, (path) => {
+    const result = runValidator(path, '--ui', '--require-product-visual');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /Missing --product-visual-evidence-path/);
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const passing = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.equal(passing.status, 0, outputText(passing.stdout) + outputText(passing.stderr));
+      assert.equal(JSON.parse(outputText(passing.stdout)).ok, true);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.observations.word_ribbon_command = 'Raw task pane';
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /observation missing product name: word_ribbon_command/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      writeFileSync(broken.screenshot_paths.tray_icon, 'not an image');
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /screenshot missing or invalid: tray_icon/);
+    });
+  });
+});
 test('runtime evidence validator can require manual Windows tray evidence', () => {
   const ui = uiReport();
   withEvidenceFile(ui, (path) => {
@@ -352,6 +389,63 @@ function uiReport() {
   };
 }
 
+function withProductVisualEvidence(passed: boolean, callback: (path: string) => void): void {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-product-visual-evidence-'));
+  try {
+    const screenshots: Record<string, string> = {};
+    for (const surface of productVisualSurfaces()) {
+      const screenshotPath = join(dir, `${surface}.png`);
+      if (passed) writeFileSync(screenshotPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+      screenshots[surface] = screenshotPath;
+    }
+    const path = join(dir, 'product-visual-evidence.json');
+    writeFileSync(path, JSON.stringify(productVisualReport(passed, screenshots), null, 2));
+    callback(path);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function productVisualReport(passed: boolean, screenshots: Record<string, string>) {
+  const observations = Object.fromEntries(productVisualSurfaces().map((surface) => [surface, `Office MCP Control ${surface}`]));
+  return {
+    schema_version: 1,
+    kind: 'product_visual_evidence',
+    recorded_at: new Date().toISOString(),
+    tester: 'test',
+    platform: 'win32',
+    product_name: 'Office MCP Control',
+    required_surfaces: productVisualSurfaces(),
+    observations,
+    screenshot_paths: screenshots,
+    screenshots_exist: Object.fromEntries(productVisualSurfaces().map((surface) => [surface, passed])),
+    product_text_ready: passed,
+    catalog_type: 'Local productivity automation control utility',
+    catalog_type_ready: passed,
+    catalog_icon_visible: passed,
+    tray_tooltip: 'Office MCP - Up - 0 clients - 0 documents',
+    tray_tooltip_ready: passed,
+    tray_icon_visible: passed,
+    tray_menu_native: passed,
+    quit_confirmation_visible: passed,
+    passed
+  };
+}
+
+function productVisualSurfaces(): string[] {
+  return [
+    'word_ribbon_command',
+    'word_catalog_entry',
+    'word_taskpane_title',
+    'excel_ribbon_command',
+    'excel_catalog_entry',
+    'excel_taskpane_title',
+    'tray_icon',
+    'tray_native_menu',
+    'tray_tooltip',
+    'tray_quit_confirmation'
+  ];
+}
 function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png') {
   return {
     schema_version: 1,

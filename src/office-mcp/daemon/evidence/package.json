@@ -11,6 +11,7 @@
     "evidence:excel": "tsx runtime-evidence.ts --output ../../../../artifacts/runtime-evidence-excel.json --include-excel-smoke --wait-for-session-ms 120000",
     "evidence:runtime": "tsx runtime-evidence.ts",
     "evidence:record-tray-manual": "tsx record-tray-manual-evidence.ts",
+    "evidence:record-product-visual": "tsx record-product-visual-evidence.ts",
     "evidence:ui": "tsx ui-runtime-evidence.ts",
     "evidence:record-agent-client": "tsx record-agent-client-evidence.ts",
     "evidence:validate": "tsx validate-runtime-evidence.ts",

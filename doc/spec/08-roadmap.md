@@ -404,21 +404,24 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       from the installed add-in catalog without loopback or missing-icon paths.
       Current packaging tests assert MSI staging includes the generated assets,
       and AppSource packaging includes `assets/*` in the add-in bundle.
-- [ ] Add automated tests for manifest metadata/icon URL substitution and asset
+- [x] Add automated tests for manifest metadata/icon URL substitution and asset
       presence, plus manual Windows evidence showing the ribbon command icon,
       add-in title, visible tray glyph, and native right-click menu. Automated
       tests now cover metadata/icon substitution, generated asset dimensions,
       PNG palette checks, source logo guardrails, static asset serving,
       packaging presence, tray glyph generation, tray tooltip format, structured
-      native menu roles, disabled status rows, separator position, and tray
-      action IDs; the remaining open portion is live Windows ribbon/tray visual
-      evidence.
+      native menu roles, disabled status rows, separator position, tray action
+      IDs, product visual evidence recording, and product visual evidence
+      validation. Live Windows ribbon/tray screenshots remain tracked by the
+      final visual evidence item.
 - [ ] Capture visual evidence for the finished identity on Windows: Word ribbon
       command, Word catalog entry including type/category and icon, Word task
       pane title/icon, Excel equivalents, visible notification-area tray icon,
       native right-click menu opened from that icon, and tray tooltip/
-      confirmation dialog. The evidence must be tied to the same local daemon
-      build under test and stored as release-checkable artifacts.
+      confirmation dialog. The evidence must be recorded with
+      `npm run evidence:record-product-visual`, tied to the same local daemon
+      build under test, validated with `--require-product-visual`, and stored as
+      release-checkable artifacts.
 
 **Exit criterion**: Word and Excel show a mature product add-in name and icon in
 the ribbon/catalog; the task pane title and chrome match the product identity;
