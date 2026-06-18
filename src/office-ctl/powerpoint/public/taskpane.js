@@ -597,7 +597,7 @@
     toolListEl.innerHTML = TOOL_GROUPS.map((group) => {
       const enabledInGroup = group.tools.filter((tool) => isToolEnabled(tool));
       const rows = group.tools.map((tool) => toolControlMarkup(tool)).join('');
-      return `<details class="tool-group" open><summary class="tool-group-title"><span>${escapeHtml(group.label)}</span><span>Enabled ${enabledInGroup.length} of ${group.tools.length}</span></summary>${rows}</details>`;
+      return `<details class="tool-group"><summary class="tool-group-title"><span>${escapeHtml(group.label)}</span><span>Enabled ${enabledInGroup.length} of ${group.tools.length}</span></summary><div class="tool-permission-list">${rows}</div></details>`;
     }).join('');
     for (const checkbox of toolListEl.querySelectorAll('input[data-tool]')) {
       checkbox.addEventListener('change', () => updateToolPermission(checkbox.dataset.tool, checkbox.checked));
