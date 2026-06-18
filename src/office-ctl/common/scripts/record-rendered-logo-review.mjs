@@ -50,7 +50,7 @@ mkdirSync(dirname(sheetPath), { recursive: true });
 writeFileSync(sheetPath, encodePng(sheet.width, sheet.height, sheet.rgba));
 
 const designReview = {
-  future_office_control_brief: 'Future office control: precise document surfaces, routing geometry, and restrained operator affordances communicate local control without Office-owned app marks, terminal/debug motifs, or decorative AI/neon styling.',
+  future_office_control_brief: 'Future office control: precise control-console document surfaces, routing geometry, and restrained operator affordances communicate local control without Office-owned app marks, terminal/debug motifs, or decorative AI/neon styling.',
   concept_pass: {
     ready: true,
     selected_direction: 'Command Console Panes',
@@ -59,7 +59,7 @@ const designReview = {
       {
         name: 'Command Console Panes',
         decision: 'selected',
-        rationale: 'Layered abstract document panes, a command spine, operator nodes, and a control dial communicate office productivity, local routing, and deliberate user control at tray, ribbon, catalog, title-bar, and installer sizes without borrowing Office-owned marks.'
+        rationale: 'Layered abstract document panes, a command rail, operator nodes, and a control reticle communicate office productivity, local routing, and deliberate user control at tray, ribbon, catalog, title-bar, and installer sizes without borrowing Office-owned marks.'
       },
       {
         name: 'Orbiting Document Hub',
@@ -74,9 +74,9 @@ const designReview = {
     ],
     rejected_patterns: ['gear-only settings mark', 'Office-like app tile', 'host-app color block', 'generic document thumbnail', 'terminal/debug glyph', 'AI sparkle motif']
   },
-  office_productivity_metaphor: 'Abstract document, workbook, and presentation panes remain visible at tray, ribbon, catalog, title-bar, and installer sizes without host-specific silhouettes.',
-  user_control_metaphor: 'The command spine, operator nodes, and control dial communicate local user control rather than passive document storage.',
-  futuristic_maturity: 'Crisp geometry and restrained accent colors give the mark a mature slightly futuristic desktop utility feel without decorative noise.',
+  office_productivity_metaphor: 'Abstract document, workbook, and presentation panes remain visible as a compact control console at tray, ribbon, catalog, title-bar, and installer sizes without host-specific silhouettes.',
+  user_control_metaphor: 'The command rail, operator nodes, and yellow control reticle communicate local user control rather than passive document storage.',
+  futuristic_maturity: 'Crisp geometry, layered control-console depth, and restrained accent colors give the mark a mature slightly futuristic desktop utility feel without decorative noise.',
   non_microsoft_distinction: 'The rendered mark avoids Office logos, Office tile language, Microsoft 365 gradients, Word document silhouettes, Excel grid marks, PowerPoint slide silhouettes, Outlook envelope marks, Windows logo conventions, placeholder initials, and gear-only settings artwork.',
   rejects_generic_readings: ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'],
   ready: true

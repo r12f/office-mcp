@@ -74,17 +74,17 @@ test('brand design note documents the office-control visual brief', () => {
   assert.match(note, /Command Console Panes/);
   assert.match(note, /Orbiting Document Hub/);
   assert.match(note, /Shielded Automation Badge/);
-  assert.match(note, /This direction was\s+selected/i);
+  assert.match(note, /This direction\s+was\s+selected/i);
   assert.match(note, /This direction was rejected because the hub read too much like a generic sync/i);
   assert.match(note, /This direction was rejected because it over-emphasized security/i);
   assert.match(note, /gear-only settings marks/i);
   assert.match(note, /Office-like app\s+tiles/i);
   assert.match(note, /terminal\/debug glyphs/i);
   assert.match(note, /AI sparkle motifs/i);
-  assert.match(note, /abstract document or app panes/i);
-  assert.match(note, /command spine/i);
+  assert.match(note, /Control-console panes/i);
+  assert.match(note, /command rail/i);
   assert.match(note, /operator nodes/i);
-  assert.match(note, /control dial/i);
+  assert.match(note, /control reticle/i);
   assert.match(note, /not a Microsoft Office app palette/i);
   assert.match(note, /16 px/);
   assert.match(note, /32 px/);
@@ -104,10 +104,12 @@ test('generated brand icons are original non-placeholder assets', () => {
   assert.match(svg, /aria-label="Office MCP control mark"/);
   assert.match(svg, /#0F172A/);
   assert.match(svg, /#2457D6/);
-  assert.match(svg, /#48D6A4/);
+  assert.match(svg, /#4BD7A8/);
+  assert.match(svg, /#243B7A/);
   assert.match(svg, /#F8D84A/);
-  assert.match(svg, /M70 196h62c24 0 36-34 60-34h15/);
-  assert.match(svg, /cx="203" cy="162" r="31"/);
+  assert.match(svg, /M54 198h43c17 0 27-18 42-18h28c18 0 25-28 43-28h7/);
+  assert.match(svg, /cx="210" cy="152" r="30"/);
+  assert.match(svg, /M210 136v32/);
   assert.doesNotMatch(svg, /office[-_ ]?logo|word[-_ ]?logo|excel[-_ ]?logo|gear/i);
 
   for (const size of ICON_SIZES) {
@@ -165,7 +167,7 @@ test('rendered-size logo review artifact covers first-contact product surfaces',
     assert.match(report.design_review.future_office_control_brief, /routing|operator|control/i);
     assert.match(report.design_review.future_office_control_brief, /without .*Office-owned app marks/i);
     assert.match(report.design_review.office_productivity_metaphor, /document|pane/i);
-    assert.match(report.design_review.user_control_metaphor, /control|command/i);
+    assert.match(report.design_review.user_control_metaphor, /control|command|reticle/i);
     assert.match(report.design_review.futuristic_maturity, /mature|futuristic/i);
     assert.match(report.design_review.non_microsoft_distinction, /Office logos|Microsoft 365 gradients|PowerPoint slide silhouettes|Outlook envelope marks|gear-only/i);
     assert.deepEqual(report.design_review.rejects_generic_readings, ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone']);
