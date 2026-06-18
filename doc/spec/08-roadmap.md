@@ -335,6 +335,23 @@ User-reported follow-up from live Word add-in and tray testing. This milestone
 owns the product identity layer, not protocol behavior: the add-in and tray must
 feel like a finished local desktop utility rather than an experimental scaffold.
 
+Latest UI feedback to preserve in implementation planning:
+
+- The product mark must not use Microsoft Office logos or near-logo variants,
+  but it must still read as office productivity under local user control. The
+  preferred direction is a mature, slightly futuristic control-surface mark:
+  document/window panes, routing geometry, and an explicit operator/control
+  affordance that remains legible at tray and ribbon sizes.
+- The add-in first-run surface must be treated as one product impression. Title,
+  icon, provider, description, ribbon command, catalog type/category, and task
+  pane chrome must all change together; a polished title paired with a missing
+  icon or experimental type/category is still a release failure.
+- The tray must look like native desktop software. A missing/default tray icon,
+  non-native-looking right-click surface, webview/HTML imitation menu, or debug
+  wording makes the product feel unfinished and must remain blocked until live
+  Windows visual evidence proves a real native notification-area icon and native
+  context menu.
+
 - [x] Design an original office-control product logo and icon system. It must
       avoid Microsoft Office product marks while still communicating office
       productivity, local automation, and user control with a mature, slightly
