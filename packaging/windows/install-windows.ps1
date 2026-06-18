@@ -15,6 +15,7 @@ $uiRoot = Join-Path $repoRoot "src\office-mcp\ui"
 $commonRoot = Join-Path $repoRoot "src\office-ctl\common"
 $addinRoot = Join-Path $repoRoot "src\office-ctl\word"
 $excelAddinRoot = Join-Path $repoRoot "src\office-ctl\excel"
+$powerPointAddinRoot = Join-Path $repoRoot "src\office-ctl\powerpoint"
 $catalogScriptPath = Join-Path $commonRoot "scripts\register-office-catalog.ps1"
 $catalogPath = Join-Path $InstallRoot "addin-catalog"
 $pfxPath = Join-Path $InstallRoot ".office-mcp-localhost.pfx"
@@ -44,6 +45,9 @@ if (-not (Test-Path (Join-Path $addinRoot "manifest.xml"))) {
 }
 if (-not (Test-Path (Join-Path $excelAddinRoot "manifest.xml"))) {
   throw "Cannot find src/office-ctl/excel/manifest.xml under $repoRoot."
+}
+if (-not (Test-Path (Join-Path $powerPointAddinRoot "manifest.xml"))) {
+  throw "Cannot find src/office-ctl/powerpoint/manifest.xml under $repoRoot."
 }
 if (-not (Test-Path $catalogScriptPath)) {
   throw "Cannot find shared Office catalog script under $repoRoot."
@@ -88,19 +92,29 @@ try {
   Pop-Location
 }
 
+Push-Location $powerPointAddinRoot
+try {
+  npm run check
+} finally {
+  Pop-Location
+}
+
 & $catalogScriptPath -RepoRoot $repoRoot -CatalogPath $catalogPath -BaseUrl "https://localhost:8765" -SkipRegistry -ClearOfficeCache
 Copy-Item -Force -Path (Join-Path $repoRoot "target\release\office-mcp-daemon.exe") -Destination (Join-Path $InstallRoot "office-mcp-daemon.exe")
 $installedUiRoot = Join-Path $InstallRoot "office-mcp\ui"
 $installedCommonRoot = Join-Path $InstallRoot "office-ctl\common"
 $installedWordRoot = Join-Path $InstallRoot "office-ctl\word"
 $installedExcelRoot = Join-Path $InstallRoot "office-ctl\excel"
-New-Item -ItemType Directory -Force -Path $installedUiRoot, $installedCommonRoot, $installedWordRoot, $installedExcelRoot | Out-Null
+$installedPowerPointRoot = Join-Path $InstallRoot "office-ctl\powerpoint"
+New-Item -ItemType Directory -Force -Path $installedUiRoot, $installedCommonRoot, $installedWordRoot, $installedExcelRoot, $installedPowerPointRoot | Out-Null
 Copy-Item -Recurse -Force -Path (Join-Path $uiRoot "*") -Destination $installedUiRoot
 Copy-Item -Recurse -Force -Path (Join-Path $commonRoot "*") -Destination $installedCommonRoot
 Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination $installedWordRoot
 Copy-Item -Recurse -Force -Path (Join-Path $addinRoot "public") -Destination $installedWordRoot
 Copy-Item -Force -Path (Join-Path $excelAddinRoot "manifest.xml") -Destination $installedExcelRoot
 Copy-Item -Recurse -Force -Path (Join-Path $excelAddinRoot "public") -Destination $installedExcelRoot
+Copy-Item -Force -Path (Join-Path $powerPointAddinRoot "manifest.xml") -Destination $installedPowerPointRoot
+Copy-Item -Recurse -Force -Path (Join-Path $powerPointAddinRoot "public") -Destination $installedPowerPointRoot
 $trayLauncherPath = Join-Path $InstallRoot "office-mcp-tray.ps1"
 Copy-Item -Force -Path (Join-Path $repoRoot "packaging\windows\office-mcp-tray.ps1") -Destination $trayLauncherPath
 

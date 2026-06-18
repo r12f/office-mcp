@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#F7F8FA" />
+    <title>Office MCP Control</title>
+    <link rel="stylesheet" href="/powerpoint/taskpane.css?v=0.1.0" />
+    <script async src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script defer src="/common/browser-ui.js?v=0.1.0"></script>
+    <script defer src="/common/addin-channel.js?v=0.1.0"></script>
+    <script defer src="/common/logger.js?v=0.1.0"></script>
+    <script defer src="/common/task-history.js?v=0.1.0"></script>
+    <script defer src="/powerpoint/taskpane.js?v=0.1.0"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to Status</a>
+    <main id="main" class="taskpane-shell">
+      <section class="panel summary-panel" aria-labelledby="documentHeading">
+        <header class="topbar" aria-label="Daemon connection">
+          <div class="identity">
+            <img class="product-mark" src="/assets/icon-32.png" width="32" height="32" alt="" aria-hidden="true" />
+            <div class="identity-copy">
+              <span id="connectionBadge" class="status-badge status-neutral" aria-live="polite">Connecting...</span>
+              <h1>Office MCP Control</h1>
+            </div>
+          </div>
+          <button id="settingsToggle" class="icon-button" type="button" aria-label="Open Settings" aria-expanded="false" aria-controls="settingsPanel">&#9881;</button>
+        </header>
+
+        <div class="section-heading document-heading">
+          <h2 id="documentHeading">Presentation</h2>
+        </div>
+        <dl class="metadata-grid">
+          <dt>Title</dt>
+          <dd id="documentTitle">Unknown PowerPoint Presentation</dd>
+          <dt>Session</dt>
+          <dd><code id="session">-</code></dd>
+          <dt>Daemon</dt>
+          <dd><code id="daemon">-</code></dd>
+          <dt>Runtime</dt>
+          <dd id="runtimeVersions"><span id="serverVersion">Server Unknown</span> / <span id="protocolVersion">Protocol 1.0</span></dd>
+          <dt>Host</dt>
+          <dd id="hostPlatform">PowerPoint / Unknown</dd>
+          <dt>Protection</dt>
+          <dd id="protection">Not protected</dd>
+          <dt>State</dt>
+          <dd id="documentState">Editable</dd>
+          <dt>Last Error</dt>
+          <dd id="connectionDetail">None</dd>
+        </dl>
+
+        <details class="tools-panel">
+          <summary>
+            <span>Tools</span>
+            <span id="toolCount" class="meta-pill">Available 0 of 5</span>
+          </summary>
+          <div id="toolList" class="tool-list" aria-label="PowerPoint tool controls"></div>
+        </details>
+
+        <section id="settingsPanel" class="settings-panel" aria-labelledby="settingsHeading" hidden>
+          <h2 id="settingsHeading">Settings</h2>
+          <form id="settingsForm" novalidate>
+            <label for="endpointInput">Daemon Endpoint</label>
+            <div class="input-row">
+              <input id="endpointInput" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="wss://localhost:8765/addin" />
+              <button id="saveEndpoint" type="submit">Save Endpoint</button>
+            </div>
+            <p id="endpointError" class="field-error" role="alert"></p>
+          </form>
+        </section>
+      </section>
+
+      <section class="panel current-task-panel" aria-labelledby="currentTaskHeading">
+        <div class="section-heading">
+          <h2 id="currentTaskHeading">Current Task</h2>
+          <span id="currentTaskState" class="meta-pill">Idle</span>
+        </div>
+        <div id="currentTask" class="empty-state">No command is running.</div>
+      </section>
+
+      <section class="panel history-panel" aria-labelledby="historyHeading">
+        <div class="section-heading">
+          <h2 id="historyHeading">Recent Tasks</h2>
+          <span id="historyCount" class="meta-pill">0 / 20</span>
+        </div>
+        <ol id="historyList" class="history-list" aria-live="polite"></ol>
+      </section>
+
+      <div id="announcer" class="sr-only" aria-live="polite"></div>
+    </main>
+  </body>
+</html>

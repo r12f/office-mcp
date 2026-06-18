@@ -50,6 +50,26 @@ fn serves_excel_taskpane_static_assets() {
 }
 
 #[test]
+fn serves_powerpoint_taskpane_static_assets() {
+    let html = response_text(&service().serve_addin_asset("/powerpoint/taskpane.html"));
+    assert!(html.starts_with("HTTP/1.1 200 OK"));
+    assert!(html.contains("Office MCP Control"));
+    assert!(html.contains("/powerpoint/taskpane.js?v=0.1.0"));
+    assert!(html.contains("/common/addin-channel.js?v=0.1.0"));
+
+    let js = response_text(&service().serve_addin_asset("/powerpoint/taskpane.js"));
+    assert!(js.starts_with("HTTP/1.1 200 OK"));
+    assert!(js.contains("function isPowerPointHost"));
+    assert!(js.contains("Office.HostType?.PowerPoint"));
+    assert!(js.contains("sessionAddedNotification"));
+    assert!(js.contains("available_tools: []"));
+
+    let css = response_text(&service().serve_addin_asset("/powerpoint/taskpane.css"));
+    assert!(css.starts_with("HTTP/1.1 200 OK"));
+    assert!(css.contains("--powerpoint: #b7472a"));
+}
+
+#[test]
 fn serves_office_ctl_common_browser_asset() {
     let response = response_text(&service().serve_addin_asset("/common/browser-ui.js"));
 

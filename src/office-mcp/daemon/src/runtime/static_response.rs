@@ -36,7 +36,9 @@ impl StaticResponseService {
         if let Some(common_path) = path.strip_prefix("/common/") {
             return Self::serve_common_asset(common_path);
         }
-        let (host_root, relative) = if let Some(relative) = path.strip_prefix("/excel/") {
+        let (host_root, relative) = if let Some(relative) = path.strip_prefix("/powerpoint/") {
+            (default_office_ctl_host_public_dir("powerpoint"), relative)
+        } else if let Some(relative) = path.strip_prefix("/excel/") {
             (default_office_ctl_host_public_dir("excel"), relative)
         } else if let Some(relative) = path.strip_prefix("/word/") {
             (default_office_ctl_host_public_dir("word"), relative)

@@ -1,0 +1,91 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import test from 'node:test';
+
+const ADDIN_ROOT = process.cwd();
+
+test('PowerPoint add-in manifest targets presentation host and product identity', () => {
+  const manifest = readFileSync(join(ADDIN_ROOT, 'manifest.xml'), 'utf8');
+  const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
+
+  assert.match(manifest, /<Host Name="Presentation" \/>/);
+  assert.match(manifest, /<Set Name="PowerPointApi" MinVersion="1\.1" \/>/);
+  assert.match(manifest, /powerpoint\/taskpane\.html\?v=0\.1\.0/);
+  assert.match(manifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
+  assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
+  assert.match(manifest, /Control live PowerPoint presentations through a local productivity automation control utility\./);
+  assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP" \/>/);
+  assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Open Control Panel" \/>/);
+  assert.match(manifest, /Office MCP Control for this presentation/);
+  assert.match(manifest, /https:\/\/localhost:8765\/assets\/icon-32\.png/);
+  assert.match(manifest, /https:\/\/localhost:8765\/assets\/icon-80\.png/);
+  assert.doesNotMatch(manifest, /DefaultValue="office-mcp(?: for PowerPoint)?"/);
+  assert.doesNotMatch(manifest, /DefaultValue="Open"/);
+  assert.match(html, /<title>Office MCP Control<\/title>/);
+  assert.match(html, /<img class="product-mark" src="\/assets\/icon-32\.png" width="32" height="32" alt="" aria-hidden="true" \/>/);
+  assert.match(html, /<h1>Office MCP Control<\/h1>/);
+});
+
+test('PowerPoint task pane uses compact shared product UI shell', () => {
+  const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
+  const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+
+  assert.match(html, /powerpoint\/taskpane\.css\?v=0\.1\.0/);
+  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.0/);
+  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.0/);
+  assert.match(html, /common\/logger\.js\?v=0\.1\.0/);
+  assert.match(html, /common\/task-history\.js\?v=0\.1\.0/);
+  assert.match(html, /powerpoint\/taskpane\.js\?v=0\.1\.0/);
+  assert.match(html, /id="runtimeVersions"/);
+  assert.match(html, /<dd id="runtimeVersions"><span id="serverVersion">Server Unknown<\/span> \/ <span id="protocolVersion">Protocol 1\.0<\/span><\/dd>/);
+  assert.match(html, /<dd id="protection">Not protected<\/dd>/);
+  assert.match(html, /<dd id="documentState">Editable<\/dd>/);
+  assert.match(html, /class="panel summary-panel"/);
+  assert.match(html, /class="tools-panel"/);
+  assert.match(html, /<span>Tools<\/span>/);
+  assert.match(html, /id="toolList"/);
+  assert.match(html, /Available 0 of 5/);
+  assert.doesNotMatch(html, /Tool Permissions/);
+  assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
+  assert.match(html, /aria-label="Open Settings"/);
+  assert.ok(html.indexOf('id="settingsPanel"') < html.indexOf('id="currentTaskHeading"'));
+  assert.ok(html.indexOf('id="toolList"') < html.indexOf('id="settingsPanel"'));
+
+  assert.match(css, /--powerpoint: #b7472a/);
+  assert.match(css, /body \{[\s\S]*min-width: 320px;[\s\S]*overflow-x: hidden;/);
+  assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);
+  assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
+  assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
+  assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
+  assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
+
+  assert.match(js, /ADDIN_VERSION = '0\.1\.0'/);
+  assert.match(js, /const PLANNED_TOOLS = \[/);
+  assert.match(js, /powerpoint\.add_slide/);
+  assert.match(js, /powerpoint\.replace_text/);
+  assert.match(js, /powerpoint\.insert_image/);
+  assert.match(js, /powerpoint\.apply_layout/);
+  assert.match(js, /powerpoint\.export_pdf/);
+  assert.match(js, /function isPowerPointHost\(info\)/);
+  assert.match(js, /Office\.HostType\?\.PowerPoint/);
+  assert.match(js, /Office\.context\?\.requirements\?\.isSetSupported\?\.\('PowerPointApi', '1\.1'\)/);
+  assert.match(js, /app: 'powerpoint'/);
+  assert.match(js, /supported_features: \['presentation\.session'\]/);
+  assert.match(js, /available_tools: \[\]/);
+  assert.match(js, /HOST_CAPABILITY_UNAVAILABLE/);
+  assert.match(js, /sessionAddedNotification\(\{/);
+  assert.match(js, /new TaskHistoryStore\(\{ redactText \}\)/);
+  assert.match(js, /clearEndpointOverride/);
+  assert.match(js, /currentOriginEndpoint/);
+  assert.match(js, /Office\.AutoShowTaskpaneWithDocument/);
+  assert.match(js, /window\.__OFFICE_MCP_TASKPANE_READY__ = true/);
+  assert.doesNotMatch(js, /console\.(log|warn|error)/);
+});
+
+function cssRule(source, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = source.match(new RegExp(`${escaped}\\s*\\{([\\s\\S]*?)\\}`));
+  return match?.[1] || '';
+}

@@ -116,8 +116,13 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
     "office-ctl\excel\public\taskpane.html",
     "office-ctl\excel\public\taskpane.css",
     "office-ctl\excel\public\taskpane.js",
+    "office-ctl\powerpoint\manifest.xml",
+    "office-ctl\powerpoint\public\taskpane.html",
+    "office-ctl\powerpoint\public\taskpane.css",
+    "office-ctl\powerpoint\public\taskpane.js",
     "addin-catalog\office-mcp-word.xml",
     "addin-catalog\office-mcp-excel.xml",
+    "addin-catalog\office-mcp-powerpoint.xml",
     "office-mcp-env.ps1",
     "config.toml",
     "office-mcp-daemon.ps1",
@@ -175,6 +180,7 @@ $uiRoot = Join-Path $repoRoot "src\office-mcp\ui"
 $commonRoot = Join-Path $repoRoot "src\office-ctl\common"
 $addinRoot = Join-Path $repoRoot "src\office-ctl\word"
 $excelAddinRoot = Join-Path $repoRoot "src\office-ctl\excel"
+$powerPointAddinRoot = Join-Path $repoRoot "src\office-ctl\powerpoint"
 $wxsPath = Join-Path $repoRoot "packaging\wix\Product.wxs"
 $outputPath = Join-Path $OutputDir "office-mcp-setup-$Version-x64.msi"
 $stageRoot = Join-Path $OutputDir "msi-stage"
@@ -235,15 +241,24 @@ try {
   Pop-Location
 }
 
+Push-Location $powerPointAddinRoot
+try {
+  npm run check
+  Assert-LastExitCode "npm run check"
+} finally {
+  Pop-Location
+}
+
 Reset-DirectoryInside -Path $stageRoot -Parent $OutputDir
 
 $stageUiRoot = Join-Path $stageRoot "office-mcp\ui"
 $stageCommonRoot = Join-Path $stageRoot "office-ctl\common"
 $stageAddinRoot = Join-Path $stageRoot "office-ctl\word"
 $stageExcelAddinRoot = Join-Path $stageRoot "office-ctl\excel"
+$stagePowerPointAddinRoot = Join-Path $stageRoot "office-ctl\powerpoint"
 $stageCatalogRoot = Join-Path $stageRoot "addin-catalog"
 $stageScriptsRoot = Join-Path $stageRoot "scripts"
-New-Item -ItemType Directory -Force -Path $stageScriptsRoot, $stageUiRoot, $stageCommonRoot, $stageAddinRoot, $stageExcelAddinRoot, $stageCatalogRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $stageScriptsRoot, $stageUiRoot, $stageCommonRoot, $stageAddinRoot, $stageExcelAddinRoot, $stagePowerPointAddinRoot, $stageCatalogRoot | Out-Null
 
 Copy-Item -Force -Path (Join-Path $repoRoot "target\release\office-mcp-daemon.exe") -Destination (Join-Path $stageRoot "office-mcp-daemon.exe")
 Copy-Item -Recurse -Force -Path (Join-Path $uiRoot "*") -Destination $stageUiRoot
@@ -254,6 +269,8 @@ Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination $stage
 Copy-Item -Recurse -Force -Path (Join-Path $addinRoot "public") -Destination $stageAddinRoot
 Copy-Item -Force -Path (Join-Path $excelAddinRoot "manifest.xml") -Destination $stageExcelAddinRoot
 Copy-Item -Recurse -Force -Path (Join-Path $excelAddinRoot "public") -Destination $stageExcelAddinRoot
+Copy-Item -Force -Path (Join-Path $powerPointAddinRoot "manifest.xml") -Destination $stagePowerPointAddinRoot
+Copy-Item -Recurse -Force -Path (Join-Path $powerPointAddinRoot "public") -Destination $stagePowerPointAddinRoot
 & (Join-Path $commonRoot "scripts\register-office-catalog.ps1") -RepoRoot $repoRoot -CatalogPath $stageCatalogRoot -BaseUrl "https://localhost:8765" -SkipRegistry
 Copy-Item -Force -Path (Join-Path $repoRoot "packaging\windows\office-mcp-tray.ps1") -Destination (Join-Path $stageRoot "office-mcp-tray.ps1")
 

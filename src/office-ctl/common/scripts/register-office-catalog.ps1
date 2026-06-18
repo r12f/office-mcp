@@ -106,7 +106,7 @@ function Remove-LegacyHostCatalogFolders {
   )
 
   $resolvedCatalogRoot = [System.IO.Path]::GetFullPath($CatalogRoot)
-  foreach ($legacyHost in @("word", "excel")) {
+  foreach ($legacyHost in @("word", "excel", "powerpoint")) {
     $legacyPath = Join-Path $resolvedCatalogRoot $legacyHost
     if (-not (Test-Path -LiteralPath $legacyPath)) { continue }
 
@@ -230,7 +230,8 @@ function ConvertTo-OfficeCatalogRegistryUrl {
 
 $hosts = @(
   @{ Name = "Word"; ProcessName = "WINWORD"; CatalogFile = "office-mcp-word.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\word\manifest.xml"; AddinId = "11111111-aaaa-bbbb-cccc-222222222222" },
-  @{ Name = "Excel"; ProcessName = "EXCEL"; CatalogFile = "office-mcp-excel.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\excel\manifest.xml"; AddinId = "33333333-aaaa-bbbb-cccc-444444444444" }
+  @{ Name = "Excel"; ProcessName = "EXCEL"; CatalogFile = "office-mcp-excel.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\excel\manifest.xml"; AddinId = "33333333-aaaa-bbbb-cccc-444444444444" },
+  @{ Name = "PowerPoint"; ProcessName = "POWERPNT"; CatalogFile = "office-mcp-powerpoint.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\powerpoint\manifest.xml"; AddinId = "44444444-aaaa-bbbb-cccc-555555555555" }
 )
 
 New-Item -ItemType Directory -Force -Path $CatalogPath | Out-Null
@@ -268,4 +269,5 @@ Write-Output "Catalog URL: $catalogUrl"
 Write-Output "Manifest origin: $BaseUrl"
 Write-Output "Word manifest: $(Join-Path $CatalogPath 'office-mcp-word.xml')"
 Write-Output "Excel manifest: $(Join-Path $CatalogPath 'office-mcp-excel.xml')"
+Write-Output "PowerPoint manifest: $(Join-Path $CatalogPath 'office-mcp-powerpoint.xml')"
 if ($ClearOfficeCache) { Write-Output "Cleared Office WEF add-in cache for office-mcp." }

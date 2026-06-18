@@ -1,0 +1,14 @@
+{
+  "name": "office-mcp-powerpoint-addin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PowerPoint task pane add-in for office-mcp.",
+  "scripts": {
+    "check": "npm run check:taskpane && npm test",
+    "check:taskpane": "node --check public/taskpane.js",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

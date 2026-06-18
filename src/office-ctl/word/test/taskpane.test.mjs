@@ -58,15 +58,17 @@ test('Word add-in uses product identity metadata and generated icons', () => {
   assert.match(readFileSync(join(assetRoot, 'brand-mark.svg'), 'utf8'), /Office MCP control mark/);
 });
 
-test('Office catalog registration wrapper delegates to shared Word and Excel catalog script', () => {
+test('Office catalog registration wrapper delegates to shared Office catalog script', () => {
   const script = readFileSync(join(ADDIN_ROOT, 'scripts', 'register-word-catalog.ps1'), 'utf8');
   const commonScript = readFileSync(join(ADDIN_ROOT, '..', 'common', 'scripts', 'register-office-catalog.ps1'), 'utf8');
 
   assert.match(script, /register-office-catalog\.ps1/);
   assert.match(commonScript, /src\\office-ctl\\word\\manifest\.xml/);
   assert.match(commonScript, /src\\office-ctl\\excel\\manifest\.xml/);
+  assert.match(commonScript, /src\\office-ctl\\powerpoint\\manifest\.xml/);
   assert.match(commonScript, /Word manifest:/);
   assert.match(commonScript, /Excel manifest:/);
+  assert.match(commonScript, /PowerPoint manifest:/);
   assert.match(commonScript, /TrustedCatalogs\\office-mcp/);
   assert.match(commonScript, /ClearOfficeCache/);
   assert.match(commonScript, /Close Office host processes before clearing add-in cache/);
@@ -75,12 +77,14 @@ test('Office catalog registration wrapper delegates to shared Word and Excel cat
   assert.match(commonScript, /WEF\\\\Developer|WEF\\Developer/);
 });
 
-test('Office catalog registration script stages Word and Excel manifests without registry mutation', () => {
+test('Office catalog registration script stages Office host manifests without registry mutation', () => {
   const catalogPath = mkdtempSync(join(tmpdir(), 'office-mcp-catalog-'));
   mkdirSync(join(catalogPath, 'word'), { recursive: true });
   mkdirSync(join(catalogPath, 'excel'), { recursive: true });
+  mkdirSync(join(catalogPath, 'powerpoint'), { recursive: true });
   writeFileSync(join(catalogPath, 'word', 'manifest.xml'), '<legacy />');
   writeFileSync(join(catalogPath, 'excel', 'manifest.xml'), '<legacy />');
+  writeFileSync(join(catalogPath, 'powerpoint', 'manifest.xml'), '<legacy />');
 
   try {
     const result = spawnSync(
@@ -106,8 +110,10 @@ test('Office catalog registration script stages Word and Excel manifests without
     assert.match(result.stdout, /Manifest origin: https:\/\/localhost:8766/);
     assert.match(result.stdout, /Word manifest:/);
     assert.match(result.stdout, /Excel manifest:/);
+    assert.match(result.stdout, /PowerPoint manifest:/);
     const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
+    const powerpointManifest = readFileSync(join(catalogPath, 'office-mcp-powerpoint.xml'), 'utf8');
     assert.match(wordManifest, /<OfficeApp/);
     assert.match(wordManifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
     assert.match(wordManifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
@@ -130,10 +136,23 @@ test('Office catalog registration script stages Word and Excel manifests without
     assert.match(excelManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-80\.png/);
+    assert.match(powerpointManifest, /<OfficeApp/);
+    assert.match(powerpointManifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
+    assert.match(powerpointManifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
+    assert.match(powerpointManifest, /local productivity automation control utility/);
+    assert.match(powerpointManifest, /<SupportUrl DefaultValue="https:\/\/github\.com\/office-mcp\/office-mcp" \/>/);
+    assert.match(powerpointManifest, /DefaultValue="Open Control Panel"/);
+    assert.match(powerpointManifest, /https:\/\/localhost:8766\/powerpoint\/taskpane\.html\?v=0\.1\.0/);
+    assert.match(powerpointManifest, /<IconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-32\.png" \/>/);
+    assert.match(powerpointManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
+    assert.match(powerpointManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
+    assert.match(powerpointManifest, /https:\/\/localhost:8766\/assets\/icon-80\.png/);
     assert.doesNotMatch(wordManifest, /https:\/\/localhost:8765/);
     assert.doesNotMatch(excelManifest, /https:\/\/localhost:8765/);
+    assert.doesNotMatch(powerpointManifest, /https:\/\/localhost:8765/);
     assert.throws(() => readFileSync(join(catalogPath, 'word', 'manifest.xml'), 'utf8'));
     assert.throws(() => readFileSync(join(catalogPath, 'excel', 'manifest.xml'), 'utf8'));
+    assert.throws(() => readFileSync(join(catalogPath, 'powerpoint', 'manifest.xml'), 'utf8'));
   } finally {
     rmSync(catalogPath, { force: true, recursive: true });
   }
@@ -166,14 +185,19 @@ test('Office catalog registration can sync its origin from running daemon status
     assert.match(result.stdout, /Manifest origin: https:\/\/localhost:8777/);
     const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
+    const powerpointManifest = readFileSync(join(catalogPath, 'office-mcp-powerpoint.xml'), 'utf8');
     assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.8/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.7/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
+    assert.match(powerpointManifest, /https:\/\/localhost:8777\/powerpoint\/taskpane\.html\?v=0\.1\.0/);
+    assert.match(powerpointManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
+    assert.match(powerpointManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
     assert.doesNotMatch(wordManifest, /https:\/\/localhost:8765/);
     assert.doesNotMatch(excelManifest, /https:\/\/localhost:8765/);
+    assert.doesNotMatch(powerpointManifest, /https:\/\/localhost:8765/);
   } finally {
     rmSync(catalogPath, { force: true, recursive: true });
   }

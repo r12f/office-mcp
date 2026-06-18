@@ -79,6 +79,7 @@ npm run check
 | `src/office-ctl/common/` | Shared TypeScript add-in utilities: config, logging, channel/protocol helpers, redaction, and reusable UI primitives. |
 | `src/office-ctl/word/` | Word add-in package: XML manifest, task pane static bundle, add-in validation scripts, and Word catalog registration script. |
 | `src/office-ctl/excel/` | Excel add-in entry point and host-specific command surface. |
+| `src/office-ctl/powerpoint/` | PowerPoint add-in scaffold: XML manifest, compact task pane static bundle, and presentation-session registration. |
 | `packaging/` | Cross-component packaging assets: Windows bootstrap scripts and WiX MSI source. |
 | `doc/spec/` | Product and protocol design. |
 
@@ -116,7 +117,7 @@ Prerequisites:
 - A trusted current-user `CN=localhost` HTTPS certificate. The daemon reads a
   PFX file; it does not import root certificates during startup.
 
-Verify the Rust daemon, evidence harnesses, Word add-in, and packaging checks:
+Verify the Rust daemon, evidence harnesses, Office add-ins, and packaging checks:
 
 ```powershell
 cargo fmt --all --check
@@ -126,6 +127,12 @@ cd .\src\office-mcp\daemon\evidence
 npm install
 npm run check
 cd ..\..\..\office-ctl\word
+npm install
+npm run check
+cd ..\excel
+npm install
+npm run check
+cd ..\powerpoint
 npm install
 npm run check
 cd ..\..\..\packaging
@@ -282,10 +289,11 @@ cargo run -p office-mcp-daemon -- daemon run
 The catalog URL shown by the script is the local folder path to use in Office's
 trusted add-in catalog settings if Office does not pick up the registry entry.
 The Windows bootstrap and MSI install a broader catalog under
-`%LOCALAPPDATA%\office-mcp\addin-catalog\` with Word and Excel manifests placed
-directly at the catalog root as `office-mcp-word.xml` and
-`office-mcp-excel.xml`. After restarting Office, open **Insert > My Add-ins >
-Shared Folder** in Word or Excel and add `office-mcp`.
+`%LOCALAPPDATA%\office-mcp\addin-catalog\` with Word, Excel, and PowerPoint
+manifests placed directly at the catalog root as `office-mcp-word.xml`,
+`office-mcp-excel.xml`, and `office-mcp-powerpoint.xml`. After restarting
+Office, open **Insert > My Add-ins > Shared Folder** in the target host and add
+`Office MCP Control`.
 
 For a repeatable Windows developer bootstrap that also registers a logon
 Scheduled Task and local add-in catalog, run:
