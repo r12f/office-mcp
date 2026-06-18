@@ -422,7 +422,12 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       coherent product surface. A passing run must show mature software naming
       and iconography on all visible surfaces at once; partial polish, such as a
       good title with a missing icon or a good icon with experimental
-      type/category text, does not satisfy this item.
+      type/category text, does not satisfy this item. Automated recorder support
+      now binds product visual evidence to the current Word and Excel manifests:
+      display name, provider, description, standard/high-resolution icon URLs,
+      and type/category metadata are validated before product visual evidence can
+      pass. This item remains open until those manifest-derived fields are also
+      matched by live Office catalog/ribbon/task pane screenshots.
 - [x] Replace the current tray placeholder/missing icon with the generated
       tray glyph in normal daemon and installed launch paths. The icon must be
       visible in the Windows notification area and visually deliberate beside

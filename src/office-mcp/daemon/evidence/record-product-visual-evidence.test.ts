@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { tinyPng } from './image-evidence.js';
 
@@ -42,6 +42,8 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).excel.ready, true);
+    assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.display_name, 'Office MCP Control');
+    assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.icon_url, 'https://localhost:8765/assets/icon-32.png');
     assert.equal(evidence.rendered_logo_review_ready, true);
     assert.equal(evidence.daemon_context_ready, true);
     assert.equal(evidence.passed, true);
@@ -176,6 +178,9 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const skipProductReviewFlags = extra.includes('--skip-product-review-flags');
   const skipRenderedLogoAndFirstRunFlags = extra.includes('--skip-rendered-logo-and-first-run-flags');
   const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags' && item !== '--skip-rendered-logo-and-first-run-flags');
+  const hasWordManifest = filteredExtra.includes('--word-manifest-path');
+  const hasExcelManifest = filteredExtra.includes('--excel-manifest-path');
+  const outputDir = dirname(output);
   const args = [
     TSX,
     RECORDER,
@@ -198,6 +203,8 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     '--excel-server-protocol-row', 'Server 0.1.0 / Protocol 1.0',
     '--excel-document-state', 'Editable'
   ];
+  if (!hasWordManifest) args.push('--word-manifest-path', writeManifest(outputDir, 'word'));
+  if (!hasExcelManifest) args.push('--excel-manifest-path', writeManifest(outputDir, 'excel'));
   if (!skipProductReviewFlags) {
     args.push(
       '--logo-quality-reviewed', 'true',
@@ -274,6 +281,21 @@ function writeRenderedLogoReview(dir: string, ready = true): string {
     surfaces,
     ready
   }, null, 2));
+  return path;
+}
+
+function writeManifest(dir: string, host: 'word' | 'excel'): string {
+  const path = join(dir, `${host}-manifest.xml`);
+  const context = host === 'word' ? 'Word documents' : 'Excel workbooks';
+  writeFileSync(path, `<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp>
+  <ProviderName>Office MCP Control</ProviderName>
+  <DisplayName DefaultValue="Office MCP Control" />
+  <Description DefaultValue="Control live ${context} through a local productivity automation control utility." />
+  <IconUrl DefaultValue="https://localhost:8765/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:8765/assets/icon-80.png" />
+</OfficeApp>
+`);
   return path;
 }
 

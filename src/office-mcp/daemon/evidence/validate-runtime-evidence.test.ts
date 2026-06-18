@@ -346,6 +346,24 @@ test('runtime evidence validator can require product visual evidence', () => {
       assert.match(outputText(result.stdout), /Rendered logo review missing surface: logo_tray_size/);
     });
   });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.first_run_identity.excel.display_name = 'office-mcp-excel';
+      broken.first_run_identity.excel.icon_url = 'https://localhost:8765/assets/blank.png';
+      broken.first_run_identity.excel.manifest_ready = false;
+      broken.first_run_identity.excel.ready = false;
+      broken.product_identity_review.excel_first_run_identity_ready = false;
+      broken.product_identity_review.ready = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Excel manifest-derived identity ready flag/);
+      assert.match(outputText(result.stdout), /Excel display name product identity/);
+      assert.match(outputText(result.stdout), /Excel first-run icon URL/);
+    });
+  });
 });
 test('runtime evidence validator can require manual Windows tray evidence', () => {
   const ui = uiReport();
@@ -615,15 +633,23 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     },
     first_run_identity: {
       word: {
+        manifest_ready: passed,
+        display_name: 'Office MCP Control',
         provider: 'Office MCP Control',
         description: 'Local office productivity automation and control utility',
         type: 'Local productivity automation control utility',
+        icon_url: 'https://localhost:8765/assets/icon-32.png',
+        high_resolution_icon_url: 'https://localhost:8765/assets/icon-80.png',
         ready: passed
       },
       excel: {
+        manifest_ready: passed,
+        display_name: 'Office MCP Control',
         provider: 'Office MCP Control',
         description: 'Local office productivity automation and control utility',
         type: 'Local productivity automation control utility',
+        icon_url: 'https://localhost:8765/assets/icon-32.png',
+        high_resolution_icon_url: 'https://localhost:8765/assets/icon-80.png',
         ready: passed
       }
     },

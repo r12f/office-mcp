@@ -11,6 +11,8 @@ const tester = readOption('--tester') ?? process.env.USERNAME ?? process.env.USE
 const notes = readOption('--notes');
 const daemonBin = readOption('--daemon-bin');
 const renderedLogoReviewPath = readOption('--rendered-logo-review-path');
+const wordManifestPath = resolve(readOption('--word-manifest-path') ?? join(repoRoot, 'src/office-ctl/word/manifest.xml'));
+const excelManifestPath = resolve(readOption('--excel-manifest-path') ?? join(repoRoot, 'src/office-ctl/excel/manifest.xml'));
 
 const requiredSurfaces = [
   'word_ribbon_command',
@@ -63,13 +65,17 @@ const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefi
 const daemonContextReady = daemonContextLooksReady(daemonContext);
 const renderedLogoReview = renderedLogoReviewPath ? readRenderedLogoReview(resolve(renderedLogoReviewPath)) : undefined;
 const renderedLogoReviewReady = renderedLogoReviewLooksReady(renderedLogoReview);
+const wordManifestIdentity = readManifestIdentity(wordManifestPath);
+const excelManifestIdentity = readManifestIdentity(excelManifestPath);
 
 const productTextReady = requiredSurfaces.filter((surface) => surface !== 'tray_tooltip').every((surface) => typeof observations[surface] === 'string' && (observations[surface] as string).includes(productName));
 const allScreenshotsExist = Object.values(screenshotsExist).every(Boolean);
 const trayTooltipReady = typeof trayTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(trayTooltip);
 const catalogTypeReady = typeof catalogType === 'string' && /local productivity automation control utility/i.test(catalogType);
-const wordFirstRunIdentityReady = wordFirstRunIdentityReviewed && catalogIdentityLooksReady(wordCatalogProvider, wordCatalogDescription, wordCatalogType);
-const excelFirstRunIdentityReady = excelFirstRunIdentityReviewed && catalogIdentityLooksReady(excelCatalogProvider, excelCatalogDescription, excelCatalogType);
+const wordFirstRunIdentity = firstRunIdentity(wordManifestIdentity, wordCatalogProvider, wordCatalogDescription, wordCatalogType, catalogType);
+const excelFirstRunIdentity = firstRunIdentity(excelManifestIdentity, excelCatalogProvider, excelCatalogDescription, excelCatalogType, catalogType);
+const wordFirstRunIdentityReady = wordFirstRunIdentityReviewed && catalogIdentityLooksReady(wordFirstRunIdentity);
+const excelFirstRunIdentityReady = excelFirstRunIdentityReviewed && catalogIdentityLooksReady(excelFirstRunIdentity);
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady;
@@ -110,15 +116,13 @@ const evidence = {
   },
   first_run_identity: {
     word: {
-      provider: wordCatalogProvider,
-      description: wordCatalogDescription,
-      type: wordCatalogType,
+      manifest_path: wordManifestPath,
+      ...wordFirstRunIdentity,
       ready: wordFirstRunIdentityReady
     },
     excel: {
-      provider: excelCatalogProvider,
-      description: excelCatalogDescription,
-      type: excelCatalogType,
+      manifest_path: excelManifestPath,
+      ...excelFirstRunIdentity,
       ready: excelFirstRunIdentityReady
     }
   },
@@ -161,10 +165,51 @@ function readOption(name: string): string | undefined {
   return process.argv[index + 1];
 }
 
-function catalogIdentityLooksReady(provider: string | undefined, description: string | undefined, type: string | undefined): boolean {
-  return typeof provider === 'string' && provider.includes(productName)
-    && typeof description === 'string' && /local/i.test(description) && /(productivity|office)/i.test(description) && /(automation|control)/i.test(description)
-    && typeof type === 'string' && /local productivity automation control utility/i.test(type);
+function firstRunIdentity(manifest: Record<string, unknown>, providerOverride: string | undefined, descriptionOverride: string | undefined, typeOverride: string | undefined, catalogTypeFallback: string | undefined): Record<string, unknown> {
+  return {
+    display_name: manifest.display_name,
+    provider: providerOverride ?? manifest.provider,
+    description: descriptionOverride ?? manifest.description,
+    type: typeOverride ?? catalogTypeFallback,
+    icon_url: manifest.icon_url,
+    high_resolution_icon_url: manifest.high_resolution_icon_url,
+    manifest_ready: manifest.ready === true
+  };
+}
+
+function catalogIdentityLooksReady(identity: Record<string, unknown>): boolean {
+  return typeof identity.display_name === 'string' && identity.display_name.includes(productName)
+    && typeof identity.provider === 'string' && identity.provider.includes(productName)
+    && typeof identity.description === 'string' && /local/i.test(identity.description) && /(productivity|office)/i.test(identity.description) && /(automation|control)/i.test(identity.description)
+    && typeof identity.type === 'string' && /local productivity automation control utility/i.test(identity.type)
+    && typeof identity.icon_url === 'string' && /\/assets\/icon-32\.png/.test(identity.icon_url)
+    && typeof identity.high_resolution_icon_url === 'string' && /\/assets\/icon-80\.png/.test(identity.high_resolution_icon_url)
+    && identity.manifest_ready === true;
+}
+
+function readManifestIdentity(path: string): Record<string, unknown> {
+  try {
+    const xml = readFileSync(path, 'utf8');
+    return {
+      path,
+      ready: true,
+      display_name: extractDefaultValue(xml, 'DisplayName'),
+      provider: extractElementText(xml, 'ProviderName'),
+      description: extractDefaultValue(xml, 'Description'),
+      icon_url: extractDefaultValue(xml, 'IconUrl'),
+      high_resolution_icon_url: extractDefaultValue(xml, 'HighResolutionIconUrl')
+    };
+  } catch (error) {
+    return { path, ready: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function extractElementText(xml: string, element: string): string | undefined {
+  return new RegExp(`<${element}>([^<]+)<\\/${element}>`).exec(xml)?.[1];
+}
+
+function extractDefaultValue(xml: string, element: string): string | undefined {
+  return new RegExp(`<${element}[^>]*DefaultValue="([^"]+)"`).exec(xml)?.[1];
 }
 
 function readRenderedLogoReview(path: string): Record<string, unknown> {

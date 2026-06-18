@@ -294,6 +294,10 @@ function validateHostFirstRunIdentity(identity: unknown, host: string): void {
     failures.push(`Product visual evidence missing ${host} first-run identity details.`);
     return;
   }
+  if (identity.manifest_ready !== true) failures.push(`Product visual evidence missing ${host} manifest-derived identity ready flag.`);
+  if (typeof identity.display_name !== 'string' || !identity.display_name.includes('Office MCP Control')) {
+    failures.push(`Product visual evidence missing ${host} display name product identity.`);
+  }
   if (typeof identity.provider !== 'string' || !identity.provider.includes('Office MCP Control')) {
     failures.push(`Product visual evidence missing ${host} provider product name.`);
   }
@@ -302,6 +306,12 @@ function validateHostFirstRunIdentity(identity: unknown, host: string): void {
   }
   if (typeof identity.type !== 'string' || !/local productivity automation control utility/i.test(identity.type)) {
     failures.push(`Product visual evidence missing ${host} local productivity automation/control type metadata.`);
+  }
+  if (typeof identity.icon_url !== 'string' || !/\/assets\/icon-32\.png/.test(identity.icon_url)) {
+    failures.push(`Product visual evidence missing ${host} first-run icon URL.`);
+  }
+  if (typeof identity.high_resolution_icon_url !== 'string' || !/\/assets\/icon-80\.png/.test(identity.high_resolution_icon_url)) {
+    failures.push(`Product visual evidence missing ${host} first-run high-resolution icon URL.`);
   }
   if (identity.ready !== true) failures.push(`Product visual evidence missing ${host} first-run identity ready flag.`);
 }
