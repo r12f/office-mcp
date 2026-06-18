@@ -77,6 +77,11 @@ $metadata = [ordered]@{
   slug = "office-mcp"
   category = "Productivity"
   type = "Local productivity automation control utility"
+  icons = [ordered]@{
+    standard = "assets/icon-32.png"
+    high_resolution = "assets/icon-80.png"
+    source = "assets/brand-mark.svg"
+  }
   version = $Version
   manifest = Split-Path -Leaf $manifestPath
   manifest_sha256 = Get-Sha256 $manifestPath
@@ -107,6 +112,7 @@ Generated for version `$Version`.
 - Hosted manifest rendered from `src/office-ctl/word/manifest.xml`.
 - Manifest uses `$($BaseUrl.TrimEnd('/'))` and contains no loopback URLs.
 - Add-in static bundle includes `taskpane.html`, `taskpane.css`, `taskpane.js`, and generated `assets/*` product icons.
+- The first-run title, icon, and type metadata match Office MCP Control across the manifest, catalog-visible metadata, and packaged assets.
 - SHA-256 digests are recorded in `$([System.IO.Path]::GetFileName($metadataPath))`.
 
 ## External gates before Partner Center submission

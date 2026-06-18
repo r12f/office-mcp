@@ -44,6 +44,11 @@ test('AppSource package builder emits submission artifacts without loopback URLs
     assert.equal(metadata.slug, 'office-mcp');
     assert.equal(metadata.category, 'Productivity');
     assert.equal(metadata.type, 'Local productivity automation control utility');
+    assert.deepEqual(metadata.icons, {
+      standard: 'assets/icon-32.png',
+      high_resolution: 'assets/icon-80.png',
+      source: 'assets/brand-mark.svg'
+    });
     assert.equal(metadata.manifest, 'manifest-1.2.3.xml');
     assert.equal(metadata.addin_bundle, 'office-mcp-addin-1.2.3.zip');
     assert.match(String(metadata.manifest_sha256), /^[0-9a-f]{64}$/);
@@ -53,6 +58,7 @@ test('AppSource package builder emits submission artifacts without loopback URLs
     assert.match(checklist, /External gates before Partner Center submission/);
     assert.match(checklist, /category Productivity/);
     assert.match(checklist, /type Local productivity automation control utility/);
+    assert.match(checklist, /first-run title, icon, and type metadata match Office MCP Control/);
     assert.match(checklist, /Microsoft AppSource validation review/);
 
     assert.ok(readFileSync(join(dir, 'office-mcp-addin-1.2.3.zip')).byteLength > 1000);

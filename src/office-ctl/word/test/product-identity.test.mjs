@@ -41,7 +41,9 @@ test('Office add-ins use mature product identity metadata', () => {
     assert.match(manifest, /local productivity automation control utility/, `${host} description states product type`);
     assert.match(manifest, new RegExp(`Open ${PRODUCT_NAME} for this ${context}`), `${host} tooltip names the product and host context`);
     assert.match(taskpane, new RegExp(`<title>${PRODUCT_NAME}</title>`), `${host} task pane title is product branded`);
+    assert.match(taskpane, /<img class="product-mark" src="\/assets\/icon-32\.png" width="32" height="32" alt="" aria-hidden="true" \/>/, `${host} task pane chrome uses the product icon`);
     assert.match(taskpane, new RegExp(`<h1>${PRODUCT_NAME}</h1>`), `${host} task pane heading is product branded`);
+    assert.doesNotMatch(taskpane, /<h1>\s*(Add-in|Task Pane|office-mcp)/i, `${host} task pane heading must not read as a scaffold`);
     for (const pattern of BANNED_IDENTITY_PATTERNS) {
       assert.doesNotMatch(manifest, pattern, `${host} manifest must not contain ${pattern}`);
     }
