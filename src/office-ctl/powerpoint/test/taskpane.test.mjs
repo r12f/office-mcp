@@ -96,6 +96,9 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /TOOL_DISABLED_BY_USER/);
   assert.match(js, /function effectiveTools\(\)/);
   assert.match(js, /function updateToolPermission\(tool, enabled\)/);
+  assert.match(js, /const id = `toolPermission-\$\{tool\.replace\(\/\[\^a-z0-9_-\]\/gi, '-'\)\}`/);
+  assert.match(js, /for="\$\{id\}"/);
+  assert.match(js, /<input id="\$\{id\}" class="tool-toggle"/);
   assert.match(js, /toolListEl\.classList\.toggle\('is-editing-tools', opening\)/);
   assert.match(js, /sessionAddedNotification\(\{/);
   assert.match(js, /new TaskHistoryStore\(\{ redactText \}\)/);

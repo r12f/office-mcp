@@ -608,7 +608,8 @@
     const meta = TOOL_METADATA.get(tool) || { sideEffect: 'unknown', description: 'No metadata.' };
     const enabled = isToolEnabled(tool);
     const sideEffectClass = meta.sideEffect === 'mutating' ? ' mutating' : '';
-    return `<label class="tool-permission-row${enabled ? '' : ' is-disabled'}"><input class="tool-toggle" type="checkbox" data-tool="${escapeHtml(tool)}" ${enabled ? 'checked' : ''} /><span class="tool-permission-main"><span class="tool-permission-title"><span class="tool-permission-name">${escapeHtml(tool)}</span><span class="side-effect-pill${sideEffectClass}">${escapeHtml(titleCase(meta.sideEffect))}</span></span><span class="tool-permission-meta">${escapeHtml(meta.description)}</span></span></label>`;
+    const id = `toolPermission-${tool.replace(/[^a-z0-9_-]/gi, '-')}`;
+    return `<label class="tool-permission-row${enabled ? '' : ' is-disabled'}" for="${id}"><input id="${id}" class="tool-toggle" type="checkbox" data-tool="${escapeHtml(tool)}" ${enabled ? 'checked' : ''} /><span class="tool-permission-main"><span class="tool-permission-title"><span class="tool-permission-name">${escapeHtml(tool)}</span><span class="side-effect-pill${sideEffectClass}">${escapeHtml(titleCase(meta.sideEffect))}</span></span><span class="tool-permission-meta">${escapeHtml(meta.description)}</span></span></label>`;
   }
 
   function effectiveTools() {
