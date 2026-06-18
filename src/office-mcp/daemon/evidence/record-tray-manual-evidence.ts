@@ -22,8 +22,9 @@ const menuContainsRequiredItems = expectedItems.every((expected) =>
 );
 const screenshotExists = screenshotPath ? existsSync(resolve(screenshotPath)) : false;
 const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
-const passed = visibleIcon && rightClickMenu && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists;
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
+const daemonContextReady = daemonContextLooksReady(daemonContext);
+const passed = visibleIcon && rightClickMenu && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -42,6 +43,7 @@ const evidence = {
   screenshot_path: screenshotPath ? resolve(screenshotPath) : undefined,
   screenshot_exists: screenshotExists,
   daemon_context: daemonContext,
+  daemon_context_ready: daemonContextReady,
   notes,
   passed
 };
@@ -80,13 +82,14 @@ function readDaemonContext(binaryPath: string): Record<string, unknown> {
 }
 
 function runJson(binaryPath: string, args: string[]): Record<string, unknown> {
-  const result = spawnSync(binaryPath, args, { encoding: 'utf8' });
+  const result = spawnSync(binaryPath, args, { encoding: 'utf8', shell: process.platform === 'win32' && binaryPath.toLowerCase().endsWith('.cmd') });
   if (result.status !== 0) {
     return {
       ok: false,
+      error: result.error instanceof Error ? result.error.message : undefined,
       exit_code: result.status,
-      stderr: result.stderr.trim(),
-      stdout: result.stdout.trim()
+      stderr: result.stderr?.trim() ?? '',
+      stdout: result.stdout?.trim() ?? ''
     };
   }
   try {
@@ -99,4 +102,16 @@ function runJson(binaryPath: string, args: string[]): Record<string, unknown> {
       stdout: result.stdout.trim()
     };
   }
+}
+
+function daemonContextLooksReady(context: Record<string, unknown> | undefined): boolean {
+  if (!context) return false;
+  const status = context.status;
+  const trayProbe = context.tray_probe;
+  return isRecord(status) && status.ok === true && status.running === true && typeof status.uiUrl === 'string'
+    && isRecord(trayProbe) && trayProbe.ok === true && trayProbe.native_host === true;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

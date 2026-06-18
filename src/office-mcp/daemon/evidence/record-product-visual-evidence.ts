@@ -41,6 +41,7 @@ const excelInlineSettings = booleanFlag('--excel-inline-settings');
 const excelServerProtocolRow = readOption('--excel-server-protocol-row');
 const excelDocumentState = readOption('--excel-document-state');
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
+const daemonContextReady = daemonContextLooksReady(daemonContext);
 
 const productTextReady = requiredSurfaces.filter((surface) => surface !== 'tray_tooltip').every((surface) => typeof observations[surface] === 'string' && (observations[surface] as string).includes(productName));
 const allScreenshotsExist = Object.values(screenshotsExist).every(Boolean);
@@ -49,7 +50,7 @@ const catalogTypeReady = typeof catalogType === 'string' && /local productivity 
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady;
-const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && excelTaskpaneDensityReady;
+const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && excelTaskpaneDensityReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -82,6 +83,7 @@ const evidence = {
     density_ready: excelTaskpaneDensityReady
   },
   daemon_context: daemonContext,
+  daemon_context_ready: daemonContextReady,
   notes,
   passed
 };
@@ -136,4 +138,16 @@ function runJson(binaryPath: string, args: string[]): Record<string, unknown> {
       stdout: result.stdout.trim()
     };
   }
+}
+
+function daemonContextLooksReady(context: Record<string, unknown> | undefined): boolean {
+  if (!context) return false;
+  const status = context.status;
+  const trayProbe = context.tray_probe;
+  return isRecord(status) && status.ok === true && status.running === true && typeof status.uiUrl === 'string'
+    && isRecord(trayProbe) && trayProbe.ok === true && trayProbe.native_host === true;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

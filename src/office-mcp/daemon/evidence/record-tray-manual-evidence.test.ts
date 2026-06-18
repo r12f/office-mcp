@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -10,18 +10,31 @@ const RECORDER = resolve(process.cwd(), 'record-tray-manual-evidence.ts');
 
 test('manual tray evidence recorder requires product tooltip', () => {
   withTrayScreenshot((dir, screenshotPath) => {
+    const daemonBin = writeFakeDaemon(dir);
     const output = join(dir, 'tray-evidence.json');
-    const passing = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents');
+    const passing = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
     assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.tooltip_product_ready, true);
+    assert.equal(evidence.daemon_context_ready, true);
     assert.equal(evidence.passed, true);
 
-    const missingTooltip = runRecorder(join(dir, 'missing-tooltip.json'), screenshotPath);
+    const missingTooltip = runRecorder(join(dir, 'missing-tooltip.json'), screenshotPath, '--daemon-bin', daemonBin);
     assert.notEqual(missingTooltip.status, 0);
     const failed = JSON.parse(outputText(missingTooltip.stdout)) as Record<string, unknown>;
     assert.equal(failed.tooltip_product_ready, false);
     assert.equal(failed.passed, false);
+  });
+});
+
+test('manual tray evidence recorder requires daemon context before passing', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const output = join(dir, 'missing-daemon-context.json');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents');
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.daemon_context_ready, false);
+    assert.equal(evidence.passed, false);
   });
 });
 
@@ -56,4 +69,20 @@ function withTrayScreenshot(callback: (dir: string, screenshotPath: string) => v
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+function writeFakeDaemon(dir: string): string {
+  const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
+  writeFileSync(daemonBin, fakeDaemonScript());
+  chmodSync(daemonBin, 0o755);
+  return daemonBin;
+}
+
+function fakeDaemonScript(): string {
+  const status = JSON.stringify({ running: true, uiUrl: 'https://localhost:8765/ui/' });
+  const trayProbe = JSON.stringify({ native_host: true, snapshot: { tooltip: 'Office MCP - Up - 0 clients - 0 documents' } });
+  if (process.platform === 'win32') {
+    return `@echo off\r\nif "%1"=="daemon" echo ${status}\r\nif "%1"=="tray" echo ${trayProbe}\r\n`;
+  }
+  return `#!/bin/sh\nif [ "$1" = "daemon" ]; then printf '%s\\n' '${status}'; fi\nif [ "$1" = "tray" ]; then printf '%s\\n' '${trayProbe}'; fi\n`;
 }

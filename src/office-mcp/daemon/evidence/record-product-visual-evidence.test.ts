@@ -22,8 +22,9 @@ const SURFACES = [
 
 test('product visual evidence recorder requires all product surfaces', () => {
   withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
     const output = join(dir, 'product-visual-evidence.json');
-    const passing = runRecorder(output, screenshots);
+    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
     assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.kind, 'product_visual_evidence');
@@ -31,11 +32,12 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal(evidence.catalog_type_ready, true);
     assert.equal(evidence.tray_tooltip_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
+    assert.equal(evidence.daemon_context_ready, true);
     assert.equal(evidence.passed, true);
 
     const missingScreenshots = { ...screenshots };
     missingScreenshots['tray-native-menu'] = join(dir, 'missing-tray-menu.png');
-    const missingTray = runRecorder(join(dir, 'missing-tray.json'), missingScreenshots);
+    const missingTray = runRecorder(join(dir, 'missing-tray.json'), missingScreenshots, '--daemon-bin', daemonBin);
     assert.notEqual(missingTray.status, 0);
     const failed = JSON.parse(outputText(missingTray.stdout)) as Record<string, unknown>;
     assert.equal(failed.passed, false);
@@ -43,11 +45,20 @@ test('product visual evidence recorder requires all product surfaces', () => {
   });
 });
 
+test('product visual evidence recorder requires daemon context before passing', () => {
+  withScreenshots((dir, screenshots) => {
+    const output = join(dir, 'missing-daemon-context.json');
+    const result = runRecorder(output, screenshots);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.daemon_context_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('product visual evidence recorder can bind evidence to daemon context', () => {
   withScreenshots((dir, screenshots) => {
-    const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
-    writeFileSync(daemonBin, fakeDaemonScript());
-    chmodSync(daemonBin, 0o755);
+    const daemonBin = writeFakeDaemon(dir);
 
     const output = join(dir, 'product-visual-evidence.json');
     const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
@@ -102,6 +113,13 @@ function withScreenshots(callback: (dir: string, screenshots: Record<string, str
 
 function outputText(value: string | Buffer): string {
   return typeof value === 'string' ? value : value.toString('utf8');
+}
+
+function writeFakeDaemon(dir: string): string {
+  const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
+  writeFileSync(daemonBin, fakeDaemonScript());
+  chmodSync(daemonBin, 0o755);
+  return daemonBin;
 }
 
 function fakeDaemonScript(): string {
