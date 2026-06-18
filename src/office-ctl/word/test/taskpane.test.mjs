@@ -337,6 +337,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(html, /<dd id="protection">Not protected<\/dd>/);
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
   assert.match(html, /id="connectionDetail"/);
+  assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID"/);
+  assert.match(html, /class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint"/);
   assert.match(html, /id="currentTask"/);
   assert.match(html, /id="historyList"/);
   assert.match(html, /class="panel summary-panel"/);
@@ -366,6 +368,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(css, /\.tool-permission-row/);
   assert.match(css, /\.tool-toggle/);
   assert.match(css, /\.tool-list:not\(\.is-editing-tools\) \.tool-toggle/);
+  assert.match(css, /\.metadata-copy \{[\s\S]*min-height: 24px;[\s\S]*text-align: left;/);
+  assert.match(css, /\.metadata-copy code \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /forced-colors: active/);
   assert.match(js, /const TOOL_GROUPS = \[/);
@@ -401,6 +405,16 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /Partial effect:/);
   assert.match(js, /storeEndpointOverride\(value\)/);
   assert.match(js, /settingsToggleEl\.addEventListener\('click', handleSettingsClick\)/);
+  assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
+  assert.match(js, /async function handleMetadataCopy\(event\)/);
+  assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
+  assert.match(js, /navigator\.clipboard\?\.writeText/);
+  assert.match(js, /function setCopyableMetadata\(element, value\)/);
+  assert.match(js, /element\.textContent = middleTruncate\(text\)/);
+  assert.match(js, /button\.dataset\.copyValue = text/);
+  assert.match(js, /function middleTruncate\(value, maxLength = 30\)/);
+  assert.match(js, /return `\$\{text\.slice\(0, head\)\}\$\{marker\}\$\{text\.slice\(text\.length - tail\)\}`/);
+  assert.match(js, /function fallbackCopy\(value\)/);
   assert.match(js, /toolListEl\.classList\.toggle\('is-editing-tools', opening\)/);
   assert.match(js, /settingsToggleEl\.addEventListener\('keydown', activateSettingsWithKeyboard\)/);
   assert.match(js, /suppressNextSettingsClick/);

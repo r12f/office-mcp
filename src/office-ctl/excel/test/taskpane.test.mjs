@@ -52,6 +52,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(html, /id="hostPlatform"/);
   assert.match(html, /<dd id="protection">Not protected<\/dd>/);
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
+  assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID"/);
+  assert.match(html, /class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint"/);
   assert.match(html, /id="historyList"/);
   assert.match(html, /class="panel summary-panel"/);
   assert.match(html, /class="tools-panel"/);
@@ -83,6 +85,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(css, /\.tool-permission-row/);
   assert.match(css, /\.tool-toggle/);
   assert.match(css, /\.tool-list:not\(\.is-editing-tools\) \.tool-toggle/);
+  assert.match(css, /\.metadata-copy \{[\s\S]*min-height: 24px;[\s\S]*text-align: left;/);
+  assert.match(css, /\.metadata-copy code \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /forced-colors: active/);
   assert.match(js, /const TOOL_GROUPS = \[/);
@@ -134,6 +138,16 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.doesNotMatch(js, /Reconnecting\.\.\./);
   assert.doesNotMatch(js, /Registering\.\.\./);
   assert.match(js, /settingsToggleEl\.setAttribute\('aria-label', opening \? 'Close Settings' : 'Open Settings'\)/);
+  assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
+  assert.match(js, /async function handleMetadataCopy\(event\)/);
+  assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
+  assert.match(js, /navigator\.clipboard\?\.writeText/);
+  assert.match(js, /function setCopyableMetadata\(element, value\)/);
+  assert.match(js, /element\.textContent = middleTruncate\(text\)/);
+  assert.match(js, /button\.dataset\.copyValue = text/);
+  assert.match(js, /function middleTruncate\(value, maxLength = 30\)/);
+  assert.match(js, /return `\$\{text\.slice\(0, head\)\}\$\{marker\}\$\{text\.slice\(text\.length - tail\)\}`/);
+  assert.match(js, /function fallbackCopy\(value\)/);
   assert.match(js, /toolListEl\.classList\.toggle\('is-editing-tools', opening\)/);
   assert.match(js, /settingsToggleEl\.addEventListener\('click', handleSettingsClick\)/);
   assert.match(js, /settingsToggleEl\.addEventListener\('keydown', activateSettingsWithKeyboard\)/);

@@ -49,6 +49,8 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(html, /Connecting\.\.\./);
   assert.match(html, /<dd id="protection">Not protected<\/dd>/);
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
+  assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID"/);
+  assert.match(html, /class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint"/);
   assert.match(html, /class="panel summary-panel"/);
   assert.match(html, /class="tools-panel"/);
   assert.match(html, /<span>Tools<\/span>/);
@@ -69,6 +71,8 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
   assert.match(css, /\.control-glyph \{[\s\S]*width: 18px;[\s\S]*stroke: currentColor;/);
   assert.match(css, /\.tool-permission-row\.is-mutating \{[\s\S]*border-left: 3px solid var\(--powerpoint\);/);
+  assert.match(css, /\.metadata-copy \{[\s\S]*min-height: 24px;[\s\S]*text-align: left;/);
+  assert.match(css, /\.metadata-copy code \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
   assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
   assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
@@ -109,6 +113,16 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /new TaskHistoryStore\(\{ redactText \}\)/);
   assert.match(js, /taskStore\.isCancelled\(requestId\)/);
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
+  assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
+  assert.match(js, /async function handleMetadataCopy\(event\)/);
+  assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
+  assert.match(js, /navigator\.clipboard\?\.writeText/);
+  assert.match(js, /function setCopyableMetadata\(element, value\)/);
+  assert.match(js, /element\.textContent = middleTruncate\(text\)/);
+  assert.match(js, /button\.dataset\.copyValue = text/);
+  assert.match(js, /function middleTruncate\(value, maxLength = 30\)/);
+  assert.match(js, /return `\$\{text\.slice\(0, head\)\}\$\{marker\}\$\{text\.slice\(text\.length - tail\)\}`/);
+  assert.match(js, /function fallbackCopy\(value\)/);
   assert.match(js, /clearEndpointOverride/);
   assert.match(js, /currentOriginEndpoint/);
   assert.match(js, /Office\.AutoShowTaskpaneWithDocument/);

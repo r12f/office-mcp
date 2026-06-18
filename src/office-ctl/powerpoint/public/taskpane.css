@@ -319,6 +319,26 @@ code,
   font-size: 12px;
 }
 
+.metadata-copy {
+  display: grid;
+  width: 100%;
+  min-height: 24px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.metadata-copy code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .empty-state {
   padding: 10px;
   border: 1px dashed var(--border);

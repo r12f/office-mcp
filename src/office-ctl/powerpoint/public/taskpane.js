@@ -88,6 +88,7 @@
   settingsToggleEl.addEventListener('click', handleSettingsClick);
   settingsToggleEl.addEventListener('keydown', activateSettingsWithKeyboard);
   settingsFormEl.addEventListener('submit', saveEndpointOverride);
+  document.addEventListener('click', handleMetadataCopy);
   endpointInputEl.addEventListener('input', () => {
     endpointDirty = endpointInputEl.value.trim() !== configuredEndpoint();
   });
@@ -129,7 +130,7 @@
   function connect() {
     clearTimeout(reconnectTimer);
     const endpoint = configuredEndpoint();
-    daemonEl.textContent = endpoint;
+    setCopyableMetadata(daemonEl, endpoint);
     endpointInputEl.value = endpoint;
     endpointDirty = false;
     setConnectionState('connecting', 'Connecting\u2026');
@@ -194,7 +195,7 @@
       available_tools: effectiveTools(),
       is_active: null
     }));
-    sessionEl.textContent = sessionId;
+    setCopyableMetadata(sessionEl, sessionId);
     sessionAnnounced = true;
     renderDocumentState();
     setConnectionState('connected', 'Connected');
@@ -582,8 +583,8 @@
   }
 
   function renderStaticState() {
-    sessionEl.textContent = sessionId;
-    daemonEl.textContent = configuredEndpoint();
+    setCopyableMetadata(sessionEl, sessionId);
+    setCopyableMetadata(daemonEl, configuredEndpoint());
     serverVersionEl.textContent = `Server ${serverInfo.serverVersion}`;
     protocolVersionEl.textContent = `Protocol ${serverInfo.protocolVersion}`;
     renderToolSummary();
@@ -791,5 +792,51 @@
       saveEndpointEl.disabled = false;
       saveEndpointEl.textContent = 'Save Endpoint';
     }
+  }
+
+  async function handleMetadataCopy(event) {
+    const button = event.target.closest('[data-copy-target]');
+    if (!button) return;
+    const target = document.getElementById(button.dataset.copyTarget);
+    const value = button.dataset.copyValue || target?.textContent?.trim();
+    if (!value || value === '-') return;
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value);
+      else fallbackCopy(value);
+      announcerEl.textContent = `Copied ${button.getAttribute('aria-label') || 'value'}`;
+    } catch (error) {
+      logger.warn('metadata_copy.failed', error);
+      announcerEl.textContent = 'Copy failed';
+    }
+  }
+
+  function setCopyableMetadata(element, value) {
+    const text = value || '-';
+    element.textContent = middleTruncate(text);
+    element.title = text;
+    const button = element.closest('[data-copy-target]');
+    if (button) button.dataset.copyValue = text;
+  }
+
+  function middleTruncate(value, maxLength = 30) {
+    const text = String(value || '');
+    if (text.length <= maxLength) return text;
+    const marker = '...';
+    const available = maxLength - marker.length;
+    const head = Math.ceil(available / 2);
+    const tail = Math.floor(available / 2);
+    return `${text.slice(0, head)}${marker}${text.slice(text.length - tail)}`;
+  }
+
+  function fallbackCopy(value) {
+    const area = document.createElement('textarea');
+    area.value = value;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand('copy');
+    area.remove();
   }
 })();
