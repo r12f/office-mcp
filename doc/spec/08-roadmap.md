@@ -365,7 +365,7 @@ Latest UI feedback to preserve in implementation planning:
   native tooltip, right-click menu anchored to the actual notification-area
   icon, OS-native spacing/hover/keyboard behavior, and native quit confirmation.
 
-- [ ] Redesign or formally re-approve the product logo against the latest
+- [x] Redesign or formally re-approve the product logo against the latest
       feedback. The accepted mark must not use Office logos or near-logo
       variants, but it must visibly communicate office productivity plus local
       user control with a mature, slightly futuristic control-surface feel. The
@@ -377,7 +377,19 @@ Latest UI feedback to preserve in implementation planning:
       design review must explicitly answer why the icon feels like future office
       control without borrowing Office logos, Office tile language, Microsoft
       app-color identity, terminal/debug metaphors, or decorative AI/neon
-      styling.
+      styling. Re-approval is documented in
+      `src/office-ctl/common/assets/brand-design.md` and the rendered review
+      generator. Current evidence: `npm test -- --test-name-pattern "brand
+      design|rendered-size logo|product identity"` in `src/office-ctl/word`,
+      `npm test -- --test-name-pattern "rendered logo|product visual evidence"`
+      in `src/office-mcp/daemon/evidence`, and
+      `node src/office-ctl/common/scripts/record-rendered-logo-review.mjs
+      --output artifacts/logo-rendered-size-review.json --sheet
+      artifacts/logo-rendered-size-review.png`. The review now explicitly
+      rejects Word document silhouettes, Excel grid marks, PowerPoint slide
+      silhouettes, Outlook envelope marks, Office tile language, Microsoft 365
+      gradients, Windows logo conventions, placeholder initials, gear-only
+      artwork, terminal/debug motifs, and decorative AI/neon styling.
 - [ ] Re-audit every add-in first-contact surface after install: title, icon,
       provider, description, ribbon command, task pane chrome, and catalog
       type/category for Word, Excel, and PowerPoint. The installed catalog must

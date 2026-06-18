@@ -82,6 +82,8 @@ test('brand design note documents the office-control visual brief', () => {
   assert.match(note, /Microsoft 365\s+multi-color gradients/i);
   assert.match(note, /Word document silhouettes/i);
   assert.match(note, /Excel grid marks/i);
+  assert.match(note, /PowerPoint\s+slide\/presentation silhouettes/i);
+  assert.match(note, /Outlook envelope marks/i);
   assert.match(note, /standalone gear icon/i);
 });
 
@@ -130,7 +132,7 @@ test('rendered-size logo review artifact covers first-contact product surfaces',
     assert.match(report.design_review.office_productivity_metaphor, /document|pane/i);
     assert.match(report.design_review.user_control_metaphor, /control|command/i);
     assert.match(report.design_review.futuristic_maturity, /mature|futuristic/i);
-    assert.match(report.design_review.non_microsoft_distinction, /Office logos|Microsoft 365 gradients|gear-only/i);
+    assert.match(report.design_review.non_microsoft_distinction, /Office logos|Microsoft 365 gradients|PowerPoint slide silhouettes|Outlook envelope marks|gear-only/i);
     assert.deepEqual(report.design_review.rejects_generic_readings, ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone']);
     assert.equal(report.surfaces.length, RENDERED_REVIEW_SURFACES.length);
     const sheetImage = parsePngRgba(readFileSync(sheet));

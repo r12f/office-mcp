@@ -9,8 +9,9 @@ looking like a generic preferences icon.
 
 ## Visual Metaphor
 
-- Document panes: live Word and Excel files are present, but abstracted as
-  neutral productivity surfaces rather than host-specific document silhouettes.
+- Document panes: live Word, Excel, and PowerPoint work is present, but
+  abstracted as neutral productivity surfaces rather than host-specific
+  document, workbook, slide, or presentation silhouettes.
 - Command spine: the blue route with two operator nodes makes control and local
   command routing visible even at tray size.
 - Control dial: the yellow dial communicates user approval and command control
@@ -43,7 +44,8 @@ Word and Excel colors remain UI accents only and are not the product mark.
 The source artwork must not copy, trace, remix, or visually impersonate
 Microsoft Office, Word, Excel, PowerPoint, Outlook, Windows, or Microsoft 365
 marks. In particular, it must not use Office ribbon tiles, Microsoft 365
-multi-color gradients, Word document silhouettes, Excel grid marks, Windows app
-logo conventions, placeholder initials, or a standalone gear icon. The mark is
-an original abstract control console for documents, with the command spine and
+multi-color gradients, Word document silhouettes, Excel grid marks, PowerPoint
+slide/presentation silhouettes, Outlook envelope marks, Windows app logo
+conventions, placeholder initials, or a standalone gear icon. The mark is an
+original abstract control console for documents, with the command spine and
 control dial as its signature elements.

@@ -390,7 +390,7 @@ function validateRenderedLogoDesignReview(review: unknown): void {
   if (typeof review.office_productivity_metaphor !== 'string' || !/document|pane|office/i.test(review.office_productivity_metaphor)) failures.push('Rendered logo design review missing office productivity metaphor.');
   if (typeof review.user_control_metaphor !== 'string' || !/control|command|operator/i.test(review.user_control_metaphor)) failures.push('Rendered logo design review missing user control metaphor.');
   if (typeof review.futuristic_maturity !== 'string' || !/mature|futuristic|desktop utility/i.test(review.futuristic_maturity)) failures.push('Rendered logo design review missing mature futuristic utility rationale.');
-  if (typeof review.non_microsoft_distinction !== 'string' || !/Office logos|Microsoft 365 gradients|gear-only/i.test(review.non_microsoft_distinction)) failures.push('Rendered logo design review missing non-Microsoft distinction.');
+  if (typeof review.non_microsoft_distinction !== 'string' || !/Office logos/i.test(review.non_microsoft_distinction) || !/Microsoft 365 gradients/i.test(review.non_microsoft_distinction) || !/PowerPoint slide silhouettes/i.test(review.non_microsoft_distinction) || !/Outlook envelope marks/i.test(review.non_microsoft_distinction) || !/gear-only/i.test(review.non_microsoft_distinction)) failures.push('Rendered logo design review missing non-Microsoft distinction.');
   const rejected = Array.isArray(review.rejects_generic_readings) ? review.rejects_generic_readings : [];
   for (const item of ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone']) {
     if (!rejected.includes(item)) failures.push(`Rendered logo design review does not reject ${item}.`);

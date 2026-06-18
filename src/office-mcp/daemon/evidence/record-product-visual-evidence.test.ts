@@ -543,7 +543,7 @@ function renderedLogoDesignReview(ready: boolean) {
     office_productivity_metaphor: ready ? 'Abstract document panes communicate office productivity.' : '',
     user_control_metaphor: ready ? 'Command routing and operator nodes communicate local user control.' : '',
     futuristic_maturity: ready ? 'Mature slightly futuristic desktop utility geometry.' : '',
-    non_microsoft_distinction: ready ? 'Avoids Office logos, Microsoft 365 gradients, Word silhouettes, Excel grid marks, and gear-only artwork.' : '',
+    non_microsoft_distinction: ready ? 'Avoids Office logos, Microsoft 365 gradients, Word silhouettes, Excel grid marks, PowerPoint slide silhouettes, Outlook envelope marks, and gear-only artwork.' : '',
     rejects_generic_readings: ready ? ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'] : [],
     ready
   };

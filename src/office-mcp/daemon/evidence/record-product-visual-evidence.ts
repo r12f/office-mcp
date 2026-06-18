@@ -317,7 +317,7 @@ function renderedLogoDesignReviewLooksReady(review: unknown): boolean {
     && typeof review.office_productivity_metaphor === 'string' && /document|pane|office/i.test(review.office_productivity_metaphor)
     && typeof review.user_control_metaphor === 'string' && /control|command|operator/i.test(review.user_control_metaphor)
     && typeof review.futuristic_maturity === 'string' && /mature|futuristic|desktop utility/i.test(review.futuristic_maturity)
-    && typeof review.non_microsoft_distinction === 'string' && /Office logos|Microsoft 365 gradients|gear-only/i.test(review.non_microsoft_distinction)
+    && typeof review.non_microsoft_distinction === 'string' && /Office logos/i.test(review.non_microsoft_distinction) && /Microsoft 365 gradients/i.test(review.non_microsoft_distinction) && /PowerPoint slide silhouettes/i.test(review.non_microsoft_distinction) && /Outlook envelope marks/i.test(review.non_microsoft_distinction) && /gear-only/i.test(review.non_microsoft_distinction)
     && ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'].every((item) => rejectedReadings.includes(item));
 }
 function renderedLogoSurfaceSpecs(): Array<[string, number]> {
