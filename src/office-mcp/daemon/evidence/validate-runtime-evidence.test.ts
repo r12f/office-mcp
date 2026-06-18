@@ -230,6 +230,16 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       assert.match(outputText(result.stdout), /Manual tray evidence missing menu item: Documents:/);
     });
   });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      writeFileSync(broken.screenshot_path, 'not an image');
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence screenshot file does not exist/);
+    });
+  });
 });
 
 test('runtime evidence validator rejects missing or failed required gates', () => {
@@ -273,7 +283,7 @@ function withManualTrayEvidence(passed: boolean, callback: (path: string) => voi
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-manual-tray-evidence-'));
   try {
     const screenshotPath = join(dir, 'tray-visible.png');
-    if (passed) writeFileSync(screenshotPath, 'fake png bytes for validator file existence');
+    if (passed) writeFileSync(screenshotPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
     const path = join(dir, 'tray-manual-evidence.json');
     writeFileSync(path, JSON.stringify(manualTrayReport(passed, screenshotPath), null, 2));
     callback(path);

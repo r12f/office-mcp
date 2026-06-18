@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -167,7 +167,7 @@ function validateManualTrayEvidence(): void {
       failures.push(`Manual tray evidence missing menu item: ${expected}`);
     }
   }
-  if (typeof manual.screenshot_path !== 'string' || !existsSync(resolve(manual.screenshot_path))) {
+  if (typeof manual.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(manual.screenshot_path))) {
     failures.push('Manual tray evidence screenshot file does not exist.');
   }
   for (const [key, label] of [
@@ -178,6 +178,16 @@ function validateManualTrayEvidence(): void {
   ] as const) {
     if (manual[key] !== true) failures.push(`Manual tray evidence missing ${label}.`);
   }
+}
+
+function screenshotFileLooksLikeImage(path: string): boolean {
+  if (!existsSync(path) || !statSync(path).isFile()) return false;
+  const header = readFileSync(path).subarray(0, 12);
+  const isPng = header.length >= 8 && header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4e && header[3] === 0x47 && header[4] === 0x0d && header[5] === 0x0a && header[6] === 0x1a && header[7] === 0x0a;
+  const isJpeg = header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+  const isWebp = header.length >= 12 && header.subarray(0, 4).toString('ascii') === 'RIFF' && header.subarray(8, 12).toString('ascii') === 'WEBP';
+  const isBmp = header.length >= 2 && header[0] === 0x42 && header[1] === 0x4d;
+  return isPng || isJpeg || isWebp || isBmp;
 }
 
 function emitSummary(): never {
