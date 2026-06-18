@@ -46,7 +46,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(html, /class="tools-panel"/);
   assert.match(html, /<span>Tools<\/span>/);
   assert.match(html, /id="toolList"/);
-  assert.match(html, /Available 0 of 5/);
+  assert.match(html, /Enabled 0 of 5/);
   assert.doesNotMatch(html, /Tool Permissions/);
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
   assert.match(html, /aria-label="Open Settings"/);
@@ -92,6 +92,31 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(js, /console\.(log|warn|error)/);
 });
 
+
+test('PowerPoint task pane keeps settings inline and compact at narrow widths', () => {
+  const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
+  const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
+
+  assert.match(css, /body \{[\s\S]*min-width: 320px;[\s\S]*overflow-x: hidden;/);
+  assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);
+  assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
+  assert.match(css, /\.empty-state \{[\s\S]*padding: 10px;/);
+  assert.match(css, /@media \(min-width: 380px\)/);
+  assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
+  assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
+  assert.doesNotMatch(cssRule(css, '.current-task-panel'), /\bheight:/);
+  assert.doesNotMatch(cssRule(css, '.history-panel'), /\bheight:/);
+  assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
+
+  const summaryStart = html.indexOf('class="panel summary-panel"');
+  const settingsIndex = html.indexOf('id="settingsPanel"');
+  const summaryEnd = html.indexOf('</section>', settingsIndex);
+  const currentTaskIndex = html.indexOf('id="currentTaskHeading"');
+  assert.ok(summaryStart !== -1 && settingsIndex !== -1, 'summary and settings exist');
+  assert.ok(settingsIndex > summaryStart, 'settings panel is inside summary flow');
+  assert.ok(settingsIndex < currentTaskIndex, 'settings appears before current task');
+  assert.ok(summaryEnd < currentTaskIndex, 'summary closes before current task');
+});
 test('PowerPoint task pane implements advertised tool handlers with host APIs', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
