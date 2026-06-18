@@ -48,6 +48,24 @@ test('Office add-ins use mature product identity metadata', () => {
   }
 });
 
+test('brand design note documents the office-control visual brief', () => {
+  const note = readFileSync(join(ASSET_ROOT, 'brand-design.md'), 'utf8');
+  assert.match(note, /local office automation under user\s+control/i);
+  assert.match(note, /overlapping document or app panes/i);
+  assert.match(note, /routing path/i);
+  assert.match(note, /control node/i);
+  assert.match(note, /not a Microsoft Office app palette/i);
+  assert.match(note, /16 px/);
+  assert.match(note, /32 px/);
+  assert.match(note, /80 px/);
+  assert.match(note, /must not copy, trace, remix, or visually impersonate/i);
+  assert.match(note, /Office ribbon tiles/i);
+  assert.match(note, /Microsoft 365\s+multi-color gradients/i);
+  assert.match(note, /Word document silhouettes/i);
+  assert.match(note, /Excel grid marks/i);
+  assert.match(note, /standalone gear icon/i);
+});
+
 test('generated brand icons are original non-placeholder assets', () => {
   const svg = readFileSync(join(ASSET_ROOT, 'brand-mark.svg'), 'utf8');
   assert.match(svg, /aria-label="Office MCP control mark"/);

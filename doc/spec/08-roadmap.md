@@ -328,14 +328,14 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       futuristic desktop utility style. The first implemented identity is the
       Office MCP Control mark: abstract document panes plus a control node,
       generated from `src/office-ctl/common/assets/brand-mark.svg`.
-- [ ] Review and refine the implemented logo against the product brief before
-      final release. The final mark must communicate office productivity plus
-      user control through abstract document panes, routing, and a control node
-      or switch; it must not use Office logos, Office tile language, Microsoft
-      365 gradients, Word document silhouettes, Excel grid marks, generic gear
-      icons, or text-only initials. Add or update a design note beside the
-      source artwork documenting the metaphor, palette, minimum sizes, and
-      non-Microsoft distinction.
+- [x] Review and refine the implemented logo against the product brief before
+      final release. The final mark communicates office productivity plus user
+      control through abstract document panes, routing, and a control node; it
+      avoids Office logos, Office tile language, Microsoft 365 gradients, Word
+      document silhouettes, Excel grid marks, generic gear icons, and text-only
+      initials. `src/office-ctl/common/assets/brand-design.md` documents the
+      metaphor, palette, minimum sizes, and non-Microsoft distinction, with
+      product identity tests guarding the brief.
 - [x] Add an explicit brand guard so generated/source assets cannot regress to
       Microsoft Office-owned visual marks, placeholder initials, generic gear
       icons, or single-color debug glyphs. Covered by
