@@ -1390,8 +1390,13 @@
   function renderDocumentState() {
     if (!documentInfo) return;
     documentTitleEl.textContent = documentInfo.title || documentInfo.filename || 'Word Document';
-    protectionEl.textContent = documentInfo.protection?.kind || 'Unknown';
+    protectionEl.textContent = protectionLabel(documentInfo);
     documentStateEl.textContent = documentStateLabel(documentInfo);
+  }
+
+  function protectionLabel(info) {
+    if (info.is_protected === true || info.protection?.kind) return info.protection?.kind || 'Protected';
+    return 'Not protected';
   }
 
   function documentStateLabel(info) {

@@ -209,6 +209,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(html, /<dd id="runtimeVersions"><span id="serverVersion">Server Unknown<\/span> \/ <span id="protocolVersion">Protocol 1\.0<\/span><\/dd>/);
   assert.match(html, /id="hostPlatform"/);
   assert.match(html, /id="documentState"/);
+  assert.match(html, /<dd id="protection">Not protected<\/dd>/);
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
   assert.match(html, /id="connectionDetail"/);
   assert.match(html, /id="currentTask"/);
@@ -277,6 +278,9 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /registerResult\(message, PROTOCOL_VERSION\)/);
   assert.match(js, /serverVersionEl\.textContent = `Server \$\{serverInfo\.serverVersion\}`/);
   assert.match(js, /protocolVersionEl\.textContent = `Protocol \$\{serverInfo\.protocolVersion\}`/);
+  assert.match(js, /function protectionLabel\(info\)/);
+  assert.match(js, /return 'Not protected'/);
+  assert.doesNotMatch(js, /protectionEl\.textContent = documentInfo\.protection\?\.kind \|\| 'Unknown'/);
   assert.match(js, /function documentStateLabel\(info\)/);
   assert.match(js, /return 'Editable'/);
   assert.doesNotMatch(js, /Dirty: \$\{boolLabel/);

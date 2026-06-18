@@ -601,9 +601,14 @@
   function renderDocumentState() {
     const workbook = documentInfo || {};
     documentTitleEl.textContent = workbook.title || workbook.filename || 'Unknown Excel Workbook';
-    protectionEl.textContent = workbook.protection?.kind || 'Unknown';
+    protectionEl.textContent = protectionLabel(workbook);
     documentStateEl.textContent = documentStateLabel(workbook);
     hostPlatformEl.textContent = `Excel / ${window.Office?.context?.platform || 'Unknown'}`;
+  }
+
+  function protectionLabel(info) {
+    if (info.is_protected === true || info.protection?.kind) return info.protection?.kind || 'Protected';
+    return 'Not protected';
   }
 
   function documentStateLabel(info) {

@@ -49,6 +49,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(html, /id="protocolVersion"/);
   assert.match(html, /<dd id="runtimeVersions"><span id="serverVersion">Server Unknown<\/span> \/ <span id="protocolVersion">Protocol 1\.0<\/span><\/dd>/);
   assert.match(html, /id="hostPlatform"/);
+  assert.match(html, /<dd id="protection">Not protected<\/dd>/);
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
   assert.match(html, /id="historyList"/);
   assert.match(html, /class="panel summary-panel"/);
@@ -137,6 +138,9 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /saveEndpointEl\.textContent = 'Saving…'/);
   assert.match(js, /serverVersionEl\.textContent = `Server \$\{serverInfo\.serverVersion\}`/);
   assert.match(js, /protocolVersionEl\.textContent = `Protocol \$\{serverInfo\.protocolVersion\}`/);
+  assert.match(js, /function protectionLabel\(info\)/);
+  assert.match(js, /return 'Not protected'/);
+  assert.doesNotMatch(js, /protectionEl\.textContent = workbook\.protection\?\.kind \|\| 'Unknown'/);
   assert.match(js, /function documentStateLabel\(info\)/);
   assert.match(js, /return 'Editable'/);
   assert.doesNotMatch(js, /Dirty: \$\{valueLabel/);
