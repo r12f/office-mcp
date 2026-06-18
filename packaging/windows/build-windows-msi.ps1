@@ -102,6 +102,11 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
     "office-ctl\common\browser-ui.js",
     "office-ctl\common\logger.js",
     "office-ctl\common\task-history.js",
+    "office-ctl\common\assets\brand-mark.svg",
+    "office-ctl\common\assets\icon-16.png",
+    "office-ctl\common\assets\icon-32.png",
+    "office-ctl\common\assets\icon-80.png",
+    "office-ctl\common\assets\icon-256.png",
     "scripts\export-localhost-dev-cert.ps1",
     "office-ctl\word\manifest.xml",
     "office-ctl\word\public\taskpane.html",
@@ -143,7 +148,7 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
   }
 
   $generatedWxs = Get-Content -Raw -LiteralPath $GeneratedWxsPath
-  foreach ($needle in @("office-mcp-daemon.exe", "index.html", "app.js", "taskpane.js", "addin-catalog", "office-mcp-env.ps1", "office-mcp-daemon.ps1")) {
+  foreach ($needle in @("office-mcp-daemon.exe", "index.html", "app.js", "taskpane.js", "brand-mark.svg", "icon-32.png", "icon-80.png", "addin-catalog", "office-mcp-env.ps1", "office-mcp-daemon.ps1")) {
     if (-not $generatedWxs.Contains($needle)) {
       throw "Generated WiX payload is missing expected entry: $needle"
     }

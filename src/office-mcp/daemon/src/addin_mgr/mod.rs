@@ -54,8 +54,8 @@ pub use session_registry_model::{
     RuntimeInfo, SessionDescriptor, SessionDetails, SessionPatch, SessionStatus,
 };
 pub use static_assets::{
-    default_addin_public_dir, default_office_ctl_common_dir, default_office_ctl_host_public_dir,
-    find_addin_public_dir_from, static_asset_content_type,
+    default_addin_public_dir, default_office_ctl_assets_dir, default_office_ctl_common_dir,
+    default_office_ctl_host_public_dir, find_addin_public_dir_from, static_asset_content_type,
 };
 pub use websocket_codec::{
     WebSocketCodec, WebSocketCodecError, WebSocketFrame, WebSocketProtocolError,

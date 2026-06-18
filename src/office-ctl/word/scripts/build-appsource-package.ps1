@@ -29,8 +29,10 @@ function Get-Sha256([string]$Path) {
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)))
 $addinRoot = Split-Path -Parent $PSScriptRoot
 $publicRoot = Join-Path $addinRoot "public"
+$assetRoot = Join-Path (Split-Path -Parent $addinRoot) "common\assets"
 $manifestPath = Join-Path $OutputDir "manifest-$Version.xml"
 $bundlePath = Join-Path $OutputDir "office-mcp-addin-$Version.zip"
+$bundleStagePath = Join-Path $OutputDir "office-mcp-addin-bundle-$Version"
 $checklistPath = Join-Path $OutputDir "appsource-checklist-$Version.md"
 $metadataPath = Join-Path $OutputDir "appsource-metadata-$Version.json"
 $packagePath = Join-Path $OutputDir "office-mcp-appsource-$Version.zip"
@@ -39,6 +41,9 @@ Assert-File (Join-Path $addinRoot "manifest.xml")
 Assert-File (Join-Path $publicRoot "taskpane.html")
 Assert-File (Join-Path $publicRoot "taskpane.css")
 Assert-File (Join-Path $publicRoot "taskpane.js")
+Assert-File (Join-Path $assetRoot "brand-mark.svg")
+Assert-File (Join-Path $assetRoot "icon-32.png")
+Assert-File (Join-Path $assetRoot "icon-80.png")
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
@@ -60,7 +65,12 @@ if ($manifestXml -notmatch [regex]::Escape($BaseUrl.TrimEnd('/'))) {
 }
 
 if (Test-Path -LiteralPath $bundlePath) { Remove-Item -LiteralPath $bundlePath -Force }
-Compress-Archive -Path (Join-Path $publicRoot "*") -DestinationPath $bundlePath -CompressionLevel Optimal
+if (Test-Path -LiteralPath $bundleStagePath) { Remove-Item -LiteralPath $bundleStagePath -Recurse -Force }
+New-Item -ItemType Directory -Force -Path $bundleStagePath | Out-Null
+Copy-Item -Recurse -Force -Path (Join-Path $publicRoot "*") -Destination $bundleStagePath
+Copy-Item -Recurse -Force -Path $assetRoot -Destination (Join-Path $bundleStagePath "assets")
+Compress-Archive -Path (Join-Path $bundleStagePath "*") -DestinationPath $bundlePath -CompressionLevel Optimal
+Remove-Item -LiteralPath $bundleStagePath -Recurse -Force
 
 $metadata = [ordered]@{
   name = "office-mcp"
@@ -93,7 +103,7 @@ Generated for version `$Version`.
 
 - Hosted manifest rendered from `src/office-ctl/word/manifest.xml`.
 - Manifest uses `$($BaseUrl.TrimEnd('/'))` and contains no loopback URLs.
-- Add-in static bundle includes `taskpane.html`, `taskpane.css`, and `taskpane.js`.
+- Add-in static bundle includes `taskpane.html`, `taskpane.css`, `taskpane.js`, and generated `assets/*` product icons.
 - SHA-256 digests are recorded in `$([System.IO.Path]::GetFileName($metadataPath))`.
 
 ## External gates before Partner Center submission

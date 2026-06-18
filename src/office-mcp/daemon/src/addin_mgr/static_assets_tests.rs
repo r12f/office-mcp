@@ -1,4 +1,4 @@
-use super::{find_addin_public_dir_from, static_asset_content_type};
+use super::{default_office_ctl_assets_dir, find_addin_public_dir_from, static_asset_content_type};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -18,8 +18,23 @@ fn maps_static_asset_content_types() {
     );
     assert_eq!(
         static_asset_content_type(Path::new("icon.png")),
-        "application/octet-stream"
+        "image/png"
     );
+    assert_eq!(
+        static_asset_content_type(Path::new("brand-mark.svg")),
+        "image/svg+xml; charset=utf-8"
+    );
+}
+
+#[test]
+fn default_asset_dir_finds_generated_brand_icons() {
+    let asset_dir = default_office_ctl_assets_dir().expect("brand asset dir");
+
+    assert!(asset_dir.join("brand-mark.svg").is_file());
+    assert!(asset_dir.join("icon-16.png").is_file());
+    assert!(asset_dir.join("icon-32.png").is_file());
+    assert!(asset_dir.join("icon-80.png").is_file());
+    assert!(asset_dir.join("icon-256.png").is_file());
 }
 
 #[test]

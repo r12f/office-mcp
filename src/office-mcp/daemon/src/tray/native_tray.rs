@@ -1,4 +1,5 @@
 use super::{TrayHostOptions, open_ui_from_runtime, read_ui_state, stop_daemon};
+use crate::tray::product_icon::{ICON_HEIGHT, ICON_WIDTH, product_icon_rgba};
 use crate::tray::{
     QuitConfirmation, TrayController, TrayMenuItem, TrayPlatformAdapter, TrayPlatformError,
     TraySnapshot,
@@ -166,20 +167,8 @@ fn build_menu(snapshot: &TraySnapshot) -> Menu {
 }
 
 fn app_icon() -> Icon {
-    let width: u32 = 32;
-    let height: u32 = 32;
-    let mut rgba = Vec::with_capacity(32 * 32 * 4);
-    for y in 0..height {
-        for x in 0..width {
-            let inside = (4..28).contains(&x) && (4..28).contains(&y);
-            if inside {
-                rgba.extend_from_slice(&[43, 87, 154, 255]);
-            } else {
-                rgba.extend_from_slice(&[0, 0, 0, 0]);
-            }
-        }
-    }
-    Icon::from_rgba(rgba, width, height).expect("generated tray icon is valid")
+    Icon::from_rgba(product_icon_rgba(), ICON_WIDTH, ICON_HEIGHT)
+        .expect("generated tray icon is valid")
 }
 
 fn confirm_quit(confirmation: &QuitConfirmation) -> bool {

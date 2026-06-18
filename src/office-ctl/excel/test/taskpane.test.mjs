@@ -20,6 +20,24 @@ test('Excel add-in manifest targets workbook host and versioned task pane', () =
   assert.match(js, /ADDIN_VERSION = '0\.1\.7'/);
 });
 
+test('Excel add-in uses product identity metadata and generated icon URLs', () => {
+  const manifest = readFileSync(join(ADDIN_ROOT, 'manifest.xml'), 'utf8');
+  const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
+
+  assert.match(manifest, /<ProviderName>Office MCP Project<\/ProviderName>/);
+  assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
+  assert.match(manifest, /Control live Excel workbooks through a local MCP automation console\./);
+  assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP" \/>/);
+  assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Control Panel" \/>/);
+  assert.match(manifest, /Office MCP control panel for this workbook/);
+  assert.match(manifest, /https:\/\/localhost:8765\/assets\/icon-32\.png/);
+  assert.match(manifest, /https:\/\/localhost:8765\/assets\/icon-80\.png/);
+  assert.doesNotMatch(manifest, /DefaultValue="office-mcp(?: for Excel)?"/);
+  assert.doesNotMatch(manifest, /DefaultValue="Open"/);
+  assert.match(html, /<title>Office MCP Control<\/title>/);
+  assert.match(html, /<h1>Office MCP Control<\/h1>/);
+});
+
 test('Excel task pane uses common channel and registers Excel runtime metadata', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');

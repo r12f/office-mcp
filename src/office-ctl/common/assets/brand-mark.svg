@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Office MCP control mark">
+  <rect width="256" height="256" rx="56" fill="#0F172A" />
+  <path d="M56 66h96c12 0 22 10 22 22v102H80c-13 0-24-11-24-24V66Z" fill="#EAF2FF" />
+  <path d="M82 92h72M82 118h58M82 144h42" stroke="#2457D6" stroke-width="10" stroke-linecap="round" />
+  <path d="M112 54h88c12 0 22 10 22 22v104c0 12-10 22-22 22h-88V54Z" fill="#48D6A4" />
+  <path d="M134 92h58M134 120h44M134 148h58" stroke="#0F172A" stroke-width="10" stroke-linecap="round" opacity="0.72" />
+  <circle cx="190" cy="188" r="34" fill="#F8D84A" stroke="#0F172A" stroke-width="12" />
+  <path d="M178 188h24M190 176v24" stroke="#0F172A" stroke-width="10" stroke-linecap="round" />
+</svg>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -33,6 +33,8 @@ test('AppSource package builder emits submission artifacts without loopback URLs
     assert.equal(result.status, 0, result.stderr);
 
     const manifest = readFileSync(join(dir, 'manifest-1.2.3.xml'), 'utf8');
+    assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
+    assert.match(manifest, /DefaultValue="Control Panel"/);
     assert.match(manifest, /https:\/\/office-mcp\.dev\/taskpane\.html\?v=1\.2\.3/);
     assert.doesNotMatch(manifest, /localhost|127\.0\.0\.1/);
 
@@ -48,6 +50,20 @@ test('AppSource package builder emits submission artifacts without loopback URLs
 
     assert.ok(readFileSync(join(dir, 'office-mcp-addin-1.2.3.zip')).byteLength > 1000);
     assert.ok(readFileSync(join(dir, 'office-mcp-appsource-1.2.3.zip')).byteLength > 1000);
+
+    const expandedBundle = join(dir, 'expanded-addin');
+    const expandResult = spawnSync(POWERSHELL, [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-Command',
+      `Expand-Archive -LiteralPath '${join(dir, 'office-mcp-addin-1.2.3.zip')}' -DestinationPath '${expandedBundle}' -Force`
+    ], { encoding: 'utf8' });
+    assert.equal(expandResult.status, 0, expandResult.stderr);
+    assert.ok(existsSync(join(expandedBundle, 'taskpane.html')));
+    assert.ok(existsSync(join(expandedBundle, 'assets', 'brand-mark.svg')));
+    assert.ok(existsSync(join(expandedBundle, 'assets', 'icon-32.png')));
+    assert.ok(existsSync(join(expandedBundle, 'assets', 'icon-80.png')));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

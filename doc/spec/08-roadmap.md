@@ -314,37 +314,53 @@ and server/protocol metadata fits on one row.
 
 User-reported follow-up from live Word add-in and tray testing:
 
-- [ ] Design an original office-control product logo and icon system. It must
+- [x] Design an original office-control product logo and icon system. It must
       avoid Microsoft Office product marks while still communicating office
       productivity, local automation, and user control with a mature, slightly
-      futuristic desktop utility style.
-- [ ] Add reproducible brand assets: source artwork, generated 16/20/24/32/48/
+      futuristic desktop utility style. The first implemented identity is the
+      Office MCP Control mark: abstract document panes plus a control node,
+      generated from `src/office-ctl/common/assets/brand-mark.svg`.
+- [x] Add reproducible brand assets: source artwork, generated 16/20/24/32/48/
       64/128/256 px app icons, Office add-in command icons, and a monochrome
       tray/menu-bar glyph that remains legible at 16 px in light, dark, and
-      high-contrast themes.
-- [ ] Update Word and Excel add-in manifests/catalog rendering so release and
+      high-contrast themes. Current implementation adds generated PNG assets
+      under `src/office-ctl/common/assets/` and a deterministic generator in
+      `src/office-ctl/common/scripts/generate-brand-assets.mjs`; Rust tray
+      glyph coverage verifies the native 32 px mark is not blank or single-color.
+- [x] Update Word and Excel add-in manifests/catalog rendering so release and
       sideloaded builds use mature product metadata: stable add-in title,
       provider, description, support URL, ribbon group label, action label, and
       product icons. Placeholder labels such as `office-mcp`, generic `Open`,
-      blank icons, or debug/experimental naming fail this item.
-- [ ] Update task pane visible title/chrome and any in-app product references
+      blank icons, or debug/experimental naming fail this item. Covered by Word
+      and Excel task pane tests plus catalog renderer assertions.
+- [x] Update task pane visible title/chrome and any in-app product references
       to match the new identity while keeping host-specific Word/Excel accents
-      restrained and secondary.
-- [ ] Replace the current tray placeholder/missing icon with the generated
+      restrained and secondary. Word and Excel task panes now use `Office MCP
+      Control` as the document-local chrome title.
+- [x] Replace the current tray placeholder/missing icon with the generated
       tray glyph in normal daemon and installed launch paths. The icon must be
       visible in the Windows notification area and visually deliberate beside
-      native system icons.
+      native system icons. Automated coverage verifies the Rust tray icon uses
+      the product glyph instead of a blank or single-color placeholder; final
+      visible notification-area evidence remains manual.
 - [ ] Ensure the tray right-click interaction uses a real platform-native menu
       on Windows, with native separators, disabled/read-only status rows,
       hover/selection behavior, keyboard access, and theme/high-contrast
       adaptation. Custom web-styled or custom-drawn menu panels are not
-      acceptable for release.
-- [ ] Update MSI/package asset installation and manifest renderer tests so the
+      acceptable for release. Existing automated tests verify the Rust tray host
+      uses `tray_icon::menu`; manual Windows evidence is still required for the
+      native look and interaction.
+- [x] Update MSI/package asset installation and manifest renderer tests so the
       generated logo/icon files and product metadata are packaged and referenced
       from the installed add-in catalog without loopback or missing-icon paths.
+      Current packaging tests assert MSI staging includes the generated assets,
+      and AppSource packaging includes `assets/*` in the add-in bundle.
 - [ ] Add automated tests for manifest metadata/icon URL substitution and asset
       presence, plus manual Windows evidence showing the ribbon command icon,
-      add-in title, visible tray glyph, and native right-click menu.
+      add-in title, visible tray glyph, and native right-click menu. Automated
+      tests now cover metadata/icon substitution, generated asset dimensions,
+      static asset serving, packaging presence, and tray glyph generation; the
+      remaining open portion is live Windows ribbon/tray visual evidence.
 
 **Exit criterion**: Word and Excel show a mature product add-in name and icon in
 the ribbon/catalog; the task pane title matches the product identity; the tray

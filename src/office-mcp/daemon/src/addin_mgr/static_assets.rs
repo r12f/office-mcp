@@ -6,8 +6,30 @@ pub fn static_asset_content_type(path: &Path) -> &'static str {
         Some("html") => "text/html; charset=utf-8",
         Some("js") => "text/javascript; charset=utf-8",
         Some("css") => "text/css; charset=utf-8",
+        Some("png") => "image/png",
+        Some("svg") => "image/svg+xml; charset=utf-8",
         _ => "application/octet-stream",
     }
+}
+
+#[must_use]
+pub fn default_office_ctl_assets_dir() -> Option<PathBuf> {
+    let current = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    for ancestor in current.ancestors() {
+        let source_candidate = ancestor
+            .join("src")
+            .join("office-ctl")
+            .join("common")
+            .join("assets");
+        if source_candidate.join("icon-32.png").is_file() {
+            return Some(source_candidate);
+        }
+        let installed_candidate = ancestor.join("office-ctl").join("common").join("assets");
+        if installed_candidate.join("icon-32.png").is_file() {
+            return Some(installed_candidate);
+        }
+    }
+    None
 }
 
 #[must_use]

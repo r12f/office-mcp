@@ -6,10 +6,10 @@
   xsi:type="TaskPaneApp">
   <Id>11111111-aaaa-bbbb-cccc-222222222222</Id>
   <Version>1.0.0.8</Version>
-  <ProviderName>office-mcp</ProviderName>
+  <ProviderName>Office MCP Project</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="office-mcp" />
-  <Description DefaultValue="Connect live Word documents to local MCP clients." />
+  <DisplayName DefaultValue="Office MCP Control" />
+  <Description DefaultValue="Control live Word documents through a local MCP automation console." />
   <IconUrl DefaultValue="https://localhost:8765/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:8765/assets/icon-80.png" />
   <SupportUrl DefaultValue="https://github.com/office-mcp/office-mcp" />
@@ -80,13 +80,13 @@
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://github.com/office-mcp/office-mcp" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="office-mcp is ready" />
-        <bt:String id="OfficeMcp.GroupLabel" DefaultValue="office-mcp" />
-        <bt:String id="OfficeMcp.OpenPane.Label" DefaultValue="Open" />
+        <bt:String id="GetStarted.Title" DefaultValue="Office MCP Control is ready" />
+        <bt:String id="OfficeMcp.GroupLabel" DefaultValue="Office MCP" />
+        <bt:String id="OfficeMcp.OpenPane.Label" DefaultValue="Control Panel" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Open the task pane to connect this Word document to the local MCP daemon." />
-        <bt:String id="OfficeMcp.OpenPane.Tooltip" DefaultValue="Open the office-mcp task pane." />
+        <bt:String id="GetStarted.Description" DefaultValue="Open the control panel to connect this Word document to the local MCP daemon." />
+        <bt:String id="OfficeMcp.OpenPane.Tooltip" DefaultValue="Open the Office MCP control panel for this document." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

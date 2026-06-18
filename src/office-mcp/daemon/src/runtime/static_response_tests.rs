@@ -34,7 +34,7 @@ fn serves_versioned_addin_static_assets_with_query_strings() {
 fn serves_excel_taskpane_static_assets() {
     let html = response_text(&service().serve_addin_asset("/excel/taskpane.html"));
     assert!(html.starts_with("HTTP/1.1 200 OK"));
-    assert!(html.contains("Office MCP Excel"));
+    assert!(html.contains("Office MCP Control"));
     assert!(html.contains("/excel/taskpane.js?v=0.1.7"));
     assert!(html.contains("/common/addin-channel.js?v=0.1.7"));
 
@@ -89,10 +89,52 @@ fn serves_office_ctl_common_logger_asset() {
     assert!(response.contains("AddinLogger"));
 }
 
+#[test]
+fn serves_generated_brand_icons_instead_of_placeholder_pngs() {
+    let icon_32 = response_bytes(&service().serve_addin_asset("/assets/icon-32.png"));
+    let icon_80 = response_bytes(&service().serve_addin_asset("/assets/icon-80.png"));
+
+    assert!(starts_with_http_ok(&icon_32));
+    assert!(String::from_utf8_lossy(&icon_32).contains("Content-Type: image/png"));
+    assert!(png_body(&icon_32).len() > 120);
+    assert_eq!(png_dimensions(png_body(&icon_32)), (32, 32));
+
+    assert!(starts_with_http_ok(&icon_80));
+    assert!(String::from_utf8_lossy(&icon_80).contains("Content-Type: image/png"));
+    assert!(png_body(&icon_80).len() > png_body(&icon_32).len());
+    assert_eq!(png_dimensions(png_body(&icon_80)), (80, 80));
+}
+
 fn service() -> StaticResponseService {
     StaticResponseService::new(crate::addin_mgr::default_addin_public_dir())
 }
 
 fn response_text(response: &crate::runtime::http_wire::WireHttpResponse) -> String {
     String::from_utf8(response.to_bytes()).expect("response utf8")
+}
+
+fn response_bytes(response: &crate::runtime::http_wire::WireHttpResponse) -> Vec<u8> {
+    response.to_bytes()
+}
+
+fn starts_with_http_ok(response: &[u8]) -> bool {
+    response.starts_with(b"HTTP/1.1 200 OK")
+}
+
+fn png_body(response: &[u8]) -> &[u8] {
+    let marker = b"\r\n\r\n";
+    let start = response
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .expect("response header terminator")
+        + marker.len();
+    &response[start..]
+}
+
+fn png_dimensions(png: &[u8]) -> (u32, u32) {
+    assert!(png.starts_with(&[137, 80, 78, 71, 13, 10, 26, 10]));
+    (
+        u32::from_be_bytes(png[16..20].try_into().unwrap()),
+        u32::from_be_bytes(png[20..24].try_into().unwrap()),
+    )
 }

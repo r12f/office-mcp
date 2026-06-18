@@ -43,6 +43,9 @@ test('Windows packaging includes the tray controller in installer payload', () =
   const buildScript = readFileSync(join(PACKAGING_ROOT, 'windows', 'build-windows-msi.ps1'), 'utf8');
   const installScript = readFileSync(join(PACKAGING_ROOT, 'windows', 'install-windows.ps1'), 'utf8');
   const productWxs = readFileSync(join(PACKAGING_ROOT, 'wix', 'Product.wxs'), 'utf8');
+  const repoRoot = join(PACKAGING_ROOT, '..');
+  const icon32 = readFileSync(join(repoRoot, 'src', 'office-ctl', 'common', 'assets', 'icon-32.png'));
+  const icon80 = readFileSync(join(repoRoot, 'src', 'office-ctl', 'common', 'assets', 'icon-80.png'));
 
   assert.match(buildScript, /office-mcp-tray\.ps1/);
   assert.match(buildScript, /cargo build --release -p office-mcp-daemon/);
@@ -52,6 +55,10 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.match(buildScript, /office-ctl\\common\\browser-ui\.js/);
   assert.match(buildScript, /office-ctl\\common\\logger\.js/);
   assert.match(buildScript, /office-ctl\\common\\task-history\.js/);
+  assert.match(buildScript, /office-ctl\\common\\assets\\brand-mark\.svg/);
+  assert.match(buildScript, /office-ctl\\common\\assets\\icon-32\.png/);
+  assert.match(buildScript, /office-ctl\\common\\assets\\icon-80\.png/);
+  assert.match(buildScript, /brand-mark\.svg/);
   assert.match(buildScript, /office-ctl\\excel\\manifest\.xml/);
   assert.match(buildScript, /office-ctl\\excel\\public\\taskpane\.js/);
   assert.match(buildScript, /addin-catalog\\office-mcp-word\.xml/);
@@ -91,6 +98,9 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.match(productWxs, /office-mcp-daemon\.exe&quot; tray/);
   assert.doesNotMatch(productWxs, /office-mcp-daemon\.ps1/);
   assert.doesNotMatch(productWxs, /office-mcp-tray\.ps1/);
+  assert.deepEqual([...icon32.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(icon32.readUInt32BE(16), 32);
+  assert.equal(icon80.readUInt32BE(16), 80);
 });
 
 test('Windows localhost certificate helper lives under packaging', () => {

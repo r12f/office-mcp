@@ -34,6 +34,29 @@ test('Word add-in manifest and task pane asset versions stay aligned', () => {
   assert.match(js, /ADDIN_VERSION = '0\.1\.8'/);
 });
 
+test('Word add-in uses product identity metadata and generated icons', () => {
+  const manifest = readFileSync(join(ADDIN_ROOT, 'manifest.xml'), 'utf8');
+  const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
+  const assetRoot = join(ADDIN_ROOT, '..', 'common', 'assets');
+
+  assert.match(manifest, /<ProviderName>Office MCP Project<\/ProviderName>/);
+  assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
+  assert.match(manifest, /Control live Word documents through a local MCP automation console\./);
+  assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP" \/>/);
+  assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Control Panel" \/>/);
+  assert.match(manifest, /Office MCP control panel for this document/);
+  assert.doesNotMatch(manifest, /DefaultValue="office-mcp"/);
+  assert.doesNotMatch(manifest, /DefaultValue="Open"/);
+  assert.match(html, /<title>Office MCP Control<\/title>/);
+  assert.match(html, /<h1>Office MCP Control<\/h1>/);
+  for (const size of [16, 20, 24, 32, 48, 64, 80, 128, 256]) {
+    const png = readFileSync(join(assetRoot, `icon-${size}.png`));
+    assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+    assert.deepEqual(pngDimensions(png), [size, size]);
+  }
+  assert.match(readFileSync(join(assetRoot, 'brand-mark.svg'), 'utf8'), /Office MCP control mark/);
+});
+
 test('Office catalog registration wrapper delegates to shared Word and Excel catalog script', () => {
   const script = readFileSync(join(ADDIN_ROOT, 'scripts', 'register-word-catalog.ps1'), 'utf8');
   const commonScript = readFileSync(join(ADDIN_ROOT, '..', 'common', 'scripts', 'register-office-catalog.ps1'), 'utf8');
@@ -85,9 +108,17 @@ test('Office catalog registration script stages Word and Excel manifests without
     const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
     assert.match(wordManifest, /<OfficeApp/);
+    assert.match(wordManifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
+    assert.match(wordManifest, /DefaultValue="Control Panel"/);
     assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.8/);
+    assert.match(wordManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
+    assert.match(wordManifest, /https:\/\/localhost:8766\/assets\/icon-80\.png/);
     assert.match(excelManifest, /<OfficeApp/);
+    assert.match(excelManifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
+    assert.match(excelManifest, /DefaultValue="Control Panel"/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.7/);
+    assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
+    assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-80\.png/);
     assert.doesNotMatch(wordManifest, /https:\/\/localhost:8765/);
     assert.doesNotMatch(excelManifest, /https:\/\/localhost:8765/);
     assert.throws(() => readFileSync(join(catalogPath, 'word', 'manifest.xml'), 'utf8'));
@@ -317,4 +348,8 @@ function cssRule(source, selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = source.match(new RegExp(`${escaped}\\s*\\{([\\s\\S]*?)\\}`));
   return match?.[1] || '';
+}
+
+function pngDimensions(png) {
+  return [png.readUInt32BE(16), png.readUInt32BE(20)];
 }
