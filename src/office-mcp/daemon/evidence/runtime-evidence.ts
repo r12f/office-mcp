@@ -33,6 +33,7 @@ const requestedSessionId = readOption('--session-id');
 const includeMutation = hasFlag('--include-mutation');
 const includeFullWordSmoke = hasFlag('--include-full-word-smoke');
 const includeExcelSmoke = hasFlag('--include-excel-smoke');
+const includePowerPointSmoke = hasFlag('--include-powerpoint-smoke');
 const includeComTrackedChanges = hasFlag('--include-com-tracked-changes');
 const includeTrackedChanges = hasFlag('--include-tracked-changes');
 const irmMode = readOption('--irm-mode') ?? 'none';
@@ -49,7 +50,7 @@ const wantsWordRuntime = Boolean(
   irmMode !== 'none' ||
   agentClientEvidencePath
 );
-const wantsWordBaseline = !includeExcelSmoke || wantsWordRuntime;
+const wantsWordBaseline = !(includeExcelSmoke || includePowerPointSmoke) || wantsWordRuntime;
 
 const report: EvidenceReport = {
   schema_version: 1,
@@ -74,8 +75,13 @@ try {
     const waitResult = await runWaitForHostSessionGate('excel', waitForSessionMs);
     sessions = Array.isArray(waitResult.sessions) ? waitResult.sessions as Array<Record<string, unknown>> : sessions;
   }
+  if (includePowerPointSmoke && waitForSessionMs > 0 && !selectHostSessionId(sessions, 'powerpoint')) {
+    const waitResult = await runWaitForHostSessionGate('powerpoint', waitForSessionMs);
+    sessions = Array.isArray(waitResult.sessions) ? waitResult.sessions as Array<Record<string, unknown>> : sessions;
+  }
   const sessionId = wantsWordBaseline ? requestedSessionId ?? selectWordSessionId(sessions, irmDocumentPath) : '';
   const excelSessionId = selectHostSessionId(sessions, 'excel');
+  const powerPointSessionId = selectHostSessionId(sessions, 'powerpoint');
   if (sessionId) report.session_id = sessionId;
 
   if (!sessionId && wantsWordBaseline) {
@@ -107,6 +113,12 @@ try {
     if (excelSessionId) await runExcelSmokeGate(excelSessionId);
     else addGate('excel.runtime_smoke', 'blocked_by_runtime', {
       reason: 'No connected Excel add-in session. Open Excel, load the office-mcp task pane, then rerun this script.'
+    });
+  }
+  if (includePowerPointSmoke) {
+    if (powerPointSessionId) await runPowerPointSmokeGate(powerPointSessionId);
+    else addGate('powerpoint.runtime_smoke', 'blocked_by_runtime', {
+      reason: 'No connected PowerPoint add-in session. Open PowerPoint, load the office-mcp task pane, then rerun this script.'
     });
   }
 } catch (error) {
@@ -270,6 +282,55 @@ async function runExcelSmokeGate(sessionId: string): Promise<void> {
   });
 }
 
+
+async function runPowerPointSmokeGate(sessionId: string): Promise<void> {
+  await runGate('powerpoint.runtime_smoke', async () => {
+    const marker = `Office MCP PowerPoint smoke ${Date.now()}`;
+    const replacement = `${marker} updated`;
+    const info = await callToolData('office.get_session_info', { session_id: sessionId });
+    const addSlide = await callToolData('powerpoint.add_slide', {
+      session_id: sessionId,
+      title: marker,
+      content: 'PowerPoint runtime smoke content'
+    });
+    const replaceText = await callToolData('powerpoint.replace_text', {
+      session_id: sessionId,
+      search: marker,
+      replacement,
+      match_case: true
+    });
+    const layout = await callToolData('powerpoint.apply_layout', {
+      session_id: sessionId,
+      slide_id: String(addSlide.slide_id ?? ''),
+      layout: 'TitleOnly'
+    });
+    const pdf = await callToolResult('powerpoint.export_pdf', { session_id: sessionId, slice_size: 1048576 });
+    const pdfData = toolData(pdf);
+    const pdfSupported = !isToolError(pdf);
+    const pdfHostRejection = isToolError(pdf) && ['HOST_CAPABILITY_UNAVAILABLE', 'HOST_ERROR'].includes(String(pdfData.office_mcp_code ?? pdfData.code ?? ''));
+    if (!pdfSupported && !pdfHostRejection) throw new Error(`PowerPoint PDF export failed without explicit host-capability rejection: ${JSON.stringify(pdfData)}`);
+    return {
+      session_id: sessionId,
+      document_title: (info.document as { title?: string } | undefined)?.title,
+      available_tool_count: Array.isArray(info.available_tools) ? info.available_tools.length : undefined,
+      add_slide: addSlide,
+      replace_text: replaceText,
+      layout,
+      marker,
+      replacement,
+      mutation_proved: typeof addSlide.slide_id === 'string' && Number(replaceText.replacements ?? 0) >= 1,
+      pdf_supported: pdfSupported,
+      pdf_host_rejection: pdfHostRejection,
+      pdf_mime_type: pdfSupported ? pdfData.mime_type : undefined,
+      pdf_size: pdfSupported ? pdfData.size : undefined
+    };
+  });
+}
+
+
+async function callToolResult(name: string, args: Record<string, unknown>): Promise<unknown> {
+  return await client.callTool({ name, arguments: args });
+}
 async function callToolData(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   const result = await client.callTool({ name, arguments: args });
   if (isToolError(result)) throw new Error(`${name} returned an MCP tool error: ${JSON.stringify(toolData(result))}`);

@@ -198,6 +198,8 @@ For a connected Excel workbook, run:
 # $env:OFFICE_MCP_MCP_ENDPOINT = 'http://127.0.0.1:8801/mcp'
 npm run evidence:excel
 npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-excel.json --require-excel-smoke
+npm run evidence:powerpoint
+npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-powerpoint.json --require-powerpoint-smoke
 ```
 
 Against a representative protected document, add `--irm-document-path` for a

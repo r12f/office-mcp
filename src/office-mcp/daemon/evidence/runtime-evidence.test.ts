@@ -25,7 +25,7 @@ test('runtime evidence harness covers Word, agent client bridge, and IRM gates',
   assert.match(source, /claude_desktop_installation/);
   assert.match(source, /agent_client_prompt/);
   assert.match(source, /irm_document_preflight/);
-  assert.match(source, /const wantsWordBaseline = !includeExcelSmoke \|\| wantsWordRuntime/);
+  assert.match(source, /const wantsWordBaseline = !\(includeExcelSmoke \|\| includePowerPointSmoke\) \|\| wantsWordRuntime/);
   assert.match(source, /if \(!sessionId && wantsWordBaseline\)/);
   assert.match(source, /else if \(sessionId\)/);
   assert.match(source, /wantsWordBaseline \? requestedSessionId \?\? selectWordSessionId/);

@@ -31,13 +31,14 @@ const productVisualEvidencePath = readOption('--product-visual-evidence-path') ?
 const requireIrm = hasFlag('--require-irm');
 const requireFullWordSmoke = hasFlag('--require-full-word-smoke');
 const requireExcelSmoke = hasFlag('--require-excel-smoke');
+const requirePowerPointSmoke = hasFlag('--require-powerpoint-smoke');
 const requireComTrackedChanges = hasFlag('--require-com-tracked-changes');
 const requireIrmPreflight = hasFlag('--require-irm-preflight');
 const requireClaudeDesktopInstallation = hasFlag('--require-claude-desktop-installation');
 const requireAgentClientPrompt = hasFlag('--require-agent-client-prompt');
 const requireMutation = hasFlag('--require-mutation');
 const report = JSON.parse(readFileSync(evidencePath, 'utf8')) as EvidenceReport;
-const requiresWordBaseline = !requireExcelSmoke ||
+const requiresWordBaseline = !(requireExcelSmoke || requirePowerPointSmoke) ||
   requireIrm ||
   requireFullWordSmoke ||
   requireComTrackedChanges ||
@@ -89,6 +90,10 @@ if (requireFullWordSmoke) {
 }
 
 if (requireExcelSmoke) requirePassedGate('excel.runtime_smoke');
+if (requirePowerPointSmoke) {
+  const gate = requirePassedGate('powerpoint.runtime_smoke');
+  validatePowerPointSmokeGate(gate);
+}
 
 if (requireMutation) requirePassedGate('word.runtime_mutation_smoke');
 
@@ -123,6 +128,7 @@ const summary = {
   require_irm: requireIrm,
   require_full_word_smoke: requireFullWordSmoke,
   require_excel_smoke: requireExcelSmoke,
+  require_powerpoint_smoke: requirePowerPointSmoke,
   require_com_tracked_changes: requireComTrackedChanges,
   require_irm_preflight: requireIrmPreflight,
   require_claude_desktop_installation: requireClaudeDesktopInstallation,
@@ -139,6 +145,24 @@ const summary = {
 console.log(JSON.stringify(summary, null, 2));
 if (failures.length > 0) process.exit(1);
 
+
+function validatePowerPointSmokeGate(gate: EvidenceGate | undefined): void {
+  if (!gate || gate.status !== 'passed') return;
+  const details = gate.details;
+  if (!isRecord(details)) {
+    failures.push('PowerPoint smoke gate missing details.');
+    return;
+  }
+  if (typeof details.session_id !== 'string' || details.session_id.length === 0) failures.push('PowerPoint smoke gate missing session_id.');
+  if (typeof details.available_tool_count !== 'number' || details.available_tool_count < 5) failures.push('PowerPoint smoke gate missing available tool count.');
+  if (details.mutation_proved !== true) failures.push('PowerPoint smoke gate did not prove a mutation path.');
+  if (!isRecord(details.add_slide) || typeof details.add_slide.slide_id !== 'string') failures.push('PowerPoint smoke gate missing add_slide proof.');
+  if (!isRecord(details.replace_text) || Number(details.replace_text.replacements ?? 0) < 1) failures.push('PowerPoint smoke gate missing replace_text proof.');
+  if (!isRecord(details.layout) || typeof details.layout.slide_id !== 'string') failures.push('PowerPoint smoke gate missing apply_layout proof.');
+  const pdfSupported = details.pdf_supported === true && details.pdf_mime_type === 'application/pdf' && typeof details.pdf_size === 'number';
+  const pdfHostRejection = details.pdf_host_rejection === true;
+  if (!pdfSupported && !pdfHostRejection) failures.push('PowerPoint smoke gate missing PDF export success or explicit host-capability rejection.');
+}
 function validateUiEvidence(): never {
   if (report.kind !== 'ui_runtime_evidence') failures.push(`Unsupported UI evidence kind: ${report.kind ?? 'missing'}`);
   for (const name of [

@@ -81,6 +81,31 @@ test('runtime evidence validator accepts Excel-only smoke without Word runtime g
   });
 });
 
+test('runtime evidence validator can require PowerPoint smoke evidence', () => {
+  withEvidenceFile(report('skipped'), (path) => {
+    const result = runValidator(path, '--require-powerpoint-smoke');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /Missing required gate: powerpoint\.runtime_smoke/);
+  });
+
+  const full = powerpointOnlyReport();
+  withEvidenceFile(full, (path) => {
+    const result = runValidator(path, '--require-powerpoint-smoke');
+    assert.equal(result.status, 0, outputText(result.stdout) + outputText(result.stderr));
+    const summary = JSON.parse(outputText(result.stdout)) as { ok: boolean; session_id?: string; require_powerpoint_smoke?: boolean };
+    assert.equal(summary.ok, true);
+    assert.equal(summary.session_id, undefined);
+    assert.equal(summary.require_powerpoint_smoke, true);
+  });
+
+  full.gates[1].details.pdf_supported = false;
+  full.gates[1].details.pdf_host_rejection = false;
+  withEvidenceFile(full, (path) => {
+    const result = runValidator(path, '--require-powerpoint-smoke');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /PDF export success or explicit host-capability rejection/);
+  });
+});
 test('runtime evidence validator can require COM tracked-change evidence', () => {
   withEvidenceFile(report('skipped'), (path) => {
     const result = runValidator(path, '--require-com-tracked-changes');
@@ -880,6 +905,27 @@ function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Docum
   };
 }
 
+function powerpointOnlyReport() {
+  const now = new Date().toISOString();
+  return {
+    schema_version: 1,
+    generated_at: now,
+    endpoint: 'http://127.0.0.1:8800/mcp',
+    gates: [
+      gate('word.session_discovery', 'passed', { sessions: [{ app: 'powerpoint', session_id: 'ppt-session' }] }),
+      gate('powerpoint.runtime_smoke', 'passed', {
+        session_id: 'ppt-session',
+        available_tool_count: 5,
+        add_slide: { slide_id: 'slide-1', slide_index: 0, added: true },
+        replace_text: { replacements: 1, touched_shapes: [{ slide_id: 'slide-1', shape_id: 'shape-1' }] },
+        layout: { slide_id: 'slide-1', slide_index: 0, layout_name: 'Title Only' },
+        mutation_proved: true,
+        pdf_supported: false,
+        pdf_host_rejection: true
+      })
+    ]
+  };
+}
 function excelOnlyReport() {
   const now = new Date().toISOString();
   return {

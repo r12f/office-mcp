@@ -787,7 +787,12 @@ Catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
       The evidence must prove session registration, tool visibility after
       handler implementation, at least one read/write mutation path, and PDF
       export behavior or an explicit host-capability rejection when the current
-      Office.js host cannot support export.
+      Office.js host cannot support export. Automated support now exists via
+      `npm run evidence:powerpoint`, which writes
+      `artifacts/runtime-evidence-powerpoint.json`, and validator gate
+      `npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-powerpoint.json --require-powerpoint-smoke`;
+      this item remains open until that command passes against a connected live
+      PowerPoint presentation.
 
 ### M9 — Outlook (cautious)
 
