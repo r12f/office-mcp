@@ -362,14 +362,14 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       provider/display identity, `Open Control Panel` as the action label, and
       host-specific product tooltips. Static tests reject raw implementation
       slugs, vague commands such as `Open`, and prototype/debug wording.
-- [ ] Add explicit manifest/catalog coverage for add-in type/category metadata.
+- [x] Add explicit manifest/catalog coverage for add-in type/category metadata.
       Word and Excel catalog entries, hosted manifest output, AppSource
-      pre-submission metadata, and installer-generated catalog manifests must
+      pre-submission metadata, and installer-generated catalog manifests now
       describe the product as a local productivity automation/control utility,
       not as a sample, debug add-in, raw protocol bridge, or experimental task
-      pane. Tests should fail on missing type/category values where the target
-      format supports them and on inconsistent product names across catalog,
-      ribbon command, and task pane chrome.
+      pane. Coverage exists in Word/Excel task pane tests, product identity
+      tests, hosted manifest tests, AppSource package tests, and catalog
+      registration tests.
 - [x] Update task pane visible title/chrome and any in-app product references
       to match the new identity while keeping host-specific Word/Excel accents
       restrained and secondary. Word and Excel task panes now use `Office MCP
