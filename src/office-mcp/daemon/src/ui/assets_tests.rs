@@ -62,6 +62,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     let css = String::from_utf8(store.read("app.css").expect("css").content).expect("css utf8");
     let js = String::from_utf8(store.read("app.js").expect("js").content).expect("js utf8");
 
+    assert!(html.contains("<title>Office MCP Control</title>"));
+    assert!(html.contains("<h1>Office MCP Control</h1>"));
+    assert!(!html.contains("<title>Office MCP</title>"));
+    assert!(!html.contains("<h1>Office MCP</h1>"));
     assert!(html.contains("aria-label=\"Copy MCP endpoint\""));
     assert!(html.contains("aria-label=\"Copy add-in endpoint\""));
     assert!(html.contains("name=\"session-filter\""));
