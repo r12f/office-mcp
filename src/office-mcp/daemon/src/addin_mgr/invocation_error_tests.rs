@@ -25,8 +25,9 @@ fn invocation_error_formats_user_actionable_message() {
     assert_eq!(error.failure.partial_effect, None);
     assert_eq!(
         error.to_string(),
-        "No Office document sessions are connected. Activate the office-mcp add-in in Word and try again."
+        "No Office document sessions are connected. Open Office MCP Control in Word and try again."
     );
+    assert!(!error.to_string().contains("office-mcp add-in"));
 }
 
 #[test]

@@ -70,7 +70,7 @@ impl OfficeMcpCode {
 
     fn message(self, session_id: &str, tool: &str) -> String {
         match self {
-            Self::NoSessions => "No Office document sessions are connected. Activate the office-mcp add-in in Word and try again.".to_string(),
+            Self::NoSessions => "No Office document sessions are connected. Open Office MCP Control in Word and try again.".to_string(),
             Self::SessionNotFound => format!("Session {session_id} is not registered."),
             Self::SessionStale => format!("Session {session_id} is stale while the add-in reconnects."),
             Self::SessionLost => format!("Session {session_id} lost its add-in connection."),
