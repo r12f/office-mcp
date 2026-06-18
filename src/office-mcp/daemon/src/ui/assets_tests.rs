@@ -64,6 +64,7 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
 
     assert!(html.contains("<title>Office MCP Control</title>"));
     assert!(html.contains("<h1>Office MCP Control</h1>"));
+    assert!(html.contains("<img class=\"product-mark\" src=\"/assets/icon-32.png\" width=\"32\" height=\"32\" alt=\"\" aria-hidden=\"true\" />"));
     assert!(!html.contains("<title>Office MCP</title>"));
     assert!(!html.contains("<h1>Office MCP</h1>"));
     assert!(html.contains("aria-label=\"Copy MCP endpoint\""));
@@ -72,6 +73,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("Word, Excel, PowerPoint, session&hellip;"));
     assert!(!html.contains("session..."));
     assert!(html.contains("aria-live=\"polite\""));
+    assert!(css.contains("grid-template-columns: 32px auto minmax(0, 1fr)"));
+    assert!(css.contains(".product-mark { width: 32px; height: 32px;"));
     assert!(css.contains("minmax(0, 1fr)"));
     assert!(css.contains("content-visibility: auto"));
     assert!(css.contains(".empty strong"));
