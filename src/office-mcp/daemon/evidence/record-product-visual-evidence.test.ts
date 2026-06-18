@@ -83,6 +83,27 @@ test('product visual evidence recorder requires all product surfaces', () => {
   });
 });
 
+test('README product visual evidence command matches current PowerPoint gates', () => {
+  const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
+  const commandLine = readme.split('\n').find((line) => line.includes('npm run evidence:record-product-visual')) ?? '';
+
+  for (const required of [
+    '--powerpoint-runtime-evidence-path',
+    '--powerpoint-ribbon-command',
+    '--powerpoint-ribbon-command-screenshot',
+    '--powerpoint-catalog-entry',
+    '--powerpoint-catalog-entry-screenshot',
+    '--powerpoint-taskpane-title',
+    '--powerpoint-taskpane-title-screenshot',
+    '--powerpoint-catalog-provider',
+    '--powerpoint-catalog-description',
+    '--powerpoint-catalog-type',
+    '--powerpoint-first-run-identity-reviewed'
+  ]) {
+    assert.match(commandLine, new RegExp(required));
+  }
+});
+
 
 test('product visual evidence recorder rejects experimental catalog type and non-native tray surface', () => {
   withScreenshots((dir, screenshots) => {
