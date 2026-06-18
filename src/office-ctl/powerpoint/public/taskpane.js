@@ -105,7 +105,7 @@
       setStatus('Unsupported host');
       return;
     }
-    setConnectionState('connecting', 'Connecting...');
+    setConnectionState('connecting', 'Connecting\u2026');
     connect();
   });
 
@@ -132,7 +132,7 @@
     daemonEl.textContent = endpoint;
     endpointInputEl.value = endpoint;
     endpointDirty = false;
-    setConnectionState('connecting', 'Connecting...');
+    setConnectionState('connecting', 'Connecting\u2026');
     socket = new WebSocket(endpoint);
     socket.addEventListener('open', () => register());
     socket.addEventListener('message', (event) => handleMessage(event.data));
@@ -154,7 +154,7 @@
     const nextEndpoint = clearEndpointOverride();
     logger.warn('websocket.fallback_to_manifest_origin', { failedEndpoint, nextEndpoint });
     connectionDetailEl.textContent = `Endpoint ${failedEndpoint} failed. Retrying ${nextEndpoint}.`;
-    setConnectionState('reconnecting', 'Reconnecting...');
+    setConnectionState('reconnecting', 'Reconnecting\u2026');
     reconnectAttempt = 0;
     clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(connect, 250);
@@ -163,7 +163,7 @@
 
   function register() {
     reconnectAttempt = 0;
-    setConnectionState('connecting', 'Registering...');
+    setConnectionState('connecting', 'Registering\u2026');
     const requestId = crypto.randomUUID();
     send(registerRequest(requestId, {
       instance_id: instanceId,
@@ -776,7 +776,7 @@
       return;
     }
     saveEndpointEl.disabled = true;
-    saveEndpointEl.textContent = 'Saving...';
+    saveEndpointEl.textContent = 'Saving\u2026';
     try {
       storeEndpointOverride(value);
       endpointDirty = false;

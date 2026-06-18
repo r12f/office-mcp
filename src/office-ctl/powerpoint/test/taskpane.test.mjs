@@ -40,6 +40,8 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(html, /powerpoint\/taskpane\.js\?v=0\.1\.0/);
   assert.match(html, /id="runtimeVersions"/);
   assert.match(html, /<dd id="runtimeVersions"><span id="serverVersion">Server Unknown<\/span> \/ <span id="protocolVersion">Protocol 1\.0<\/span><\/dd>/);
+  assert.match(html, /Connecting&hellip;/);
+  assert.doesNotMatch(html, /Connecting\.\.\./);
   assert.match(html, /<dd id="protection">Not protected<\/dd>/);
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
   assert.match(html, /class="panel summary-panel"/);
@@ -62,6 +64,11 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
 
   assert.match(js, /ADDIN_VERSION = '0\.1\.0'/);
+  assert.match(js, /Connecting\\u2026/);
+  assert.match(js, /Reconnecting\\u2026/);
+  assert.match(js, /Registering\\u2026/);
+  assert.match(js, /saveEndpointEl\.textContent = 'Saving\\u2026'/);
+  assert.doesNotMatch(js, /Connecting\.\.\./);
   assert.match(js, /const AVAILABLE_TOOLS = \[/);
   assert.match(js, /powerpoint\.add_slide/);
   assert.match(js, /powerpoint\.replace_text/);
