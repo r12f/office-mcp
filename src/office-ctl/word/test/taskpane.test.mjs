@@ -42,7 +42,7 @@ test('Word add-in uses product identity metadata and generated icons', () => {
   assert.match(manifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
   assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
   assert.match(manifest, /Control live Word documents through a local productivity automation control utility\./);
-  assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP" \/>/);
+  assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP Control" \/>/);
   assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Open Control Panel" \/>/);
   assert.match(manifest, /Office MCP Control for this document/);
   assert.doesNotMatch(manifest, /DefaultValue="office-mcp"/);
@@ -184,6 +184,7 @@ test('Office catalog registration script stages Office host manifests without re
     for (const host of ['word', 'excel', 'powerpoint']) {
       assert.equal(report.hosts[host].display_name, 'Office MCP Control');
       assert.equal(report.hosts[host].provider, 'Office MCP Control');
+      assert.equal(report.hosts[host].group_label, 'Office MCP Control');
       assert.equal(report.hosts[host].command_label, 'Open Control Panel');
       assert.equal(report.hosts[host].ready, true);
       assert.match(report.hosts[host].description, /local productivity automation control utility/i);
@@ -211,6 +212,7 @@ test('Office catalog identity review rejects prototype first-impression metadata
   <Description DefaultValue="${host === 'excel' ? 'Experimental protocol bridge debug panel.' : 'Control live documents through a local productivity automation control utility.'}" />
   <IconUrl DefaultValue="https://localhost:8766/assets/${host === 'powerpoint' ? 'blank.png' : 'icon-32.png'}" />
   <HighResolutionIconUrl DefaultValue="https://localhost:8766/assets/icon-80.png" />
+  <bt:String id="OfficeMcp.GroupLabel" DefaultValue="${host === 'excel' ? 'Office MCP' : 'Office MCP Control'}" />
   <bt:String id="OfficeMcp.OpenPane.Label" DefaultValue="${host === 'word' ? 'Open' : 'Open Control Panel'}" />
   <bt:String id="OfficeMcp.OpenPane.Tooltip" DefaultValue="Open Office MCP Control." />
   <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:8766${taskpane}?v=0.1.0" />

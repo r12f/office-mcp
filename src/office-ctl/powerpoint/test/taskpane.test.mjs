@@ -20,7 +20,7 @@ test('PowerPoint add-in manifest targets presentation host and product identity'
   assert.match(manifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
   assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
   assert.match(manifest, /Control live PowerPoint presentations through a local productivity automation control utility\./);
-  assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP" \/>/);
+  assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP Control" \/>/);
   assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Open Control Panel" \/>/);
   assert.match(manifest, /Office MCP Control for this presentation/);
   assert.match(manifest, /https:\/\/localhost:8765\/assets\/icon-32\.png/);

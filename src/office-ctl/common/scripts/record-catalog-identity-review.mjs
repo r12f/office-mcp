@@ -54,6 +54,7 @@ function reviewHost(host) {
     description: extractDefaultValue(xml, 'Description'),
     icon_url: extractDefaultValue(xml, 'IconUrl'),
     high_resolution_icon_url: extractDefaultValue(xml, 'HighResolutionIconUrl'),
+    group_label: extractStringDefaultValue(xml, 'OfficeMcp.GroupLabel'),
     command_label: extractStringDefaultValue(xml, 'OfficeMcp.OpenPane.Label'),
     tooltip: extractStringDefaultValue(xml, 'OfficeMcp.OpenPane.Tooltip'),
     taskpane_url: extractUrlDefaultValue(xml, 'Taskpane.Url'),
@@ -72,6 +73,7 @@ function hostFailures(host, identity, xml) {
   if (identity.display_name !== PRODUCT_NAME) failures.push(`display name must be ${PRODUCT_NAME}.`);
   if (identity.provider !== PRODUCT_NAME) failures.push(`provider must be ${PRODUCT_NAME}.`);
   if (!PRODUCT_DESCRIPTION.test(identity.description ?? '')) failures.push('description must describe a local productivity automation control utility.');
+  if (identity.group_label !== PRODUCT_NAME) failures.push(`ribbon group label must be ${PRODUCT_NAME}.`);
   if (identity.command_label !== 'Open Control Panel') failures.push('ribbon command must be Open Control Panel.');
   if (typeof identity.tooltip !== 'string' || !identity.tooltip.includes(PRODUCT_NAME)) failures.push('tooltip must include the product name.');
   if (typeof identity.taskpane_url !== 'string' || !identity.taskpane_url.includes(host.path)) failures.push(`task pane URL must target ${host.path}.`);

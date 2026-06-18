@@ -49,7 +49,8 @@ test('Office add-ins use mature product identity metadata', () => {
 
     assert.match(manifest, new RegExp(`<ProviderName>${PRODUCT_NAME}</ProviderName>`), `${host} provider is product branded`);
     assert.match(manifest, new RegExp(`<DisplayName DefaultValue="${PRODUCT_NAME}" \/>`), `${host} display name is product branded`);
-    assert.match(manifest, /DefaultValue="Office MCP"/, `${host} ribbon group has a stable product label`);
+    assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP Control" \/>/, `${host} ribbon group uses the full product label`);
+    assert.doesNotMatch(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP" \/>/, `${host} ribbon group must not use a shortened prototype label`);
     assert.match(manifest, /DefaultValue="Open Control Panel"/, `${host} command label is action-oriented`);
     assert.match(manifest, /local productivity automation control utility/, `${host} description states product type`);
     assert.match(manifest, new RegExp(`Open ${PRODUCT_NAME} for this ${context}`), `${host} tooltip names the product and host context`);

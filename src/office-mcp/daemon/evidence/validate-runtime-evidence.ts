@@ -300,6 +300,7 @@ function validateCatalogIdentityHost(host: unknown, label: string, taskpanePath:
   if (host.display_name !== 'Office MCP Control') failures.push(`Catalog identity review missing ${label} product display name.`);
   if (host.provider !== 'Office MCP Control') failures.push(`Catalog identity review missing ${label} product provider.`);
   if (typeof host.description !== 'string' || !/local productivity automation control utility/i.test(host.description)) failures.push(`Catalog identity review missing ${label} product description.`);
+  if (host.group_label !== 'Office MCP Control') failures.push(`Catalog identity review missing ${label} product ribbon group label.`);
   if (host.command_label !== 'Open Control Panel') failures.push(`Catalog identity review missing ${label} Open Control Panel command label.`);
   if (typeof host.taskpane_url !== 'string' || !host.taskpane_url.includes(taskpanePath)) failures.push(`Catalog identity review missing ${label} task pane URL.`);
   if (typeof host.icon_url !== 'string' || !/\/assets\/icon-32\.png$/.test(host.icon_url)) failures.push(`Catalog identity review missing ${label} generated icon URL.`);

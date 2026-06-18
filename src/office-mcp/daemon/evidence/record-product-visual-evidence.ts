@@ -505,6 +505,7 @@ function catalogIdentityHostLooksReady(host: unknown): boolean {
     && host.display_name === productName
     && host.provider === productName
     && typeof host.description === 'string' && /local productivity automation control utility/i.test(host.description)
+    && host.group_label === productName
     && host.command_label === 'Open Control Panel'
     && typeof host.icon_url === 'string' && /\/assets\/icon-32\.png$/.test(host.icon_url)
     && typeof host.high_resolution_icon_url === 'string' && /\/assets\/icon-80\.png$/.test(host.high_resolution_icon_url);

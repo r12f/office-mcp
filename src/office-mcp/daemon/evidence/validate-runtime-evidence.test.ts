@@ -489,11 +489,13 @@ test('runtime evidence validator can require product visual evidence', () => {
       broken.catalog_identity_review_ready = false;
       broken.catalog_identity_review.ready = false;
       broken.catalog_identity_review.hosts.word.display_name = 'office-mcp-word';
+      broken.catalog_identity_review.hosts.excel.group_label = 'Office MCP';
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /catalog identity review ready flag/);
       assert.match(outputText(result.stdout), /Catalog identity review missing Word product display name/);
+      assert.match(outputText(result.stdout), /Catalog identity review missing Excel product ribbon group label/);
     });
   });
 
@@ -912,6 +914,7 @@ function catalogIdentityHost(host: string, passed: boolean) {
     display_name: passed ? 'Office MCP Control' : `office-mcp-${host}`,
     provider: passed ? 'Office MCP Control' : 'office-mcp',
     description: passed ? 'Control live documents through a local productivity automation control utility.' : 'Experimental protocol bridge debug panel.',
+    group_label: passed ? 'Office MCP Control' : 'Office MCP',
     command_label: passed ? 'Open Control Panel' : 'Open',
     taskpane_url: `https://localhost:8765${taskpanePath}?v=0.1.0`,
     icon_url: passed ? 'https://localhost:8765/assets/icon-32.png' : 'https://localhost:8765/assets/blank.png',

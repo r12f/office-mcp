@@ -670,6 +670,7 @@ function writeManifest(dir: string, host: 'word' | 'excel' | 'powerpoint'): stri
   <Description DefaultValue="Control live ${context} through a local productivity automation control utility." />
   <IconUrl DefaultValue="https://localhost:8765/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:8765/assets/icon-80.png" />
+  <bt:String id="OfficeMcp.GroupLabel" DefaultValue="Office MCP Control" />
 </OfficeApp>
 `);
   return path;
@@ -809,6 +810,7 @@ function catalogIdentityHost(host: string, ready = true): Record<string, unknown
     description: ready ? 'Control live documents through a local productivity automation control utility.' : 'Experimental protocol bridge debug panel.',
     icon_url: ready ? 'https://localhost:8765/assets/icon-32.png' : 'https://localhost:8765/assets/blank.png',
     high_resolution_icon_url: ready ? 'https://localhost:8765/assets/icon-80.png' : 'https://localhost:8765/assets/blank.png',
+    group_label: ready ? 'Office MCP Control' : 'Office MCP',
     command_label: ready ? 'Open Control Panel' : 'Open',
     tooltip: ready ? 'Open Office MCP Control.' : 'Open task pane.',
     taskpane_url: `https://localhost:8765${taskpanePath}?v=0.1.0`,

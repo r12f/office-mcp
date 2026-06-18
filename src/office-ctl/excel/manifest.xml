@@ -81,7 +81,7 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Office MCP Control is ready" />
-        <bt:String id="OfficeMcp.GroupLabel" DefaultValue="Office MCP" />
+        <bt:String id="OfficeMcp.GroupLabel" DefaultValue="Office MCP Control" />
         <bt:String id="OfficeMcp.OpenPane.Label" DefaultValue="Open Control Panel" />
       </bt:ShortStrings>
       <bt:LongStrings>
