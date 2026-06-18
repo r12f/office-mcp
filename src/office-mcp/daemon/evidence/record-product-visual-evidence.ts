@@ -18,6 +18,11 @@ const requiredSurfaces = [
   'excel_ribbon_command',
   'excel_catalog_entry',
   'excel_taskpane_title',
+  'logo_tray_size',
+  'logo_ribbon_size',
+  'logo_catalog_thumbnail',
+  'logo_daemon_titlebar',
+  'logo_installer_metadata',
   'tray_icon',
   'tray_native_menu',
   'tray_tooltip',
@@ -39,6 +44,15 @@ const quitConfirmationVisible = booleanFlag('--quit-confirmation-visible');
 const logoQualityReviewed = booleanFlag('--logo-quality-reviewed');
 const addinIdentityReviewed = booleanFlag('--addin-identity-reviewed');
 const trayProductPolishReviewed = booleanFlag('--tray-product-polish-reviewed');
+const renderedSizeLogoReviewed = booleanFlag('--rendered-size-logo-reviewed');
+const wordFirstRunIdentityReviewed = booleanFlag('--word-first-run-identity-reviewed');
+const excelFirstRunIdentityReviewed = booleanFlag('--excel-first-run-identity-reviewed');
+const wordCatalogProvider = readOption('--word-catalog-provider');
+const wordCatalogDescription = readOption('--word-catalog-description');
+const wordCatalogType = readOption('--word-catalog-type');
+const excelCatalogProvider = readOption('--excel-catalog-provider');
+const excelCatalogDescription = readOption('--excel-catalog-description');
+const excelCatalogType = readOption('--excel-catalog-type');
 const excelCompactTopBlock = booleanFlag('--excel-compact-top-block');
 const excelToolsPermissionsMerged = booleanFlag('--excel-tools-permissions-merged');
 const excelInlineSettings = booleanFlag('--excel-inline-settings');
@@ -51,10 +65,12 @@ const productTextReady = requiredSurfaces.filter((surface) => surface !== 'tray_
 const allScreenshotsExist = Object.values(screenshotsExist).every(Boolean);
 const trayTooltipReady = typeof trayTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(trayTooltip);
 const catalogTypeReady = typeof catalogType === 'string' && /local productivity automation control utility/i.test(catalogType);
+const wordFirstRunIdentityReady = wordFirstRunIdentityReviewed && catalogIdentityLooksReady(wordCatalogProvider, wordCatalogDescription, wordCatalogType);
+const excelFirstRunIdentityReady = excelFirstRunIdentityReviewed && catalogIdentityLooksReady(excelCatalogProvider, excelCatalogDescription, excelCatalogType);
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady;
-const productIdentityReviewReady = logoQualityReviewed && addinIdentityReviewed && trayProductPolishReviewed;
+const productIdentityReviewReady = logoQualityReviewed && renderedSizeLogoReviewed && addinIdentityReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && trayProductPolishReviewed;
 const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && excelTaskpaneDensityReady && productIdentityReviewReady && daemonContextReady;
 
 const evidence = {
@@ -79,9 +95,28 @@ const evidence = {
   quit_confirmation_visible: quitConfirmationVisible,
   product_identity_review: {
     logo_quality_reviewed: logoQualityReviewed,
+    rendered_size_logo_reviewed: renderedSizeLogoReviewed,
     addin_identity_reviewed: addinIdentityReviewed,
+    word_first_run_identity_reviewed: wordFirstRunIdentityReviewed,
+    excel_first_run_identity_reviewed: excelFirstRunIdentityReviewed,
     tray_product_polish_reviewed: trayProductPolishReviewed,
+    word_first_run_identity_ready: wordFirstRunIdentityReady,
+    excel_first_run_identity_ready: excelFirstRunIdentityReady,
     ready: productIdentityReviewReady
+  },
+  first_run_identity: {
+    word: {
+      provider: wordCatalogProvider,
+      description: wordCatalogDescription,
+      type: wordCatalogType,
+      ready: wordFirstRunIdentityReady
+    },
+    excel: {
+      provider: excelCatalogProvider,
+      description: excelCatalogDescription,
+      type: excelCatalogType,
+      ready: excelFirstRunIdentityReady
+    }
   },
   excel_taskpane: {
     compact_top_block: excelCompactTopBlock,
@@ -118,6 +153,12 @@ function readOption(name: string): string | undefined {
   const index = process.argv.indexOf(name);
   if (index === -1) return undefined;
   return process.argv[index + 1];
+}
+
+function catalogIdentityLooksReady(provider: string | undefined, description: string | undefined, type: string | undefined): boolean {
+  return typeof provider === 'string' && provider.includes(productName)
+    && typeof description === 'string' && /local/i.test(description) && /(productivity|office)/i.test(description) && /(automation|control)/i.test(description)
+    && typeof type === 'string' && /local productivity automation control utility/i.test(type);
 }
 
 function readDaemonContext(binaryPath: string): Record<string, unknown> {

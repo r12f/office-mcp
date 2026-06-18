@@ -310,6 +310,23 @@ test('runtime evidence validator can require product visual evidence', () => {
       assert.match(outputText(result.stdout), /Product visual evidence missing product identity review ready flag/);
     });
   });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.product_identity_review.rendered_size_logo_reviewed = false;
+      broken.product_identity_review.word_first_run_identity_ready = false;
+      broken.first_run_identity.word.type = 'Experimental protocol bridge';
+      broken.first_run_identity.word.ready = false;
+      broken.product_identity_review.ready = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /rendered-size logo review/);
+      assert.match(outputText(result.stdout), /Word first-run identity ready flag/);
+      assert.match(outputText(result.stdout), /Word local productivity automation\/control type metadata/);
+    });
+  });
 });
 test('runtime evidence validator can require manual Windows tray evidence', () => {
   const ui = uiReport();
@@ -567,9 +584,28 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     quit_confirmation_visible: passed,
     product_identity_review: {
       logo_quality_reviewed: passed,
+      rendered_size_logo_reviewed: passed,
       addin_identity_reviewed: passed,
+      word_first_run_identity_reviewed: passed,
+      excel_first_run_identity_reviewed: passed,
       tray_product_polish_reviewed: passed,
+      word_first_run_identity_ready: passed,
+      excel_first_run_identity_ready: passed,
       ready: passed
+    },
+    first_run_identity: {
+      word: {
+        provider: 'Office MCP Control',
+        description: 'Local office productivity automation and control utility',
+        type: 'Local productivity automation control utility',
+        ready: passed
+      },
+      excel: {
+        provider: 'Office MCP Control',
+        description: 'Local office productivity automation and control utility',
+        type: 'Local productivity automation control utility',
+        ready: passed
+      }
     },
     excel_taskpane: {
       compact_top_block: passed,
@@ -595,6 +631,11 @@ function productVisualSurfaces(): string[] {
     'excel_ribbon_command',
     'excel_catalog_entry',
     'excel_taskpane_title',
+    'logo_tray_size',
+    'logo_ribbon_size',
+    'logo_catalog_thumbnail',
+    'logo_daemon_titlebar',
+    'logo_installer_metadata',
     'tray_icon',
     'tray_native_menu',
     'tray_tooltip',

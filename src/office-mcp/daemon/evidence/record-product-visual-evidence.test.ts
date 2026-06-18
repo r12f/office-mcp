@@ -15,6 +15,11 @@ const SURFACES = [
   'excel-ribbon-command',
   'excel-catalog-entry',
   'excel-taskpane-title',
+  'logo-tray-size',
+  'logo-ribbon-size',
+  'logo-catalog-thumbnail',
+  'logo-daemon-titlebar',
+  'logo-installer-metadata',
   'tray-icon',
   'tray-native-menu',
   'tray-tooltip',
@@ -34,6 +39,8 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal(evidence.tray_tooltip_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, true);
+    assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.ready, true);
+    assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).excel.ready, true);
     assert.equal(evidence.daemon_context_ready, true);
     assert.equal(evidence.passed, true);
 
@@ -55,6 +62,22 @@ test('product visual evidence recorder requires product identity review flags', 
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
+test('product visual evidence recorder requires rendered-size and first-run identity review', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'missing-first-run-review.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--skip-rendered-logo-and-first-run-flags');
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    const review = evidence.product_identity_review as Record<string, unknown>;
+    assert.equal(review.rendered_size_logo_reviewed, false);
+    assert.equal(review.word_first_run_identity_ready, false);
+    assert.equal(review.excel_first_run_identity_ready, false);
+    assert.equal(review.ready, false);
     assert.equal(evidence.passed, false);
   });
 });
@@ -124,7 +147,8 @@ test('product visual evidence recorder can bind evidence to daemon context', () 
 
 function runRecorder(output: string, screenshots: Record<string, string>, ...extra: string[]): ReturnType<typeof spawnSync> {
   const skipProductReviewFlags = extra.includes('--skip-product-review-flags');
-  const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags');
+  const skipRenderedLogoAndFirstRunFlags = extra.includes('--skip-rendered-logo-and-first-run-flags');
+  const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags' && item !== '--skip-rendered-logo-and-first-run-flags');
   const args = [
     TSX,
     RECORDER,
@@ -135,6 +159,12 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     '--tray-icon-visible', 'true',
     '--tray-menu-native', 'true',
     '--quit-confirmation-visible', 'true',
+    '--word-catalog-provider', 'Office MCP Control',
+    '--word-catalog-description', 'Local office productivity automation and control utility',
+    '--word-catalog-type', 'Local productivity automation control utility',
+    '--excel-catalog-provider', 'Office MCP Control',
+    '--excel-catalog-description', 'Local office productivity automation and control utility',
+    '--excel-catalog-type', 'Local productivity automation control utility',
     '--excel-compact-top-block', 'true',
     '--excel-tools-permissions-merged', 'true',
     '--excel-inline-settings', 'true',
@@ -146,6 +176,13 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
       '--logo-quality-reviewed', 'true',
       '--addin-identity-reviewed', 'true',
       '--tray-product-polish-reviewed', 'true'
+    );
+  }
+  if (!skipRenderedLogoAndFirstRunFlags) {
+    args.push(
+      '--rendered-size-logo-reviewed', 'true',
+      '--word-first-run-identity-reviewed', 'true',
+      '--excel-first-run-identity-reviewed', 'true'
     );
   }
   for (const surface of SURFACES) {
