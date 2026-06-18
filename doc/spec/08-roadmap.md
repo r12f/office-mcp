@@ -328,6 +328,14 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       futuristic desktop utility style. The first implemented identity is the
       Office MCP Control mark: abstract document panes plus a control node,
       generated from `src/office-ctl/common/assets/brand-mark.svg`.
+- [ ] Review and refine the implemented logo against the product brief before
+      final release. The final mark must communicate office productivity plus
+      user control through abstract document panes, routing, and a control node
+      or switch; it must not use Office logos, Office tile language, Microsoft
+      365 gradients, Word document silhouettes, Excel grid marks, generic gear
+      icons, or text-only initials. Add or update a design note beside the
+      source artwork documenting the metaphor, palette, minimum sizes, and
+      non-Microsoft distinction.
 - [x] Add an explicit brand guard so generated/source assets cannot regress to
       Microsoft Office-owned visual marks, placeholder initials, generic gear
       icons, or single-color debug glyphs. Covered by
@@ -354,6 +362,14 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       provider/display identity, `Open Control Panel` as the action label, and
       host-specific product tooltips. Static tests reject raw implementation
       slugs, vague commands such as `Open`, and prototype/debug wording.
+- [ ] Add explicit manifest/catalog coverage for add-in type/category metadata.
+      Word and Excel catalog entries, hosted manifest output, AppSource
+      pre-submission metadata, and installer-generated catalog manifests must
+      describe the product as a local productivity automation/control utility,
+      not as a sample, debug add-in, raw protocol bridge, or experimental task
+      pane. Tests should fail on missing type/category values where the target
+      format supports them and on inconsistent product names across catalog,
+      ribbon command, and task pane chrome.
 - [x] Update task pane visible title/chrome and any in-app product references
       to match the new identity while keeping host-specific Word/Excel accents
       restrained and secondary. Word and Excel task panes now use `Office MCP
@@ -370,12 +386,19 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       adaptation. Custom web-styled or custom-drawn menu panels are not
       acceptable for release. Existing automated tests verify the Rust tray host
       uses `tray_icon::menu`; manual Windows evidence is still required for the
-      native look and interaction.
-- [ ] Polish the tray product surface so normal Windows users see a deliberate
-      app icon, native tooltip/title, native context menu text, disabled status
-      rows, and confirmation dialogs that match the add-in product name. The
-      tray must not expose placeholder labels, missing icons, web-rendered menu
-      panels, or debug-only commands in the primary right-click menu.
+      native look and interaction. A browser window, webview, frameless HTML
+      menu, CSS-styled popup, or manually positioned floating panel must fail
+      acceptance even if it resembles a Windows menu.
+- [x] Polish the automated tray product surface model so normal Windows users
+      are expected to see a deliberate app icon, native tooltip/title, native
+      context menu text, disabled status rows, and confirmation dialogs that
+      match the add-in product name. The Rust tray probe now exposes structured
+      menu roles (`read_only`, `separator`, `action`), enabled states, action
+      IDs, product tooltip text, and quit confirmation details. UI runtime
+      evidence and manual evidence validation reject missing tooltip text,
+      missing structured menu roles, web-rendered/custom menu substitutions in
+      the evidence model, and debug-only primary menu commands. Final visual
+      Windows proof remains tracked by the manual evidence items.
 - [x] Update MSI/package asset installation and manifest renderer tests so the
       generated logo/icon files and product metadata are packaged and referenced
       from the installed add-in catalog without loopback or missing-icon paths.
@@ -386,13 +409,16 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       add-in title, visible tray glyph, and native right-click menu. Automated
       tests now cover metadata/icon substitution, generated asset dimensions,
       PNG palette checks, source logo guardrails, static asset serving,
-      packaging presence, and tray glyph generation; the remaining open portion
-      is live Windows ribbon/tray visual evidence.
+      packaging presence, tray glyph generation, tray tooltip format, structured
+      native menu roles, disabled status rows, separator position, and tray
+      action IDs; the remaining open portion is live Windows ribbon/tray visual
+      evidence.
 - [ ] Capture visual evidence for the finished identity on Windows: Word ribbon
-      command, Word catalog entry, Word task pane title/icon, Excel equivalents,
-      visible notification-area tray icon, native right-click menu, and tray
-      tooltip/confirmation dialog. The evidence must be tied to the same local
-      daemon build under test and stored as release-checkable artifacts.
+      command, Word catalog entry including type/category and icon, Word task
+      pane title/icon, Excel equivalents, visible notification-area tray icon,
+      native right-click menu opened from that icon, and tray tooltip/
+      confirmation dialog. The evidence must be tied to the same local daemon
+      build under test and stored as release-checkable artifacts.
 
 **Exit criterion**: Word and Excel show a mature product add-in name and icon in
 the ribbon/catalog; the task pane title and chrome match the product identity;

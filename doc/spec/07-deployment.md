@@ -58,6 +58,13 @@ file names such as `addin-catalog\office-mcp-word.xml` and
 Office's Shared Folder add-in picker without relying on recursive catalog
 scanning.
 
+The shared-folder catalog must present the same product identity users see in
+the ribbon and task pane: polished product title, product icon, provider,
+description, and local automation/control category or type metadata where the
+manifest or catalog format supports it. The user-facing catalog entry must not
+show raw package names, blank icons, generic Office icons, debug wording, or a
+host-only name that hides the product family.
+
 ### 3.2 AppSource (eventual)
 
 Published via [partner.microsoft.com](https://partner.microsoft.com). Users
@@ -115,9 +122,13 @@ textually identical with, the add-in package semver.
 
 Release manifests MUST also substitute product-quality add-in identity fields:
 `DisplayName`, ribbon group labels, command labels, description, provider name,
-support URL, and all icon URLs. These values must match the product identity in
-[09-ui.md](09-ui.md), avoid developer placeholders such as `office-mcp` and
-generic command labels such as `Open`, and must not imply Microsoft ownership.
+support URL, add-in type/category metadata where supported, and all icon URLs.
+These values must match the product identity in [09-ui.md](09-ui.md), avoid
+developer placeholders such as `office-mcp` and generic command labels such as
+`Open`, and must not imply Microsoft ownership. Manifest and catalog renderers
+must fail if required identity fields are missing, still point at placeholder
+assets, or expose inconsistent names between the catalog, ribbon command, and
+task pane title.
 
 The hosted manifest is rendered from the checked developer manifest rather than
 maintained as a second XML file:
@@ -268,6 +279,8 @@ The production MSI remains the release packaging target:
    - Drops the native Rust daemon executable to `%LOCALAPPDATA%\office-mcp\`.
    - Installs the generated product logo, tray icon, add-in command icons, and
      main-window UI assets.
+   - Verifies the installed add-in catalog resolves product metadata and icon
+     paths for Word and Excel before declaring installation complete.
    - Installs the static add-in bundle beside the daemon.
    - Exports a current-user trusted localhost certificate on first daemon start;
      it does not import root certificates.
