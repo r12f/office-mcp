@@ -24,7 +24,7 @@ const osNativeMenuBehaviorReviewed = booleanFlag('--os-native-menu-behavior-revi
 const keyboardMenuAccessReviewed = booleanFlag('--keyboard-menu-access-reviewed');
 const nativeQuitConfirmationReviewed = booleanFlag('--native-quit-confirmation-reviewed');
 const showUiOpened = booleanFlag('--show-ui-opened');
-const expectedItems = ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'];
+const expectedItems = ['Status:', 'Clients:', 'Documents:', 'Show Office MCP Control', 'Quit Office MCP Control'];
 const observedMenuItems = readRepeatedOption('--menu-item');
 const menuContainsRequiredItems = expectedItems.every((expected) =>
   observedMenuItems.some((item) => item.includes(expected))
@@ -35,7 +35,7 @@ const traySurfaceScreenshotsExist = Object.fromEntries(
 );
 const traySurfaceScreenshotsReady = Object.values(traySurfaceScreenshotsExist).every(Boolean);
 const traySurfaceScreenshotsDistinct = screenshotPathsAreDistinct(traySurfaceScreenshots);
-const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
+const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
 const trayMenuSurfaceNative = trayMenuSurfaceKind === 'native';
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
@@ -173,7 +173,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function traySnapshotLooksReady(snapshot: unknown): boolean {
   if (!isRecord(snapshot)) return false;
-  const tooltipReady = typeof snapshot.tooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(snapshot.tooltip);
+  const tooltipReady = typeof snapshot.tooltip === 'string' && /^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(snapshot.tooltip);
   const menuItems = Array.isArray(snapshot.menu_items) ? snapshot.menu_items.filter((item): item is string => typeof item === 'string') : [];
   const menuReady = expectedItems.every((expected) => menuItems.some((item) => item.includes(expected)));
   return tooltipReady && menuReady;

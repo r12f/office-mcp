@@ -108,7 +108,7 @@ impl TraySnapshot {
     #[must_use]
     pub fn from_input(platform: TrayPlatform, input: TrayStatusInput) -> Self {
         let tooltip = format!(
-            "Office MCP - {} - {} clients - {} documents",
+            "Office MCP Control - {} - {} clients - {} documents",
             input.health.label(),
             input.client_count,
             input.document_count
@@ -121,8 +121,8 @@ impl TraySnapshot {
                 TrayMenuItem::read_only(format!("Clients: {}", input.client_count)),
                 TrayMenuItem::read_only(format!("Documents: {}", input.document_count)),
                 TrayMenuItem::Separator,
-                TrayMenuItem::action(TrayAction::ShowUi, "Show Office MCP"),
-                TrayMenuItem::action(TrayAction::Quit, "Quit Office MCP"),
+                TrayMenuItem::action(TrayAction::ShowUi, "Show Office MCP Control"),
+                TrayMenuItem::action(TrayAction::Quit, "Quit Office MCP Control"),
             ],
             quit_confirmation: QuitConfirmation::from_input(&input),
         }
@@ -231,12 +231,12 @@ impl QuitConfirmation {
     #[must_use]
     pub fn from_input(input: &TrayStatusInput) -> Self {
         Self {
-            title: "Quit Office MCP".to_string(),
+            title: "Quit Office MCP Control".to_string(),
             body: format!(
-                "Quit Office MCP and disconnect {} clients, {} documents, and {} running tasks?",
+                "Quit Office MCP Control and disconnect {} clients, {} documents, and {} running tasks?",
                 input.client_count, input.document_count, input.running_task_count
             ),
-            primary_action: "Quit Office MCP".to_string(),
+            primary_action: "Quit Office MCP Control".to_string(),
             secondary_action: "Keep Running".to_string(),
         }
     }

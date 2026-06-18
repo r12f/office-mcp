@@ -13,7 +13,7 @@ test('manual tray evidence recorder requires product tooltip', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     const daemonBin = writeFakeDaemon(dir);
     const output = join(dir, 'tray-evidence.json');
-    const passing = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
+    const passing = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
     assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.tooltip_product_ready, true);
@@ -45,7 +45,7 @@ test('manual tray evidence recorder rejects non-native menu surface kind', () =>
   withTrayScreenshot((dir, screenshotPath) => {
     const daemonBin = writeFakeDaemon(dir);
     const output = join(dir, 'webview-menu-surface.json');
-    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin, '--menu-surface-kind', 'webview');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin, '--menu-surface-kind', 'webview');
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.tray_menu_surface_kind, 'webview');
@@ -56,7 +56,7 @@ test('manual tray evidence recorder rejects non-native menu surface kind', () =>
 test('manual tray evidence recorder requires daemon context before passing', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     const output = join(dir, 'missing-daemon-context.json');
-    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents');
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.daemon_context_ready, false);
@@ -71,7 +71,7 @@ test('manual tray evidence recorder requires native tray menu review', () => {
     const result = runRecorder(
       output,
       screenshotPath,
-      '--tooltip', 'Office MCP - Up - 0 clients - 0 documents',
+      '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents',
       '--daemon-bin', daemonBin,
       '--skip-native-menu-review-flags'
     );
@@ -92,7 +92,7 @@ test('manual tray evidence recorder requires tray probe live state', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     const daemonBin = writeFakeDaemon(dir, false);
     const output = join(dir, 'missing-live-state.json');
-    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.daemon_context_ready, false);
@@ -104,7 +104,7 @@ test('manual tray evidence recorder requires live tray menu snapshot', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     const daemonBin = writeFakeDaemon(dir, true, ['Status: Up', 'Clients: 0']);
     const output = join(dir, 'missing-menu-items.json');
-    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.daemon_context_ready, false);
@@ -116,7 +116,7 @@ test('manual tray evidence recorder requires distinct tray surface screenshots',
   withTrayScreenshot((dir, screenshotPath) => {
     const daemonBin = writeFakeDaemon(dir);
     const output = join(dir, 'missing-tray-surfaces.json');
-    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin, '--skip-tray-surface-screenshots');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin, '--skip-tray-surface-screenshots');
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.tray_surface_screenshots_ready, false);
@@ -130,7 +130,7 @@ test('manual tray evidence recorder rejects truncated screenshots', () => {
     writeFileSync(screenshotPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
     const daemonBin = writeFakeDaemon(dir);
     const output = join(dir, 'truncated-screenshot.json');
-    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.screenshot_exists, false);
@@ -146,7 +146,7 @@ test('manual tray evidence recorder rejects reused tray surface screenshots', ()
     const result = runRecorder(
       output,
       screenshotPath,
-      '--tooltip', 'Office MCP - Up - 0 clients - 0 documents',
+      '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents',
       '--daemon-bin', daemonBin,
       '--shared-tray-surface-screenshot', sharedSurface
     );
@@ -165,7 +165,7 @@ test('manual tray evidence recorder reads daemon and screenshot paths from envir
     const result = runRecorder(
       output,
       screenshotPath,
-      '--tooltip', 'Office MCP - Up - 0 clients - 0 documents',
+      '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents',
       '--env-daemon-bin', daemonBin,
       '--env-screenshot-path', screenshotPath,
       '--env-tray-icon-screenshot', writeSurfaceScreenshot(dir, 'env-tray-icon.png'),
@@ -240,8 +240,8 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
     '--menu-item', 'Status: Up',
     '--menu-item', 'Clients: 0',
     '--menu-item', 'Documents: 0',
-    '--menu-item', 'Show Office MCP',
-    '--menu-item', 'Quit Office MCP',
+    '--menu-item', 'Show Office MCP Control',
+    '--menu-item', 'Quit Office MCP Control',
     ...filteredExtra
   ], {
     cwd: process.cwd(),
@@ -284,7 +284,7 @@ function withTrayScreenshot(callback: (dir: string, screenshotPath: string) => v
   }
 }
 
-function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']): string {
+function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control']): string {
   const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
   writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk, menuItems));
   chmodSync(daemonBin, 0o755);
@@ -293,7 +293,7 @@ function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status:
 
 function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[]): string {
   const status = JSON.stringify({ running: true, uiUrl: 'https://localhost:8765/ui/' });
-  const trayProbe = JSON.stringify({ native_host: true, state_fetch_ok: stateFetchOk, snapshot: { tooltip: 'Office MCP - Up - 0 clients - 0 documents', menu_items: menuItems } });
+  const trayProbe = JSON.stringify({ native_host: true, state_fetch_ok: stateFetchOk, snapshot: { tooltip: 'Office MCP Control - Up - 0 clients - 0 documents', menu_items: menuItems } });
   if (process.platform === 'win32') {
     return `@echo off\r\nif "%1"=="daemon" echo ${status}\r\nif "%1"=="tray" echo ${trayProbe}\r\n`;
   }

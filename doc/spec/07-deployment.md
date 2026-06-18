@@ -351,7 +351,7 @@ or probe commands:
 - The Windows tray launch path creates a visible notification-area icon in an
   interactive user session. `tray --probe` is useful automated coverage, but it
   is not sufficient evidence that the user can see or use the tray.
-- The tray `Show Office MCP` action opens or focuses the same UI URL reported by
+- The tray `Show Office MCP Control` action opens or focuses the same UI URL reported by
   `daemon status`.
 
 ## 7. Versioning & upgrades

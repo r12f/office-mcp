@@ -158,7 +158,7 @@ async function runTrayProbeGate(): Promise<void> {
     if (jsonStart === -1) throw new Error(`Tray probe did not emit JSON: ${result.stdout}`);
     const evidence = JSON.parse(result.stdout.slice(jsonStart)) as Record<string, unknown>;
     const snapshot = evidence.snapshot as Record<string, unknown> | undefined;
-    const expected = ['Status: Degraded', 'Clients: 1', 'Documents: 2', '---', 'Show Office MCP', 'Quit Office MCP'];
+    const expected = ['Status: Degraded', 'Clients: 1', 'Documents: 2', '---', 'Show Office MCP Control', 'Quit Office MCP Control'];
     if (JSON.stringify(snapshot?.menu_items) !== JSON.stringify(expected)) {
       throw new Error(`Tray menu order/counts are wrong: ${JSON.stringify(evidence)}`);
     }
@@ -231,7 +231,7 @@ async function runProductionDaemonTrayGate(): Promise<void> {
 
 function assertStructuredTraySnapshot(snapshot: Record<string, unknown> | undefined, label: string): void {
   if (!snapshot) throw new Error(`${label} did not include a tray snapshot.`);
-  if (typeof snapshot.tooltip !== 'string' || !/^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(snapshot.tooltip)) {
+  if (typeof snapshot.tooltip !== 'string' || !/^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(snapshot.tooltip)) {
     throw new Error(`${label} did not include a product tooltip: ${JSON.stringify(snapshot)}`);
   }
   const menu = Array.isArray(snapshot.menu) ? snapshot.menu : [];
@@ -240,8 +240,8 @@ function assertStructuredTraySnapshot(snapshot: Record<string, unknown> | undefi
     { kind: 'read_only', enabled: false, label: /^Clients: \d+$/ },
     { kind: 'read_only', enabled: false, label: /^Documents: \d+$/ },
     { kind: 'separator', enabled: false, label: /^---$/ },
-    { kind: 'action', enabled: true, label: /^Show Office MCP$/, action: 'show_ui' },
-    { kind: 'action', enabled: true, label: /^Quit Office MCP$/, action: 'quit' }
+    { kind: 'action', enabled: true, label: /^Show Office MCP Control$/, action: 'show_ui' },
+    { kind: 'action', enabled: true, label: /^Quit Office MCP Control$/, action: 'quit' }
   ];
   if (menu.length !== expected.length) throw new Error(`${label} structured menu has ${menu.length} items: ${JSON.stringify(snapshot)}`);
   expected.forEach((rule, index) => {

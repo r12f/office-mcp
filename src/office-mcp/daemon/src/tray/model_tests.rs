@@ -15,7 +15,7 @@ fn snapshot_matches_required_menu_order() {
     assert_eq!(snapshot.platform, TrayPlatform::WindowsNotificationArea);
     assert_eq!(
         snapshot.tooltip,
-        "Office MCP - Up - 2 clients - 3 documents"
+        "Office MCP Control - Up - 2 clients - 3 documents"
     );
     assert_eq!(snapshot.menu[0].label(), Some("Status: Up"));
     assert_eq!(snapshot.menu[1].label(), Some("Clients: 2"));
@@ -25,10 +25,10 @@ fn snapshot_matches_required_menu_order() {
         snapshot.menu[4],
         TrayMenuItem::Action {
             action: TrayAction::ShowUi,
-            label: "Show Office MCP".to_string()
+            label: "Show Office MCP Control".to_string()
         }
     );
-    assert_eq!(snapshot.menu[5].label(), Some("Quit Office MCP"));
+    assert_eq!(snapshot.menu[5].label(), Some("Quit Office MCP Control"));
 }
 
 #[test]
@@ -47,7 +47,10 @@ fn quit_confirmation_includes_current_counts_and_required_actions() {
     assert!(snapshot.quit_confirmation.body.contains("1 clients"));
     assert!(snapshot.quit_confirmation.body.contains("4 documents"));
     assert!(snapshot.quit_confirmation.body.contains("2 running tasks"));
-    assert_eq!(snapshot.quit_confirmation.primary_action, "Quit Office MCP");
+    assert_eq!(
+        snapshot.quit_confirmation.primary_action,
+        "Quit Office MCP Control"
+    );
     assert_eq!(snapshot.quit_confirmation.secondary_action, "Keep Running");
 }
 
@@ -71,7 +74,7 @@ fn tray_status_can_be_derived_from_redacted_ui_state() {
     assert_eq!(probe["menu_items"][3], "---");
     assert_eq!(
         probe["tooltip"],
-        "Office MCP - Degraded - 1 clients - 2 documents"
+        "Office MCP Control - Degraded - 1 clients - 2 documents"
     );
     assert_eq!(probe["menu"][0]["kind"], "read_only");
     assert_eq!(probe["menu"][0]["enabled"], false);
@@ -106,7 +109,7 @@ fn tray_document_count_excludes_stale_and_reconnecting_sessions() {
     assert_eq!(snapshot.menu[2].label(), Some("Documents: 2"));
     assert_eq!(
         snapshot.tooltip,
-        "Office MCP - Up - 0 clients - 2 documents"
+        "Office MCP Control - Up - 0 clients - 2 documents"
     );
     assert!(snapshot.quit_confirmation.body.contains("2 documents"));
 }
@@ -126,8 +129,8 @@ fn tray_product_surface_has_no_scaffold_or_debug_labels() {
     let rendered = serde_json::to_string(&probe).expect("serialize tray probe");
 
     assert!(rendered.contains("Office MCP"));
-    assert!(rendered.contains("Show Office MCP"));
-    assert!(rendered.contains("Quit Office MCP"));
+    assert!(rendered.contains("Show Office MCP Control"));
+    assert!(rendered.contains("Quit Office MCP Control"));
     assert!(rendered.contains("Keep Running"));
     assert!(!rendered.to_ascii_lowercase().contains("debug"));
     assert!(!rendered.to_ascii_lowercase().contains("prototype"));
@@ -135,7 +138,7 @@ fn tray_product_surface_has_no_scaffold_or_debug_labels() {
     assert!(!rendered.to_ascii_lowercase().contains("test tray"));
     assert_eq!(
         probe["tooltip"],
-        "Office MCP - Up - 0 clients - 0 documents"
+        "Office MCP Control - Up - 0 clients - 0 documents"
     );
     assert_eq!(probe["menu"][0]["kind"], "read_only");
     assert_eq!(probe["menu"][0]["enabled"], false);
@@ -144,10 +147,13 @@ fn tray_product_surface_has_no_scaffold_or_debug_labels() {
     assert_eq!(probe["menu"][4]["enabled"], true);
     assert_eq!(probe["menu"][5]["kind"], "action");
     assert_eq!(probe["menu"][5]["enabled"], true);
-    assert_eq!(probe["quit_confirmation"]["title"], "Quit Office MCP");
+    assert_eq!(
+        probe["quit_confirmation"]["title"],
+        "Quit Office MCP Control"
+    );
     assert_eq!(
         probe["quit_confirmation"]["primary_action"],
-        "Quit Office MCP"
+        "Quit Office MCP Control"
     );
     assert_eq!(
         probe["quit_confirmation"]["secondary_action"],

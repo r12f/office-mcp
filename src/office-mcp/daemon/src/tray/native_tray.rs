@@ -1,8 +1,8 @@
 use super::{TrayHostOptions, open_ui_from_runtime, read_ui_state, stop_daemon};
 use crate::tray::product_icon::{ICON_HEIGHT, ICON_WIDTH, product_icon_rgba};
 use crate::tray::{
-    QuitConfirmation, TrayController, TrayMenuItem, TrayPlatformAdapter, TrayPlatformError,
-    TraySnapshot,
+    QuitConfirmation, TrayAction, TrayController, TrayMenuItem, TrayPlatformAdapter,
+    TrayPlatformError, TraySnapshot,
 };
 use std::time::{Duration, Instant};
 use tao::event::{Event, StartCause};
@@ -150,11 +150,17 @@ fn build_menu(snapshot: &TraySnapshot) -> Menu {
                 let menu_item = MenuItem::new(label, false, None);
                 let _ = menu.append(&menu_item);
             }
-            TrayMenuItem::Action { label, .. } if label == "Show Office MCP" => {
+            TrayMenuItem::Action {
+                action: TrayAction::ShowUi,
+                label,
+            } => {
                 let menu_item = MenuItem::with_id(MenuId::new(SHOW_ID), label, true, None);
                 let _ = menu.append(&menu_item);
             }
-            TrayMenuItem::Action { label, .. } => {
+            TrayMenuItem::Action {
+                action: TrayAction::Quit,
+                label,
+            } => {
                 let menu_item = MenuItem::with_id(MenuId::new(QUIT_ID), label, true, None);
                 let _ = menu.append(&menu_item);
             }

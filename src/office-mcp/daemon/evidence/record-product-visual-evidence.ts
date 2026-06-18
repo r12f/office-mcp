@@ -101,7 +101,7 @@ const powerPointManifestIdentity = readManifestIdentity(powerPointManifestPath);
 
 const productTextReady = requiredSurfaces.filter((surface) => surface !== 'tray_tooltip').every((surface) => typeof observations[surface] === 'string' && (observations[surface] as string).includes(productName));
 const allScreenshotsExist = Object.values(screenshotsExist).every(Boolean);
-const trayTooltipReady = typeof trayTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(trayTooltip);
+const trayTooltipReady = typeof trayTooltip === 'string' && /^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(trayTooltip);
 const catalogTypeReady = productCatalogTypeLooksReady(catalogType);
 const wordFirstRunIdentity = firstRunIdentity(wordManifestIdentity, wordCatalogProvider, wordCatalogDescription, wordCatalogType, catalogType);
 const excelFirstRunIdentity = firstRunIdentity(excelManifestIdentity, excelCatalogProvider, excelCatalogDescription, excelCatalogType, catalogType);
@@ -547,10 +547,10 @@ function manualTrayEvidenceLooksReady(evidence: Record<string, unknown> | undefi
   if (!evidence) return false;
   if (evidence.ok !== true || evidence.schema_version !== 1 || evidence.kind !== 'tray_manual_evidence' || evidence.platform !== 'win32' || evidence.passed !== true) return false;
   if (!manualTrayInteractionLooksReady(evidence) || evidence.tray_menu_surface_native !== true || evidence.tray_menu_surface_kind !== 'native' || evidence.show_ui_opened !== true) return false;
-  if (typeof evidence.observed_tooltip !== 'string' || !/^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(evidence.observed_tooltip)) return false;
+  if (typeof evidence.observed_tooltip !== 'string' || !/^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(evidence.observed_tooltip)) return false;
   if (typeof evidence.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(evidence.screenshot_path))) return false;
   const items = Array.isArray(evidence.observed_menu_items) ? evidence.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];
-  return ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'].every((expected) => items.some((item) => item.includes(expected)))
+  return ['Status:', 'Clients:', 'Documents:', 'Show Office MCP Control', 'Quit Office MCP Control'].every((expected) => items.some((item) => item.includes(expected)))
     && evidence.daemon_context_ready === true
     && daemonContextLooksReady(isRecord(evidence.daemon_context) ? evidence.daemon_context : undefined);
 }
@@ -613,9 +613,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function traySnapshotLooksReady(snapshot: unknown): boolean {
   if (!isRecord(snapshot)) return false;
-  const tooltipReady = typeof snapshot.tooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(snapshot.tooltip);
+  const tooltipReady = typeof snapshot.tooltip === 'string' && /^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(snapshot.tooltip);
   const menuItems = Array.isArray(snapshot.menu_items) ? snapshot.menu_items.filter((item): item is string => typeof item === 'string') : [];
-  const menuReady = ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP']
+  const menuReady = ['Status:', 'Clients:', 'Documents:', 'Show Office MCP Control', 'Quit Office MCP Control']
     .every((expected) => menuItems.some((item) => item.includes(expected)));
   return tooltipReady && menuReady;
 }

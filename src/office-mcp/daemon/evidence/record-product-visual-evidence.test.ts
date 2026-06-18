@@ -246,7 +246,7 @@ test('product visual evidence recorder derives tray surfaces from manual tray ar
       const key = surface.replaceAll('-', '_');
       assert.equal(screenshotPaths[key], manualPaths[key]);
       assert.equal(screenshotsExist[key], true);
-      if (key === 'tray_tooltip') assert.equal(observations[key], 'Office MCP - Up - 0 clients - 0 documents');
+      if (key === 'tray_tooltip') assert.equal(observations[key], 'Office MCP Control - Up - 0 clients - 0 documents');
       else assert.match(observations[key], /Office MCP Control manual tray evidence/);
     }
     assert.equal(evidence.product_text_ready, true);
@@ -605,7 +605,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     '--output', output,
     ...(explicitCatalogType ? [] : ['--catalog-type', 'Local productivity automation control utility']),
     '--catalog-icon-visible', 'true',
-    '--tray-tooltip', 'Office MCP - Up - 0 clients - 0 documents',
+    '--tray-tooltip', 'Office MCP Control - Up - 0 clients - 0 documents',
     '--tray-icon-visible', 'true',
     '--tray-menu-native', 'true',
     ...(explicitTrayMenuSurfaceKind ? [] : ['--tray-menu-surface-kind', 'native']),
@@ -696,7 +696,7 @@ function outputText(value: string | Buffer): string {
   return typeof value === 'string' ? value : value.toString('utf8');
 }
 
-function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']): string {
+function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control']): string {
   const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
   writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk, menuItems));
   chmodSync(daemonBin, 0o755);
@@ -883,8 +883,8 @@ function writeManualTrayEvidence(dir: string, ready = true): string {
     tray_menu_surface_kind: ready ? 'native' : 'webview',
     tray_menu_surface_native: ready,
     show_ui_opened: ready,
-    observed_menu_items: ready ? ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP'] : ['Status: Up'],
-    observed_tooltip: 'Office MCP - Up - 0 clients - 0 documents',
+    observed_menu_items: ready ? ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP Control', 'Quit Office MCP Control'] : ['Status: Up'],
+    observed_tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
     screenshot_path: screenshotPath,
     tray_surface_screenshot_paths: traySurfaceScreenshotPaths,
     tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
@@ -941,8 +941,8 @@ function manualTrayDaemonContext(ready = true) {
       native_host: ready,
       state_fetch_ok: ready,
       snapshot: {
-        tooltip: 'Office MCP - Up - 0 clients - 0 documents',
-        menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']
+        tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
+        menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control']
       }
     }
   };
@@ -954,15 +954,15 @@ function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[]): string {
     native_host: true,
     state_fetch_ok: stateFetchOk,
     snapshot: {
-      tooltip: 'Office MCP - Up - 0 clients - 0 documents',
+      tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
       menu_items: menuItems,
       menu: [
         { kind: 'read_only', enabled: false, label: 'Status: Up' },
         { kind: 'read_only', enabled: false, label: 'Clients: 0' },
         { kind: 'read_only', enabled: false, label: 'Documents: 0' },
         { kind: 'separator', enabled: false, label: '---' },
-        { kind: 'action', enabled: true, label: 'Show Office MCP', action: 'show_ui' },
-        { kind: 'action', enabled: true, label: 'Quit Office MCP', action: 'quit' }
+        { kind: 'action', enabled: true, label: 'Show Office MCP Control', action: 'show_ui' },
+        { kind: 'action', enabled: true, label: 'Quit Office MCP Control', action: 'quit' }
       ]
     }
   });

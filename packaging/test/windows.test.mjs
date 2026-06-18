@@ -25,8 +25,8 @@ test('Windows tray controller exposes required notification-area menu', () => {
   assert.match(rustTrayModel, /Clients:/);
   assert.match(rustTrayModel, /Documents:/);
   assert.match(rustTrayModel, /current_tasks/);
-  assert.match(rustTrayModel, /Show Office MCP/);
-  assert.match(rustTrayModel, /Quit Office MCP/);
+  assert.match(rustTrayModel, /Show Office MCP Control/);
+  assert.match(rustTrayModel, /Quit Office MCP Control/);
   assert.match(rustTrayModel, /Keep Running/);
   assert.match(rustTrayModel, /running tasks/);
   assert.doesNotMatch(script, /node\.exe/);

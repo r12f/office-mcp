@@ -122,21 +122,21 @@ review the result like a normal collaborator's edits.
 - [x] User-visible daemon UI server entry point. Running `office-mcp-daemon
       daemon run` must make the daemon web console discoverable and openable by
       a normal user without manually guessing `https://localhost:<port>/ui/`.
-      Required entry points: `office-mcp-daemon ui`, tray `Show Office MCP`, and
+      Required entry points: `office-mcp-daemon ui`, tray `Show Office MCP Control`, and
       a documented URL in `daemon status` output. Current Rust evidence covers
-      the `office-mcp-daemon ui` runtime-file path, tray `Show Office MCP`
+      the `office-mcp-daemon ui` runtime-file path, tray `Show Office MCP Control`
       dispatch, `daemon status` output including `uiUrl`, `stateUrl`, `logPath`,
       and `uiCommand`, and `ui.production_daemon_tray` proving production
       `daemon run` publishes a reachable UI runtime URL.
 - [x] Real desktop tray icon. The current Rust tray model/probe is not enough;
       the product must create a visible Windows notification-area icon during a
       normal daemon/tray launch, with right-click menu items for Up/Down, client
-      count, document count, Show Office MCP, and Quit Office MCP. Current
+      count, document count, Show Office MCP Control, and Quit Office MCP Control. Current
       automated evidence covers production `daemon run` starting the native
       Windows tray host, logging `created native tray icon` for
       `windows-notification-area`, and `tray --probe` reading the live daemon UI
-      state with `Status: Up`, client count, document count, Show Office MCP,
-      and Quit Office MCP menu items. Manual right-click visibility remains
+      state with `Status: Up`, client count, document count, Show Office MCP Control,
+      and Quit Office MCP Control menu items. Manual right-click visibility remains
       tracked under M6.5.0.
 - [x] Daemon main window with status, endpoints, connected MCP clients, grouped
       document sessions, current tasks, and recent command history must be
@@ -144,7 +144,7 @@ review the result like a normal collaborator's edits.
       evidence fixture. Current evidence validates rendering behavior through
       `ui.browser_smoke`; production reachability is covered by
       `ui.production_daemon_tray`, `office-mcp-daemon ui`, `daemon status`, and
-      tray `Show Office MCP` dispatch.
+      tray `Show Office MCP Control` dispatch.
 - [x] Per-document detail expansion showing the most recent 10 commands and
       success/failure details. Current evidence: `npm run check:ui` verifies
       collapsed/expanded document detail panels and per-document command
@@ -202,14 +202,14 @@ User-reported follow-up from live daemon testing:
       exposes live UI state, and logs native notification-area icon creation.
       Manual Windows interaction evidence remains required for right-click menu
       visibility.
-- [x] Wire tray `Show Office MCP` to the same UI-opening path as
+- [x] Wire tray `Show Office MCP Control` to the same UI-opening path as
       `office-mcp-daemon ui`. Covered by `open_ui_from_runtime` and the native
       tray menu action dispatch.
-- [x] Wire tray `Quit Office MCP` to graceful daemon shutdown and visible menu
+- [x] Wire tray `Quit Office MCP Control` to graceful daemon shutdown and visible menu
       confirmation. Covered by `stop_daemon`, `confirm_quit`, and
       `native_tray_quit_uses_platform_confirmation_dialogs`.
 - [ ] Add manual/e2e evidence that verifies a visible tray icon exists on
-      Windows, the right-click menu appears, and `Show Office MCP` opens the
+      Windows, the right-click menu appears, and `Show Office MCP Control` opens the
       daemon UI. Automated evidence now covers native tray icon creation logs
       and the live menu model through `ui.production_daemon_tray`; this item
       remains open until a visible desktop interaction run verifies the icon and
@@ -484,7 +484,7 @@ Latest UI feedback to preserve in implementation planning:
       surface in the normal daemon launch path. Right-click must open a real
       OS-native notification-area context menu with native separators,
       disabled/read-only status rows, hover/selection behavior, keyboard access,
-      tooltip text, `Show Office MCP`, `Quit Office MCP`, and native quit
+      tooltip text, `Show Office MCP Control`, `Quit Office MCP Control`, and native quit
       confirmation. A webview, frameless HTML panel, CSS popup, or toolkit-demo
       menu fails this item even if automated probes pass. The visual evidence
       must prove the menu is opened from the visible tray icon and looks native
@@ -654,7 +654,7 @@ Latest UI feedback to preserve in implementation planning:
 - [ ] Capture tray product polish evidence from a normal interactive Windows
       launch. The artifact must show the notification-area icon, product
       tooltip, right-click native menu opened from the actual tray icon, native
-      separator/read-only row behavior, `Show Office MCP`, `Quit Office MCP`,
+      separator/read-only row behavior, `Show Office MCP Control`, `Quit Office MCP Control`,
       and the native quit confirmation dialog. The tray must use the generated
       product glyph and product-consistent labels, with no missing/default icon,
       debug wording, browser/webview menu, frameless HTML panel, or custom-drawn
@@ -815,7 +815,7 @@ module so ownership is visible from the directory tree.
       registration, heartbeat, session registry, command router, image fetch
       preprocessing for add-in calls, and stale-session handling.
 - [x] Create `src/office-mcp/daemon/src/tray/` for tray/menu-bar code: tray
-      controller, native tray host, menu model, `Show Office MCP`, and graceful
+      controller, native tray host, menu model, `Show Office MCP Control`, and graceful
       quit confirmation.
 - [x] Keep root files minimal: `main.rs` owns CLI dispatch, `lib.rs` exposes
       module wiring, and any top-level daemon composition file only wires

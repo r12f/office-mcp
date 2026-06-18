@@ -216,7 +216,7 @@ function validateManualTrayEvidence(): void {
     ['native_quit_confirmation_reviewed', 'native quit confirmation review'],
     ['native_tray_interaction_ready', 'native tray interaction ready flag'],
     ['tray_menu_surface_native', 'native tray menu surface'],
-    ['show_ui_opened', 'Show Office MCP opened UI'],
+    ['show_ui_opened', 'Show Office MCP Control opened UI'],
     ['passed', 'manual tray evidence passed']
   ] as const) {
     if (manual[key] !== true) failures.push(`Manual tray evidence missing ${label}.`);
@@ -340,7 +340,7 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
     ['native_quit_confirmation_reviewed', 'native quit confirmation review'],
     ['native_tray_interaction_ready', 'native tray interaction ready flag'],
     ['tray_menu_surface_native', 'native tray menu surface'],
-    ['show_ui_opened', 'Show Office MCP opened UI'],
+    ['show_ui_opened', 'Show Office MCP Control opened UI'],
     ['passed', 'manual tray evidence passed']
   ] as const) {
     if (manual[key] !== true) failures.push(`Embedded manual tray evidence missing ${label}.`);
@@ -755,7 +755,7 @@ function validateManualTrayDaemonContext(context: unknown): void {
 
 
 function validateTrayMenuLabels(menuItems: string[], label: string): void {
-  for (const expected of ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP']) {
+  for (const expected of ['Status:', 'Clients:', 'Documents:', 'Show Office MCP Control', 'Quit Office MCP Control']) {
     if (!menuItems.some((item) => item.includes(expected))) {
       failures.push(`${label} missing menu item: ${expected}`);
     }
@@ -776,8 +776,8 @@ function validateStructuredTraySnapshot(snapshot: unknown, label: string): void 
     { kind: 'read_only', enabled: false, label: /^Clients: \d+$/ },
     { kind: 'read_only', enabled: false, label: /^Documents: \d+$/ },
     { kind: 'separator', enabled: false, label: /^---$/ },
-    { kind: 'action', enabled: true, label: /^Show Office MCP$/, action: 'show_ui' },
-    { kind: 'action', enabled: true, label: /^Quit Office MCP$/, action: 'quit' }
+    { kind: 'action', enabled: true, label: /^Show Office MCP Control$/, action: 'show_ui' },
+    { kind: 'action', enabled: true, label: /^Quit Office MCP Control$/, action: 'quit' }
   ];
   if (menu.length !== expected.length) {
     failures.push(`${label} tray menu has ${menu.length} structured items, expected ${expected.length}.`);
@@ -797,7 +797,7 @@ function validateStructuredTraySnapshot(snapshot: unknown, label: string): void 
 }
 
 function trayTooltipLooksProductReady(value: string): boolean {
-  return /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(value);
+  return /^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(value);
 }
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

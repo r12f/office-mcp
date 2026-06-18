@@ -847,7 +847,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     catalog_identity_review: catalogIdentityReview(passed),
     catalog_identity_review_ready: passed,
     catalog_icon_visible: passed,
-    tray_tooltip: 'Office MCP - Up - 0 clients - 0 documents',
+    tray_tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
     tray_tooltip_ready: passed,
     tray_icon_visible: passed,
     tray_menu_native: passed,
@@ -1142,9 +1142,9 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     tray_menu_surface_kind: passed ? 'native' : 'webview',
     tray_menu_surface_native: passed,
     show_ui_opened: passed,
-    observed_menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP'],
-    observed_tooltip: 'Office MCP - Up - 0 clients - 0 documents',
-    expected_menu_items: ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'],
+    observed_menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP Control', 'Quit Office MCP Control'],
+    observed_tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
+    expected_menu_items: ['Status:', 'Clients:', 'Documents:', 'Show Office MCP Control', 'Quit Office MCP Control'],
     menu_contains_required_items: passed,
     screenshot_path: screenshotPath,
     tray_surface_screenshot_paths: traySurfaceScreenshotPaths(screenshotPath),
@@ -1173,7 +1173,7 @@ function trayVisualSurfaces(): string[] {
   ];
 }
 
-function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP'], stateFetchOk = true) {
+function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control'], stateFetchOk = true) {
   return {
     binary_path: 'C:\\Code\\office-mcp\\target\\debug\\office-mcp-daemon.exe',
     status: {
@@ -1189,7 +1189,7 @@ function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Docum
       snapshot: {
         menu_items: menuItems,
         menu: structuredMenu(menuItems),
-        tooltip: 'Office MCP - Up - 0 clients - 0 documents',
+        tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
         platform: 'windows-notification-area'
       }
     }
@@ -1233,8 +1233,8 @@ function excelOnlyReport() {
 function structuredMenu(menuItems: string[]) {
   return menuItems.map((label, index) => {
     if (label === '---') return { kind: 'separator', label, enabled: false };
-    if (label === 'Show Office MCP') return { kind: 'action', label, action: 'show_ui', enabled: true };
-    if (label === 'Quit Office MCP') return { kind: 'action', label, action: 'quit', enabled: true };
+    if (label === 'Show Office MCP Control') return { kind: 'action', label, action: 'show_ui', enabled: true };
+    if (label === 'Quit Office MCP Control') return { kind: 'action', label, action: 'quit', enabled: true };
     return { kind: 'read_only', label, enabled: false };
   });
 }

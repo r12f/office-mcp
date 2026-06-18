@@ -157,7 +157,7 @@ module boundaries are:
   `SessionRegistry`, per-session `CommandRouter`, stale-session handling, and
   forwarding tool invocations to connected Office add-ins.
 - `tray`: native tray/menu-bar integration, tray menu model, platform adapters,
-  `Show Office MCP`, and graceful quit confirmation. It consumes `api`/`ui`
+  `Show Office MCP Control`, and graceful quit confirmation. It consumes `api`/`ui`
   surfaces rather than reading add-in or MCP internals directly.
 - Root files such as `main.rs`, `lib.rs`, and top-level daemon composition own
   CLI dispatch and dependency wiring only.
