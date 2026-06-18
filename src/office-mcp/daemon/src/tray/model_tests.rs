@@ -82,6 +82,36 @@ fn tray_status_can_be_derived_from_redacted_ui_state() {
 }
 
 #[test]
+fn tray_document_count_excludes_stale_and_reconnecting_sessions() {
+    let ui_state = serde_json::json!({
+        "daemon": { "status": "up" },
+        "clients": [],
+        "documents": {
+            "word": [
+                { "session_id": "word-active", "status": "active" },
+                { "session_id": "word-stale", "status": "stale" }
+            ],
+            "excel": [
+                { "session_id": "excel-reconnecting", "status": "reconnecting" },
+                { "session_id": "excel-legacy-no-status" }
+            ],
+            "powerpoint": []
+        },
+        "current_tasks": []
+    });
+
+    let input = TrayStatusInput::from_ui_state(Some(&ui_state));
+    let snapshot = TraySnapshot::from_input(TrayPlatform::WindowsNotificationArea, input);
+
+    assert_eq!(snapshot.menu[2].label(), Some("Documents: 2"));
+    assert_eq!(
+        snapshot.tooltip,
+        "Office MCP - Up - 0 clients - 2 documents"
+    );
+    assert!(snapshot.quit_confirmation.body.contains("2 documents"));
+}
+
+#[test]
 fn tray_product_surface_has_no_scaffold_or_debug_labels() {
     let snapshot = TraySnapshot::from_input(
         TrayPlatform::WindowsNotificationArea,

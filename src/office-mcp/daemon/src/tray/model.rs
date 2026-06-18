@@ -249,9 +249,21 @@ fn document_count(value: Option<&serde_json::Value>) -> usize {
             groups
                 .values()
                 .filter_map(serde_json::Value::as_array)
-                .map(Vec::len)
+                .map(|sessions| {
+                    sessions
+                        .iter()
+                        .filter(|session| document_session_counts_as_connected(session))
+                        .count()
+                })
                 .sum()
         })
+}
+
+fn document_session_counts_as_connected(session: &serde_json::Value) -> bool {
+    session
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        .is_none_or(|status| status.eq_ignore_ascii_case("active"))
 }
 
 #[cfg(test)]
