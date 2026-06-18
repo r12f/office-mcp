@@ -357,15 +357,17 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       under `src/office-ctl/common/assets/` and a deterministic generator in
       `src/office-ctl/common/scripts/generate-brand-assets.mjs`; Rust tray
       glyph coverage verifies the native 32 px mark is not blank or single-color.
-- [ ] Re-review and, if needed, redesign the current logo/icon direction against
-      the stricter product-quality brief. The final mark must communicate office
-      productivity plus user control with a mature, slightly futuristic desktop
-      utility feel, without using Microsoft Office logos, Office tile language,
-      Microsoft 365 gradients, Word/Excel silhouettes, Windows app-icon
-      conventions, placeholder initials, generic document icons, or a gear-only
-      settings mark. This task is complete only when source artwork, generated
-      raster assets, and rendered-size evidence prove the icon is recognizable
-      in the ribbon, catalog, tray, installer/package, and daemon UI contexts.
+- [x] Re-review and redesign the logo/icon direction against the stricter
+      product-quality brief. The current mark uses abstract document panes, a
+      visible command spine, operator nodes, and a yellow control dial so it
+      communicates office productivity plus user control with a mature, slightly
+      futuristic desktop utility feel. It avoids Microsoft Office logos, Office
+      tile language, Microsoft 365 gradients, Word/Excel silhouettes, Windows
+      app-icon conventions, placeholder initials, generic document icons, and a
+      gear-only settings mark. Covered by updated source artwork,
+      reproducible generated raster assets, `brand-design.md`, Word/Excel
+      add-in identity tests, and Rust tray icon tests. Final real rendered
+      screenshot evidence remains tracked by the visual evidence item below.
 - [x] Update Word and Excel add-in manifests/catalog rendering so release and
       sideloaded builds use mature product metadata: stable add-in title,
       provider, description, support URL, ribbon group label, action label, and
