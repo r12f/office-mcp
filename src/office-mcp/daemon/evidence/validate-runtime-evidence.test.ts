@@ -212,6 +212,41 @@ test('runtime evidence validator can require product visual evidence', () => {
 
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
+      const passing = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      passing.screenshot_paths.logo_ribbon_size = passing.screenshot_paths.logo_tray_size;
+      passing.screenshot_paths.logo_catalog_thumbnail = passing.screenshot_paths.logo_tray_size;
+      passing.screenshot_paths.logo_daemon_titlebar = passing.screenshot_paths.logo_tray_size;
+      passing.screenshot_paths.logo_installer_metadata = passing.screenshot_paths.logo_tray_size;
+      writeFileSync(visualPath, JSON.stringify(passing, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.equal(result.status, 0, outputText(result.stdout) + outputText(result.stderr));
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.screenshot_paths.excel_ribbon_command = broken.screenshot_paths.word_ribbon_command;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /reuses one live screenshot for distinct surfaces: word_ribbon_command and excel_ribbon_command/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.screenshot_paths.tray_native_menu = broken.screenshot_paths.tray_icon;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /reuses one live screenshot for distinct surfaces: tray_icon and tray_native_menu/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.observations.word_ribbon_command = 'Raw task pane';
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));

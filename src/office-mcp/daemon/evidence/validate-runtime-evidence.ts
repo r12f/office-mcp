@@ -219,6 +219,7 @@ function validateProductVisualEvidence(): void {
     failures.push('Product visual evidence missing local productivity automation/control type metadata.');
   }
   validateProductVisualScreenshots(visual.screenshot_paths);
+  validateDistinctProductVisualScreenshots(visual.screenshot_paths);
   validateProductVisualObservations(visual.observations);
   validateProductIdentityReview(visual.product_identity_review);
   validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
@@ -358,6 +359,22 @@ function validateProductVisualScreenshots(paths: unknown): void {
   }
 }
 
+function validateDistinctProductVisualScreenshots(paths: unknown): void {
+  if (!isRecord(paths)) return;
+  const seenByPath = new Map<string, string>();
+  for (const surface of distinctProductVisualSurfaces()) {
+    const path = paths[surface];
+    if (typeof path !== 'string') continue;
+    const normalized = normalizeScreenshotPath(path);
+    const previous = seenByPath.get(normalized);
+    if (previous) {
+      failures.push(`Product visual evidence reuses one live screenshot for distinct surfaces: ${previous} and ${surface}.`);
+      continue;
+    }
+    seenByPath.set(normalized, surface);
+  }
+}
+
 function validateProductVisualObservations(observations: unknown): void {
   if (!isRecord(observations)) {
     failures.push('Product visual evidence observations are malformed.');
@@ -468,6 +485,26 @@ function productVisualSurfaces(): string[] {
     'tray_tooltip',
     'tray_quit_confirmation'
   ];
+}
+
+function distinctProductVisualSurfaces(): string[] {
+  return [
+    'word_ribbon_command',
+    'word_catalog_entry',
+    'word_taskpane_title',
+    'excel_ribbon_command',
+    'excel_catalog_entry',
+    'excel_taskpane_title',
+    'tray_icon',
+    'tray_native_menu',
+    'tray_tooltip',
+    'tray_quit_confirmation'
+  ];
+}
+
+function normalizeScreenshotPath(path: string): string {
+  const absolute = resolve(path);
+  return process.platform === 'win32' ? absolute.toLowerCase() : absolute;
 }
 
 function renderedLogoReviewSurfaces(): Array<[string, number]> {
