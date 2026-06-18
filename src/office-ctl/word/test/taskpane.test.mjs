@@ -39,12 +39,12 @@ test('Word add-in uses product identity metadata and generated icons', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const assetRoot = join(ADDIN_ROOT, '..', 'common', 'assets');
 
-  assert.match(manifest, /<ProviderName>Office MCP Project<\/ProviderName>/);
+  assert.match(manifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
   assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
   assert.match(manifest, /Control live Word documents through a local MCP automation console\./);
   assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP" \/>/);
-  assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Control Panel" \/>/);
-  assert.match(manifest, /Office MCP control panel for this document/);
+  assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Open Control Panel" \/>/);
+  assert.match(manifest, /Office MCP Control for this document/);
   assert.doesNotMatch(manifest, /DefaultValue="office-mcp"/);
   assert.doesNotMatch(manifest, /DefaultValue="Open"/);
   assert.match(html, /<title>Office MCP Control<\/title>/);
@@ -109,13 +109,13 @@ test('Office catalog registration script stages Word and Excel manifests without
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
     assert.match(wordManifest, /<OfficeApp/);
     assert.match(wordManifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
-    assert.match(wordManifest, /DefaultValue="Control Panel"/);
+    assert.match(wordManifest, /DefaultValue="Open Control Panel"/);
     assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.8/);
     assert.match(wordManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
     assert.match(wordManifest, /https:\/\/localhost:8766\/assets\/icon-80\.png/);
     assert.match(excelManifest, /<OfficeApp/);
     assert.match(excelManifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
-    assert.match(excelManifest, /DefaultValue="Control Panel"/);
+    assert.match(excelManifest, /DefaultValue="Open Control Panel"/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.7/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-80\.png/);

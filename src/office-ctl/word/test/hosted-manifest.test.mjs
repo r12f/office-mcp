@@ -36,7 +36,7 @@ test('hosted manifest renderer emits public office-mcp.dev URLs', () => {
     assert.match(xml, /<Id>22222222-aaaa-bbbb-cccc-333333333333<\/Id>/);
     assert.match(xml, /<Version>1\.2\.3\.4<\/Version>/);
     assert.match(xml, /<DisplayName DefaultValue="Office MCP Control" \/>/);
-    assert.match(xml, /DefaultValue="Control Panel"/);
+    assert.match(xml, /DefaultValue="Open Control Panel"/);
     assert.match(xml, /https:\/\/office-mcp\.dev\/taskpane\.html\?v=1\.2\.3/);
     assert.match(xml, /https:\/\/office-mcp\.dev\/assets\/icon-32\.png/);
     assert.match(xml, /https:\/\/office-mcp\.dev\/assets\/icon-80\.png/);

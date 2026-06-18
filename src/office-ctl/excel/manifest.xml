@@ -6,7 +6,7 @@
   xsi:type="TaskPaneApp">
   <Id>33333333-aaaa-bbbb-cccc-444444444444</Id>
   <Version>1.0.0.6</Version>
-  <ProviderName>Office MCP Project</ProviderName>
+  <ProviderName>Office MCP Control</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Office MCP Control" />
   <Description DefaultValue="Control live Excel workbooks through a local MCP automation console." />
@@ -82,11 +82,11 @@
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Office MCP Control is ready" />
         <bt:String id="OfficeMcp.GroupLabel" DefaultValue="Office MCP" />
-        <bt:String id="OfficeMcp.OpenPane.Label" DefaultValue="Control Panel" />
+        <bt:String id="OfficeMcp.OpenPane.Label" DefaultValue="Open Control Panel" />
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="Open the control panel to connect this Excel workbook to the local MCP daemon." />
-        <bt:String id="OfficeMcp.OpenPane.Tooltip" DefaultValue="Open the Office MCP control panel for this workbook." />
+        <bt:String id="OfficeMcp.OpenPane.Tooltip" DefaultValue="Open Office MCP Control for this workbook." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

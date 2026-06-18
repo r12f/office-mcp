@@ -24,12 +24,12 @@ test('Excel add-in uses product identity metadata and generated icon URLs', () =
   const manifest = readFileSync(join(ADDIN_ROOT, 'manifest.xml'), 'utf8');
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
 
-  assert.match(manifest, /<ProviderName>Office MCP Project<\/ProviderName>/);
+  assert.match(manifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
   assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
   assert.match(manifest, /Control live Excel workbooks through a local MCP automation console\./);
   assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP" \/>/);
-  assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Control Panel" \/>/);
-  assert.match(manifest, /Office MCP control panel for this workbook/);
+  assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Open Control Panel" \/>/);
+  assert.match(manifest, /Office MCP Control for this workbook/);
   assert.match(manifest, /https:\/\/localhost:8765\/assets\/icon-32\.png/);
   assert.match(manifest, /https:\/\/localhost:8765\/assets\/icon-80\.png/);
   assert.doesNotMatch(manifest, /DefaultValue="office-mcp(?: for Excel)?"/);

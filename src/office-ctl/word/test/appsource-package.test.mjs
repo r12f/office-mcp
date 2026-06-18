@@ -34,7 +34,7 @@ test('AppSource package builder emits submission artifacts without loopback URLs
 
     const manifest = readFileSync(join(dir, 'manifest-1.2.3.xml'), 'utf8');
     assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
-    assert.match(manifest, /DefaultValue="Control Panel"/);
+    assert.match(manifest, /DefaultValue="Open Control Panel"/);
     assert.match(manifest, /https:\/\/office-mcp\.dev\/taskpane\.html\?v=1\.2\.3/);
     assert.doesNotMatch(manifest, /localhost|127\.0\.0\.1/);
 

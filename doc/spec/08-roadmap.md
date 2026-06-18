@@ -328,11 +328,13 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       futuristic desktop utility style. The first implemented identity is the
       Office MCP Control mark: abstract document panes plus a control node,
       generated from `src/office-ctl/common/assets/brand-mark.svg`.
-- [ ] Add an explicit brand guard so generated/source assets cannot regress to
+- [x] Add an explicit brand guard so generated/source assets cannot regress to
       Microsoft Office-owned visual marks, placeholder initials, generic gear
-      icons, or single-color debug glyphs. The guard should verify the source
-      logo exists, generated icons are non-empty and multi-color, and manifests
-      never reference Office product logos as the add-in identity.
+      icons, or single-color debug glyphs. Covered by
+      `product-identity.test.mjs`, which verifies the source logo exists, PNG
+      app icons are non-empty and multi-color, and Word/Excel manifests do not
+      reference Office product logos, placeholder labels, generic `Open`, or
+      debug/prototype wording as the add-in identity.
 - [x] Add reproducible brand assets: source artwork, generated 16/20/24/32/48/
       64/128/256 px app icons, Office add-in command icons, and a monochrome
       tray/menu-bar glyph that remains legible at 16 px in light, dark, and
@@ -346,11 +348,12 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       product icons. Placeholder labels such as `office-mcp`, generic `Open`,
       blank icons, or debug/experimental naming fail this item. Covered by Word
       and Excel task pane tests plus catalog renderer assertions.
-- [ ] Tighten add-in product metadata and chrome so the title, icon, provider,
+- [x] Tighten add-in product metadata and chrome so the title, icon, provider,
       ribbon group, action label, catalog entry, and task pane header read as a
-      stable product. Labels must avoid raw implementation names, lowercase
-      project slugs, vague commands such as `Open`, missing add-in type/context,
-      or wording that looks like a prototype/debug build.
+      stable product. Word and Excel manifests now use `Office MCP Control` as
+      provider/display identity, `Open Control Panel` as the action label, and
+      host-specific product tooltips. Static tests reject raw implementation
+      slugs, vague commands such as `Open`, and prototype/debug wording.
 - [x] Update task pane visible title/chrome and any in-app product references
       to match the new identity while keeping host-specific Word/Excel accents
       restrained and secondary. Word and Excel task panes now use `Office MCP
@@ -382,8 +385,9 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       presence, plus manual Windows evidence showing the ribbon command icon,
       add-in title, visible tray glyph, and native right-click menu. Automated
       tests now cover metadata/icon substitution, generated asset dimensions,
-      static asset serving, packaging presence, and tray glyph generation; the
-      remaining open portion is live Windows ribbon/tray visual evidence.
+      PNG palette checks, source logo guardrails, static asset serving,
+      packaging presence, and tray glyph generation; the remaining open portion
+      is live Windows ribbon/tray visual evidence.
 - [ ] Capture visual evidence for the finished identity on Windows: Word ribbon
       command, Word catalog entry, Word task pane title/icon, Excel equivalents,
       visible notification-area tray icon, native right-click menu, and tray
