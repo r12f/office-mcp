@@ -346,6 +346,10 @@ code,
   background: transparent;
 }
 
+.settings-panel[hidden] {
+  display: none;
+}
+
 .settings-panel h2 {
   display: none;
 }

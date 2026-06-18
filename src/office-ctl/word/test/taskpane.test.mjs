@@ -228,6 +228,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(css, /\.summary-panel/);
   assert.match(css, /\.tool-list/);
   assert.match(css, /\.settings-panel/);
+  assert.match(css, /\.settings-panel\[hidden\] \{[\s\S]*display: none;/);
   assert.match(css, /\.tool-permission-row/);
   assert.match(css, /\.tool-toggle/);
   assert.match(css, /\.tool-list:not\(\.is-editing-tools\) \.tool-toggle/);

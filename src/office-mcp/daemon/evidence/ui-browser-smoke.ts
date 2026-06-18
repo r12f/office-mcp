@@ -110,28 +110,8 @@ async function main(): Promise<void> {
     const screenshot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
     if (screenshot.data.length < 1000) throw new Error('UI smoke failed: daemon screenshot is unexpectedly small');
     console.error('taskpane assertions');
-    await setViewport(cdp, 320, 720, true);
-    await cdp.send('Page.navigate', { url: `${runtime.origin}/taskpane.html` });
-    await waitFor(cdp, 'document.querySelector(".taskpane-shell") !== null');
-    await waitFor(
-      cdp,
-      'window.__OFFICE_MCP_TASKPANE_READY__ === true',
-      () => pageDiagnostics.summary()
-    );
-    await assertEval(cdp, 'document.documentElement.scrollWidth <= 320', 'taskpane 320px viewport has no horizontal overflow');
-    await assertEval(cdp, 'document.querySelector("#settingsToggle").getAttribute("aria-label") === "Open Settings"', 'taskpane settings button is named');
-    await assertEval(cdp, 'document.querySelector("#serverVersion") !== null && document.querySelector("#protocolVersion").textContent.trim().length > 0', 'taskpane exposes server and protocol fields');
-    await assertEval(cdp, 'document.querySelector("#hostPlatform") !== null && document.querySelector("#documentState") !== null && document.querySelector("#connectionDetail") !== null', 'taskpane exposes host document and connection detail fields');
-    await assertEval(cdp, 'document.querySelector("#settingsPanel") !== null && document.querySelector("#endpointInput").type === "url" && document.querySelector("#endpointInput").name === "daemonEndpoint"', 'taskpane settings form exposes endpoint URL field');
-    await assertEval(cdp, 'document.querySelector("#endpointInput").placeholder.includes("wss://localhost") && document.querySelector("#endpointError").getAttribute("role") === "alert"', 'taskpane endpoint validation affordances render');
-    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#settingsToggle").focus()' });
-    await pressKey(cdp, 'Enter', 13);
-    await waitFor(cdp, '!document.querySelector("#settingsPanel").hidden && document.activeElement === document.querySelector("#endpointInput")');
-    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#endpointInput").value = "http://127.0.0.1:8765/addin"; document.querySelector("#settingsForm").requestSubmit();' });
-    await waitFor(cdp, 'document.querySelector("#endpointError").textContent.length > 0');
-    await assertEval(cdp, 'document.activeElement === document.querySelector("#endpointInput")', 'invalid endpoint validation focuses endpoint field');
-    const taskpaneScreenshot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
-    if (taskpaneScreenshot.data.length < 1000) throw new Error('UI smoke failed: taskpane screenshot is unexpectedly small');
+    await assertTaskpane(cdp, pageDiagnostics, `${runtime.origin}/word/taskpane.html`, 'Word');
+    await assertTaskpane(cdp, pageDiagnostics, `${runtime.origin}/excel/taskpane.html`, 'Excel');
     console.error('empty-state assertions');
     const emptyRuntimePath = join(mkdtempSync(join(tmpdir(), 'office-mcp-ui-empty-runtime-')), 'ui-runtime.json');
     const emptyDaemon = startRustUiFixture(emptyRuntimePath, cargoTargetDir, 'empty');
@@ -280,6 +260,42 @@ async function setViewport(cdp: CdpClient, width: number, height: number, mobile
 async function pressKey(cdp: CdpClient, key: string, code: number): Promise<void> {
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code });
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code });
+}
+
+async function assertTaskpane(cdp: CdpClient, pageDiagnostics: PageDiagnostics, url: string, hostName: string): Promise<void> {
+  await setViewport(cdp, 320, 720, true);
+  await cdp.send('Page.navigate', { url });
+  await waitFor(cdp, 'document.querySelector(".taskpane-shell") !== null');
+  await waitFor(
+    cdp,
+    'window.__OFFICE_MCP_TASKPANE_READY__ === true',
+    () => pageDiagnostics.summary()
+  );
+  await assertEval(cdp, 'document.documentElement.scrollWidth <= 320', `${hostName} taskpane 320px viewport has no horizontal overflow`);
+  await assertEval(cdp, 'document.querySelector("#settingsToggle").getAttribute("aria-label") === "Open Settings"', `${hostName} taskpane settings button is named`);
+  await assertEval(cdp, 'document.querySelector("#runtimeVersions") !== null && document.querySelector("#runtimeVersions").textContent.includes("Server") && document.querySelector("#runtimeVersions").textContent.includes("Protocol")', `${hostName} taskpane combines server and protocol metadata`);
+  await assertEval(cdp, 'document.querySelectorAll("#serverVersion, #protocolVersion").length === 2 && document.querySelector("#serverVersion").closest("dd") === document.querySelector("#protocolVersion").closest("dd")', `${hostName} taskpane server and protocol share one metadata row`);
+  await assertEval(cdp, 'document.querySelector("#hostPlatform") !== null && document.querySelector("#documentState") !== null && document.querySelector("#connectionDetail") !== null', `${hostName} taskpane exposes host document and connection detail fields`);
+  await assertEval(cdp, '!/Dirty:\\s*unknown|Read-only:\\s*unknown/i.test(document.querySelector("#documentState").textContent)', `${hostName} taskpane avoids unknown dirty/read-only state`);
+  await assertEval(cdp, 'document.querySelector(".tools-panel summary").textContent.includes("Tools") && !document.body.textContent.includes("Available Tools") && !document.body.textContent.includes("Tool Permissions")', `${hostName} taskpane merges available tools and permissions into one surface`);
+  await assertEval(cdp, 'document.querySelectorAll("#toolList").length === 1 && document.querySelectorAll("#toolPermissionList").length === 0 && document.querySelectorAll(".tool-group").length >= 3', `${hostName} taskpane renders one grouped tools surface`);
+  await assertEval(cdp, '[...document.querySelectorAll(".tool-group")].every((group) => group.tagName === "DETAILS" && group.querySelector("summary")?.textContent.includes("Enabled"))', `${hostName} taskpane tool categories are collapsible with enabled counts`);
+  await assertEval(cdp, 'document.querySelector("#settingsPanel") !== null && document.querySelector("#endpointInput").type === "url" && document.querySelector("#endpointInput").name === "daemonEndpoint"', `${hostName} taskpane settings form exposes endpoint URL field`);
+  await assertEval(cdp, 'document.querySelector("#settingsPanel .tool-permissions") === null && document.querySelector("#settingsPanel").getBoundingClientRect().height < 120', `${hostName} taskpane settings stay compact and inline`);
+  await assertEval(cdp, 'document.querySelector("#endpointInput").placeholder.includes("wss://localhost") && document.querySelector("#endpointError").getAttribute("role") === "alert"', `${hostName} taskpane endpoint validation affordances render`);
+  await assertEval(cdp, 'document.querySelector("#settingsPanel").hidden && document.querySelector("#settingsPanel").getBoundingClientRect().height === 0', `${hostName} hidden settings panel does not reserve vertical space`);
+  await assertEval(cdp, '!document.querySelector(".tools-panel").open && document.querySelector(".tools-panel").getBoundingClientRect().height < 48', `${hostName} tools surface stays compact while collapsed`);
+  await assertEval(cdp, 'document.querySelector("#currentTaskHeading").getBoundingClientRect().top < 520 && document.querySelector("#historyHeading").getBoundingClientRect().top < 680', `${hostName} taskpane first viewport shows current and recent task regions`);
+  await assertEval(cdp, '(() => { const shell = document.querySelector(".taskpane-shell"); const rects = [...shell.children].map((child) => child.getBoundingClientRect()); return rects.every((rect, index) => index === 0 || rect.top - rects[index - 1].bottom <= 12); })()', `${hostName} taskpane avoids large vertical gaps between sections`);
+  await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#settingsToggle").focus()' });
+  await pressKey(cdp, 'Enter', 13);
+  await waitFor(cdp, '!document.querySelector("#settingsPanel").hidden && document.activeElement === document.querySelector("#endpointInput")');
+  await assertEval(cdp, 'document.querySelector("#toolList").classList.contains("is-editing-tools")', `${hostName} taskpane enables nearby tool toggles when settings opens`);
+  await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#endpointInput").value = "http://127.0.0.1:8765/addin"; document.querySelector("#settingsForm").requestSubmit();' });
+  await waitFor(cdp, 'document.querySelector("#endpointError").textContent.length > 0');
+  await assertEval(cdp, 'document.activeElement === document.querySelector("#endpointInput")', `${hostName} invalid endpoint validation focuses endpoint field`);
+  const taskpaneScreenshot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
+  if (taskpaneScreenshot.data.length < 1000) throw new Error(`UI smoke failed: ${hostName} taskpane screenshot is unexpectedly small`);
 }
 
 async function waitFor(cdp: CdpClient, expression: string, diagnostics = () => ''): Promise<void> {
