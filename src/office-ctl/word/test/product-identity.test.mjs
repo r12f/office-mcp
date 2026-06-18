@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { inflateSync } from 'node:zlib';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -10,6 +12,13 @@ const WORD_ROOT = join(REPO_ROOT, 'src', 'office-ctl', 'word');
 const EXCEL_ROOT = join(REPO_ROOT, 'src', 'office-ctl', 'excel');
 const ICON_SIZES = [16, 20, 24, 32, 48, 64, 80, 128, 256];
 const PRODUCT_NAME = 'Office MCP Control';
+const RENDERED_REVIEW_SURFACES = [
+  ['logo_tray_size', 16],
+  ['logo_ribbon_size', 32],
+  ['logo_catalog_thumbnail', 80],
+  ['logo_daemon_titlebar', 20],
+  ['logo_installer_metadata', 256]
+];
 const BANNED_IDENTITY_PATTERNS = [
   /DefaultValue="office-mcp/i,
   /DefaultValue="Open"/,
@@ -87,6 +96,45 @@ test('generated brand icons are original non-placeholder assets', () => {
     assert.equal(image.height, size);
     const colors = uniqueOpaqueColors(image.rgba);
     assert.ok(colors.size >= 4, `icon-${size}.png should contain the product palette, not a single-color placeholder`);
+  }
+});
+
+test('rendered-size logo review artifact covers first-contact product surfaces', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-rendered-logo-review-'));
+  try {
+    const output = join(dir, 'logo-rendered-size-review.json');
+    const sheet = join(dir, 'logo-rendered-size-review.png');
+    const result = spawnSync(process.execPath, [
+      join(ASSET_ROOT, '..', 'scripts', 'record-rendered-logo-review.mjs'),
+      '--output', output,
+      '--sheet', sheet
+    ], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+
+    const report = JSON.parse(readFileSync(output, 'utf8'));
+    assert.equal(report.kind, 'rendered_logo_review');
+    assert.equal(report.product_name, PRODUCT_NAME);
+    assert.equal(report.ready, true);
+    assert.equal(report.sheet_path, sheet);
+    assert.equal(report.surfaces.length, RENDERED_REVIEW_SURFACES.length);
+    const sheetImage = parsePngRgba(readFileSync(sheet));
+    assert.equal(sheetImage.width, 320 * RENDERED_REVIEW_SURFACES.length);
+    assert.equal(sheetImage.height, 320);
+
+    for (const [key, size] of RENDERED_REVIEW_SURFACES) {
+      const surface = report.surfaces.find((item) => item.key === key);
+      assert.ok(surface, `${key} is present in rendered logo review`);
+      assert.equal(surface.rendered_size_px, size);
+      assert.equal(surface.width, size);
+      assert.equal(surface.height, size);
+      assert.equal(surface.non_empty, true);
+      assert.equal(surface.palette_ready, true);
+      assert.equal(surface.expected_size_ready, true);
+      assert.ok(surface.opaque_color_count >= 4, `${key} keeps product palette at rendered size`);
+      assert.equal(surface.screenshot_path, sheet);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

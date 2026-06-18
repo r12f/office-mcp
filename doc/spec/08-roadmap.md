@@ -375,7 +375,12 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       user control with a mature, slightly futuristic product feel, not as a
       Microsoft Office clone, generic document, gear/settings icon, debug glyph,
       placeholder tile, or abstract mark unrelated to office control. Store the
-      review screenshots with the product visual evidence artifact.
+      review screenshots with the product visual evidence artifact. Automated
+      support now exists: `record-rendered-logo-review.mjs` renders a repeatable
+      contact-sheet screenshot and JSON report from the generated icon assets,
+      and product identity tests verify the required rendered sizes, non-empty
+      output, and multi-color product palette. This item remains open until that
+      rendered review is included in the final product visual evidence artifact.
 - [x] Update Word and Excel add-in manifests/catalog rendering so release and
       sideloaded builds use mature product metadata: stable add-in title,
       provider, description, support URL, ribbon group label, action label, and
