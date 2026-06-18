@@ -17,7 +17,7 @@ The target source tree is:
 
 ```text
 doc/                 # Specifications and design documentation.
-src/office-ctl/      # TypeScript Office add-ins: common, word, excel.
+src/office-ctl/      # TypeScript Office add-ins: common, word, excel, powerpoint.
 src/office-mcp/
   daemon/            # Rust daemon service, daemon-owned state/API, and daemon UI.
 packaging/           # Installers and release assembly.
@@ -45,18 +45,19 @@ source URLs and activation settings.
 # Word desktop on Windows
 1. Open Word → File → Options → Trust Center → Trusted Add-in Catalogs.
 2. Add a trusted catalog path (a network share or local folder).
-3. Drop the Word and Excel manifest XML files in that folder.
-4. Restart Word.
+3. Drop the Word, Excel, and PowerPoint manifest XML files in that folder.
+4. Restart the target Office host.
 5. Insert → My Add-ins → Shared Folder → office-mcp → Add.
 ```
 
 The MSI optionally creates `%LOCALAPPDATA%\office-mcp\addin-catalog\` and
 pre-registers it as a trusted catalog (with the user's explicit consent at
 install time). Host manifests live directly under the catalog root with stable
-file names such as `addin-catalog\office-mcp-word.xml` and
-`addin-catalog\office-mcp-excel.xml` so Word and Excel can both appear in
-Office's Shared Folder add-in picker without relying on recursive catalog
-scanning.
+file names such as `addin-catalog\office-mcp-word.xml`,
+`addin-catalog\office-mcp-excel.xml`, and
+`addin-catalog\office-mcp-powerpoint.xml` so Word, Excel, and PowerPoint can
+appear in Office's Shared Folder add-in picker without relying on recursive
+catalog scanning.
 
 The shared-folder catalog must present the same product identity users see in
 the ribbon and task pane: polished product title, product icon, provider,
@@ -280,7 +281,8 @@ The production MSI remains the release packaging target:
    - Installs the generated product logo, tray icon, add-in command icons, and
      main-window UI assets.
    - Verifies the installed add-in catalog resolves product metadata and icon
-     paths for Word and Excel before declaring installation complete.
+     paths for Word, Excel, and PowerPoint before declaring installation
+     complete once each host is packaged.
    - Installs the static add-in bundle beside the daemon.
    - Exports a current-user trusted localhost certificate on first daemon start;
      it does not import root certificates.
@@ -288,8 +290,9 @@ The production MSI remains the release packaging target:
      `OFFICE_MCP_CONFIG_PATH`.
    - Registers an autostart entry for the daemon launcher.
    - Registers an add-in trusted catalog folder under
-     `%LOCALAPPDATA%\office-mcp\addin-catalog\` and drops the Word and Excel
-     manifests directly under that catalog root.
+     `%LOCALAPPDATA%\office-mcp\addin-catalog\` and drops the Word, Excel, and
+     PowerPoint manifests directly under that catalog root once each host is
+     packaged.
    - Future production builds should start the daemon once so the user does not
      have to log out / log in for the daemon to come up.
    - Future production builds should make the tray icon visible immediately

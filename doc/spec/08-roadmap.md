@@ -503,25 +503,27 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       snapshot.
 - [ ] Capture visual evidence for the finished identity on Windows: Word ribbon
       command, Word catalog entry including type/category and icon, Word task
-      pane title/icon, Excel equivalents, visible notification-area tray icon,
-      native right-click menu opened from that icon, and tray tooltip/
-      confirmation dialog. The evidence must be recorded with
+      pane title/icon, Excel equivalents, PowerPoint ribbon command,
+      PowerPoint catalog entry including type/category and icon, PowerPoint task
+      pane title/icon, visible notification-area tray icon, native right-click
+      menu opened from that icon, and tray tooltip/confirmation dialog. The
+      evidence must be recorded with
       `npm run evidence:record-product-visual -- --daemon-bin <path>`, tied to
       the same local daemon build under test, validated with
       `--require-product-visual`, and stored as release-checkable artifacts.
       Screenshot artifacts must be real, complete image files; truncated image
       headers are rejected by both the recorder and validator.
 
-**Exit criterion**: Word and Excel show a mature product add-in name and icon in
-the ribbon/catalog; the add-in title, icon, provider, command label,
-description, and type/category read as one finished product; the task pane title
-and chrome match the product identity; the logo communicates office productivity
-and user control with a mature, slightly futuristic feel without using Office
-owned marks; the tray has a visible original glyph, native tooltip, native
-right-click menu opened from the actual notification-area icon, native quit
-confirmation, and product-consistent labels; packaged builds carry the same
-assets without blank placeholders, generic debug names, or Microsoft-owned
-marks.
+**Exit criterion**: Word, Excel, and PowerPoint show a mature product add-in
+name and icon in the ribbon/catalog once each host is packaged; the add-in
+title, icon, provider, command label, description, and type/category read as one
+finished product; the task pane title and chrome match the product identity; the
+logo communicates office productivity and user control with a mature, slightly
+futuristic feel without using Office owned marks; the tray has a visible
+original glyph, native tooltip, native right-click menu opened from the actual
+notification-area icon, native quit confirmation, and product-consistent labels;
+packaged builds carry the same assets without blank placeholders, generic debug
+names, or Microsoft-owned marks.
 
 ### M6.6 — Rust native daemon migration
 
@@ -723,6 +725,43 @@ new tool namespace `excel.*`. Catalog (rough): `excel.read_range`,
 Similar pattern: `powerpoint.*` namespace, second add-in.
 Catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
 `export_pdf`.
+
+- [x] Add the daemon-side PowerPoint forwarding contract and catalog entries
+      for `powerpoint.add_slide`, `powerpoint.replace_text`,
+      `powerpoint.insert_image`, `powerpoint.apply_layout`, and
+      `powerpoint.export_pdf`. Rust tests cover MCP `tools/list`, catalog
+      membership, capability-gated forwarding, and a PowerPoint session dispatch
+      path through the add-in connection hub.
+- [x] Add a PowerPoint add-in scaffold under `src/office-ctl/powerpoint` with
+      Presentation manifest metadata, mature product identity, compact task pane
+      UI, shared channel/logger/task-history usage, PowerPoint runtime
+      registration, session announcement, Windows catalog staging, packaging
+      inclusion, and daemon static serving under `/powerpoint/*`. The scaffold
+      intentionally announces no available `powerpoint.*` tools until each
+      Office.js handler has implementation and tests.
+- [ ] Finish PowerPoint add-in first-run identity and catalog validation. The
+      PowerPoint `DisplayName`, ribbon group, command label, task pane title,
+      icon URLs, provider, description, support metadata, and type/category must
+      match `Office MCP Control` quality bars and must not look like a scaffold,
+      sample add-in, raw protocol bridge, or host-only implementation package.
+      The Windows catalog installer must create `office-mcp-powerpoint.xml`,
+      keep it in sync with the daemon origin and generated asset URLs, and prove
+      the entry does not disappear after reinstall.
+- [ ] Extend product identity automated coverage to include PowerPoint wherever
+      Word and Excel are already checked: manifest metadata, catalog type/
+      category, generated icon references, packaged asset presence, static
+      serving under `/powerpoint/*`, and product visual evidence recording
+      fields for PowerPoint ribbon/catalog/task pane screenshots.
+- [ ] Implement the PowerPoint task pane handlers for `powerpoint.add_slide`,
+      `powerpoint.replace_text`, `powerpoint.insert_image`,
+      `powerpoint.apply_layout`, and `powerpoint.export_pdf`, with typed
+      argument validation, useful error mapping, cancellation/deadline behavior,
+      and unit/static tests for each supported Office.js API path.
+- [ ] Add live PowerPoint runtime smoke evidence against a real presentation.
+      The evidence must prove session registration, tool visibility after
+      handler implementation, at least one read/write mutation path, and PDF
+      export behavior or an explicit host-capability rejection when the current
+      Office.js host cannot support export.
 
 ### M9 — Outlook (cautious)
 
