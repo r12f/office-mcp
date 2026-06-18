@@ -271,9 +271,11 @@ function validateProductIdentityReview(review: unknown): void {
     ['addin_identity_reviewed', 'add-in first-run identity review'],
     ['word_first_run_identity_reviewed', 'Word first-run identity review'],
     ['excel_first_run_identity_reviewed', 'Excel first-run identity review'],
+    ['powerpoint_first_run_identity_reviewed', 'PowerPoint first-run identity review'],
     ['tray_product_polish_reviewed', 'tray product polish review'],
     ['word_first_run_identity_ready', 'Word first-run identity ready flag'],
     ['excel_first_run_identity_ready', 'Excel first-run identity ready flag'],
+    ['powerpoint_first_run_identity_ready', 'PowerPoint first-run identity ready flag'],
     ['ready', 'product identity review ready flag']
   ] as const) {
     if (review[key] !== true) failures.push(`Product visual evidence missing ${label}.`);
@@ -317,6 +319,7 @@ function validateFirstRunIdentity(identity: unknown): void {
   }
   validateHostFirstRunIdentity(identity.word, 'Word');
   validateHostFirstRunIdentity(identity.excel, 'Excel');
+  validateHostFirstRunIdentity(identity.powerpoint, 'PowerPoint');
 }
 
 function validateHostFirstRunIdentity(identity: unknown, host: string): void {
@@ -475,6 +478,9 @@ function productVisualSurfaces(): string[] {
     'excel_ribbon_command',
     'excel_catalog_entry',
     'excel_taskpane_title',
+    'powerpoint_ribbon_command',
+    'powerpoint_catalog_entry',
+    'powerpoint_taskpane_title',
     'logo_tray_size',
     'logo_ribbon_size',
     'logo_catalog_thumbnail',
@@ -495,6 +501,9 @@ function distinctProductVisualSurfaces(): string[] {
     'excel_ribbon_command',
     'excel_catalog_entry',
     'excel_taskpane_title',
+    'powerpoint_ribbon_command',
+    'powerpoint_catalog_entry',
+    'powerpoint_taskpane_title',
     'tray_icon',
     'tray_native_menu',
     'tray_tooltip',

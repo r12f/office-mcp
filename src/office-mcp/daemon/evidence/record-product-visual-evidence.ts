@@ -15,6 +15,7 @@ const excelRuntimeEvidencePath = readOption('--excel-runtime-evidence-path');
 const manualTrayEvidencePath = readOption('--manual-tray-evidence-path');
 const wordManifestPath = resolve(readOption('--word-manifest-path') ?? join(repoRoot, 'src/office-ctl/word/manifest.xml'));
 const excelManifestPath = resolve(readOption('--excel-manifest-path') ?? join(repoRoot, 'src/office-ctl/excel/manifest.xml'));
+const powerPointManifestPath = resolve(readOption('--powerpoint-manifest-path') ?? join(repoRoot, 'src/office-ctl/powerpoint/manifest.xml'));
 
 const requiredSurfaces = [
   'word_ribbon_command',
@@ -23,6 +24,9 @@ const requiredSurfaces = [
   'excel_ribbon_command',
   'excel_catalog_entry',
   'excel_taskpane_title',
+  'powerpoint_ribbon_command',
+  'powerpoint_catalog_entry',
+  'powerpoint_taskpane_title',
   'logo_tray_size',
   'logo_ribbon_size',
   'logo_catalog_thumbnail',
@@ -52,12 +56,16 @@ const trayProductPolishReviewed = booleanFlag('--tray-product-polish-reviewed');
 const renderedSizeLogoReviewed = booleanFlag('--rendered-size-logo-reviewed');
 const wordFirstRunIdentityReviewed = booleanFlag('--word-first-run-identity-reviewed');
 const excelFirstRunIdentityReviewed = booleanFlag('--excel-first-run-identity-reviewed');
+const powerPointFirstRunIdentityReviewed = booleanFlag('--powerpoint-first-run-identity-reviewed');
 const wordCatalogProvider = readOption('--word-catalog-provider');
 const wordCatalogDescription = readOption('--word-catalog-description');
 const wordCatalogType = readOption('--word-catalog-type');
 const excelCatalogProvider = readOption('--excel-catalog-provider');
 const excelCatalogDescription = readOption('--excel-catalog-description');
 const excelCatalogType = readOption('--excel-catalog-type');
+const powerPointCatalogProvider = readOption('--powerpoint-catalog-provider');
+const powerPointCatalogDescription = readOption('--powerpoint-catalog-description');
+const powerPointCatalogType = readOption('--powerpoint-catalog-type');
 const excelCompactTopBlock = booleanFlag('--excel-compact-top-block');
 const excelToolsPermissionsMerged = booleanFlag('--excel-tools-permissions-merged');
 const excelInlineSettings = booleanFlag('--excel-inline-settings');
@@ -73,6 +81,7 @@ const manualTrayEvidence = manualTrayEvidencePath ? readManualTrayEvidence(resol
 const manualTrayEvidenceReady = manualTrayEvidenceLooksReady(manualTrayEvidence);
 const wordManifestIdentity = readManifestIdentity(wordManifestPath);
 const excelManifestIdentity = readManifestIdentity(excelManifestPath);
+const powerPointManifestIdentity = readManifestIdentity(powerPointManifestPath);
 
 const productTextReady = requiredSurfaces.filter((surface) => surface !== 'tray_tooltip').every((surface) => typeof observations[surface] === 'string' && (observations[surface] as string).includes(productName));
 const allScreenshotsExist = Object.values(screenshotsExist).every(Boolean);
@@ -80,12 +89,14 @@ const trayTooltipReady = typeof trayTooltip === 'string' && /^Office MCP - (Up|D
 const catalogTypeReady = typeof catalogType === 'string' && /local productivity automation control utility/i.test(catalogType);
 const wordFirstRunIdentity = firstRunIdentity(wordManifestIdentity, wordCatalogProvider, wordCatalogDescription, wordCatalogType, catalogType);
 const excelFirstRunIdentity = firstRunIdentity(excelManifestIdentity, excelCatalogProvider, excelCatalogDescription, excelCatalogType, catalogType);
+const powerPointFirstRunIdentity = firstRunIdentity(powerPointManifestIdentity, powerPointCatalogProvider, powerPointCatalogDescription, powerPointCatalogType, catalogType);
 const wordFirstRunIdentityReady = wordFirstRunIdentityReviewed && catalogIdentityLooksReady(wordFirstRunIdentity);
 const excelFirstRunIdentityReady = excelFirstRunIdentityReviewed && catalogIdentityLooksReady(excelFirstRunIdentity);
+const powerPointFirstRunIdentityReady = powerPointFirstRunIdentityReviewed && catalogIdentityLooksReady(powerPointFirstRunIdentity);
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady && excelRuntimeEvidenceReady;
-const productIdentityReviewReady = logoQualityReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && trayProductPolishReviewed;
+const productIdentityReviewReady = logoQualityReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && trayProductPolishReviewed;
 const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && excelTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && daemonContextReady;
 
 const evidence = {
@@ -117,9 +128,11 @@ const evidence = {
     addin_identity_reviewed: addinIdentityReviewed,
     word_first_run_identity_reviewed: wordFirstRunIdentityReviewed,
     excel_first_run_identity_reviewed: excelFirstRunIdentityReviewed,
+    powerpoint_first_run_identity_reviewed: powerPointFirstRunIdentityReviewed,
     tray_product_polish_reviewed: trayProductPolishReviewed,
     word_first_run_identity_ready: wordFirstRunIdentityReady,
     excel_first_run_identity_ready: excelFirstRunIdentityReady,
+    powerpoint_first_run_identity_ready: powerPointFirstRunIdentityReady,
     ready: productIdentityReviewReady
   },
   first_run_identity: {
@@ -132,6 +145,11 @@ const evidence = {
       manifest_path: excelManifestPath,
       ...excelFirstRunIdentity,
       ready: excelFirstRunIdentityReady
+    },
+    powerpoint: {
+      manifest_path: powerPointManifestPath,
+      ...powerPointFirstRunIdentity,
+      ready: powerPointFirstRunIdentityReady
     }
   },
   rendered_logo_review: renderedLogoReview,

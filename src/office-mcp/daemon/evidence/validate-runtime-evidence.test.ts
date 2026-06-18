@@ -695,9 +695,11 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       addin_identity_reviewed: passed,
       word_first_run_identity_reviewed: passed,
       excel_first_run_identity_reviewed: passed,
+      powerpoint_first_run_identity_reviewed: passed,
       tray_product_polish_reviewed: passed,
       word_first_run_identity_ready: passed,
       excel_first_run_identity_ready: passed,
+      powerpoint_first_run_identity_ready: passed,
       ready: passed
     },
     first_run_identity: {
@@ -712,6 +714,16 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
         ready: passed
       },
       excel: {
+        manifest_ready: passed,
+        display_name: 'Office MCP Control',
+        provider: 'Office MCP Control',
+        description: 'Local office productivity automation and control utility',
+        type: 'Local productivity automation control utility',
+        icon_url: 'https://localhost:8765/assets/icon-32.png',
+        high_resolution_icon_url: 'https://localhost:8765/assets/icon-80.png',
+        ready: passed
+      },
+      powerpoint: {
         manifest_ready: passed,
         display_name: 'Office MCP Control',
         provider: 'Office MCP Control',
@@ -806,6 +818,9 @@ function productVisualSurfaces(): string[] {
     'excel_ribbon_command',
     'excel_catalog_entry',
     'excel_taskpane_title',
+    'powerpoint_ribbon_command',
+    'powerpoint_catalog_entry',
+    'powerpoint_taskpane_title',
     'logo_tray_size',
     'logo_ribbon_size',
     'logo_catalog_thumbnail',

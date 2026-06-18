@@ -10,6 +10,7 @@ const REPO_ROOT = join(process.cwd(), '..', '..', '..');
 const ASSET_ROOT = join(REPO_ROOT, 'src', 'office-ctl', 'common', 'assets');
 const WORD_ROOT = join(REPO_ROOT, 'src', 'office-ctl', 'word');
 const EXCEL_ROOT = join(REPO_ROOT, 'src', 'office-ctl', 'excel');
+const POWERPOINT_ROOT = join(REPO_ROOT, 'src', 'office-ctl', 'powerpoint');
 const ICON_SIZES = [16, 20, 24, 32, 48, 64, 80, 128, 256];
 const PRODUCT_NAME = 'Office MCP Control';
 const RENDERED_REVIEW_SURFACES = [
@@ -31,6 +32,7 @@ const BANNED_IDENTITY_PATTERNS = [
   /office[-_ ]?logo/i,
   /word[-_ ]?logo/i,
   /excel[-_ ]?logo/i,
+  /powerpoint[-_ ]?logo/i,
   /fabric[-_ ]?icon/i,
   /fluent[-_ ]?emoji/i
 ];
@@ -38,7 +40,8 @@ const BANNED_IDENTITY_PATTERNS = [
 test('Office add-ins use mature product identity metadata', () => {
   for (const [host, root, context] of [
     ['Word', WORD_ROOT, 'document'],
-    ['Excel', EXCEL_ROOT, 'workbook']
+    ['Excel', EXCEL_ROOT, 'workbook'],
+    ['PowerPoint', POWERPOINT_ROOT, 'presentation']
   ]) {
     const manifest = readFileSync(join(root, 'manifest.xml'), 'utf8');
     const taskpane = readFileSync(join(root, 'public', 'taskpane.html'), 'utf8');

@@ -756,19 +756,23 @@ Catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
       inclusion, and daemon static serving under `/powerpoint/*`. The initial
       scaffold announced no tools until the handler slice below added tested
       Office.js implementations.
-- [ ] Finish PowerPoint add-in first-run identity and catalog validation. The
+- [x] Finish PowerPoint add-in first-run identity and catalog validation. The
       PowerPoint `DisplayName`, ribbon group, command label, task pane title,
-      icon URLs, provider, description, support metadata, and type/category must
-      match `Office MCP Control` quality bars and must not look like a scaffold,
-      sample add-in, raw protocol bridge, or host-only implementation package.
-      The Windows catalog installer must create `office-mcp-powerpoint.xml`,
-      keep it in sync with the daemon origin and generated asset URLs, and prove
-      the entry does not disappear after reinstall.
-- [ ] Extend product identity automated coverage to include PowerPoint wherever
+      icon URLs, provider, description, support metadata, and type/category now
+      match `Office MCP Control` quality bars and avoid scaffold/sample/protocol
+      wording. The shared Windows catalog installer creates
+      `office-mcp-powerpoint.xml`, syncs it to the daemon origin and generated
+      asset URLs, removes stale legacy host subfolders, and is covered by the
+      Office catalog registration tests.
+- [x] Extend product identity automated coverage to include PowerPoint wherever
       Word and Excel are already checked: manifest metadata, catalog type/
       category, generated icon references, packaged asset presence, static
       serving under `/powerpoint/*`, and product visual evidence recording
-      fields for PowerPoint ribbon/catalog/task pane screenshots.
+      fields for PowerPoint ribbon/catalog/task pane screenshots. Coverage now
+      includes the shared product identity test, PowerPoint task pane tests,
+      Windows packaging/catalog tests, daemon static asset tests, and product
+      visual evidence recorder/validator gates for PowerPoint first-run identity
+      plus ribbon/catalog/task pane screenshot surfaces.
 - [x] Implement the PowerPoint task pane handlers for `powerpoint.add_slide`,
       `powerpoint.replace_text`, `powerpoint.insert_image`,
       `powerpoint.apply_layout`, and `powerpoint.export_pdf`, with typed

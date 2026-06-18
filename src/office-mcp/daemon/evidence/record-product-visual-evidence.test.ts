@@ -15,6 +15,9 @@ const SURFACES = [
   'excel-ribbon-command',
   'excel-catalog-entry',
   'excel-taskpane-title',
+  'powerpoint-ribbon-command',
+  'powerpoint-catalog-entry',
+  'powerpoint-taskpane-title',
   'logo-tray-size',
   'logo-ribbon-size',
   'logo-catalog-thumbnail',
@@ -44,6 +47,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).excel.ready, true);
+    assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).powerpoint.ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.display_name, 'Office MCP Control');
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.icon_url, 'https://localhost:8765/assets/icon-32.png');
     assert.equal(evidence.rendered_logo_review_ready, true);
@@ -85,6 +89,7 @@ test('product visual evidence recorder requires rendered-size and first-run iden
     assert.equal(review.rendered_size_logo_reviewed, false);
     assert.equal(review.word_first_run_identity_ready, false);
     assert.equal(review.excel_first_run_identity_ready, false);
+    assert.equal(review.powerpoint_first_run_identity_ready, false);
     assert.equal(review.ready, false);
     assert.equal(evidence.passed, false);
   });
@@ -218,6 +223,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags' && item !== '--skip-rendered-logo-and-first-run-flags');
   const hasWordManifest = filteredExtra.includes('--word-manifest-path');
   const hasExcelManifest = filteredExtra.includes('--excel-manifest-path');
+  const hasPowerPointManifest = filteredExtra.includes('--powerpoint-manifest-path');
   const hasExcelRuntimeEvidence = filteredExtra.includes('--excel-runtime-evidence-path');
   const hasManualTrayEvidence = filteredExtra.includes('--manual-tray-evidence-path');
   const outputDir = dirname(output);
@@ -237,6 +243,9 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     '--excel-catalog-provider', 'Office MCP Control',
     '--excel-catalog-description', 'Local office productivity automation and control utility',
     '--excel-catalog-type', 'Local productivity automation control utility',
+    '--powerpoint-catalog-provider', 'Office MCP Control',
+    '--powerpoint-catalog-description', 'Local office productivity automation and control utility',
+    '--powerpoint-catalog-type', 'Local productivity automation control utility',
     '--excel-compact-top-block', 'true',
     '--excel-tools-permissions-merged', 'true',
     '--excel-inline-settings', 'true',
@@ -245,6 +254,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   ];
   if (!hasWordManifest) args.push('--word-manifest-path', writeManifest(outputDir, 'word'));
   if (!hasExcelManifest) args.push('--excel-manifest-path', writeManifest(outputDir, 'excel'));
+  if (!hasPowerPointManifest) args.push('--powerpoint-manifest-path', writeManifest(outputDir, 'powerpoint'));
   if (!hasExcelRuntimeEvidence) args.push('--excel-runtime-evidence-path', writeExcelRuntimeEvidence(outputDir));
   if (!hasManualTrayEvidence) args.push('--manual-tray-evidence-path', writeManualTrayEvidence(outputDir));
   if (!skipProductReviewFlags) {
@@ -258,7 +268,8 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     args.push(
       '--rendered-size-logo-reviewed', 'true',
       '--word-first-run-identity-reviewed', 'true',
-      '--excel-first-run-identity-reviewed', 'true'
+      '--excel-first-run-identity-reviewed', 'true',
+      '--powerpoint-first-run-identity-reviewed', 'true'
     );
   }
   for (const surface of SURFACES) {
@@ -326,9 +337,9 @@ function writeRenderedLogoReview(dir: string, ready = true): string {
   return path;
 }
 
-function writeManifest(dir: string, host: 'word' | 'excel'): string {
+function writeManifest(dir: string, host: 'word' | 'excel' | 'powerpoint'): string {
   const path = join(dir, `${host}-manifest.xml`);
-  const context = host === 'word' ? 'Word documents' : 'Excel workbooks';
+  const context = host === 'word' ? 'Word documents' : host === 'excel' ? 'Excel workbooks' : 'PowerPoint presentations';
   writeFileSync(path, `<?xml version="1.0" encoding="UTF-8"?>
 <OfficeApp>
   <ProviderName>Office MCP Control</ProviderName>
