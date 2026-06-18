@@ -365,6 +365,20 @@ Latest UI feedback to preserve in implementation planning:
   native tooltip, right-click menu anchored to the actual notification-area
   icon, OS-native spacing/hover/keyboard behavior, and native quit confirmation.
 
+Latest design feedback from the current visible build:
+
+- The logo needs a deliberate redesign/re-approval pass. It must not use Office
+  logos, but it must visibly communicate office productivity and user control
+  with a mature, slightly futuristic feel. A generated asset that only reads as
+  a generic document, settings mark, debug badge, or placeholder app icon is not
+  acceptable.
+- The add-in's title, icon, and type/category must be corrected together. The
+  first installed Office surface must look like mature software rather than an
+  experimental or half-finished sideload package.
+- The tray still needs product-quality native presentation. The normal daemon
+  launch must show the product icon, and the right-click menu must be OS-native,
+  not a custom or web-styled menu surface.
+
 - [x] Run a full product logo concept pass before accepting the final mark. The
       pass must produce multiple original concept directions that communicate
       office productivity plus local control without Office-owned marks, Office
@@ -444,6 +458,14 @@ Latest UI feedback to preserve in implementation planning:
       developer/debug badge, or loud decorative graphic. This review must inspect
       the add-in catalog, ribbon, task pane chrome, tray, installer, and daemon
       title-bar renderings.
+- [ ] Redesign or materially refine the current logo if the live rendered
+      surfaces still fail the future-office-control brief. The new pass must
+      produce an original mark that avoids Office-owned logos and tile language
+      while clearly suggesting office work, command routing, and local user
+      control. It must be reviewed at 16 px tray size, 32 px ribbon size,
+      catalog thumbnail size, task pane/title-bar size, and installer size. This
+      item remains open if the icon feels generic, weak, placeholder-like,
+      debug-oriented, gear-only, or visually unrelated to office control.
 - [ ] Re-audit every add-in first-contact surface after install: title, icon,
       provider, description, ribbon command, task pane chrome, and catalog
       type/category for Word, Excel, and PowerPoint. The installed catalog must
@@ -457,6 +479,14 @@ Latest UI feedback to preserve in implementation planning:
       performed from Office's real installed surfaces, not only manifest XML, so
       a valid manifest can still fail when Office renders the title, icon, or
       category as a half-finished sideloaded add-in.
+- [ ] Rework add-in title, icon, and catalog-visible type/category as one
+      coherent product identity update for Word, Excel, and PowerPoint. The
+      final installed Office catalog, ribbon command, and task pane chrome must
+      expose the same mature product name, generated product icon, provider,
+      description, and local productivity automation/control category. Generic
+      Office container labels, missing/default icons, raw host package names,
+      sideload/debug wording, or mismatched per-host metadata keep this item
+      open even if all manifests validate.
 - [ ] Fix add-in product identity as one installable-software surface wherever
       Office exposes it. `DisplayName`, Office catalog title, icon, provider,
       short description, ribbon group, primary command, task pane title/chrome,
@@ -489,6 +519,13 @@ Latest UI feedback to preserve in implementation planning:
       menu fails this item even if automated probes pass. The visual evidence
       must prove the menu is opened from the visible tray icon and looks native
       beside normal Windows tray applications, not like an embedded web UI.
+- [ ] Implement and verify the tray as a polished native Windows first-contact
+      surface. The visible tray icon must be the accepted product glyph, not a
+      blank/default/framework icon, and right-click must open a native Windows
+      context menu anchored to that icon. Any menu drawn by HTML/CSS, a webview,
+      a frameless floating panel, or a toolkit-demo-looking surface keeps this
+      item open. The evidence must come from a normal interactive daemon launch,
+      not only from model/probe output.
 - [ ] Replace any tray implementation path that draws its own menu surface. The
       Windows build must use native notification-area and menu primitives for
       the visible user interaction, including the right-click menu opened from
