@@ -333,6 +333,23 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.powerpoint_runtime_evidence_ready = false;
+      broken.product_identity_review.powerpoint_runtime_evidence_ready = false;
+      broken.powerpoint_runtime_evidence.smoke_details.mutation_proved = false;
+      broken.powerpoint_runtime_evidence.smoke_details.replace_text = { replacements: 0 };
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /PowerPoint runtime evidence ready flag/);
+      assert.match(outputText(result.stdout), /PowerPoint runtime evidence did not prove mutation path/);
+      assert.match(outputText(result.stdout), /PowerPoint runtime evidence missing replace_text proof/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.catalog_type = 'Local productivity automation control utility protocol bridge debug panel';
       broken.first_run_identity.word.type = 'Local productivity automation control utility sample debug add-in';
       broken.tray_menu_surface_kind = 'webview';
@@ -777,6 +794,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       word_first_run_identity_ready: passed,
       excel_first_run_identity_ready: passed,
       powerpoint_first_run_identity_ready: passed,
+      powerpoint_runtime_evidence_ready: passed,
       ready: passed
     },
     first_run_identity: {
@@ -813,6 +831,8 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     },
     rendered_logo_review: renderedLogoReview(passed, screenshots.logo_tray_size),
     rendered_logo_review_ready: passed,
+    powerpoint_runtime_evidence: powerPointRuntimeEvidence(passed),
+    powerpoint_runtime_evidence_ready: passed,
     excel_taskpane: {
       compact_top_block: passed,
       tools_permissions_merged: passed,
@@ -857,6 +877,36 @@ function excelRuntimeEvidence(passed: boolean) {
       table: { table: 'OfficeMcpTable' },
       chart: { chart: 'Chart 1' },
       sheet: { activated: passed }
+    }
+  };
+}
+
+function powerPointRuntimeEvidence(passed: boolean) {
+  const sessionId = '22222222-3333-4444-5555-666666666666';
+  return {
+    ok: passed,
+    schema_version: 1,
+    endpoint: 'http://127.0.0.1:8800/mcp',
+    generated_at: new Date().toISOString(),
+    smoke_passed: passed,
+    ready: passed,
+    session: {
+      app: 'powerpoint',
+      status: 'active',
+      session_id: sessionId,
+      available_tool_count: 5,
+      document: { title: 'PowerPoint Presentation' },
+      host: { app: 'powerpoint', platform: 'pc', version: '16.0' }
+    },
+    smoke_details: {
+      session_id: sessionId,
+      available_tool_count: 5,
+      add_slide: { slide_id: 'slide-1', slide_index: 0 },
+      replace_text: { replacements: passed ? 1 : 0 },
+      layout: { slide_id: 'slide-1', slide_index: 0, layout_name: 'Title Only' },
+      mutation_proved: passed,
+      pdf_supported: false,
+      pdf_host_rejection: passed
     }
   };
 }

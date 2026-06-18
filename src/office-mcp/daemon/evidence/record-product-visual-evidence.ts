@@ -12,6 +12,7 @@ const notes = readOption('--notes');
 const daemonBin = readOption('--daemon-bin');
 const renderedLogoReviewPath = readOption('--rendered-logo-review-path') ?? process.env.OFFICE_MCP_RENDERED_LOGO_REVIEW_PATH;
 const excelRuntimeEvidencePath = readOption('--excel-runtime-evidence-path') ?? process.env.OFFICE_MCP_EXCEL_RUNTIME_EVIDENCE_PATH;
+const powerPointRuntimeEvidencePath = readOption('--powerpoint-runtime-evidence-path') ?? process.env.OFFICE_MCP_POWERPOINT_RUNTIME_EVIDENCE_PATH;
 const manualTrayEvidencePath = readOption('--manual-tray-evidence-path') ?? process.env.OFFICE_MCP_TRAY_MANUAL_EVIDENCE_PATH;
 const wordManifestPath = resolve(readOption('--word-manifest-path') ?? join(repoRoot, 'src/office-ctl/word/manifest.xml'));
 const excelManifestPath = resolve(readOption('--excel-manifest-path') ?? join(repoRoot, 'src/office-ctl/excel/manifest.xml'));
@@ -81,6 +82,8 @@ const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefi
 const daemonContextReady = daemonContextLooksReady(daemonContext);
 const excelRuntimeEvidence = excelRuntimeEvidencePath ? readExcelRuntimeEvidence(resolve(excelRuntimeEvidencePath)) : undefined;
 const excelRuntimeEvidenceReady = excelRuntimeEvidenceLooksReady(excelRuntimeEvidence);
+const powerPointRuntimeEvidence = powerPointRuntimeEvidencePath ? readPowerPointRuntimeEvidence(resolve(powerPointRuntimeEvidencePath)) : undefined;
+const powerPointRuntimeEvidenceReady = powerPointRuntimeEvidenceLooksReady(powerPointRuntimeEvidence);
 const wordManifestIdentity = readManifestIdentity(wordManifestPath);
 const excelManifestIdentity = readManifestIdentity(excelManifestPath);
 const powerPointManifestIdentity = readManifestIdentity(powerPointManifestPath);
@@ -98,8 +101,8 @@ const powerPointFirstRunIdentityReady = powerPointFirstRunIdentityReviewed && ca
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady && excelRuntimeEvidenceReady;
-const productIdentityReviewReady = logoQualityReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && trayProductPolishReviewed;
-const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && excelTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && daemonContextReady;
+const productIdentityReviewReady = logoQualityReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed;
+const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && excelTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -137,6 +140,7 @@ const evidence = {
     word_first_run_identity_ready: wordFirstRunIdentityReady,
     excel_first_run_identity_ready: excelFirstRunIdentityReady,
     powerpoint_first_run_identity_ready: powerPointFirstRunIdentityReady,
+    powerpoint_runtime_evidence_ready: powerPointRuntimeEvidenceReady,
     ready: productIdentityReviewReady
   },
   first_run_identity: {
@@ -158,6 +162,8 @@ const evidence = {
   },
   rendered_logo_review: renderedLogoReview,
   rendered_logo_review_ready: renderedLogoReviewReady,
+  powerpoint_runtime_evidence: powerPointRuntimeEvidence,
+  powerpoint_runtime_evidence_ready: powerPointRuntimeEvidenceReady,
   excel_taskpane: {
     compact_top_block: excelCompactTopBlock,
     tools_permissions_merged: excelToolsPermissionsMerged,
@@ -359,6 +365,69 @@ function excelSessionFromDiscovery(discovery: Record<string, unknown> | undefine
 function excelRuntimeEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
   if (!evidence) return false;
   return evidence.ok === true && evidence.schema_version === 1 && evidence.smoke_passed === true && evidence.ready === true;
+}
+
+function readPowerPointRuntimeEvidence(path: string): Record<string, unknown> {
+  try {
+    const report = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    const gates = Array.isArray(report.gates) ? report.gates.filter(isRecord) : [];
+    const discovery = gates.find((gate) => gate.name === 'word.session_discovery' && gate.status === 'passed');
+    const smoke = gates.find((gate) => gate.name === 'powerpoint.runtime_smoke' && gate.status === 'passed');
+    const session = powerPointSessionFromDiscovery(discovery, smoke);
+    const details = isRecord(smoke?.details) ? smoke.details : undefined;
+    return {
+      path,
+      ok: true,
+      schema_version: report.schema_version,
+      endpoint: report.endpoint,
+      generated_at: report.generated_at,
+      session,
+      smoke_details: details,
+      smoke_passed: Boolean(smoke),
+      ready: powerPointRuntimeDetailsLookReady(session, details)
+    };
+  } catch (error) {
+    return { path, ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function powerPointSessionFromDiscovery(discovery: Record<string, unknown> | undefined, smoke: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  const smokeDetails = isRecord(smoke?.details) ? smoke.details : undefined;
+  const smokeSessionId = typeof smokeDetails?.session_id === 'string' ? smokeDetails.session_id : undefined;
+  const discoveryDetails = isRecord(discovery?.details) ? discovery.details : undefined;
+  const sessions = Array.isArray(discoveryDetails?.sessions) ? discoveryDetails.sessions.filter(isRecord) : [];
+  return sessions.find((session) => session.app === 'powerpoint' && (!smokeSessionId || session.session_id === smokeSessionId));
+}
+
+function powerPointRuntimeEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
+  if (!evidence) return false;
+  return evidence.ok === true && evidence.schema_version === 1 && evidence.smoke_passed === true && evidence.ready === true;
+}
+
+function powerPointRuntimeDetailsLookReady(session: Record<string, unknown> | undefined, details: Record<string, unknown> | undefined): boolean {
+  if (!session || !details) return false;
+  const document = isRecord(session.document) ? session.document : undefined;
+  const host = isRecord(session.host) ? session.host : undefined;
+  const pdfSupported = details.pdf_supported === true && details.pdf_mime_type === 'application/pdf' && typeof details.pdf_size === 'number';
+  const pdfHostRejection = details.pdf_host_rejection === true;
+  return session.app === 'powerpoint'
+    && session.status === 'active'
+    && typeof session.session_id === 'string'
+    && typeof details.session_id === 'string'
+    && session.session_id === details.session_id
+    && typeof document?.title === 'string'
+    && document.title.length > 0
+    && host?.app === 'powerpoint'
+    && typeof session.available_tool_count === 'number'
+    && session.available_tool_count >= 5
+    && details.mutation_proved === true
+    && isRecord(details.add_slide)
+    && typeof details.add_slide.slide_id === 'string'
+    && isRecord(details.replace_text)
+    && Number(details.replace_text.replacements ?? 0) >= 1
+    && isRecord(details.layout)
+    && typeof details.layout.slide_id === 'string'
+    && (pdfSupported || pdfHostRejection);
 }
 
 function excelRuntimeDetailsLookReady(session: Record<string, unknown> | undefined, details: Record<string, unknown> | undefined): boolean {

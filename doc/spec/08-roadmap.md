@@ -596,6 +596,11 @@ Latest UI feedback to preserve in implementation planning:
       `npm run evidence:record-product-visual -- --daemon-bin <path>`, tied to
       the same local daemon build under test, validated with
       `--require-product-visual`, and stored as release-checkable artifacts.
+      The product visual artifact must include a PowerPoint runtime evidence
+      artifact proving an active presentation session, available tool count,
+      add-slide, replace-text, layout mutation, and PDF success or explicit host
+      rejection, so PowerPoint visual polish cannot pass from static screenshots
+      alone.
       Screenshot artifacts must be real, complete image files; truncated image
       headers are rejected by both the recorder and validator.
 

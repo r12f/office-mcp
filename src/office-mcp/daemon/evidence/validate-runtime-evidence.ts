@@ -260,6 +260,7 @@ function validateProductVisualEvidence(): void {
   validateProductIdentityReview(visual.product_identity_review);
   validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
   validateFirstRunIdentity(visual.first_run_identity);
+  validatePowerPointRuntimeEvidence(visual.powerpoint_runtime_evidence, visual.powerpoint_runtime_evidence_ready);
   validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
   if (visual.daemon_context_ready !== true) {
     failures.push('Product visual evidence daemon context is not recorder-ready.');
@@ -339,6 +340,7 @@ function validateProductIdentityReview(review: unknown): void {
     ['word_first_run_identity_ready', 'Word first-run identity ready flag'],
     ['excel_first_run_identity_ready', 'Excel first-run identity ready flag'],
     ['powerpoint_first_run_identity_ready', 'PowerPoint first-run identity ready flag'],
+    ['powerpoint_runtime_evidence_ready', 'PowerPoint runtime evidence ready flag'],
     ['ready', 'product identity review ready flag']
   ] as const) {
     if (review[key] !== true) failures.push(`Product visual evidence missing ${label}.`);
@@ -476,6 +478,38 @@ function validateProductVisualObservations(observations: unknown): void {
       failures.push(`Product visual evidence observation missing product name: ${surface}.`);
     }
   }
+}
+
+function validatePowerPointRuntimeEvidence(evidence: unknown, ready: unknown): void {
+  if (ready !== true) failures.push('Product visual evidence missing PowerPoint runtime evidence ready flag.');
+  if (!isRecord(evidence)) {
+    failures.push('Product visual evidence missing PowerPoint runtime evidence details.');
+    return;
+  }
+  if (evidence.ok !== true) failures.push('Product visual PowerPoint runtime evidence was not read successfully.');
+  if (evidence.schema_version !== 1) failures.push(`Unsupported PowerPoint runtime evidence schema_version: ${evidence.schema_version}`);
+  if (evidence.smoke_passed !== true) failures.push('Product visual evidence missing passed PowerPoint runtime smoke gate.');
+  if (evidence.ready !== true) failures.push('Product visual PowerPoint runtime evidence is not ready.');
+  const session = evidence.session;
+  const details = evidence.smoke_details;
+  if (!isRecord(session) || !isRecord(details)) {
+    failures.push('Product visual PowerPoint runtime evidence missing session or smoke details.');
+    return;
+  }
+  const document = isRecord(session.document) ? session.document : undefined;
+  const host = isRecord(session.host) ? session.host : undefined;
+  if (session.app !== 'powerpoint' || session.status !== 'active') failures.push('Product visual PowerPoint runtime evidence missing active PowerPoint session.');
+  if (typeof session.session_id !== 'string' || details.session_id !== session.session_id) failures.push('Product visual PowerPoint runtime evidence session_id mismatch.');
+  if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual PowerPoint runtime evidence missing presentation title.');
+  if (host?.app !== 'powerpoint') failures.push('Product visual PowerPoint runtime evidence missing PowerPoint host metadata.');
+  if (typeof session.available_tool_count !== 'number' || session.available_tool_count < 5) failures.push('Product visual PowerPoint runtime evidence missing available tool count.');
+  if (details.mutation_proved !== true) failures.push('Product visual PowerPoint runtime evidence did not prove mutation path.');
+  if (!isRecord(details.add_slide) || typeof details.add_slide.slide_id !== 'string') failures.push('Product visual PowerPoint runtime evidence missing add_slide proof.');
+  if (!isRecord(details.replace_text) || Number(details.replace_text.replacements ?? 0) < 1) failures.push('Product visual PowerPoint runtime evidence missing replace_text proof.');
+  if (!isRecord(details.layout) || typeof details.layout.slide_id !== 'string') failures.push('Product visual PowerPoint runtime evidence missing apply_layout proof.');
+  const pdfSupported = details.pdf_supported === true && details.pdf_mime_type === 'application/pdf' && typeof details.pdf_size === 'number';
+  const pdfHostRejection = details.pdf_host_rejection === true;
+  if (!pdfSupported && !pdfHostRejection) failures.push('Product visual PowerPoint runtime evidence missing PDF export success or explicit host-capability rejection.');
 }
 
 function validateExcelTaskpaneVisualEvidence(taskpane: unknown): void {
