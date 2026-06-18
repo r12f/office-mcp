@@ -238,6 +238,7 @@ test('Office catalog identity review rejects prototype first-impression metadata
     assert.match(report.failures.join('\n'), /Word: display name must be Office MCP Control/);
     assert.match(report.failures.join('\n'), /Word: provider must be Office MCP Control/);
     assert.match(report.failures.join('\n'), /Excel: description must describe a local productivity automation control utility/);
+    assert.match(report.failures.join('\n'), /Excel: ribbon group label must be Office MCP Control/);
     assert.match(report.failures.join('\n'), /PowerPoint: catalog\/ribbon icon URL must use generated icon-32\.png/);
     assert.match(report.failures.join('\n'), /Catalog type is not product-ready/);
   } finally {

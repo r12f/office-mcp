@@ -584,14 +584,20 @@ Latest UI feedback to preserve in implementation planning:
       rendered tray, ribbon, catalog, daemon title-bar, and installer sizes.
       Final live Office/tray visual evidence remains tracked by the separate
       product visual evidence items below.
-- [ ] Rework every add-in first-contact identity field so Word, Excel, and
+- [x] Rework every add-in first-contact identity field so Word, Excel, and
       PowerPoint look like mature installable software after a clean install.
       Title, icon, provider, command label, short description, type/category,
       catalog card, ribbon command, task pane title/chrome, installer metadata,
-      and generated catalog output must be updated together. Any surface that
-      still shows generic `Add-in`, `Task Pane`, `MCP`, `Debug`, host-only
-      scaffold names, missing icons, or prototype type/category wording keeps
-      this item open.
+      and generated catalog output are updated together for all three hosts.
+      Static coverage verifies `Office MCP Control` display/provider/ribbon
+      group/task pane chrome, `Open Control Panel`, generated icon URLs,
+      support metadata, local productivity automation/control descriptions, and
+      generated catalog manifests for Word, Excel, and PowerPoint. The catalog
+      identity review now rejects generic `Add-in`/`Task Pane`, debug/prototype,
+      protocol-bridge, missing-icon, raw package, and shortened ribbon-label
+      regressions. Clean install packaging paths stage/run the shared catalog
+      generator for all three hosts. Real Office installed-surface screenshots
+      remain tracked by the live first-contact evidence items.
 - [x] Replace the current tray placeholder/missing icon with the generated
       tray glyph in normal daemon and installed launch paths. The icon must be
       visible in the Windows notification area and visually deliberate beside
