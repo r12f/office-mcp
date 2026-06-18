@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
+import { tinyPng } from './image-evidence.js';
 
 test('runtime evidence validator accepts required runtime gates and optional IRM skip', () => {
   withEvidenceFile(report('skipped'), (path) => {
@@ -609,11 +610,4 @@ function structuredMenu(menuItems: string[]) {
     if (label === 'Quit Office MCP') return { kind: 'action', label, action: 'quit', enabled: true };
     return { kind: 'read_only', label, enabled: false };
   });
-}
-
-function tinyPng(): Buffer {
-  return Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luznWQAAAABJRU5ErkJggg==',
-    'base64'
-  );
 }

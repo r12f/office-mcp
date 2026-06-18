@@ -4,6 +4,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
+import { tinyPng } from './image-evidence.js';
 
 const TSX = './node_modules/tsx/dist/cli.mjs';
 const RECORDER = resolve(process.cwd(), 'record-product-visual-evidence.ts');
@@ -150,13 +151,6 @@ function withScreenshots(callback: (dir: string, screenshots: Record<string, str
 
 function outputText(value: string | Buffer): string {
   return typeof value === 'string' ? value : value.toString('utf8');
-}
-
-function tinyPng(): Buffer {
-  return Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luznWQAAAABJRU5ErkJggg==',
-    'base64'
-  );
 }
 
 function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']): string {

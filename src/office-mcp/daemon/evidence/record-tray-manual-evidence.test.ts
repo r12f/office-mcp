@@ -4,6 +4,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
+import { tinyPng } from './image-evidence.js';
 
 const TSX = './node_modules/tsx/dist/cli.mjs';
 const RECORDER = resolve(process.cwd(), 'record-tray-manual-evidence.ts');
@@ -106,13 +107,6 @@ function withTrayScreenshot(callback: (dir: string, screenshotPath: string) => v
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-}
-
-function tinyPng(): Buffer {
-  return Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luznWQAAAABJRU5ErkJggg==',
-    'base64'
-  );
 }
 
 function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']): string {
