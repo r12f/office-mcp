@@ -404,6 +404,13 @@ Latest UI feedback to preserve in implementation planning:
       disabled status rows, keyboardable native menu behavior, and a native quit
       confirmation. Any webview/HTML/CSS/custom-drawn or toolkit-demo-looking
       menu surface keeps this item open even when the daemon probe passes.
+- [ ] Re-review the tray visual implementation from a normal Windows launch,
+      not only from model/probe output. The tray must have a real product icon,
+      native tooltip, native Windows context menu, platform spacing/hover/keyboard
+      behavior, and native quit confirmation. Missing icon, framework sample icon,
+      blank placeholder, HTML/webview/floating custom menu, or non-native-looking
+      right-click surface is a release blocker because it makes the product feel
+      unfinished.
 - [x] Redesign or formally re-approve the product logo against the latest
       feedback. The accepted mark must not use Office logos or near-logo
       variants, but it must visibly communicate office productivity plus local
@@ -429,6 +436,14 @@ Latest UI feedback to preserve in implementation planning:
       silhouettes, Outlook envelope marks, Office tile language, Microsoft 365
       gradients, Windows logo conventions, placeholder initials, gear-only
       artwork, terminal/debug motifs, and decorative AI/neon styling.
+- [ ] Conduct a final product-design review of the logo in the actual user
+      surfaces before release. The mark must feel like future office control
+      without using Office logos: office/document work must be recognizable,
+      control/routing must be visible, and the style must read as mature software
+      rather than a placeholder, sample icon, settings gear, generic document,
+      developer/debug badge, or loud decorative graphic. This review must inspect
+      the add-in catalog, ribbon, task pane chrome, tray, installer, and daemon
+      title-bar renderings.
 - [ ] Re-audit every add-in first-contact surface after install: title, icon,
       provider, description, ribbon command, task pane chrome, and catalog
       type/category for Word, Excel, and PowerPoint. The installed catalog must
@@ -442,6 +457,14 @@ Latest UI feedback to preserve in implementation planning:
       performed from Office's real installed surfaces, not only manifest XML, so
       a valid manifest can still fail when Office renders the title, icon, or
       category as a half-finished sideloaded add-in.
+- [ ] Fix add-in product identity as one installable-software surface wherever
+      Office exposes it. `DisplayName`, Office catalog title, icon, provider,
+      short description, ribbon group, primary command, task pane title/chrome,
+      and catalog-visible type/category must be changed and verified together for
+      Word, Excel, and PowerPoint. Generic visible types such as `Add-in` or
+      `Task Pane`, default/missing icons, raw package names, debug/protocol labels,
+      or host-specific scaffold wording keep this item open even when the manifest
+      validates.
 - [x] Replace prototype add-in identity copy everywhere it can appear in Office:
       manifest `DisplayName`, provider, description, support metadata, ribbon
       group, primary command label, task pane title/chrome, catalog title, and
