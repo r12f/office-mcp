@@ -233,6 +233,16 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      writeFileSync(broken.screenshot_paths.tray_icon, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /screenshot missing or invalid: tray_icon/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.excel_taskpane.document_state = 'unknown';
       broken.excel_taskpane.document_state_ready = false;
       broken.excel_taskpane.density_ready = false;
@@ -348,6 +358,16 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
   withEvidenceFile(ui, (uiPath) => {
     withManualTrayEvidence(true, (manualPath) => {
       const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      writeFileSync(broken.screenshot_path, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence screenshot file does not exist/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
       broken.daemon_context = manualTrayDaemonContext(['Status: Up', 'Clients: 0']);
       writeFileSync(manualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
@@ -409,7 +429,7 @@ function withManualTrayEvidence(passed: boolean, callback: (path: string) => voi
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-manual-tray-evidence-'));
   try {
     const screenshotPath = join(dir, 'tray-visible.png');
-    if (passed) writeFileSync(screenshotPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+    if (passed) writeFileSync(screenshotPath, tinyPng());
     const path = join(dir, 'tray-manual-evidence.json');
     writeFileSync(path, JSON.stringify(manualTrayReport(passed, screenshotPath), null, 2));
     callback(path);
@@ -463,7 +483,7 @@ function withProductVisualEvidence(passed: boolean, callback: (path: string) => 
     const screenshots: Record<string, string> = {};
     for (const surface of productVisualSurfaces()) {
       const screenshotPath = join(dir, `${surface}.png`);
-      if (passed) writeFileSync(screenshotPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+      if (passed) writeFileSync(screenshotPath, tinyPng());
       screenshots[surface] = screenshotPath;
     }
     const path = join(dir, 'product-visual-evidence.json');
@@ -589,4 +609,11 @@ function structuredMenu(menuItems: string[]) {
     if (label === 'Quit Office MCP') return { kind: 'action', label, action: 'quit', enabled: true };
     return { kind: 'read_only', label, enabled: false };
   });
+}
+
+function tinyPng(): Buffer {
+  return Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luznWQAAAABJRU5ErkJggg==',
+    'base64'
+  );
 }
