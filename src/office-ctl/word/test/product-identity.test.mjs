@@ -38,6 +38,7 @@ test('Office add-ins use mature product identity metadata', () => {
     assert.match(manifest, new RegExp(`<DisplayName DefaultValue="${PRODUCT_NAME}" \/>`), `${host} display name is product branded`);
     assert.match(manifest, /DefaultValue="Office MCP"/, `${host} ribbon group has a stable product label`);
     assert.match(manifest, /DefaultValue="Open Control Panel"/, `${host} command label is action-oriented`);
+    assert.match(manifest, /local productivity automation control utility/, `${host} description states product type`);
     assert.match(manifest, new RegExp(`Open ${PRODUCT_NAME} for this ${context}`), `${host} tooltip names the product and host context`);
     assert.match(taskpane, new RegExp(`<title>${PRODUCT_NAME}</title>`), `${host} task pane title is product branded`);
     assert.match(taskpane, new RegExp(`<h1>${PRODUCT_NAME}</h1>`), `${host} task pane heading is product branded`);

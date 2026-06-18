@@ -26,7 +26,7 @@ test('Excel add-in uses product identity metadata and generated icon URLs', () =
 
   assert.match(manifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
   assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
-  assert.match(manifest, /Control live Excel workbooks through a local MCP automation console\./);
+  assert.match(manifest, /Control live Excel workbooks through a local productivity automation control utility\./);
   assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP" \/>/);
   assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Open Control Panel" \/>/);
   assert.match(manifest, /Office MCP Control for this workbook/);

@@ -34,11 +34,16 @@ test('AppSource package builder emits submission artifacts without loopback URLs
 
     const manifest = readFileSync(join(dir, 'manifest-1.2.3.xml'), 'utf8');
     assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
+    assert.match(manifest, /local productivity automation control utility/);
     assert.match(manifest, /DefaultValue="Open Control Panel"/);
     assert.match(manifest, /https:\/\/office-mcp\.dev\/taskpane\.html\?v=1\.2\.3/);
     assert.doesNotMatch(manifest, /localhost|127\.0\.0\.1/);
 
     const metadata = JSON.parse(readFileSync(join(dir, 'appsource-metadata-1.2.3.json'), 'utf8'));
+    assert.equal(metadata.name, 'Office MCP Control');
+    assert.equal(metadata.slug, 'office-mcp');
+    assert.equal(metadata.category, 'Productivity');
+    assert.equal(metadata.type, 'Local productivity automation control utility');
     assert.equal(metadata.manifest, 'manifest-1.2.3.xml');
     assert.equal(metadata.addin_bundle, 'office-mcp-addin-1.2.3.zip');
     assert.match(String(metadata.manifest_sha256), /^[0-9a-f]{64}$/);
@@ -46,6 +51,8 @@ test('AppSource package builder emits submission artifacts without loopback URLs
 
     const checklist = readFileSync(join(dir, 'appsource-checklist-1.2.3.md'), 'utf8');
     assert.match(checklist, /External gates before Partner Center submission/);
+    assert.match(checklist, /category Productivity/);
+    assert.match(checklist, /type Local productivity automation control utility/);
     assert.match(checklist, /Microsoft AppSource validation review/);
 
     assert.ok(readFileSync(join(dir, 'office-mcp-addin-1.2.3.zip')).byteLength > 1000);

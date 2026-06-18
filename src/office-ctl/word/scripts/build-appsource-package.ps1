@@ -73,7 +73,10 @@ Compress-Archive -Path (Join-Path $bundleStagePath "*") -DestinationPath $bundle
 Remove-Item -LiteralPath $bundleStagePath -Recurse -Force
 
 $metadata = [ordered]@{
-  name = "office-mcp"
+  name = "Office MCP Control"
+  slug = "office-mcp"
+  category = "Productivity"
+  type = "Local productivity automation control utility"
   version = $Version
   manifest = Split-Path -Leaf $manifestPath
   manifest_sha256 = Get-Sha256 $manifestPath
@@ -111,7 +114,8 @@ Generated for version `$Version`.
 - Host `$($BaseUrl.TrimEnd('/'))/taskpane.html` and `$($BaseUrl.TrimEnd('/'))/assets/*` over public HTTPS.
 - Host the manifest at `$($BaseUrl.TrimEnd('/'))/manifest.xml` or the chosen Partner Center URL.
 - Validate Office webview behavior from the hosted origin to the local daemon endpoint.
-- Provide Partner Center listing metadata, screenshots, privacy/support URLs, and reviewer notes.
+- Provide Partner Center listing metadata with category `Productivity` and type `Local productivity automation control utility`.
+- Provide screenshots, privacy/support URLs, and reviewer notes.
 - Complete Microsoft AppSource validation review.
 "@ | Set-Content -Encoding ASCII -Path $checklistPath
 

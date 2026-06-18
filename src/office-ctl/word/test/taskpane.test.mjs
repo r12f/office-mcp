@@ -41,7 +41,7 @@ test('Word add-in uses product identity metadata and generated icons', () => {
 
   assert.match(manifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
   assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
-  assert.match(manifest, /Control live Word documents through a local MCP automation console\./);
+  assert.match(manifest, /Control live Word documents through a local productivity automation control utility\./);
   assert.match(manifest, /<bt:String id="OfficeMcp\.GroupLabel" DefaultValue="Office MCP" \/>/);
   assert.match(manifest, /<bt:String id="OfficeMcp\.OpenPane\.Label" DefaultValue="Open Control Panel" \/>/);
   assert.match(manifest, /Office MCP Control for this document/);
@@ -109,12 +109,14 @@ test('Office catalog registration script stages Word and Excel manifests without
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
     assert.match(wordManifest, /<OfficeApp/);
     assert.match(wordManifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
+    assert.match(wordManifest, /local productivity automation control utility/);
     assert.match(wordManifest, /DefaultValue="Open Control Panel"/);
     assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.8/);
     assert.match(wordManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
     assert.match(wordManifest, /https:\/\/localhost:8766\/assets\/icon-80\.png/);
     assert.match(excelManifest, /<OfficeApp/);
     assert.match(excelManifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
+    assert.match(excelManifest, /local productivity automation control utility/);
     assert.match(excelManifest, /DefaultValue="Open Control Panel"/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.7/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);

@@ -9,7 +9,7 @@
   <ProviderName>Office MCP Control</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Office MCP Control" />
-  <Description DefaultValue="Control live Excel workbooks through a local MCP automation console." />
+  <Description DefaultValue="Control live Excel workbooks through a local productivity automation control utility." />
   <IconUrl DefaultValue="https://localhost:8765/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:8765/assets/icon-80.png" />
   <SupportUrl DefaultValue="https://github.com/office-mcp/office-mcp" />
