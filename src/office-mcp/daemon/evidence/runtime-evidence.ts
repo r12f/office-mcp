@@ -86,8 +86,8 @@ try {
 
   if (!sessionId && wantsWordBaseline) {
     const reason = irmDocumentPath
-      ? `No connected Word add-in session matched the requested IRM document path: ${irmDocumentPath}. Open that document and load the office-mcp task pane, then rerun this script.`
-      : 'No connected Word add-in session. Open Word, load the add-in task pane, then rerun this script.';
+      ? `No connected Word add-in session matched the requested IRM document path: ${irmDocumentPath}. Open that document and open Office MCP Control, then rerun this script.`
+      : 'No connected Word add-in session. Open Word, open Office MCP Control, then rerun this script.';
     addGate('word.runtime_smoke', 'blocked_by_runtime', { reason });
     addGate('agent_client_stdio_bridge', 'blocked_by_runtime', {
       reason: 'No connected Word add-in session to prove an agent client can call MCP.'
@@ -112,13 +112,13 @@ try {
   if (includeExcelSmoke) {
     if (excelSessionId) await runExcelSmokeGate(excelSessionId);
     else addGate('excel.runtime_smoke', 'blocked_by_runtime', {
-      reason: 'No connected Excel add-in session. Open Excel, load the office-mcp task pane, then rerun this script.'
+      reason: 'No connected Excel add-in session. Open Excel, open Office MCP Control, then rerun this script.'
     });
   }
   if (includePowerPointSmoke) {
     if (powerPointSessionId) await runPowerPointSmokeGate(powerPointSessionId);
     else addGate('powerpoint.runtime_smoke', 'blocked_by_runtime', {
-      reason: 'No connected PowerPoint add-in session. Open PowerPoint, load the office-mcp task pane, then rerun this script.'
+      reason: 'No connected PowerPoint add-in session. Open PowerPoint, open Office MCP Control, then rerun this script.'
     });
   }
 } catch (error) {

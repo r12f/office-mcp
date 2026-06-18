@@ -31,6 +31,8 @@ test('runtime evidence harness covers Word, agent client bridge, and IRM gates',
   assert.match(source, /wantsWordBaseline \? requestedSessionId \?\? selectWordSessionId/);
   assert.match(source, /function selectWordSessionId/);
   assert.match(source, /host\?\.app \?\? ''\)\.toLowerCase\(\) === 'word'/);
+  assert.match(source, /open Office MCP Control, then rerun this script/);
+  assert.doesNotMatch(source, /load the office-mcp task pane|load the add-in task pane/);
   assert.doesNotMatch(packageJson, /evidence:(irm|excel)[^\n]+--endpoint http:\/\/127\.0\.0\.1:8800\/mcp/);
 });
 
