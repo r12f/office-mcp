@@ -271,6 +271,45 @@ without large empty blocks; settings open inside the top block; users can see
 which tools are available and disable any individual tool with daemon-visible
 effect.
 
+### M6.5.2 — Add-in task pane density and state accuracy follow-up
+
+User-reported follow-up from live Excel task pane testing:
+
+- [ ] Merge the `Available Tools` and `Tool Permissions` surfaces for Word and
+      Excel into one grouped tools surface, unless implementation evidence shows
+      a separate read-only summary is materially clearer. The merged surface
+      must avoid repeating the same tool names, descriptions, and counts in two
+      blocks.
+- [ ] Group tool permission rows by the same capability categories as available
+      tools. Each category must support independent expand/collapse, show
+      `Enabled X of Y` while collapsed, and preserve per-tool saved permission
+      state.
+- [ ] Replace the current settings-card interaction with compact inline editing
+      inside the top summary block. Clicking the gear should reveal editable
+      rows for daemon endpoint and tool permissions without creating a large
+      separate framed settings block that consumes the task pane viewport.
+- [ ] Combine server version and protocol version into one metadata row in Word
+      and Excel task panes, for example `Server 0.1.0 / Protocol 1.0`.
+- [ ] Fix document state reporting so normal editable workbooks/documents do not
+      show `Dirty: unknown / Read-only: unknown`. When Office APIs can determine
+      editability, show `Editable`, `Read-only`, `Protected`, or a more specific
+      host state. When a dirty/saved signal is not reliably exposed by the host,
+      omit it from the primary summary or label it as diagnostic-only instead
+      of presenting `unknown` as the user-facing state.
+- [ ] Add Word and Excel task pane contract tests covering grouped collapsible
+      permissions, no duplicated tools block, inline settings editing, merged
+      server/protocol metadata, and non-unknown editable document state for the
+      normal mocked editable host case.
+- [ ] Capture live Excel evidence after implementation showing a connected
+      workbook with the compact top block, merged tools/permissions surface,
+      inline settings edit rows, combined server/protocol row, and a concrete
+      editable/read-only/protected state.
+
+**Exit criterion**: In a 320 px Office task pane, a connected editable Excel
+workbook does not show duplicated tool lists or `unknown` document state; tools
+and permissions share one categorized collapsible surface; settings edit inline;
+and server/protocol metadata fits on one row.
+
 ### M6.6 — Rust native daemon migration
 
 - [x] Normalize the source tree away from legacy top-level packages into
