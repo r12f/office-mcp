@@ -136,8 +136,6 @@
   const endpointInputEl = document.getElementById('endpointInput');
   const endpointErrorEl = document.getElementById('endpointError');
   const saveEndpointEl = document.getElementById('saveEndpoint');
-  const enabledToolCountEl = document.getElementById('enabledToolCount');
-  const toolPermissionListEl = document.getElementById('toolPermissionList');
   const announcerEl = document.getElementById('announcer');
 
   settingsToggleEl.addEventListener('click', handleSettingsClick);
@@ -1300,11 +1298,10 @@
   function renderStaticState() {
     sessionEl.textContent = sessionId;
     daemonEl.textContent = configuredEndpoint();
-    serverVersionEl.textContent = serverInfo.serverVersion;
-    protocolVersionEl.textContent = serverInfo.protocolVersion;
+    serverVersionEl.textContent = `Server ${serverInfo.serverVersion}`;
+    protocolVersionEl.textContent = `Protocol ${serverInfo.protocolVersion}`;
     hostPlatformEl.textContent = hostSummary();
     renderToolSummary();
-    renderToolPermissions();
     renderHistory();
   }
 
@@ -1313,51 +1310,42 @@
     toolCountEl.textContent = `Enabled ${effective.length} of ${AVAILABLE_TOOLS.length}`;
     toolListEl.textContent = '';
     for (const group of TOOL_GROUPS) {
-      const tools = group.tools.filter((tool) => effective.includes(tool));
+      const tools = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool));
       if (tools.length === 0) continue;
-      const groupTotal = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool)).length;
-      const groupEl = document.createElement('section');
+      const enabledInGroup = tools.filter((tool) => effective.includes(tool));
+      const groupEl = document.createElement('details');
       groupEl.className = 'tool-group';
+      groupEl.open = false;
       groupEl.innerHTML = [
-        '<h3 class="tool-group-title">',
+        '<summary class="tool-group-title">',
         `<span>${escapeHtml(group.label)}</span>`,
-        `<span>${tools.length}/${groupTotal} enabled</span>`,
-        '</h3>',
-        `<div class="tool-chip-list">${tools.map((tool) => `<span class="tool-chip">${escapeHtml(tool)}</span>`).join('')}</div>`
+        `<span>Enabled ${enabledInGroup.length} of ${tools.length}</span>`,
+        '</summary>',
+        `<div class="tool-permission-list">${tools.map(toolControlMarkup).join('')}</div>`
       ].join('');
       toolListEl.appendChild(groupEl);
     }
-  }
-
-  function renderToolPermissions() {
-    const enabled = effectiveTools();
-    enabledToolCountEl.textContent = `Enabled ${enabled.length} of ${AVAILABLE_TOOLS.length}`;
-    toolPermissionListEl.textContent = '';
-    for (const group of TOOL_GROUPS) {
-      for (const tool of group.tools) {
-        if (!AVAILABLE_TOOLS.includes(tool)) continue;
-        const metadata = TOOL_METADATA.get(tool) || { category: group.label, sideEffect: 'read', description: 'Office tool.' };
-        const id = `toolPermission-${tool.replace(/[^a-z0-9_-]/gi, '-')}`;
-        const checked = isToolEnabled(tool);
-        const row = document.createElement('label');
-        row.className = `tool-permission-row${metadata.sideEffect === 'mutating' ? ' is-mutating' : ''}`;
-        row.setAttribute('for', id);
-        row.innerHTML = [
-          `<input id="${id}" class="tool-toggle" type="checkbox" data-tool="${escapeHtml(tool)}" ${checked ? 'checked' : ''} />`,
-          '<span class="tool-permission-main">',
-          '<span class="tool-permission-title">',
-          `<span class="tool-permission-name">${escapeHtml(tool)}</span>`,
-          `<span class="side-effect-pill ${metadata.sideEffect === 'mutating' ? 'mutating' : 'read'}">${escapeHtml(metadata.sideEffect)}</span>`,
-          '</span>',
-          `<span class="tool-permission-meta">${escapeHtml(metadata.category)} - ${escapeHtml(metadata.description)}</span>`,
-          '</span>'
-        ].join('');
-        toolPermissionListEl.appendChild(row);
-      }
-    }
-    toolPermissionListEl.querySelectorAll('[data-tool]').forEach((input) => {
+    toolListEl.querySelectorAll('[data-tool]').forEach((input) => {
       input.addEventListener('change', handleToolPermissionChange);
     });
+  }
+
+  function toolControlMarkup(tool) {
+    const metadata = TOOL_METADATA.get(tool) || { category: 'Tools', sideEffect: 'read', description: 'Office tool.' };
+    const id = `toolPermission-${tool.replace(/[^a-z0-9_-]/gi, '-')}`;
+    const checked = isToolEnabled(tool);
+    return [
+      `<label class="tool-permission-row${metadata.sideEffect === 'mutating' ? ' is-mutating' : ''}" for="${id}">`,
+      `<input id="${id}" class="tool-toggle" type="checkbox" data-tool="${escapeHtml(tool)}" ${checked ? 'checked' : ''} />`,
+      '<span class="tool-permission-main">',
+      '<span class="tool-permission-title">',
+      `<span class="tool-permission-name">${escapeHtml(tool)}</span>`,
+      `<span class="side-effect-pill ${metadata.sideEffect === 'mutating' ? 'mutating' : 'read'}">${escapeHtml(metadata.sideEffect)}</span>`,
+      '</span>',
+      `<span class="tool-permission-meta">${escapeHtml(metadata.description)}</span>`,
+      '</span>',
+      '</label>'
+    ].join('');
   }
 
   function handleToolPermissionChange(event) {
@@ -1366,7 +1354,6 @@
     toolPermissions[tool] = event.currentTarget.checked;
     saveToolPermissions();
     renderToolSummary();
-    renderToolPermissions();
     sendSessionToolUpdate();
   }
 
@@ -1404,7 +1391,14 @@
     if (!documentInfo) return;
     documentTitleEl.textContent = documentInfo.title || documentInfo.filename || 'Word Document';
     protectionEl.textContent = documentInfo.protection?.kind || 'Unknown';
-    documentStateEl.textContent = `Dirty: ${boolLabel(documentInfo.is_dirty)} / Read-only: ${boolLabel(documentInfo.is_read_only)}`;
+    documentStateEl.textContent = documentStateLabel(documentInfo);
+  }
+
+  function documentStateLabel(info) {
+    if (info.is_read_only === true) return 'Read-only';
+    if (info.is_protected === true || info.protection?.kind) return `Protected${info.protection?.kind ? `: ${info.protection.kind}` : ''}`;
+    if (info.is_dirty === true) return 'Editable, unsaved changes';
+    return 'Editable';
   }
 
   function startTask(requestId, tool, args, timeoutMs) {
@@ -1489,6 +1483,7 @@
     settingsPanelEl.hidden = !opening;
     settingsToggleEl.setAttribute('aria-expanded', String(opening));
     settingsToggleEl.setAttribute('aria-label', opening ? 'Close Settings' : 'Open Settings');
+    toolListEl.classList.toggle('is-editing-tools', opening);
     if (opening) endpointInputEl.focus();
     else {
       endpointInputEl.value = configuredEndpoint();

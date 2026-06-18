@@ -275,28 +275,34 @@ effect.
 
 User-reported follow-up from live Excel task pane testing:
 
-- [ ] Merge the `Available Tools` and `Tool Permissions` surfaces for Word and
+- [x] Merge the `Available Tools` and `Tool Permissions` surfaces for Word and
       Excel into one grouped tools surface, unless implementation evidence shows
       a separate read-only summary is materially clearer. The merged surface
       must avoid repeating the same tool names, descriptions, and counts in two
-      blocks.
-- [ ] Group tool permission rows by the same capability categories as available
+      blocks. Word and Excel now use one `Tools` surface that exposes the same
+      categorized rows for inspection and per-tool permission changes.
+- [x] Group tool permission rows by the same capability categories as available
       tools. Each category must support independent expand/collapse, show
       `Enabled X of Y` while collapsed, and preserve per-tool saved permission
-      state.
-- [ ] Replace the current settings-card interaction with compact inline editing
+      state. Contract tests cover categorized collapsible tool controls and
+      persisted per-tool permission updates.
+- [x] Replace the current settings-card interaction with compact inline editing
       inside the top summary block. Clicking the gear should reveal editable
       rows for daemon endpoint and tool permissions without creating a large
-      separate framed settings block that consumes the task pane viewport.
-- [ ] Combine server version and protocol version into one metadata row in Word
+      separate framed settings block that consumes the task pane viewport. The
+      settings panel now contains only the endpoint edit row; tool toggles stay
+      in the nearby `Tools` surface and become edit-enabled when settings opens.
+- [x] Combine server version and protocol version into one metadata row in Word
       and Excel task panes, for example `Server 0.1.0 / Protocol 1.0`.
-- [ ] Fix document state reporting so normal editable workbooks/documents do not
+- [x] Fix document state reporting so normal editable workbooks/documents do not
       show `Dirty: unknown / Read-only: unknown`. When Office APIs can determine
       editability, show `Editable`, `Read-only`, `Protected`, or a more specific
       host state. When a dirty/saved signal is not reliably exposed by the host,
       omit it from the primary summary or label it as diagnostic-only instead
-      of presenting `unknown` as the user-facing state.
-- [ ] Add Word and Excel task pane contract tests covering grouped collapsible
+      of presenting `unknown` as the user-facing state. Word and Excel now show
+      `Editable`, `Editable, unsaved changes`, `Read-only`, or `Protected...`
+      instead of primary `unknown` dirty/read-only text.
+- [x] Add Word and Excel task pane contract tests covering grouped collapsible
       permissions, no duplicated tools block, inline settings editing, merged
       server/protocol metadata, and non-unknown editable document state for the
       normal mocked editable host case.

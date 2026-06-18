@@ -224,24 +224,33 @@ button:hover {
 
 .tool-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   padding: 0 9px 9px;
 }
 
 .tool-group {
   display: grid;
-  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
 }
 
 .tool-group-title {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
+  padding: 7px 8px;
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 650;
   text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tool-group-title::marker {
+  color: var(--text-secondary);
 }
 
 .tool-group-title span:first-child {
@@ -255,24 +264,6 @@ button:hover {
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
   text-transform: none;
-}
-
-.tool-chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.tool-chip {
-  max-width: 100%;
-  padding: 2px 6px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text-primary);
-  background: var(--surface);
-  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 11px;
-  overflow-wrap: anywhere;
 }
 
 dt {
@@ -348,27 +339,21 @@ code,
 }
 
 .settings-panel {
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface-raised);
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .settings-panel h2 {
-  margin-bottom: 8px;
-}
-
-.tool-permissions {
-  display: grid;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
+  display: none;
 }
 
 .tool-permission-list {
   display: grid;
-  gap: 7px;
+  gap: 6px;
+  padding: 0 8px 8px;
 }
 
 .tool-permission-row {
@@ -376,10 +361,9 @@ code,
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
   align-items: start;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface);
+  padding: 7px;
+  border-top: 1px solid var(--border);
+  background: transparent;
 }
 
 .tool-permission-row.is-mutating {
@@ -391,6 +375,10 @@ code,
   height: 16px;
   margin: 2px 0 0;
   accent-color: var(--excel);
+}
+
+.tool-list:not(.is-editing-tools) .tool-toggle {
+  pointer-events: none;
 }
 
 .tool-permission-main {
