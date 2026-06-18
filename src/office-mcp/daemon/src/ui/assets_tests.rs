@@ -65,7 +65,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("aria-label=\"Copy MCP endpoint\""));
     assert!(html.contains("aria-label=\"Copy add-in endpoint\""));
     assert!(html.contains("name=\"session-filter\""));
-    assert!(html.contains("Word, Excel, PowerPoint, session..."));
+    assert!(html.contains("Word, Excel, PowerPoint, session&hellip;"));
+    assert!(!html.contains("session..."));
     assert!(html.contains("aria-live=\"polite\""));
     assert!(css.contains("minmax(0, 1fr)"));
     assert!(css.contains("content-visibility: auto"));
