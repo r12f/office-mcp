@@ -19,6 +19,10 @@ const visibleIcon = booleanFlag('--visible-icon');
 const rightClickMenu = booleanFlag('--right-click-menu');
 const menuOpenedFromTrayIcon = booleanFlag('--menu-opened-from-tray-icon');
 const nativeMenuAppearanceReviewed = booleanFlag('--native-menu-appearance-reviewed');
+const menuAnchoredToTrayIcon = booleanFlag('--menu-anchored-to-tray-icon');
+const osNativeMenuBehaviorReviewed = booleanFlag('--os-native-menu-behavior-reviewed');
+const keyboardMenuAccessReviewed = booleanFlag('--keyboard-menu-access-reviewed');
+const nativeQuitConfirmationReviewed = booleanFlag('--native-quit-confirmation-reviewed');
 const showUiOpened = booleanFlag('--show-ui-opened');
 const expectedItems = ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'];
 const observedMenuItems = readRepeatedOption('--menu-item');
@@ -34,7 +38,8 @@ const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office
 const trayMenuSurfaceNative = trayMenuSurfaceKind === 'native';
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
-const passed = visibleIcon && rightClickMenu && menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && traySurfaceScreenshotsReady && daemonContextReady;
+const nativeTrayInteractionReady = menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && menuAnchoredToTrayIcon && osNativeMenuBehaviorReviewed && keyboardMenuAccessReviewed && nativeQuitConfirmationReviewed;
+const passed = visibleIcon && rightClickMenu && nativeTrayInteractionReady && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && traySurfaceScreenshotsReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -46,6 +51,11 @@ const evidence = {
   right_click_menu: rightClickMenu,
   menu_opened_from_tray_icon: menuOpenedFromTrayIcon,
   native_menu_appearance_reviewed: nativeMenuAppearanceReviewed,
+  menu_anchored_to_tray_icon: menuAnchoredToTrayIcon,
+  os_native_menu_behavior_reviewed: osNativeMenuBehaviorReviewed,
+  keyboard_menu_access_reviewed: keyboardMenuAccessReviewed,
+  native_quit_confirmation_reviewed: nativeQuitConfirmationReviewed,
+  native_tray_interaction_ready: nativeTrayInteractionReady,
   tray_menu_surface_kind: trayMenuSurfaceKind,
   tray_menu_surface_native: trayMenuSurfaceNative,
   show_ui_opened: showUiOpened,

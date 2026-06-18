@@ -124,6 +124,9 @@ test('rendered-size logo review artifact covers first-contact product surfaces',
     assert.equal(report.ready, true);
     assert.equal(report.sheet_path, sheet);
     assert.equal(report.design_review.ready, true);
+    assert.match(report.design_review.future_office_control_brief, /future office control/i);
+    assert.match(report.design_review.future_office_control_brief, /routing|operator|control/i);
+    assert.match(report.design_review.future_office_control_brief, /without .*Office-owned app marks/i);
     assert.match(report.design_review.office_productivity_metaphor, /document|pane/i);
     assert.match(report.design_review.user_control_metaphor, /control|command/i);
     assert.match(report.design_review.futuristic_maturity, /mature|futuristic/i);

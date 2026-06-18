@@ -24,6 +24,11 @@ test('manual tray evidence recorder requires product tooltip', () => {
     assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_quit_confirmation, true);
     assert.equal(evidence.tray_menu_surface_kind, 'native');
     assert.equal(evidence.tray_menu_surface_native, true);
+    assert.equal(evidence.menu_anchored_to_tray_icon, true);
+    assert.equal(evidence.os_native_menu_behavior_reviewed, true);
+    assert.equal(evidence.keyboard_menu_access_reviewed, true);
+    assert.equal(evidence.native_quit_confirmation_reviewed, true);
+    assert.equal(evidence.native_tray_interaction_ready, true);
     assert.equal(evidence.passed, true);
 
     const missingTooltip = runRecorder(join(dir, 'missing-tooltip.json'), screenshotPath, '--daemon-bin', daemonBin);
@@ -73,6 +78,11 @@ test('manual tray evidence recorder requires native tray menu review', () => {
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.menu_opened_from_tray_icon, false);
     assert.equal(evidence.native_menu_appearance_reviewed, false);
+    assert.equal(evidence.menu_anchored_to_tray_icon, false);
+    assert.equal(evidence.os_native_menu_behavior_reviewed, false);
+    assert.equal(evidence.keyboard_menu_access_reviewed, false);
+    assert.equal(evidence.native_quit_confirmation_reviewed, false);
+    assert.equal(evidence.native_tray_interaction_ready, false);
     assert.equal(evidence.passed, false);
   });
 });
@@ -181,7 +191,11 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
   });
   const reviewArgs = skipNativeMenuReviewFlags ? [] : [
     '--menu-opened-from-tray-icon', 'true',
-    '--native-menu-appearance-reviewed', 'true'
+    '--native-menu-appearance-reviewed', 'true',
+    '--menu-anchored-to-tray-icon', 'true',
+    '--os-native-menu-behavior-reviewed', 'true',
+    '--keyboard-menu-access-reviewed', 'true',
+    '--native-quit-confirmation-reviewed', 'true'
   ];
   return spawnSync(process.execPath, [
     TSX,

@@ -209,6 +209,11 @@ function validateManualTrayEvidence(): void {
     ['right_click_menu', 'right-click menu'],
     ['menu_opened_from_tray_icon', 'right-click menu opened from the notification-area tray icon'],
     ['native_menu_appearance_reviewed', 'native tray menu appearance review'],
+    ['menu_anchored_to_tray_icon', 'native menu anchored to the notification-area tray icon'],
+    ['os_native_menu_behavior_reviewed', 'OS-native tray menu spacing, hover, and theme behavior review'],
+    ['keyboard_menu_access_reviewed', 'keyboard access for native tray menu actions'],
+    ['native_quit_confirmation_reviewed', 'native quit confirmation review'],
+    ['native_tray_interaction_ready', 'native tray interaction ready flag'],
     ['tray_menu_surface_native', 'native tray menu surface'],
     ['show_ui_opened', 'Show Office MCP opened UI'],
     ['passed', 'manual tray evidence passed']
@@ -286,6 +291,11 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
     ['right_click_menu', 'right-click menu'],
     ['menu_opened_from_tray_icon', 'right-click menu opened from the notification-area tray icon'],
     ['native_menu_appearance_reviewed', 'native tray menu appearance review'],
+    ['menu_anchored_to_tray_icon', 'native menu anchored to the notification-area tray icon'],
+    ['os_native_menu_behavior_reviewed', 'OS-native tray menu spacing, hover, and theme behavior review'],
+    ['keyboard_menu_access_reviewed', 'keyboard access for native tray menu actions'],
+    ['native_quit_confirmation_reviewed', 'native quit confirmation review'],
+    ['native_tray_interaction_ready', 'native tray interaction ready flag'],
     ['tray_menu_surface_native', 'native tray menu surface'],
     ['show_ui_opened', 'Show Office MCP opened UI'],
     ['passed', 'manual tray evidence passed']
@@ -372,6 +382,9 @@ function validateRenderedLogoDesignReview(review: unknown): void {
     return;
   }
   if (review.ready !== true) failures.push('Rendered logo design review is not ready.');
+  if (typeof review.future_office_control_brief !== 'string' || !/future office control/i.test(review.future_office_control_brief) || !/routing|operator|control/i.test(review.future_office_control_brief) || !/without .*Office-owned app marks/i.test(review.future_office_control_brief)) {
+    failures.push('Rendered logo design review missing future office control brief.');
+  }
   if (typeof review.office_productivity_metaphor !== 'string' || !/document|pane|office/i.test(review.office_productivity_metaphor)) failures.push('Rendered logo design review missing office productivity metaphor.');
   if (typeof review.user_control_metaphor !== 'string' || !/control|command|operator/i.test(review.user_control_metaphor)) failures.push('Rendered logo design review missing user control metaphor.');
   if (typeof review.futuristic_maturity !== 'string' || !/mature|futuristic|desktop utility/i.test(review.futuristic_maturity)) failures.push('Rendered logo design review missing mature futuristic utility rationale.');

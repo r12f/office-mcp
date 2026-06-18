@@ -364,6 +364,11 @@ test('runtime evidence validator can require product visual evidence', () => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.manual_tray_evidence.menu_opened_from_tray_icon = false;
       broken.manual_tray_evidence.native_menu_appearance_reviewed = false;
+      broken.manual_tray_evidence.menu_anchored_to_tray_icon = false;
+      broken.manual_tray_evidence.os_native_menu_behavior_reviewed = false;
+      broken.manual_tray_evidence.keyboard_menu_access_reviewed = false;
+      broken.manual_tray_evidence.native_quit_confirmation_reviewed = false;
+      broken.manual_tray_evidence.native_tray_interaction_ready = false;
       broken.manual_tray_evidence_ready = false;
       broken.passed = false;
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
@@ -372,6 +377,10 @@ test('runtime evidence validator can require product visual evidence', () => {
       assert.match(outputText(result.stdout), /embedded manual tray evidence ready flag/);
       assert.match(outputText(result.stdout), /right-click menu opened from the notification-area tray icon/);
       assert.match(outputText(result.stdout), /native tray menu appearance review/);
+      assert.match(outputText(result.stdout), /native menu anchored to the notification-area tray icon/);
+      assert.match(outputText(result.stdout), /OS-native tray menu spacing, hover, and theme behavior review/);
+      assert.match(outputText(result.stdout), /keyboard access for native tray menu actions/);
+      assert.match(outputText(result.stdout), /native quit confirmation review/);
     });
   });
 
@@ -604,11 +613,20 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
       broken.menu_opened_from_tray_icon = false;
       broken.native_menu_appearance_reviewed = false;
+      broken.menu_anchored_to_tray_icon = false;
+      broken.os_native_menu_behavior_reviewed = false;
+      broken.keyboard_menu_access_reviewed = false;
+      broken.native_quit_confirmation_reviewed = false;
+      broken.native_tray_interaction_ready = false;
       writeFileSync(manualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /right-click menu opened from the notification-area tray icon/);
       assert.match(outputText(result.stdout), /native tray menu appearance review/);
+      assert.match(outputText(result.stdout), /native menu anchored to the notification-area tray icon/);
+      assert.match(outputText(result.stdout), /OS-native tray menu spacing, hover, and theme behavior review/);
+      assert.match(outputText(result.stdout), /keyboard access for native tray menu actions/);
+      assert.match(outputText(result.stdout), /native quit confirmation review/);
     });
   });
 });
@@ -872,6 +890,7 @@ function renderedLogoReview(passed: boolean, sheetPath: string) {
 
 function renderedLogoDesignReview(passed: boolean) {
   return {
+    future_office_control_brief: passed ? 'Future office control: routing geometry and operator control without Office-owned app marks.' : '',
     office_productivity_metaphor: passed ? 'Abstract document panes communicate office productivity.' : '',
     user_control_metaphor: passed ? 'Command routing and operator nodes communicate local user control.' : '',
     futuristic_maturity: passed ? 'Mature slightly futuristic desktop utility geometry.' : '',
@@ -914,6 +933,11 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     right_click_menu: passed,
     menu_opened_from_tray_icon: passed,
     native_menu_appearance_reviewed: passed,
+    menu_anchored_to_tray_icon: passed,
+    os_native_menu_behavior_reviewed: passed,
+    keyboard_menu_access_reviewed: passed,
+    native_quit_confirmation_reviewed: passed,
+    native_tray_interaction_ready: passed,
     tray_menu_surface_kind: passed ? 'native' : 'webview',
     tray_menu_surface_native: passed,
     show_ui_opened: passed,

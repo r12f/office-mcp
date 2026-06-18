@@ -547,8 +547,12 @@ Latest UI feedback to preserve in implementation planning:
       manual tray evidence artifact, including visible icon, right-click menu,
       menu-opened-from-tray-icon proof, native appearance review, product
       tooltip, required menu items, screenshot image, and live daemon/tray probe
-      context. This item remains open until those fields are backed by a real
-      interactive Windows tray capture.
+      context. The manual tray recorder and final product visual validator now
+      also require explicit review flags proving the menu is anchored to the
+      visible notification-area icon, uses OS-native menu spacing/hover/theme
+      behavior, supports keyboard menu actions, and shows a native quit
+      confirmation. This item remains open until those fields are backed by a
+      real interactive Windows tray capture.
 - [x] Polish the automated tray product surface model so normal Windows users
       are expected to see a deliberate app icon, native tooltip/title, native
       context menu text, disabled status rows, and confirmation dialogs that
@@ -579,7 +583,9 @@ Latest UI feedback to preserve in implementation planning:
       visual evidence without that daemon context, and the recorder marks the
       artifact failed before validation when the daemon context is missing, not
       ready, cannot read live UI state, or does not expose the expected tray
-      snapshot.
+      snapshot. The rendered logo review artifact must include the future
+      office control design brief in addition to rendered-size palette and
+      non-Microsoft distinction checks.
 - [ ] Capture visual evidence for the finished identity on Windows: Word ribbon
       command, Word catalog entry including type/category and icon, Word task
       pane title/icon, Excel equivalents, PowerPoint ribbon command,

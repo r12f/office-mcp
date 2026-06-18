@@ -511,6 +511,7 @@ function writeRenderedLogoReview(dir: string, ready = true): string {
 
 function renderedLogoDesignReview(ready: boolean) {
   return {
+    future_office_control_brief: ready ? 'Future office control: routing geometry and operator control without Office-owned app marks.' : '',
     office_productivity_metaphor: ready ? 'Abstract document panes communicate office productivity.' : '',
     user_control_metaphor: ready ? 'Command routing and operator nodes communicate local user control.' : '',
     futuristic_maturity: ready ? 'Mature slightly futuristic desktop utility geometry.' : '',
@@ -587,6 +588,11 @@ function writeManualTrayEvidence(dir: string, ready = true): string {
     right_click_menu: ready,
     menu_opened_from_tray_icon: ready,
     native_menu_appearance_reviewed: ready,
+    menu_anchored_to_tray_icon: ready,
+    os_native_menu_behavior_reviewed: ready,
+    keyboard_menu_access_reviewed: ready,
+    native_quit_confirmation_reviewed: ready,
+    native_tray_interaction_ready: ready,
     tray_menu_surface_kind: ready ? 'native' : 'webview',
     tray_menu_surface_native: ready,
     show_ui_opened: ready,

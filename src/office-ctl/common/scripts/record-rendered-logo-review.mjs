@@ -50,6 +50,7 @@ mkdirSync(dirname(sheetPath), { recursive: true });
 writeFileSync(sheetPath, encodePng(sheet.width, sheet.height, sheet.rgba));
 
 const designReview = {
+  future_office_control_brief: 'Future office control: precise document surfaces, routing geometry, and restrained operator affordances communicate local control without Office-owned app marks, terminal/debug motifs, or decorative AI/neon styling.',
   office_productivity_metaphor: 'Abstract document and app panes remain visible at tray, ribbon, catalog, title-bar, and installer sizes.',
   user_control_metaphor: 'The command spine, operator nodes, and control dial communicate local user control rather than passive document storage.',
   futuristic_maturity: 'Crisp geometry and restrained accent colors give the mark a mature slightly futuristic desktop utility feel without decorative noise.',

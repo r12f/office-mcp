@@ -304,7 +304,11 @@ function renderedLogoReviewLooksReady(review: Record<string, unknown> | undefine
 function renderedLogoDesignReviewLooksReady(review: unknown): boolean {
   if (!isRecord(review) || review.ready !== true) return false;
   const rejectedReadings = Array.isArray(review.rejects_generic_readings) ? review.rejects_generic_readings : [];
-  return typeof review.office_productivity_metaphor === 'string' && /document|pane|office/i.test(review.office_productivity_metaphor)
+  return typeof review.future_office_control_brief === 'string'
+    && /future office control/i.test(review.future_office_control_brief)
+    && /routing|operator|control/i.test(review.future_office_control_brief)
+    && /without .*Office-owned app marks/i.test(review.future_office_control_brief)
+    && typeof review.office_productivity_metaphor === 'string' && /document|pane|office/i.test(review.office_productivity_metaphor)
     && typeof review.user_control_metaphor === 'string' && /control|command|operator/i.test(review.user_control_metaphor)
     && typeof review.futuristic_maturity === 'string' && /mature|futuristic|desktop utility/i.test(review.futuristic_maturity)
     && typeof review.non_microsoft_distinction === 'string' && /Office logos|Microsoft 365 gradients|gear-only/i.test(review.non_microsoft_distinction)
@@ -392,13 +396,25 @@ function readManualTrayEvidence(path: string): Record<string, unknown> {
 function manualTrayEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
   if (!evidence) return false;
   if (evidence.ok !== true || evidence.schema_version !== 1 || evidence.kind !== 'tray_manual_evidence' || evidence.platform !== 'win32' || evidence.passed !== true) return false;
-  if (evidence.visible_icon !== true || evidence.right_click_menu !== true || evidence.menu_opened_from_tray_icon !== true || evidence.native_menu_appearance_reviewed !== true || evidence.tray_menu_surface_native !== true || evidence.tray_menu_surface_kind !== 'native' || evidence.show_ui_opened !== true) return false;
+  if (!manualTrayInteractionLooksReady(evidence) || evidence.tray_menu_surface_native !== true || evidence.tray_menu_surface_kind !== 'native' || evidence.show_ui_opened !== true) return false;
   if (typeof evidence.observed_tooltip !== 'string' || !/^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(evidence.observed_tooltip)) return false;
   if (typeof evidence.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(evidence.screenshot_path))) return false;
   const items = Array.isArray(evidence.observed_menu_items) ? evidence.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];
   return ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'].every((expected) => items.some((item) => item.includes(expected)))
     && evidence.daemon_context_ready === true
     && daemonContextLooksReady(isRecord(evidence.daemon_context) ? evidence.daemon_context : undefined);
+}
+
+function manualTrayInteractionLooksReady(evidence: Record<string, unknown>): boolean {
+  return evidence.visible_icon === true
+    && evidence.right_click_menu === true
+    && evidence.menu_opened_from_tray_icon === true
+    && evidence.native_menu_appearance_reviewed === true
+    && evidence.menu_anchored_to_tray_icon === true
+    && evidence.os_native_menu_behavior_reviewed === true
+    && evidence.keyboard_menu_access_reviewed === true
+    && evidence.native_quit_confirmation_reviewed === true
+    && evidence.native_tray_interaction_ready === true;
 }
 
 function readDaemonContext(binaryPath: string): Record<string, unknown> {
