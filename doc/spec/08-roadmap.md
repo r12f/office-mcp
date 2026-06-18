@@ -357,6 +357,15 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       under `src/office-ctl/common/assets/` and a deterministic generator in
       `src/office-ctl/common/scripts/generate-brand-assets.mjs`; Rust tray
       glyph coverage verifies the native 32 px mark is not blank or single-color.
+- [ ] Re-review and, if needed, redesign the current logo/icon direction against
+      the stricter product-quality brief. The final mark must communicate office
+      productivity plus user control with a mature, slightly futuristic desktop
+      utility feel, without using Microsoft Office logos, Office tile language,
+      Microsoft 365 gradients, Word/Excel silhouettes, Windows app-icon
+      conventions, placeholder initials, generic document icons, or a gear-only
+      settings mark. This task is complete only when source artwork, generated
+      raster assets, and rendered-size evidence prove the icon is recognizable
+      in the ribbon, catalog, tray, installer/package, and daemon UI contexts.
 - [x] Update Word and Excel add-in manifests/catalog rendering so release and
       sideloaded builds use mature product metadata: stable add-in title,
       provider, description, support URL, ribbon group label, action label, and
@@ -381,12 +390,26 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       to match the new identity while keeping host-specific Word/Excel accents
       restrained and secondary. Word and Excel task panes now use `Office MCP
       Control` as the document-local chrome title.
+- [ ] Re-audit the add-in first-run identity across Word and Excel: Office
+      catalog entry, ribbon command, task pane title/chrome, manifest metadata,
+      provider, description, support metadata, and type/category. The combined
+      title/icon/type presentation must read as mature product software, not an
+      experimental add-in, internal protocol bridge, sample, debug panel, or raw
+      implementation package. The installer and catalog registration scripts
+      must keep Word and Excel catalog entries visible after reinstall and must
+      point them at the current daemon origin and generated icon URLs.
 - [x] Replace the current tray placeholder/missing icon with the generated
       tray glyph in normal daemon and installed launch paths. The icon must be
       visible in the Windows notification area and visually deliberate beside
       native system icons. Automated coverage verifies the Rust tray icon uses
       the product glyph instead of a blank or single-color placeholder; final
       visible notification-area evidence remains manual.
+- [ ] Rework tray product polish so the normal Windows notification-area surface
+      looks native and finished: visible original icon, product tooltip, no
+      missing/default icon, no debug labels, and menu/confirmation text aligned
+      with the add-in product name. The right-click menu must be the operating
+      system's native context menu, not a webview, browser window, frameless HTML
+      panel, CSS-styled popup, or custom-drawn imitation.
 - [ ] Ensure the tray right-click interaction uses a real platform-native menu
       on Windows, with native separators, disabled/read-only status rows,
       hover/selection behavior, keyboard access, and theme/high-contrast
