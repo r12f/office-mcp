@@ -82,6 +82,40 @@ fn native_tray_quit_uses_platform_confirmation_dialogs() {
 }
 
 #[test]
+fn native_tray_menu_uses_platform_menu_primitives_not_web_surfaces() {
+    let source = read_tray_source("native_tray.rs");
+    let normalized = source.to_ascii_lowercase();
+
+    assert!(
+        source.contains("tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem}")
+    );
+    assert!(source.contains("TrayIconBuilder::new()"));
+    assert!(source.contains(".with_menu(Box::new(menu))"));
+    assert!(source.contains("Menu::new()"));
+    assert!(source.contains("MenuItem::new(label, false, None)"));
+    assert!(source.contains("MenuItem::with_id(MenuId::new(SHOW_ID), label, true, None)"));
+    assert!(source.contains("PredefinedMenuItem::separator()"));
+
+    for forbidden in [
+        "webview",
+        "web_view",
+        "html",
+        "css",
+        "frameless",
+        "popup",
+        "browserwindow",
+        "windowbuilder",
+        "tao::window",
+        "wry::",
+    ] {
+        assert!(
+            !normalized.contains(forbidden),
+            "native tray menu must not use custom web or window surface: {forbidden}"
+        );
+    }
+}
+
+#[test]
 fn native_tray_allows_background_event_loop_on_windows_and_linux() {
     let source = read_tray_source("native_tray.rs");
 
