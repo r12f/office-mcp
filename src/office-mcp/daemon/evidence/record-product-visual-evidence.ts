@@ -33,12 +33,20 @@ const catalogIconVisible = booleanFlag('--catalog-icon-visible');
 const trayMenuNative = booleanFlag('--tray-menu-native');
 const trayIconVisible = booleanFlag('--tray-icon-visible');
 const quitConfirmationVisible = booleanFlag('--quit-confirmation-visible');
+const excelCompactTopBlock = booleanFlag('--excel-compact-top-block');
+const excelToolsPermissionsMerged = booleanFlag('--excel-tools-permissions-merged');
+const excelInlineSettings = booleanFlag('--excel-inline-settings');
+const excelServerProtocolRow = readOption('--excel-server-protocol-row');
+const excelDocumentState = readOption('--excel-document-state');
 
 const productTextReady = requiredSurfaces.filter((surface) => surface !== 'tray_tooltip').every((surface) => typeof observations[surface] === 'string' && (observations[surface] as string).includes(productName));
 const allScreenshotsExist = Object.values(screenshotsExist).every(Boolean);
 const trayTooltipReady = typeof trayTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(trayTooltip);
 const catalogTypeReady = typeof catalogType === 'string' && /local productivity automation control utility/i.test(catalogType);
-const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible;
+const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
+const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
+const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady;
+const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && excelTaskpaneDensityReady;
 
 const evidence = {
   schema_version: 1,
@@ -60,6 +68,16 @@ const evidence = {
   tray_icon_visible: trayIconVisible,
   tray_menu_native: trayMenuNative,
   quit_confirmation_visible: quitConfirmationVisible,
+  excel_taskpane: {
+    compact_top_block: excelCompactTopBlock,
+    tools_permissions_merged: excelToolsPermissionsMerged,
+    inline_settings: excelInlineSettings,
+    server_protocol_row: excelServerProtocolRow,
+    server_protocol_row_ready: excelServerProtocolReady,
+    document_state: excelDocumentState,
+    document_state_ready: excelDocumentStateReady,
+    density_ready: excelTaskpaneDensityReady
+  },
   notes,
   passed
 };

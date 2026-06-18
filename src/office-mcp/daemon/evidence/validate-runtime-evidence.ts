@@ -213,6 +213,7 @@ function validateProductVisualEvidence(): void {
   }
   validateProductVisualScreenshots(visual.screenshot_paths);
   validateProductVisualObservations(visual.observations);
+  validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
 }
 
 function validateProductVisualScreenshots(paths: unknown): void {
@@ -233,12 +234,33 @@ function validateProductVisualObservations(observations: unknown): void {
     failures.push('Product visual evidence observations are malformed.');
     return;
   }
-  for (const surface of productVisualSurfaces()) {
+  for (const surface of productVisualSurfaces().filter((item) => item !== 'tray_tooltip')) {
     const value = observations[surface];
     if (typeof value !== 'string' || !value.includes('Office MCP Control')) {
       failures.push(`Product visual evidence observation missing product name: ${surface}.`);
     }
   }
+}
+
+function validateExcelTaskpaneVisualEvidence(taskpane: unknown): void {
+  if (!isRecord(taskpane)) {
+    failures.push('Product visual evidence missing Excel task pane details.');
+    return;
+  }
+  for (const [key, label] of [
+    ['compact_top_block', 'compact top block'],
+    ['tools_permissions_merged', 'merged tools and permissions surface'],
+    ['inline_settings', 'inline settings']
+  ] as const) {
+    if (taskpane[key] !== true) failures.push(`Product visual evidence missing Excel ${label}.`);
+  }
+  if (typeof taskpane.server_protocol_row !== 'string' || !/^Server .+ \/ Protocol .+$/.test(taskpane.server_protocol_row)) {
+    failures.push('Product visual evidence missing Excel combined server/protocol row.');
+  }
+  if (typeof taskpane.document_state !== 'string' || !/^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(taskpane.document_state) || /unknown/i.test(taskpane.document_state)) {
+    failures.push('Product visual evidence missing concrete Excel editable/read-only/protected state.');
+  }
+  if (taskpane.density_ready !== true) failures.push('Product visual evidence missing Excel task pane density pass flag.');
 }
 
 function productVisualSurfaces(): string[] {

@@ -309,7 +309,9 @@ User-reported follow-up from live Excel task pane testing:
 - [ ] Capture live Excel evidence after implementation showing a connected
       workbook with the compact top block, merged tools/permissions surface,
       inline settings edit rows, combined server/protocol row, and a concrete
-      editable/read-only/protected state.
+      editable/read-only/protected state. The visual portion must be recorded
+      with `npm run evidence:record-product-visual` using the Excel task pane
+      density flags and then validated with `--require-product-visual`.
 
 **Exit criterion**: In a 320 px Office task pane, a connected editable Excel
 workbook does not show duplicated tool lists or `unknown` document state; tools

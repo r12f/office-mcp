@@ -30,6 +30,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal(evidence.product_text_ready, true);
     assert.equal(evidence.catalog_type_ready, true);
     assert.equal(evidence.tray_tooltip_ready, true);
+    assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal(evidence.passed, true);
 
     const missingScreenshots = { ...screenshots };
@@ -52,7 +53,12 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     '--tray-tooltip', 'Office MCP - Up - 0 clients - 0 documents',
     '--tray-icon-visible', 'true',
     '--tray-menu-native', 'true',
-    '--quit-confirmation-visible', 'true'
+    '--quit-confirmation-visible', 'true',
+    '--excel-compact-top-block', 'true',
+    '--excel-tools-permissions-merged', 'true',
+    '--excel-inline-settings', 'true',
+    '--excel-server-protocol-row', 'Server 0.1.0 / Protocol 1.0',
+    '--excel-document-state', 'Editable'
   ];
   for (const surface of SURFACES) {
     args.push(`--${surface}`, `Office MCP Control ${surface}`);
