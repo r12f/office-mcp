@@ -57,6 +57,9 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(html, /Tool Permissions/);
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
   assert.match(html, /aria-label="Open Settings"/);
+  assert.match(html, /<svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">/);
+  assert.match(html, /<circle cx="17" cy="12" r="2" \/>/);
+  assert.doesNotMatch(html, /⚙|&#9881;/);
   assert.ok(html.indexOf('id="settingsPanel"') < html.indexOf('id="currentTaskHeading"'));
   assert.ok(html.indexOf('id="toolList"') < html.indexOf('id="settingsPanel"'));
 
@@ -64,6 +67,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(css, /body \{[\s\S]*min-width: 320px;[\s\S]*overflow-x: hidden;/);
   assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);
   assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
+  assert.match(css, /\.control-glyph \{[\s\S]*width: 18px;[\s\S]*stroke: currentColor;/);
   assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
   assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);

@@ -349,12 +349,16 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
   assert.match(html, /aria-label="Open Settings"/);
+  assert.match(html, /<svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">/);
+  assert.match(html, /<circle cx="17" cy="12" r="2" \/>/);
+  assert.doesNotMatch(html, /⚙|&#9881;/);
   assert.ok(html.indexOf('id="settingsPanel"') < html.indexOf('id="currentTaskHeading"'));
   assert.ok(html.indexOf('id="toolList"') < html.indexOf('id="settingsPanel"'));
   assert.match(css, /:focus-visible/);
   assert.match(css, /\.summary-panel/);
   assert.match(css, /\.identity \{[\s\S]*grid-template-columns: 32px minmax\(0, 1fr\);/);
   assert.match(css, /\.product-mark \{[\s\S]*width: 32px;[\s\S]*height: 32px;/);
+  assert.match(css, /\.control-glyph \{[\s\S]*width: 18px;[\s\S]*stroke: currentColor;/);
   assert.match(css, /\.tool-list/);
   assert.match(css, /\.settings-panel/);
   assert.match(css, /\.settings-panel\[hidden\] \{[\s\S]*display: none;/);

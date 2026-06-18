@@ -210,6 +210,16 @@ button:hover {
   border-color: var(--focus);
 }
 
+.control-glyph {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .metadata-grid {
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr);
