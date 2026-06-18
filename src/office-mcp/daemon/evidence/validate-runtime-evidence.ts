@@ -173,6 +173,9 @@ function validateManualTrayEvidence(): void {
   if (typeof manual.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(manual.screenshot_path))) {
     failures.push('Manual tray evidence screenshot file does not exist.');
   }
+  if (manual.daemon_context_ready !== true) {
+    failures.push('Manual tray evidence daemon context is not recorder-ready.');
+  }
   validateManualTrayDaemonContext(manual.daemon_context);
   for (const [key, label] of [
     ['visible_icon', 'visible tray icon'],
@@ -215,6 +218,9 @@ function validateProductVisualEvidence(): void {
   validateProductVisualScreenshots(visual.screenshot_paths);
   validateProductVisualObservations(visual.observations);
   validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
+  if (visual.daemon_context_ready !== true) {
+    failures.push('Product visual evidence daemon context is not recorder-ready.');
+  }
   validateProductVisualDaemonContext(visual.daemon_context);
 }
 

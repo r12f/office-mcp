@@ -286,6 +286,17 @@ test('runtime evidence validator can require product visual evidence', () => {
       assert.match(outputText(result.stdout), /Product visual evidence daemon context tray probe did not read live UI state/);
     });
   });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.daemon_context_ready = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual evidence daemon context is not recorder-ready/);
+    });
+  });
 });
 test('runtime evidence validator can require manual Windows tray evidence', () => {
   const ui = uiReport();
@@ -385,6 +396,17 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /Manual tray daemon context tray probe did not read live UI state/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.daemon_context_ready = false;
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence daemon context is not recorder-ready/);
     });
   });
 });
@@ -528,6 +550,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       density_ready: passed
     },
     daemon_context: manualTrayDaemonContext(),
+    daemon_context_ready: passed,
     passed
   };
 }
@@ -563,6 +586,7 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     screenshot_path: screenshotPath,
     screenshot_exists: passed,
     daemon_context: manualTrayDaemonContext() as ReturnType<typeof manualTrayDaemonContext> | undefined,
+    daemon_context_ready: passed,
     passed
   };
 }
