@@ -220,6 +220,7 @@ function validateProductVisualEvidence(): void {
   validateProductVisualScreenshots(visual.screenshot_paths);
   validateProductVisualObservations(visual.observations);
   validateProductIdentityReview(visual.product_identity_review);
+  validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
   validateFirstRunIdentity(visual.first_run_identity);
   validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
   if (visual.daemon_context_ready !== true) {
@@ -236,6 +237,7 @@ function validateProductIdentityReview(review: unknown): void {
   for (const [key, label] of [
     ['logo_quality_reviewed', 'logo quality review'],
     ['rendered_size_logo_reviewed', 'rendered-size logo review'],
+    ['rendered_logo_review_ready', 'rendered logo review artifact ready flag'],
     ['addin_identity_reviewed', 'add-in first-run identity review'],
     ['word_first_run_identity_reviewed', 'Word first-run identity review'],
     ['excel_first_run_identity_reviewed', 'Excel first-run identity review'],
@@ -245,6 +247,36 @@ function validateProductIdentityReview(review: unknown): void {
     ['ready', 'product identity review ready flag']
   ] as const) {
     if (review[key] !== true) failures.push(`Product visual evidence missing ${label}.`);
+  }
+}
+
+function validateRenderedLogoReview(review: unknown, ready: unknown): void {
+  if (ready !== true) failures.push('Product visual evidence missing rendered logo review ready flag.');
+  if (!isRecord(review)) {
+    failures.push('Product visual evidence missing rendered logo review artifact.');
+    return;
+  }
+  if (review.ok !== true) failures.push('Product visual rendered logo review was not read successfully.');
+  if (review.schema_version !== 1) failures.push(`Unsupported rendered logo review schema_version: ${review.schema_version}`);
+  if (review.kind !== 'rendered_logo_review') failures.push(`Unsupported rendered logo review kind: ${review.kind ?? 'missing'}`);
+  if (review.product_name !== 'Office MCP Control') failures.push('Rendered logo review missing Office MCP Control product name.');
+  if (review.ready !== true) failures.push('Rendered logo review is not ready.');
+  if (typeof review.sheet_path !== 'string' || !screenshotFileLooksLikeImage(resolve(review.sheet_path))) {
+    failures.push('Rendered logo review contact sheet is missing or invalid.');
+  }
+  const surfaces = Array.isArray(review.surfaces) ? review.surfaces.filter(isRecord) : [];
+  for (const [key, size] of renderedLogoReviewSurfaces()) {
+    const surface = surfaces.find((item) => item.key === key);
+    if (!surface) {
+      failures.push(`Rendered logo review missing surface: ${key}`);
+      continue;
+    }
+    if (surface.rendered_size_px !== size || surface.width !== size || surface.height !== size) {
+      failures.push(`Rendered logo review surface ${key} has wrong rendered size.`);
+    }
+    if (surface.non_empty !== true) failures.push(`Rendered logo review surface ${key} is empty.`);
+    if (surface.palette_ready !== true) failures.push(`Rendered logo review surface ${key} is missing product palette.`);
+    if (surface.expected_size_ready !== true) failures.push(`Rendered logo review surface ${key} is not expected-size ready.`);
   }
 }
 
@@ -363,6 +395,16 @@ function productVisualSurfaces(): string[] {
     'tray_native_menu',
     'tray_tooltip',
     'tray_quit_confirmation'
+  ];
+}
+
+function renderedLogoReviewSurfaces(): Array<[string, number]> {
+  return [
+    ['logo_tray_size', 16],
+    ['logo_ribbon_size', 32],
+    ['logo_catalog_thumbnail', 80],
+    ['logo_daemon_titlebar', 20],
+    ['logo_installer_metadata', 256]
   ];
 }
 

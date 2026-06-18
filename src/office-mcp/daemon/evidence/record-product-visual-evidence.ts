@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { screenshotFileLooksLikeImage } from './image-evidence.js';
@@ -10,6 +10,7 @@ const outputPath = resolve(readOption('--output') ?? join(repoRoot, 'artifacts/p
 const tester = readOption('--tester') ?? process.env.USERNAME ?? process.env.USER ?? 'unknown';
 const notes = readOption('--notes');
 const daemonBin = readOption('--daemon-bin');
+const renderedLogoReviewPath = readOption('--rendered-logo-review-path');
 
 const requiredSurfaces = [
   'word_ribbon_command',
@@ -60,6 +61,8 @@ const excelServerProtocolRow = readOption('--excel-server-protocol-row');
 const excelDocumentState = readOption('--excel-document-state');
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
+const renderedLogoReview = renderedLogoReviewPath ? readRenderedLogoReview(resolve(renderedLogoReviewPath)) : undefined;
+const renderedLogoReviewReady = renderedLogoReviewLooksReady(renderedLogoReview);
 
 const productTextReady = requiredSurfaces.filter((surface) => surface !== 'tray_tooltip').every((surface) => typeof observations[surface] === 'string' && (observations[surface] as string).includes(productName));
 const allScreenshotsExist = Object.values(screenshotsExist).every(Boolean);
@@ -70,8 +73,8 @@ const excelFirstRunIdentityReady = excelFirstRunIdentityReviewed && catalogIdent
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady;
-const productIdentityReviewReady = logoQualityReviewed && renderedSizeLogoReviewed && addinIdentityReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && trayProductPolishReviewed;
-const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && excelTaskpaneDensityReady && productIdentityReviewReady && daemonContextReady;
+const productIdentityReviewReady = logoQualityReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && trayProductPolishReviewed;
+const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && excelTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -96,6 +99,7 @@ const evidence = {
   product_identity_review: {
     logo_quality_reviewed: logoQualityReviewed,
     rendered_size_logo_reviewed: renderedSizeLogoReviewed,
+    rendered_logo_review_ready: renderedLogoReviewReady,
     addin_identity_reviewed: addinIdentityReviewed,
     word_first_run_identity_reviewed: wordFirstRunIdentityReviewed,
     excel_first_run_identity_reviewed: excelFirstRunIdentityReviewed,
@@ -118,6 +122,8 @@ const evidence = {
       ready: excelFirstRunIdentityReady
     }
   },
+  rendered_logo_review: renderedLogoReview,
+  rendered_logo_review_ready: renderedLogoReviewReady,
   excel_taskpane: {
     compact_top_block: excelCompactTopBlock,
     tools_permissions_merged: excelToolsPermissionsMerged,
@@ -159,6 +165,29 @@ function catalogIdentityLooksReady(provider: string | undefined, description: st
   return typeof provider === 'string' && provider.includes(productName)
     && typeof description === 'string' && /local/i.test(description) && /(productivity|office)/i.test(description) && /(automation|control)/i.test(description)
     && typeof type === 'string' && /local productivity automation control utility/i.test(type);
+}
+
+function readRenderedLogoReview(path: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    return { path, ok: true, ...parsed };
+  } catch (error) {
+    return { path, ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function renderedLogoReviewLooksReady(review: Record<string, unknown> | undefined): boolean {
+  if (!review) return false;
+  if (review.ok !== true || review.schema_version !== 1 || review.kind !== 'rendered_logo_review' || review.product_name !== productName || review.ready !== true) return false;
+  if (typeof review.sheet_path !== 'string' || !screenshotFileLooksLikeImage(resolve(review.sheet_path))) return false;
+  const surfaces = Array.isArray(review.surfaces) ? review.surfaces.filter(isRecord) : [];
+  return [
+    ['logo_tray_size', 16],
+    ['logo_ribbon_size', 32],
+    ['logo_catalog_thumbnail', 80],
+    ['logo_daemon_titlebar', 20],
+    ['logo_installer_metadata', 256]
+  ].every(([key, size]) => surfaces.some((surface) => surface.key === key && surface.rendered_size_px === size && surface.width === size && surface.height === size && surface.non_empty === true && surface.palette_ready === true && surface.expected_size_ready === true));
 }
 
 function readDaemonContext(binaryPath: string): Record<string, unknown> {

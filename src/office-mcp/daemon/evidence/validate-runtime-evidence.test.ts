@@ -315,6 +315,8 @@ test('runtime evidence validator can require product visual evidence', () => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.product_identity_review.rendered_size_logo_reviewed = false;
+      broken.product_identity_review.rendered_logo_review_ready = false;
+      broken.rendered_logo_review_ready = false;
       broken.product_identity_review.word_first_run_identity_ready = false;
       broken.first_run_identity.word.type = 'Experimental protocol bridge';
       broken.first_run_identity.word.ready = false;
@@ -323,8 +325,25 @@ test('runtime evidence validator can require product visual evidence', () => {
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /rendered-size logo review/);
+      assert.match(outputText(result.stdout), /rendered logo review ready flag/);
       assert.match(outputText(result.stdout), /Word first-run identity ready flag/);
       assert.match(outputText(result.stdout), /Word local productivity automation\/control type metadata/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.rendered_logo_review.surfaces = broken.rendered_logo_review.surfaces.filter((item) => item.key !== 'logo_tray_size');
+      broken.rendered_logo_review.ready = false;
+      broken.rendered_logo_review_ready = false;
+      broken.product_identity_review.rendered_logo_review_ready = false;
+      broken.product_identity_review.ready = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /missing rendered logo review ready flag/);
+      assert.match(outputText(result.stdout), /Rendered logo review missing surface: logo_tray_size/);
     });
   });
 });
@@ -585,6 +604,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     product_identity_review: {
       logo_quality_reviewed: passed,
       rendered_size_logo_reviewed: passed,
+      rendered_logo_review_ready: passed,
       addin_identity_reviewed: passed,
       word_first_run_identity_reviewed: passed,
       excel_first_run_identity_reviewed: passed,
@@ -607,6 +627,8 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
         ready: passed
       }
     },
+    rendered_logo_review: renderedLogoReview(passed, screenshots.logo_tray_size),
+    rendered_logo_review_ready: passed,
     excel_taskpane: {
       compact_top_block: passed,
       tools_permissions_merged: passed,
@@ -620,6 +642,32 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     daemon_context: manualTrayDaemonContext(),
     daemon_context_ready: passed,
     passed
+  };
+}
+
+function renderedLogoReview(passed: boolean, sheetPath: string) {
+  return {
+    ok: passed,
+    schema_version: 1,
+    kind: 'rendered_logo_review',
+    product_name: 'Office MCP Control',
+    sheet_path: sheetPath,
+    ready: passed,
+    surfaces: [
+      ['logo_tray_size', 16],
+      ['logo_ribbon_size', 32],
+      ['logo_catalog_thumbnail', 80],
+      ['logo_daemon_titlebar', 20],
+      ['logo_installer_metadata', 256]
+    ].map(([key, size]) => ({
+      key,
+      rendered_size_px: size,
+      width: size,
+      height: size,
+      non_empty: passed,
+      palette_ready: passed,
+      expected_size_ready: passed
+    }))
   };
 }
 

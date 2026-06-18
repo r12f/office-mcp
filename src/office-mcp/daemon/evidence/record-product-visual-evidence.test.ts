@@ -29,8 +29,9 @@ const SURFACES = [
 test('product visual evidence recorder requires all product surfaces', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const output = join(dir, 'product-visual-evidence.json');
-    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
+    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
     assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.kind, 'product_visual_evidence');
@@ -41,12 +42,13 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).excel.ready, true);
+    assert.equal(evidence.rendered_logo_review_ready, true);
     assert.equal(evidence.daemon_context_ready, true);
     assert.equal(evidence.passed, true);
 
     const missingScreenshots = { ...screenshots };
     missingScreenshots['tray-native-menu'] = join(dir, 'missing-tray-menu.png');
-    const missingTray = runRecorder(join(dir, 'missing-tray.json'), missingScreenshots, '--daemon-bin', daemonBin);
+    const missingTray = runRecorder(join(dir, 'missing-tray.json'), missingScreenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
     assert.notEqual(missingTray.status, 0);
     const failed = JSON.parse(outputText(missingTray.stdout)) as Record<string, unknown>;
     assert.equal(failed.passed, false);
@@ -57,8 +59,9 @@ test('product visual evidence recorder requires all product surfaces', () => {
 test('product visual evidence recorder requires product identity review flags', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const output = join(dir, 'missing-product-review.json');
-    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--skip-product-review-flags');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--skip-product-review-flags');
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, false);
@@ -69,8 +72,9 @@ test('product visual evidence recorder requires product identity review flags', 
 test('product visual evidence recorder requires rendered-size and first-run identity review', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const output = join(dir, 'missing-first-run-review.json');
-    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--skip-rendered-logo-and-first-run-flags');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--skip-rendered-logo-and-first-run-flags');
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     const review = evidence.product_identity_review as Record<string, unknown>;
@@ -82,10 +86,29 @@ test('product visual evidence recorder requires rendered-size and first-run iden
   });
 });
 
+test('product visual evidence recorder requires rendered logo review artifact', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'missing-rendered-logo-review.json');
+    const missing = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
+    assert.notEqual(missing.status, 0);
+    let evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.rendered_logo_review_ready, false);
+    assert.equal(evidence.passed, false);
+
+    const brokenReviewPath = writeRenderedLogoReview(dir, false);
+    const broken = runRecorder(join(dir, 'broken-rendered-logo-review.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', brokenReviewPath);
+    assert.notEqual(broken.status, 0);
+    evidence = JSON.parse(outputText(broken.stdout)) as Record<string, unknown>;
+    assert.equal(evidence.rendered_logo_review_ready, false);
+  });
+});
+
 test('product visual evidence recorder requires daemon context before passing', () => {
   withScreenshots((dir, screenshots) => {
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const output = join(dir, 'missing-daemon-context.json');
-    const result = runRecorder(output, screenshots);
+    const result = runRecorder(output, screenshots, '--rendered-logo-review-path', renderedLogoReviewPath);
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.daemon_context_ready, false);
@@ -96,8 +119,9 @@ test('product visual evidence recorder requires daemon context before passing', 
 test('product visual evidence recorder requires tray probe live state', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir, false);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const output = join(dir, 'missing-live-state.json');
-    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.daemon_context_ready, false);
@@ -108,8 +132,9 @@ test('product visual evidence recorder requires tray probe live state', () => {
 test('product visual evidence recorder requires live tray menu snapshot', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir, true, ['Status: Up', 'Clients: 0']);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const output = join(dir, 'missing-menu-items.json');
-    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.daemon_context_ready, false);
@@ -121,8 +146,9 @@ test('product visual evidence recorder rejects truncated screenshots', () => {
   withScreenshots((dir, screenshots) => {
     writeFileSync(screenshots['tray-icon'], Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
     const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const output = join(dir, 'truncated-screenshot.json');
-    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal((evidence.screenshots_exist as Record<string, unknown>).tray_icon, false);
@@ -133,9 +159,10 @@ test('product visual evidence recorder rejects truncated screenshots', () => {
 test('product visual evidence recorder can bind evidence to daemon context', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
 
     const output = join(dir, 'product-visual-evidence.json');
-    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
+    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
     assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     const context = evidence.daemon_context as Record<string, unknown>;
@@ -217,6 +244,37 @@ function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status:
   writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk, menuItems));
   chmodSync(daemonBin, 0o755);
   return daemonBin;
+}
+
+function writeRenderedLogoReview(dir: string, ready = true): string {
+  const sheetPath = join(dir, 'rendered-logo-review.png');
+  writeFileSync(sheetPath, tinyPng());
+  const path = join(dir, 'rendered-logo-review.json');
+  const surfaces = [
+    ['logo_tray_size', 16],
+    ['logo_ribbon_size', 32],
+    ['logo_catalog_thumbnail', 80],
+    ['logo_daemon_titlebar', 20],
+    ['logo_installer_metadata', 256]
+  ].map(([key, size]) => ({
+    key,
+    rendered_size_px: ready ? size : 1,
+    width: ready ? size : 1,
+    height: ready ? size : 1,
+    non_empty: ready,
+    palette_ready: ready,
+    expected_size_ready: ready,
+    screenshot_path: sheetPath
+  }));
+  writeFileSync(path, JSON.stringify({
+    schema_version: 1,
+    kind: 'rendered_logo_review',
+    product_name: 'Office MCP Control',
+    sheet_path: sheetPath,
+    surfaces,
+    ready
+  }, null, 2));
+  return path;
 }
 
 function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[]): string {
