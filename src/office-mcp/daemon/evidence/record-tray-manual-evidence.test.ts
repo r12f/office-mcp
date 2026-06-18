@@ -86,6 +86,19 @@ test('manual tray evidence recorder requires live tray menu snapshot', () => {
   });
 });
 
+test('manual tray evidence recorder requires distinct tray surface screenshots', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'missing-tray-surfaces.json');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin, '--skip-tray-surface-screenshots');
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.tray_surface_screenshots_ready, false);
+    assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_icon, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('manual tray evidence recorder rejects truncated screenshots', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     writeFileSync(screenshotPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
@@ -106,7 +119,8 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
   const trayTooltipScreenshot = writeSurfaceScreenshot(dir, 'tray-tooltip.png');
   const trayQuitConfirmationScreenshot = writeSurfaceScreenshot(dir, 'tray-quit-confirmation.png');
   const skipNativeMenuReviewFlags = extra.includes('--skip-native-menu-review-flags');
-  const filteredExtra = extra.filter((item) => item !== '--skip-native-menu-review-flags');
+  const skipTraySurfaceScreenshots = extra.includes('--skip-tray-surface-screenshots');
+  const filteredExtra = extra.filter((item) => item !== '--skip-native-menu-review-flags' && item !== '--skip-tray-surface-screenshots');
   const reviewArgs = skipNativeMenuReviewFlags ? [] : [
     '--menu-opened-from-tray-icon', 'true',
     '--native-menu-appearance-reviewed', 'true'
@@ -120,10 +134,12 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
     ...reviewArgs,
     '--show-ui-opened', 'true',
     '--screenshot-path', screenshotPath,
-    '--tray-icon-screenshot', trayIconScreenshot,
-    '--tray-native-menu-screenshot', trayNativeMenuScreenshot,
-    '--tray-tooltip-screenshot', trayTooltipScreenshot,
-    '--tray-quit-confirmation-screenshot', trayQuitConfirmationScreenshot,
+    ...(skipTraySurfaceScreenshots ? [] : [
+      '--tray-icon-screenshot', trayIconScreenshot,
+      '--tray-native-menu-screenshot', trayNativeMenuScreenshot,
+      '--tray-tooltip-screenshot', trayTooltipScreenshot,
+      '--tray-quit-confirmation-screenshot', trayQuitConfirmationScreenshot
+    ]),
     '--menu-item', 'Status: Up',
     '--menu-item', 'Clients: 0',
     '--menu-item', 'Documents: 0',

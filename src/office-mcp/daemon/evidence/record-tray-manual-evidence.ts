@@ -28,10 +28,11 @@ const screenshotExists = screenshotPath ? screenshotFileLooksLikeImage(resolve(s
 const traySurfaceScreenshotsExist = Object.fromEntries(
   Object.entries(traySurfaceScreenshots).map(([surface, path]) => [surface, typeof path === 'string' && screenshotFileLooksLikeImage(resolve(path))])
 );
+const traySurfaceScreenshotsReady = Object.values(traySurfaceScreenshotsExist).every(Boolean);
 const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
-const passed = visibleIcon && rightClickMenu && menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && daemonContextReady;
+const passed = visibleIcon && rightClickMenu && menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && traySurfaceScreenshotsReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -53,6 +54,7 @@ const evidence = {
   screenshot_exists: screenshotExists,
   tray_surface_screenshot_paths: traySurfaceScreenshots,
   tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
+  tray_surface_screenshots_ready: traySurfaceScreenshotsReady,
   daemon_context: daemonContext,
   daemon_context_ready: daemonContextReady,
   notes,

@@ -483,6 +483,7 @@ function writeManualTrayEvidence(dir: string, ready = true): string {
     screenshot_path: screenshotPath,
     tray_surface_screenshot_paths: traySurfaceScreenshotPaths,
     tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
+    tray_surface_screenshots_ready: ready,
     daemon_context: manualTrayDaemonContext(ready),
     daemon_context_ready: ready,
     passed: ready

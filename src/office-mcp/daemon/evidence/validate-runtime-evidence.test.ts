@@ -625,6 +625,7 @@ function withManualTrayEvidence(passed: boolean, callback: (path: string) => voi
   try {
     const screenshotPath = join(dir, 'tray-visible.png');
     if (passed) writeFileSync(screenshotPath, tinyPng());
+    if (passed) for (const path of Object.values(traySurfaceScreenshotPaths(screenshotPath))) writeFileSync(path, tinyPng());
     const path = join(dir, 'tray-manual-evidence.json');
     writeFileSync(path, JSON.stringify(manualTrayReport(passed, screenshotPath), null, 2));
     callback(path);
@@ -878,6 +879,7 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     screenshot_path: screenshotPath,
     tray_surface_screenshot_paths: traySurfaceScreenshotPaths(screenshotPath),
     tray_surface_screenshots_exist: Object.fromEntries(trayVisualSurfaces().map((surface) => [surface, passed])),
+    tray_surface_screenshots_ready: passed,
     screenshot_exists: passed,
     daemon_context: manualTrayDaemonContext() as ReturnType<typeof manualTrayDaemonContext> | undefined,
     daemon_context_ready: passed,

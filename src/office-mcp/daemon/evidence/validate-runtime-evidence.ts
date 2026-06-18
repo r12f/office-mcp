@@ -197,6 +197,8 @@ function validateManualTrayEvidence(): void {
   if (typeof manual.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(manual.screenshot_path))) {
     failures.push('Manual tray evidence screenshot file does not exist.');
   }
+  validateManualTraySurfaceScreenshots(manual.tray_surface_screenshot_paths, manual.tray_surface_screenshots_exist, 'Manual tray evidence');
+  if (manual.tray_surface_screenshots_ready !== true) failures.push('Manual tray evidence missing tray surface screenshots ready flag.');
   if (manual.daemon_context_ready !== true) {
     failures.push('Manual tray evidence daemon context is not recorder-ready.');
   }
@@ -269,7 +271,8 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
   validateTrayMenuLabels(observedMenuItems, 'Embedded manual tray evidence');
   if (typeof manual.observed_tooltip !== 'string' || !trayTooltipLooksProductReady(manual.observed_tooltip)) failures.push('Embedded manual tray evidence missing product tray tooltip.');
   if (typeof manual.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(manual.screenshot_path))) failures.push('Embedded manual tray evidence screenshot file does not exist.');
-  validateEmbeddedManualTraySurfaceScreenshots(manual.tray_surface_screenshot_paths, manual.tray_surface_screenshots_exist);
+  validateManualTraySurfaceScreenshots(manual.tray_surface_screenshot_paths, manual.tray_surface_screenshots_exist, 'Embedded manual tray evidence');
+  if (manual.tray_surface_screenshots_ready !== true) failures.push('Embedded manual tray evidence missing tray surface screenshots ready flag.');
   if (manual.daemon_context_ready !== true) failures.push('Embedded manual tray evidence daemon context is not recorder-ready.');
   validateManualTrayDaemonContext(manual.daemon_context);
   for (const [key, label] of [
@@ -284,21 +287,21 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
   }
 }
 
-function validateEmbeddedManualTraySurfaceScreenshots(paths: unknown, exists: unknown): void {
+function validateManualTraySurfaceScreenshots(paths: unknown, exists: unknown, label: string): void {
   if (!isRecord(paths)) {
-    failures.push('Embedded manual tray evidence missing tray surface screenshot paths.');
+    failures.push(`${label} missing tray surface screenshot paths.`);
     return;
   }
   if (!isRecord(exists)) {
-    failures.push('Embedded manual tray evidence missing tray surface screenshot existence flags.');
+    failures.push(`${label} missing tray surface screenshot existence flags.`);
     return;
   }
   for (const surface of trayVisualSurfaces()) {
     const path = paths[surface];
     if (typeof path !== 'string' || !screenshotFileLooksLikeImage(resolve(path))) {
-      failures.push(`Embedded manual tray evidence missing or invalid tray surface screenshot: ${surface}.`);
+      failures.push(`${label} missing or invalid tray surface screenshot: ${surface}.`);
     }
-    if (exists[surface] !== true) failures.push(`Embedded manual tray evidence missing ready flag for tray surface screenshot: ${surface}.`);
+    if (exists[surface] !== true) failures.push(`${label} missing ready flag for tray surface screenshot: ${surface}.`);
   }
 }
 
