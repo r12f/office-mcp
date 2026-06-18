@@ -16,6 +16,9 @@ const manualTrayEvidencePath = readOption('--manual-tray-evidence-path');
 const wordManifestPath = resolve(readOption('--word-manifest-path') ?? join(repoRoot, 'src/office-ctl/word/manifest.xml'));
 const excelManifestPath = resolve(readOption('--excel-manifest-path') ?? join(repoRoot, 'src/office-ctl/excel/manifest.xml'));
 const powerPointManifestPath = resolve(readOption('--powerpoint-manifest-path') ?? join(repoRoot, 'src/office-ctl/powerpoint/manifest.xml'));
+const productName = readOption('--product-name') ?? 'Office MCP Control';
+const renderedLogoReview = renderedLogoReviewPath ? readRenderedLogoReview(resolve(renderedLogoReviewPath)) : undefined;
+const renderedLogoReviewReady = renderedLogoReviewLooksReady(renderedLogoReview);
 
 const requiredSurfaces = [
   'word_ribbon_command',
@@ -38,12 +41,11 @@ const requiredSurfaces = [
   'tray_quit_confirmation'
 ];
 
-const observations = Object.fromEntries(requiredSurfaces.map((surface) => [surface, readOption(`--${surface.replaceAll('_', '-')}`)]));
+const observations = Object.fromEntries(requiredSurfaces.map((surface) => [surface, observationFor(surface)]));
 const screenshotPaths = Object.fromEntries(requiredSurfaces.map((surface) => [surface, screenshotPathFor(surface)]));
 const screenshotsExist = Object.fromEntries(
   requiredSurfaces.map((surface) => [surface, typeof screenshotPaths[surface] === 'string' && screenshotFileLooksLikeImage(resolve(screenshotPaths[surface] as string))])
 );
-const productName = readOption('--product-name') ?? 'Office MCP Control';
 const trayTooltip = readOption('--tray-tooltip');
 const catalogType = readOption('--catalog-type');
 const catalogIconVisible = booleanFlag('--catalog-icon-visible');
@@ -73,8 +75,6 @@ const excelServerProtocolRow = readOption('--excel-server-protocol-row');
 const excelDocumentState = readOption('--excel-document-state');
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
-const renderedLogoReview = renderedLogoReviewPath ? readRenderedLogoReview(resolve(renderedLogoReviewPath)) : undefined;
-const renderedLogoReviewReady = renderedLogoReviewLooksReady(renderedLogoReview);
 const excelRuntimeEvidence = excelRuntimeEvidencePath ? readExcelRuntimeEvidence(resolve(excelRuntimeEvidencePath)) : undefined;
 const excelRuntimeEvidenceReady = excelRuntimeEvidenceLooksReady(excelRuntimeEvidence);
 const manualTrayEvidence = manualTrayEvidencePath ? readManualTrayEvidence(resolve(manualTrayEvidencePath)) : undefined;
@@ -177,8 +177,29 @@ writeFileSync(outputPath, JSON.stringify(evidence, null, 2));
 console.log(JSON.stringify(evidence, null, 2));
 if (!passed) process.exit(1);
 
+function observationFor(surface: string): string | undefined {
+  const explicit = readOption(`--${surface.replaceAll('_', '-')}`);
+  if (explicit) return explicit;
+  const logoSurface = renderedLogoReviewSurface(surface);
+  if (!logoSurface) return undefined;
+  const label = typeof logoSurface.label === 'string' ? logoSurface.label : surface.replaceAll('_', ' ');
+  return `${productName} rendered logo review ${label}`;
+}
+
 function screenshotPathFor(surface: string): string | undefined {
-  return readOption(`--${surface.replaceAll('_', '-')}-screenshot`);
+  return readOption(`--${surface.replaceAll('_', '-')}-screenshot`) ?? renderedLogoReviewScreenshotPath(surface);
+}
+
+function renderedLogoReviewScreenshotPath(surface: string): string | undefined {
+  const logoSurface = renderedLogoReviewSurface(surface);
+  if (typeof logoSurface?.screenshot_path === 'string') return logoSurface.screenshot_path;
+  if (typeof renderedLogoReview?.sheet_path === 'string' && renderedLogoSurfaceSpecs().some(([key]) => key === surface)) return renderedLogoReview.sheet_path;
+  return undefined;
+}
+
+function renderedLogoReviewSurface(surface: string): Record<string, unknown> | undefined {
+  if (!renderedLogoReviewReady || !Array.isArray(renderedLogoReview?.surfaces)) return undefined;
+  return renderedLogoReview.surfaces.filter(isRecord).find((item) => item.key === surface);
 }
 
 function booleanFlag(name: string): boolean {
@@ -254,13 +275,17 @@ function renderedLogoReviewLooksReady(review: Record<string, unknown> | undefine
   if (review.ok !== true || review.schema_version !== 1 || review.kind !== 'rendered_logo_review' || review.product_name !== productName || review.ready !== true) return false;
   if (typeof review.sheet_path !== 'string' || !screenshotFileLooksLikeImage(resolve(review.sheet_path))) return false;
   const surfaces = Array.isArray(review.surfaces) ? review.surfaces.filter(isRecord) : [];
+  return renderedLogoSurfaceSpecs().every(([key, size]) => surfaces.some((surface) => surface.key === key && surface.rendered_size_px === size && surface.width === size && surface.height === size && surface.non_empty === true && surface.palette_ready === true && surface.expected_size_ready === true));
+}
+
+function renderedLogoSurfaceSpecs(): Array<[string, number]> {
   return [
     ['logo_tray_size', 16],
     ['logo_ribbon_size', 32],
     ['logo_catalog_thumbnail', 80],
     ['logo_daemon_titlebar', 20],
     ['logo_installer_metadata', 256]
-  ].every(([key, size]) => surfaces.some((surface) => surface.key === key && surface.rendered_size_px === size && surface.width === size && surface.height === size && surface.non_empty === true && surface.palette_ready === true && surface.expected_size_ready === true));
+  ];
 }
 
 function readExcelRuntimeEvidence(path: string): Record<string, unknown> {

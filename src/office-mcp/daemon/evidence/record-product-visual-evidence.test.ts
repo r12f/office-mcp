@@ -8,6 +8,14 @@ import { tinyPng } from './image-evidence.js';
 
 const TSX = './node_modules/tsx/dist/cli.mjs';
 const RECORDER = resolve(process.cwd(), 'record-product-visual-evidence.ts');
+const LOGO_SURFACES = [
+  'logo-tray-size',
+  'logo-ribbon-size',
+  'logo-catalog-thumbnail',
+  'logo-daemon-titlebar',
+  'logo-installer-metadata'
+];
+
 const SURFACES = [
   'word-ribbon-command',
   'word-catalog-entry',
@@ -61,6 +69,31 @@ test('product visual evidence recorder requires all product surfaces', () => {
     const failed = JSON.parse(outputText(missingTray.stdout)) as Record<string, unknown>;
     assert.equal(failed.passed, false);
     assert.equal((failed.screenshots_exist as Record<string, unknown>).tray_native_menu, false);
+  });
+});
+
+test('product visual evidence recorder derives logo surfaces from rendered review artifact', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const output = join(dir, 'derived-logo-surfaces.json');
+    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--skip-logo-surface-args');
+    assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    const screenshotPaths = evidence.screenshot_paths as Record<string, string>;
+    const screenshotsExist = evidence.screenshots_exist as Record<string, boolean>;
+    const observations = evidence.observations as Record<string, string>;
+    const renderedLogoReview = evidence.rendered_logo_review as Record<string, unknown>;
+    const sheetPath = renderedLogoReview.sheet_path;
+
+    for (const surface of LOGO_SURFACES) {
+      const key = surface.replaceAll('-', '_');
+      assert.equal(screenshotPaths[key], sheetPath);
+      assert.equal(screenshotsExist[key], true);
+      assert.match(observations[key], /Office MCP Control rendered logo review/);
+    }
+    assert.equal(evidence.product_text_ready, true);
+    assert.equal(evidence.passed, true);
   });
 });
 
@@ -220,7 +253,8 @@ test('product visual evidence recorder can bind evidence to daemon context', () 
 function runRecorder(output: string, screenshots: Record<string, string>, ...extra: string[]): ReturnType<typeof spawnSync> {
   const skipProductReviewFlags = extra.includes('--skip-product-review-flags');
   const skipRenderedLogoAndFirstRunFlags = extra.includes('--skip-rendered-logo-and-first-run-flags');
-  const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags' && item !== '--skip-rendered-logo-and-first-run-flags');
+  const skipLogoSurfaceArgs = extra.includes('--skip-logo-surface-args');
+  const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags' && item !== '--skip-rendered-logo-and-first-run-flags' && item !== '--skip-logo-surface-args');
   const hasWordManifest = filteredExtra.includes('--word-manifest-path');
   const hasExcelManifest = filteredExtra.includes('--excel-manifest-path');
   const hasPowerPointManifest = filteredExtra.includes('--powerpoint-manifest-path');
@@ -273,6 +307,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     );
   }
   for (const surface of SURFACES) {
+    if (skipLogoSurfaceArgs && LOGO_SURFACES.includes(surface)) continue;
     args.push(`--${surface}`, `Office MCP Control ${surface}`);
     args.push(`--${surface}-screenshot`, screenshots[surface]);
   }
