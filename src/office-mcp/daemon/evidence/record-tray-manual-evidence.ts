@@ -8,11 +8,11 @@ const evidenceRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(evidenceRoot, '../../../..');
 const outputPath = resolve(readOption('--output') ?? join(repoRoot, 'artifacts/tray-manual-evidence.json'));
 const tester = readOption('--tester') ?? process.env.USERNAME ?? process.env.USER ?? 'unknown';
-const screenshotPath = readOption('--screenshot-path');
+const screenshotPath = readOption('--screenshot-path') ?? process.env.OFFICE_MCP_TRAY_SCREENSHOT_PATH;
 const traySurfaceScreenshots = traySurfaceScreenshotPaths();
 const notes = readOption('--notes');
 const observedTooltip = readOption('--tooltip');
-const daemonBin = readOption('--daemon-bin');
+const daemonBin = readOption('--daemon-bin') ?? process.env.OFFICE_MCP_DAEMON_BIN;
 const trayMenuSurfaceKind = readOption('--menu-surface-kind');
 
 const visibleIcon = booleanFlag('--visible-icon');
@@ -92,15 +92,20 @@ function readRepeatedOption(name: string): string[] {
 
 function traySurfaceScreenshotPaths(): Record<string, string | undefined> {
   return {
-    tray_icon: normalizedOptionPath('--tray-icon-screenshot'),
-    tray_native_menu: normalizedOptionPath('--tray-native-menu-screenshot'),
-    tray_tooltip: normalizedOptionPath('--tray-tooltip-screenshot'),
-    tray_quit_confirmation: normalizedOptionPath('--tray-quit-confirmation-screenshot')
+    tray_icon: normalizedOptionPath('--tray-icon-screenshot') ?? normalizedEnvPath('OFFICE_MCP_TRAY_ICON_SCREENSHOT_PATH'),
+    tray_native_menu: normalizedOptionPath('--tray-native-menu-screenshot') ?? normalizedEnvPath('OFFICE_MCP_TRAY_NATIVE_MENU_SCREENSHOT_PATH'),
+    tray_tooltip: normalizedOptionPath('--tray-tooltip-screenshot') ?? normalizedEnvPath('OFFICE_MCP_TRAY_TOOLTIP_SCREENSHOT_PATH'),
+    tray_quit_confirmation: normalizedOptionPath('--tray-quit-confirmation-screenshot') ?? normalizedEnvPath('OFFICE_MCP_TRAY_QUIT_CONFIRMATION_SCREENSHOT_PATH')
   };
 }
 
 function normalizedOptionPath(name: string): string | undefined {
   const value = readOption(name);
+  return value ? resolve(value) : undefined;
+}
+
+function normalizedEnvPath(name: string): string | undefined {
+  const value = process.env[name];
   return value ? resolve(value) : undefined;
 }
 

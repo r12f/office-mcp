@@ -127,6 +127,33 @@ test('manual tray evidence recorder rejects truncated screenshots', () => {
   });
 });
 
+test('manual tray evidence recorder reads daemon and screenshot paths from environment', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'tray-env-evidence.json');
+    const result = runRecorder(
+      output,
+      screenshotPath,
+      '--tooltip', 'Office MCP - Up - 0 clients - 0 documents',
+      '--env-daemon-bin', daemonBin,
+      '--env-screenshot-path', screenshotPath,
+      '--env-tray-icon-screenshot', writeSurfaceScreenshot(dir, 'env-tray-icon.png'),
+      '--env-tray-native-menu-screenshot', writeSurfaceScreenshot(dir, 'env-tray-native-menu.png'),
+      '--env-tray-tooltip-screenshot', writeSurfaceScreenshot(dir, 'env-tray-tooltip.png'),
+      '--env-tray-quit-confirmation-screenshot', writeSurfaceScreenshot(dir, 'env-tray-quit-confirmation.png'),
+      '--skip-daemon-bin-arg',
+      '--skip-screenshot-args'
+    );
+
+    assert.equal(result.status, 0, outputText(result.stderr) || outputText(result.stdout));
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.daemon_context_ready, true);
+    assert.equal(evidence.screenshot_exists, true);
+    assert.equal(evidence.tray_surface_screenshots_ready, true);
+    assert.equal(evidence.passed, true);
+  });
+});
+
 function runRecorder(output: string, screenshotPath: string, ...extra: string[]): ReturnType<typeof spawnSync> {
   const dir = dirname(output);
   const trayIconScreenshot = writeSurfaceScreenshot(dir, 'tray-icon.png');
@@ -135,8 +162,23 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
   const trayQuitConfirmationScreenshot = writeSurfaceScreenshot(dir, 'tray-quit-confirmation.png');
   const skipNativeMenuReviewFlags = extra.includes('--skip-native-menu-review-flags');
   const skipTraySurfaceScreenshots = extra.includes('--skip-tray-surface-screenshots');
+  const skipScreenshotArgs = extra.includes('--skip-screenshot-args');
+  const envDaemonBin = optionValue(extra, '--env-daemon-bin');
+  const envScreenshotPath = optionValue(extra, '--env-screenshot-path');
+  const envTrayIconScreenshot = optionValue(extra, '--env-tray-icon-screenshot');
+  const envTrayNativeMenuScreenshot = optionValue(extra, '--env-tray-native-menu-screenshot');
+  const envTrayTooltipScreenshot = optionValue(extra, '--env-tray-tooltip-screenshot');
+  const envTrayQuitConfirmationScreenshot = optionValue(extra, '--env-tray-quit-confirmation-screenshot');
   const explicitMenuSurfaceKind = extra.includes('--menu-surface-kind');
-  const filteredExtra = extra.filter((item) => item !== '--skip-native-menu-review-flags' && item !== '--skip-tray-surface-screenshots');
+  const filteredExtra = extra.filter((item, index) => {
+    const previous = extra[index - 1];
+    if (previous?.startsWith('--env-')) return false;
+    return item !== '--skip-native-menu-review-flags'
+      && item !== '--skip-tray-surface-screenshots'
+      && item !== '--skip-daemon-bin-arg'
+      && item !== '--skip-screenshot-args'
+      && !item.startsWith('--env-');
+  });
   const reviewArgs = skipNativeMenuReviewFlags ? [] : [
     '--menu-opened-from-tray-icon', 'true',
     '--native-menu-appearance-reviewed', 'true'
@@ -150,8 +192,8 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
     ...reviewArgs,
     ...(explicitMenuSurfaceKind ? [] : ['--menu-surface-kind', 'native']),
     '--show-ui-opened', 'true',
-    '--screenshot-path', screenshotPath,
-    ...(skipTraySurfaceScreenshots ? [] : [
+    ...(skipScreenshotArgs ? [] : ['--screenshot-path', screenshotPath]),
+    ...(skipTraySurfaceScreenshots || skipScreenshotArgs ? [] : [
       '--tray-icon-screenshot', trayIconScreenshot,
       '--tray-native-menu-screenshot', trayNativeMenuScreenshot,
       '--tray-tooltip-screenshot', trayTooltipScreenshot,
@@ -163,7 +205,24 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
     '--menu-item', 'Show Office MCP',
     '--menu-item', 'Quit Office MCP',
     ...filteredExtra
-  ], { cwd: process.cwd(), encoding: 'utf8' });
+  ], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      ...(envDaemonBin ? { OFFICE_MCP_DAEMON_BIN: envDaemonBin } : {}),
+      ...(envScreenshotPath ? { OFFICE_MCP_TRAY_SCREENSHOT_PATH: envScreenshotPath } : {}),
+      ...(envTrayIconScreenshot ? { OFFICE_MCP_TRAY_ICON_SCREENSHOT_PATH: envTrayIconScreenshot } : {}),
+      ...(envTrayNativeMenuScreenshot ? { OFFICE_MCP_TRAY_NATIVE_MENU_SCREENSHOT_PATH: envTrayNativeMenuScreenshot } : {}),
+      ...(envTrayTooltipScreenshot ? { OFFICE_MCP_TRAY_TOOLTIP_SCREENSHOT_PATH: envTrayTooltipScreenshot } : {}),
+      ...(envTrayQuitConfirmationScreenshot ? { OFFICE_MCP_TRAY_QUIT_CONFIRMATION_SCREENSHOT_PATH: envTrayQuitConfirmationScreenshot } : {})
+    }
+  });
+}
+
+function optionValue(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
 }
 
 function writeSurfaceScreenshot(dir: string, name: string): string {
