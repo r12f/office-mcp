@@ -79,6 +79,41 @@ fn tray_status_can_be_derived_from_redacted_ui_state() {
 }
 
 #[test]
+fn tray_product_surface_has_no_scaffold_or_debug_labels() {
+    let snapshot = TraySnapshot::from_input(
+        TrayPlatform::WindowsNotificationArea,
+        TrayStatusInput {
+            health: TrayHealth::Up,
+            client_count: 0,
+            document_count: 0,
+            running_task_count: 0,
+        },
+    );
+    let probe = snapshot.probe_json();
+    let rendered = serde_json::to_string(&probe).expect("serialize tray probe");
+
+    assert!(rendered.contains("Office MCP"));
+    assert!(rendered.contains("Show Office MCP"));
+    assert!(rendered.contains("Quit Office MCP"));
+    assert!(rendered.contains("Keep Running"));
+    assert!(!rendered.to_ascii_lowercase().contains("debug"));
+    assert!(!rendered.to_ascii_lowercase().contains("prototype"));
+    assert!(!rendered.to_ascii_lowercase().contains("placeholder"));
+    assert!(!rendered.to_ascii_lowercase().contains("test tray"));
+    assert_eq!(probe["tooltip"], "Office MCP - Up - 0 clients - 0 documents");
+    assert_eq!(probe["menu"][0]["kind"], "read_only");
+    assert_eq!(probe["menu"][0]["enabled"], false);
+    assert_eq!(probe["menu"][3]["kind"], "separator");
+    assert_eq!(probe["menu"][4]["kind"], "action");
+    assert_eq!(probe["menu"][4]["enabled"], true);
+    assert_eq!(probe["menu"][5]["kind"], "action");
+    assert_eq!(probe["menu"][5]["enabled"], true);
+    assert_eq!(probe["quit_confirmation"]["title"], "Quit Office MCP");
+    assert_eq!(probe["quit_confirmation"]["primary_action"], "Quit Office MCP");
+    assert_eq!(probe["quit_confirmation"]["secondary_action"], "Keep Running");
+}
+
+#[test]
 fn down_status_defaults_to_zero_counts() {
     let snapshot =
         TraySnapshot::from_input(TrayPlatform::LinuxStatusNotifier, TrayStatusInput::down());
