@@ -62,6 +62,9 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal(evidence.tray_menu_surface_native, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).final_logo_user_surface_reviewed, true);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).addin_installable_surface_reviewed, true);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).tray_normal_windows_launch_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).excel.ready, true);
@@ -212,6 +215,36 @@ test('product visual evidence recorder requires product identity review flags', 
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
+
+test('product visual evidence recorder requires final user-surface polish reviews', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const output = join(dir, 'missing-final-user-surface-reviews.json');
+    const result = runRecorder(
+      output,
+      screenshots,
+      '--daemon-bin', daemonBin,
+      '--rendered-logo-review-path', renderedLogoReviewPath,
+      '--skip-product-review-flags',
+      '--logo-quality-reviewed', 'true',
+      '--addin-identity-reviewed', 'true',
+      '--tray-product-polish-reviewed', 'true'
+    );
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    const review = evidence.product_identity_review as Record<string, unknown>;
+    assert.equal(review.logo_quality_reviewed, true);
+    assert.equal(review.final_logo_user_surface_reviewed, false);
+    assert.equal(review.addin_identity_reviewed, true);
+    assert.equal(review.addin_installable_surface_reviewed, false);
+    assert.equal(review.tray_product_polish_reviewed, true);
+    assert.equal(review.tray_normal_windows_launch_reviewed, false);
+    assert.equal(review.ready, false);
     assert.equal(evidence.passed, false);
   });
 });
@@ -529,8 +562,11 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   if (!skipProductReviewFlags) {
     args.push(
       '--logo-quality-reviewed', 'true',
+      '--final-logo-user-surface-reviewed', 'true',
       '--addin-identity-reviewed', 'true',
-      '--tray-product-polish-reviewed', 'true'
+      '--addin-installable-surface-reviewed', 'true',
+      '--tray-product-polish-reviewed', 'true',
+      '--tray-normal-windows-launch-reviewed', 'true'
     );
   }
   if (!skipRenderedLogoAndFirstRunFlags) {

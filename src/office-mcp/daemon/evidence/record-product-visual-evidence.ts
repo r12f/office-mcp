@@ -61,8 +61,11 @@ const trayMenuSurfaceNative = trayMenuSurfaceKind === 'native';
 const trayIconVisible = booleanFlag('--tray-icon-visible');
 const quitConfirmationVisible = booleanFlag('--quit-confirmation-visible');
 const logoQualityReviewed = booleanFlag('--logo-quality-reviewed');
+const finalLogoUserSurfaceReviewed = booleanFlag('--final-logo-user-surface-reviewed');
 const addinIdentityReviewed = booleanFlag('--addin-identity-reviewed');
+const addinInstallableSurfaceReviewed = booleanFlag('--addin-installable-surface-reviewed');
 const trayProductPolishReviewed = booleanFlag('--tray-product-polish-reviewed');
+const trayNormalWindowsLaunchReviewed = booleanFlag('--tray-normal-windows-launch-reviewed');
 const renderedSizeLogoReviewed = booleanFlag('--rendered-size-logo-reviewed');
 const wordFirstRunIdentityReviewed = booleanFlag('--word-first-run-identity-reviewed');
 const excelFirstRunIdentityReviewed = booleanFlag('--excel-first-run-identity-reviewed');
@@ -104,7 +107,7 @@ const powerPointFirstRunIdentityReady = powerPointFirstRunIdentityReviewed && ca
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady && excelRuntimeEvidenceReady;
-const productIdentityReviewReady = logoQualityReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed;
+const productIdentityReviewReady = logoQualityReviewed && finalLogoUserSurfaceReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinInstallableSurfaceReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNormalWindowsLaunchReviewed;
 const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && excelTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
 const evidence = {
@@ -135,13 +138,16 @@ const evidence = {
   manual_tray_evidence_ready: manualTrayEvidenceReady,
   product_identity_review: {
     logo_quality_reviewed: logoQualityReviewed,
+    final_logo_user_surface_reviewed: finalLogoUserSurfaceReviewed,
     rendered_size_logo_reviewed: renderedSizeLogoReviewed,
     rendered_logo_review_ready: renderedLogoReviewReady,
     addin_identity_reviewed: addinIdentityReviewed,
+    addin_installable_surface_reviewed: addinInstallableSurfaceReviewed,
     word_first_run_identity_reviewed: wordFirstRunIdentityReviewed,
     excel_first_run_identity_reviewed: excelFirstRunIdentityReviewed,
     powerpoint_first_run_identity_reviewed: powerPointFirstRunIdentityReviewed,
     tray_product_polish_reviewed: trayProductPolishReviewed,
+    tray_normal_windows_launch_reviewed: trayNormalWindowsLaunchReviewed,
     word_first_run_identity_ready: wordFirstRunIdentityReady,
     excel_first_run_identity_ready: excelFirstRunIdentityReady,
     powerpoint_first_run_identity_ready: powerPointFirstRunIdentityReady,
