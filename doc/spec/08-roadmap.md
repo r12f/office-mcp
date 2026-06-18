@@ -310,6 +310,47 @@ workbook does not show duplicated tool lists or `unknown` document state; tools
 and permissions share one categorized collapsible surface; settings edit inline;
 and server/protocol metadata fits on one row.
 
+### M6.5.3 — Product identity, add-in metadata, and native tray polish
+
+User-reported follow-up from live Word add-in and tray testing:
+
+- [ ] Design an original office-control product logo and icon system. It must
+      avoid Microsoft Office product marks while still communicating office
+      productivity, local automation, and user control with a mature, slightly
+      futuristic desktop utility style.
+- [ ] Add reproducible brand assets: source artwork, generated 16/20/24/32/48/
+      64/128/256 px app icons, Office add-in command icons, and a monochrome
+      tray/menu-bar glyph that remains legible at 16 px in light, dark, and
+      high-contrast themes.
+- [ ] Update Word and Excel add-in manifests/catalog rendering so release and
+      sideloaded builds use mature product metadata: stable add-in title,
+      provider, description, support URL, ribbon group label, action label, and
+      product icons. Placeholder labels such as `office-mcp`, generic `Open`,
+      blank icons, or debug/experimental naming fail this item.
+- [ ] Update task pane visible title/chrome and any in-app product references
+      to match the new identity while keeping host-specific Word/Excel accents
+      restrained and secondary.
+- [ ] Replace the current tray placeholder/missing icon with the generated
+      tray glyph in normal daemon and installed launch paths. The icon must be
+      visible in the Windows notification area and visually deliberate beside
+      native system icons.
+- [ ] Ensure the tray right-click interaction uses a real platform-native menu
+      on Windows, with native separators, disabled/read-only status rows,
+      hover/selection behavior, keyboard access, and theme/high-contrast
+      adaptation. Custom web-styled or custom-drawn menu panels are not
+      acceptable for release.
+- [ ] Update MSI/package asset installation and manifest renderer tests so the
+      generated logo/icon files and product metadata are packaged and referenced
+      from the installed add-in catalog without loopback or missing-icon paths.
+- [ ] Add automated tests for manifest metadata/icon URL substitution and asset
+      presence, plus manual Windows evidence showing the ribbon command icon,
+      add-in title, visible tray glyph, and native right-click menu.
+
+**Exit criterion**: Word and Excel show a mature product add-in name and icon in
+the ribbon/catalog; the task pane title matches the product identity; the tray
+has a visible original glyph and native right-click menu; packaged builds carry
+the same assets without blank placeholders or Microsoft-owned marks.
+
 ### M6.6 — Rust native daemon migration
 
 - [x] Normalize the source tree away from legacy top-level packages into

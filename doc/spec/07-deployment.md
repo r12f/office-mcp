@@ -113,6 +113,12 @@ icon assets, and support URL. The XML manifest's four-part version starts at
 `1.0.0.0` because Office rejects values below 1.0; it is mapped to, but not
 textually identical with, the add-in package semver.
 
+Release manifests MUST also substitute product-quality add-in identity fields:
+`DisplayName`, ribbon group labels, command labels, description, provider name,
+support URL, and all icon URLs. These values must match the product identity in
+[09-ui.md](09-ui.md), avoid developer placeholders such as `office-mcp` and
+generic command labels such as `Open`, and must not imply Microsoft ownership.
+
 The hosted manifest is rendered from the checked developer manifest rather than
 maintained as a second XML file:
 
@@ -260,7 +266,8 @@ The production MSI remains the release packaging target:
 
 1. User installs `office-mcp-setup-x64.msi`. The installer:
    - Drops the native Rust daemon executable to `%LOCALAPPDATA%\office-mcp\`.
-   - Installs the tray icon and main-window UI assets.
+   - Installs the generated product logo, tray icon, add-in command icons, and
+     main-window UI assets.
    - Installs the static add-in bundle beside the daemon.
    - Exports a current-user trusted localhost certificate on first daemon start;
      it does not import root certificates.
@@ -273,7 +280,7 @@ The production MSI remains the release packaging target:
    - Future production builds should start the daemon once so the user does not
      have to log out / log in for the daemon to come up.
    - Future production builds should make the tray icon visible immediately
-     after install and expose the main window from that tray menu.
+     after install and expose the main window from a native tray menu.
 
 2. User configures their MCP client to connect to
    `http://127.0.0.1:8800` (or whatever `mcp_http.port` is in their config).
