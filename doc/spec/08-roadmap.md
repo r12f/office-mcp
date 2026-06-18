@@ -571,14 +571,19 @@ Latest UI feedback to preserve in implementation planning:
       and type/category metadata are validated before product visual evidence can
       pass. This item remains open until those manifest-derived fields are also
       matched by live Office catalog/ribbon/task pane screenshots.
-- [ ] Redesign the product logo as a deliberate future-office-control identity,
+- [x] Redesign the product logo as a deliberate future-office-control identity,
       not as an Office logo variant, framework icon, placeholder mark, gear-only
-      settings symbol, or developer/debug badge. The task must produce reviewed
-      concept directions, choose an original mark that communicates office
-      productivity plus user control, document why it is visually distinct from
-      Microsoft-owned Office marks, export the full icon family, and validate the
-      rendered result at tray, ribbon, catalog, installer, and daemon title-bar
-      sizes.
+      settings symbol, or developer/debug badge. The current mark is the
+      selected `Command Console Panes` concept after three documented concept
+      directions, and uses abstract document panes, a command spine, operator
+      nodes, and a control dial to communicate office productivity plus user
+      control. `brand-design.md` documents the selected/rejected concepts,
+      palette, minimum sizes, and non-Microsoft distinction. Generated icon
+      assets cover 16, 20, 24, 32, 48, 64, 80, 128, and 256 px, and
+      `record-rendered-logo-review.mjs` plus product identity tests validate the
+      rendered tray, ribbon, catalog, daemon title-bar, and installer sizes.
+      Final live Office/tray visual evidence remains tracked by the separate
+      product visual evidence items below.
 - [ ] Rework every add-in first-contact identity field so Word, Excel, and
       PowerPoint look like mature installable software after a clean install.
       Title, icon, provider, command label, short description, type/category,
