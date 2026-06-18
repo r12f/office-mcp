@@ -23,13 +23,13 @@ test('Word add-in manifest and task pane asset versions stay aligned', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
   assert.match(manifest, /<Version>1\.0\.0\.7<\/Version>/);
-  assert.match(manifest, /taskpane\.html\?v=0\.1\.7/);
-  assert.match(html, /taskpane\.css\?v=0\.1\.7/);
+  assert.match(manifest, /word\/taskpane\.html\?v=0\.1\.7/);
+  assert.match(html, /word\/taskpane\.css\?v=0\.1\.7/);
   assert.match(html, /common\/browser-ui\.js\?v=0\.1\.7/);
   assert.match(html, /common\/addin-channel\.js\?v=0\.1\.7/);
   assert.match(html, /common\/logger\.js\?v=0\.1\.7/);
   assert.match(html, /common\/task-history\.js\?v=0\.1\.7/);
-  assert.match(html, /taskpane\.js\?v=0\.1\.7/);
+  assert.match(html, /word\/taskpane\.js\?v=0\.1\.7/);
   assert.match(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
   assert.match(js, /ADDIN_VERSION = '0\.1\.7'/);
 });
@@ -83,9 +83,9 @@ test('Office catalog registration script stages Word and Excel manifests without
     const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
     assert.match(wordManifest, /<OfficeApp/);
-    assert.match(wordManifest, /https:\/\/localhost:8766\/taskpane\.html\?v=0\.1\.7/);
+    assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.7/);
     assert.match(excelManifest, /<OfficeApp/);
-    assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.6/);
+    assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.7/);
     assert.doesNotMatch(wordManifest, /https:\/\/localhost:8765/);
     assert.doesNotMatch(excelManifest, /https:\/\/localhost:8765/);
     assert.throws(() => readFileSync(join(catalogPath, 'word', 'manifest.xml'), 'utf8'));
@@ -122,8 +122,8 @@ test('Office catalog registration can sync its origin from running daemon status
     assert.match(result.stdout, /Manifest origin: https:\/\/localhost:8777/);
     const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
-    assert.match(wordManifest, /https:\/\/localhost:8777\/taskpane\.html\?v=0\.1\.7/);
-    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.6/);
+    assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.7/);
+    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.7/);
     assert.doesNotMatch(wordManifest, /https:\/\/localhost:8765/);
     assert.doesNotMatch(excelManifest, /https:\/\/localhost:8765/);
   } finally {

@@ -249,8 +249,7 @@ Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination $stage
 Copy-Item -Recurse -Force -Path (Join-Path $addinRoot "public") -Destination $stageAddinRoot
 Copy-Item -Force -Path (Join-Path $excelAddinRoot "manifest.xml") -Destination $stageExcelAddinRoot
 Copy-Item -Recurse -Force -Path (Join-Path $excelAddinRoot "public") -Destination $stageExcelAddinRoot
-Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination (Join-Path $stageCatalogRoot "office-mcp-word.xml")
-Copy-Item -Force -Path (Join-Path $excelAddinRoot "manifest.xml") -Destination (Join-Path $stageCatalogRoot "office-mcp-excel.xml")
+& (Join-Path $commonRoot "scripts\register-office-catalog.ps1") -RepoRoot $repoRoot -CatalogPath $stageCatalogRoot -BaseUrl "https://localhost:8765" -SkipRegistry
 Copy-Item -Force -Path (Join-Path $repoRoot "packaging\windows\office-mcp-tray.ps1") -Destination (Join-Path $stageRoot "office-mcp-tray.ps1")
 
 @'

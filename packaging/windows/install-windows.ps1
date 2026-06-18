@@ -15,6 +15,7 @@ $uiRoot = Join-Path $repoRoot "src\office-mcp\ui"
 $commonRoot = Join-Path $repoRoot "src\office-ctl\common"
 $addinRoot = Join-Path $repoRoot "src\office-ctl\word"
 $excelAddinRoot = Join-Path $repoRoot "src\office-ctl\excel"
+$catalogScriptPath = Join-Path $commonRoot "scripts\register-office-catalog.ps1"
 $catalogPath = Join-Path $InstallRoot "addin-catalog"
 $pfxPath = Join-Path $InstallRoot ".office-mcp-localhost.pfx"
 
@@ -43,6 +44,9 @@ if (-not (Test-Path (Join-Path $addinRoot "manifest.xml"))) {
 }
 if (-not (Test-Path (Join-Path $excelAddinRoot "manifest.xml"))) {
   throw "Cannot find src/office-ctl/excel/manifest.xml under $repoRoot."
+}
+if (-not (Test-Path $catalogScriptPath)) {
+  throw "Cannot find shared Office catalog script under $repoRoot."
 }
 if (-not (Test-Path (Join-Path $rustDaemonRoot "Cargo.toml"))) {
   throw "Cannot find src/office-mcp/daemon/Cargo.toml under $repoRoot."
@@ -84,8 +88,7 @@ try {
   Pop-Location
 }
 
-Copy-Item -Force -Path (Join-Path $addinRoot "manifest.xml") -Destination (Join-Path $catalogPath "office-mcp-word.xml")
-Copy-Item -Force -Path (Join-Path $excelAddinRoot "manifest.xml") -Destination (Join-Path $catalogPath "office-mcp-excel.xml")
+& $catalogScriptPath -RepoRoot $repoRoot -CatalogPath $catalogPath -BaseUrl "https://localhost:8765" -SkipRegistry
 Copy-Item -Force -Path (Join-Path $repoRoot "target\release\office-mcp-daemon.exe") -Destination (Join-Path $InstallRoot "office-mcp-daemon.exe")
 $installedUiRoot = Join-Path $InstallRoot "office-mcp\ui"
 $installedCommonRoot = Join-Path $InstallRoot "office-ctl\common"
