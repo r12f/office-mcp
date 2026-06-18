@@ -409,12 +409,14 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       native system icons. Automated coverage verifies the Rust tray icon uses
       the product glyph instead of a blank or single-color placeholder; final
       visible notification-area evidence remains manual.
-- [ ] Rework tray product polish so the normal Windows notification-area surface
+- [x] Rework tray product polish so the normal Windows notification-area surface
       looks native and finished: visible original icon, product tooltip, no
       missing/default icon, no debug labels, and menu/confirmation text aligned
-      with the add-in product name. The right-click menu must be the operating
-      system's native context menu, not a webview, browser window, frameless HTML
-      panel, CSS-styled popup, or custom-drawn imitation.
+      with the add-in product name. Automated coverage verifies the generated
+      tray glyph, product tooltip, read-only status rows, action labels,
+      confirmation text, structured menu roles, and absence of scaffold/debug
+      labels. Real Windows native right-click interaction evidence remains
+      tracked by the next item and the final visual evidence item.
 - [ ] Ensure the tray right-click interaction uses a real platform-native menu
       on Windows, with native separators, disabled/read-only status rows,
       hover/selection behavior, keyboard access, and theme/high-contrast
