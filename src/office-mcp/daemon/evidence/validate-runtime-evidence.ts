@@ -170,6 +170,7 @@ function validateManualTrayEvidence(): void {
   if (typeof manual.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(manual.screenshot_path))) {
     failures.push('Manual tray evidence screenshot file does not exist.');
   }
+  validateManualTrayDaemonContext(manual.daemon_context);
   for (const [key, label] of [
     ['visible_icon', 'visible tray icon'],
     ['right_click_menu', 'right-click menu'],
@@ -178,6 +179,36 @@ function validateManualTrayEvidence(): void {
   ] as const) {
     if (manual[key] !== true) failures.push(`Manual tray evidence missing ${label}.`);
   }
+}
+
+function validateManualTrayDaemonContext(context: unknown): void {
+  if (context === undefined) return;
+  if (!isRecord(context)) {
+    failures.push('Manual tray daemon context is malformed.');
+    return;
+  }
+  const status = context.status;
+  if (!isRecord(status) || status.ok !== true || status.running !== true || typeof status.uiUrl !== 'string') {
+    failures.push('Manual tray daemon context missing running daemon status.');
+  }
+  const trayProbe = context.tray_probe;
+  if (!isRecord(trayProbe) || trayProbe.ok !== true || trayProbe.native_host !== true) {
+    failures.push('Manual tray daemon context missing native tray probe success.');
+    return;
+  }
+  const snapshot = trayProbe.snapshot;
+  const menuItems = isRecord(snapshot) && Array.isArray(snapshot.menu_items)
+    ? snapshot.menu_items.filter((item): item is string => typeof item === 'string')
+    : [];
+  for (const expected of ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP']) {
+    if (!menuItems.some((item) => item.includes(expected))) {
+      failures.push(`Manual tray daemon context missing live menu item: ${expected}`);
+    }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function screenshotFileLooksLikeImage(path: string): boolean {

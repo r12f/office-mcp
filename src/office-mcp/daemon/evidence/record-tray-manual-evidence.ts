@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,6 +9,7 @@ const outputPath = resolve(readOption('--output') ?? join(repoRoot, 'artifacts/t
 const tester = readOption('--tester') ?? process.env.USERNAME ?? process.env.USER ?? 'unknown';
 const screenshotPath = readOption('--screenshot-path');
 const notes = readOption('--notes');
+const daemonBin = readOption('--daemon-bin');
 
 const visibleIcon = booleanFlag('--visible-icon');
 const rightClickMenu = booleanFlag('--right-click-menu');
@@ -19,6 +21,7 @@ const menuContainsRequiredItems = expectedItems.every((expected) =>
 );
 const screenshotExists = screenshotPath ? existsSync(resolve(screenshotPath)) : false;
 const passed = visibleIcon && rightClickMenu && showUiOpened && menuContainsRequiredItems && screenshotExists;
+const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 
 const evidence = {
   schema_version: 1,
@@ -34,6 +37,7 @@ const evidence = {
   menu_contains_required_items: menuContainsRequiredItems,
   screenshot_path: screenshotPath ? resolve(screenshotPath) : undefined,
   screenshot_exists: screenshotExists,
+  daemon_context: daemonContext,
   notes,
   passed
 };
@@ -61,4 +65,34 @@ function readRepeatedOption(name: string): string[] {
     if (process.argv[index] === name && process.argv[index + 1]) values.push(process.argv[index + 1]);
   }
   return values;
+}
+
+function readDaemonContext(binaryPath: string): Record<string, unknown> {
+  return {
+    binary_path: binaryPath,
+    status: runJson(binaryPath, ['daemon', 'status']),
+    tray_probe: runJson(binaryPath, ['tray', '--probe'])
+  };
+}
+
+function runJson(binaryPath: string, args: string[]): Record<string, unknown> {
+  const result = spawnSync(binaryPath, args, { encoding: 'utf8' });
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      exit_code: result.status,
+      stderr: result.stderr.trim(),
+      stdout: result.stdout.trim()
+    };
+  }
+  try {
+    const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
+    return { ok: true, ...parsed };
+  } catch (error) {
+    return {
+      ok: false,
+      parse_error: error instanceof Error ? error.message : String(error),
+      stdout: result.stdout.trim()
+    };
+  }
 }

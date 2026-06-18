@@ -220,6 +220,16 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
 
   withEvidenceFile(ui, (uiPath) => {
     withManualTrayEvidence(true, (manualPath) => {
+      const manual = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      manual.daemon_context = manualTrayDaemonContext();
+      writeFileSync(manualPath, JSON.stringify(manual, null, 2));
+      const passing = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.equal(passing.status, 0, outputText(passing.stdout) + outputText(passing.stderr));
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
       const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
       broken.observed_menu_items = ['Status: Up', 'Clients: 0'];
       broken.menu_contains_required_items = true;
@@ -238,6 +248,17 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /Manual tray evidence screenshot file does not exist/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.daemon_context = manualTrayDaemonContext(['Status: Up', 'Clients: 0']);
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray daemon context missing live menu item: Documents:/);
     });
   });
 });
@@ -346,7 +367,29 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     menu_contains_required_items: passed,
     screenshot_path: screenshotPath,
     screenshot_exists: passed,
+    daemon_context: undefined as ReturnType<typeof manualTrayDaemonContext> | undefined,
     passed
+  };
+}
+
+function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP']) {
+  return {
+    binary_path: 'C:\\Code\\office-mcp\\target\\debug\\office-mcp-daemon.exe',
+    status: {
+      ok: true,
+      running: true,
+      pid: 1234,
+      uiUrl: 'https://localhost:8765/ui/'
+    },
+    tray_probe: {
+      ok: true,
+      native_host: true,
+      snapshot: {
+        menu_items: menuItems,
+        platform: 'windows-notification-area'
+      },
+      state_fetch_ok: true
+    }
   };
 }
 
