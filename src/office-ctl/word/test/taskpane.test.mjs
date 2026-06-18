@@ -131,6 +131,38 @@ test('Office catalog registration can sync its origin from running daemon status
   }
 });
 
+test('Office catalog registration writes a local folder URL to the trusted catalog registry', () => {
+  const catalogPath = mkdtempSync(join(tmpdir(), 'office-mcp-catalog-registry-'));
+
+  try {
+    const result = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        [
+          '$old = Get-ItemProperty HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -ErrorAction SilentlyContinue',
+          `& '${join(ADDIN_ROOT, '..', 'common', 'scripts', 'register-office-catalog.ps1')}' -CatalogPath '${catalogPath}' -BaseUrl https://localhost:8778`,
+          '$entry = Get-ItemProperty HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp',
+          'Write-Output "REGISTRY_URL=$($entry.Url)"',
+          'Remove-Item HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -Recurse -Force',
+          'if ($old) { New-Item HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -Force | Out-Null; Set-ItemProperty HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -Name Id -Value $old.Id; Set-ItemProperty HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -Name Url -Value $old.Url; Set-ItemProperty HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -Name Flags -Value $old.Flags -Type DWord }'
+        ].join('; ')
+      ],
+      { cwd: join(ADDIN_ROOT, '..', '..', '..'), encoding: 'utf8' }
+    );
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /REGISTRY_URL=[A-Z]:\\/i);
+    assert.match(result.stdout, new RegExp(catalogPath.split(/[\\/]/).at(-1)));
+    assert.doesNotMatch(result.stdout, /REGISTRY_URL=\\\\localhost/);
+  } finally {
+    rmSync(catalogPath, { force: true, recursive: true });
+  }
+});
+
 test('Word task pane exposes product UI regions and accessible endpoint settings', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');

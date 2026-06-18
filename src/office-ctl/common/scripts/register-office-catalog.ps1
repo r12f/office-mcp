@@ -153,6 +153,18 @@ function ConvertTo-OfficeCatalogUrl {
   return "\\localhost\$drive`$\$relativePath"
 }
 
+function ConvertTo-OfficeCatalogRegistryUrl {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  $resolvedPath = [System.IO.Path]::GetFullPath($Path)
+  if ($resolvedPath.StartsWith("\\", [System.StringComparison]::Ordinal)) {
+    return $resolvedPath
+  }
+  return $resolvedPath
+}
+
 $hosts = @(
   @{ Name = "Word"; CatalogFile = "office-mcp-word.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\word\manifest.xml"; AddinId = "11111111-aaaa-bbbb-cccc-222222222222" },
   @{ Name = "Excel"; CatalogFile = "office-mcp-excel.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\excel\manifest.xml"; AddinId = "33333333-aaaa-bbbb-cccc-444444444444" }
@@ -169,7 +181,7 @@ foreach ($officeHost in $hosts) {
 }
 
 if (-not $SkipRegistry) {
-  $catalogUrl = ConvertTo-OfficeCatalogUrl -Path $CatalogPath
+  $catalogUrl = ConvertTo-OfficeCatalogRegistryUrl -Path $CatalogPath
   $key = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp"
   New-Item -Path $key -Force | Out-Null
   Set-ItemProperty -Path $key -Name Id -Value "office-mcp"
