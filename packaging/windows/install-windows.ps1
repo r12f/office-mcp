@@ -88,7 +88,7 @@ try {
   Pop-Location
 }
 
-& $catalogScriptPath -RepoRoot $repoRoot -CatalogPath $catalogPath -BaseUrl "https://localhost:8765" -SkipRegistry
+& $catalogScriptPath -RepoRoot $repoRoot -CatalogPath $catalogPath -BaseUrl "https://localhost:8765" -SkipRegistry -ClearOfficeCache
 Copy-Item -Force -Path (Join-Path $repoRoot "target\release\office-mcp-daemon.exe") -Destination (Join-Path $InstallRoot "office-mcp-daemon.exe")
 $installedUiRoot = Join-Path $InstallRoot "office-mcp\ui"
 $installedCommonRoot = Join-Path $InstallRoot "office-ctl\common"

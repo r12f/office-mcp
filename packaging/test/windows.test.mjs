@@ -75,6 +75,7 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.match(installScript, /installedWordRoot/);
   assert.match(installScript, /register-office-catalog\.ps1/);
   assert.match(installScript, /-CatalogPath \$catalogPath/);
+  assert.match(installScript, /-ClearOfficeCache/);
   assert.match(installScript, /\$catalogScriptPath = Join-Path \$commonRoot "scripts\\register-office-catalog\.ps1"/);
   assert.doesNotMatch(installScript, /Destination \(Join-Path \$catalogPath "office-mcp-word\.xml"\)/);
   assert.doesNotMatch(installScript, /Destination \(Join-Path \$catalogPath "office-mcp-excel\.xml"\)/);

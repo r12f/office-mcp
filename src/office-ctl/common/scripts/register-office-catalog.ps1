@@ -3,6 +3,8 @@ param(
   [string]$RepoRoot = "",
   [string]$BaseUrl = "https://localhost:8765",
   [string]$DaemonStatusCommand = "",
+  [string]$TrustedCatalogRegistryKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp",
+  [switch]$ClearOfficeCache,
   [switch]$SkipRegistry
 )
 
@@ -133,6 +135,71 @@ function Remove-DeveloperDebugRegistration {
   }
 }
 
+function Assert-TrustedCatalogRegistryKey {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  if ($Path -notmatch '^HKCU:\\') {
+    throw "TrustedCatalogRegistryKey must be under HKCU."
+  }
+  if ($Path -match '[\r\n]') {
+    throw "TrustedCatalogRegistryKey must be a single registry path."
+  }
+}
+
+function Assert-OfficeHostsClosed {
+  param(
+    [Parameter(Mandatory = $true)][array]$Hosts
+  )
+
+  $running = @()
+  foreach ($officeHost in $Hosts) {
+    $processName = $officeHost.ProcessName
+    if (Get-Process -Name $processName -ErrorAction SilentlyContinue) {
+      $running += $processName
+    }
+  }
+  if ($running.Count -gt 0) {
+    throw "Close Office host processes before clearing add-in cache: $($running -join ', ')."
+  }
+}
+
+function Remove-OfficeAddinCache {
+  param(
+    [Parameter(Mandatory = $true)][array]$Hosts
+  )
+
+  $wefRoot = Join-Path $env:LOCALAPPDATA "Microsoft\Office\16.0\Wef"
+  if (-not (Test-Path -LiteralPath $wefRoot)) { return }
+
+  foreach ($officeHost in $Hosts) {
+    $addinId = $officeHost.AddinId
+    $hostName = $officeHost.Name
+
+    $addinInfoRoot = Join-Path $wefRoot "AddinInfo\1\filesystem\$hostName\1"
+    if (Test-Path -LiteralPath $addinInfoRoot) {
+      Get-ChildItem -LiteralPath $addinInfoRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name.StartsWith($addinId, [System.StringComparison]::OrdinalIgnoreCase) } |
+        Remove-Item -Recurse -Force
+    }
+
+    Get-ChildItem -LiteralPath $wefRoot -Recurse -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -match '\\Manifests\\' -and $_.Name.StartsWith($addinId, [System.StringComparison]::OrdinalIgnoreCase) } |
+      Remove-Item -Force
+
+    $appCommandsRoot = Join-Path $wefRoot "AppCommands"
+    if (Test-Path -LiteralPath $appCommandsRoot) {
+      Get-ChildItem -LiteralPath $appCommandsRoot -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object {
+          ($_.FullName -match '\\TrustedCatalog\\' -and $_.Name.StartsWith($addinId, [System.StringComparison]::OrdinalIgnoreCase)) -or
+          ($_.Name -like "$hostName.RibbonCache.*")
+        } |
+        Remove-Item -Force
+    }
+  }
+}
+
 function ConvertTo-OfficeCatalogUrl {
   param(
     [Parameter(Mandatory = $true)][string]$Path
@@ -162,8 +229,8 @@ function ConvertTo-OfficeCatalogRegistryUrl {
 }
 
 $hosts = @(
-  @{ Name = "Word"; CatalogFile = "office-mcp-word.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\word\manifest.xml"; AddinId = "11111111-aaaa-bbbb-cccc-222222222222" },
-  @{ Name = "Excel"; CatalogFile = "office-mcp-excel.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\excel\manifest.xml"; AddinId = "33333333-aaaa-bbbb-cccc-444444444444" }
+  @{ Name = "Word"; ProcessName = "WINWORD"; CatalogFile = "office-mcp-word.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\word\manifest.xml"; AddinId = "11111111-aaaa-bbbb-cccc-222222222222" },
+  @{ Name = "Excel"; ProcessName = "EXCEL"; CatalogFile = "office-mcp-excel.xml"; Manifest = Join-Path $RepoRoot "src\office-ctl\excel\manifest.xml"; AddinId = "33333333-aaaa-bbbb-cccc-444444444444" }
 )
 
 New-Item -ItemType Directory -Force -Path $CatalogPath | Out-Null
@@ -177,8 +244,9 @@ foreach ($officeHost in $hosts) {
 }
 
 if (-not $SkipRegistry) {
+  Assert-TrustedCatalogRegistryKey -Path $TrustedCatalogRegistryKey
   $catalogUrl = ConvertTo-OfficeCatalogRegistryUrl -Path $CatalogPath
-  $key = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp"
+  $key = $TrustedCatalogRegistryKey
   New-Item -Path $key -Force | Out-Null
   Set-ItemProperty -Path $key -Name Id -Value "office-mcp"
   Set-ItemProperty -Path $key -Name Url -Value $catalogUrl
@@ -190,8 +258,14 @@ if (-not $SkipRegistry) {
   $catalogUrl = ConvertTo-OfficeCatalogUrl -Path $CatalogPath
 }
 
+if ($ClearOfficeCache) {
+  Assert-OfficeHostsClosed -Hosts $hosts
+  Remove-OfficeAddinCache -Hosts $hosts
+}
+
 Write-Output "Registered Office trusted catalog: $CatalogPath"
 Write-Output "Catalog URL: $catalogUrl"
 Write-Output "Manifest origin: $BaseUrl"
 Write-Output "Word manifest: $(Join-Path $CatalogPath 'office-mcp-word.xml')"
 Write-Output "Excel manifest: $(Join-Path $CatalogPath 'office-mcp-excel.xml')"
+if ($ClearOfficeCache) { Write-Output "Cleared Office WEF add-in cache for office-mcp." }

@@ -22,16 +22,16 @@ test('Word add-in manifest and task pane asset versions stay aligned', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
-  assert.match(manifest, /<Version>1\.0\.0\.7<\/Version>/);
-  assert.match(manifest, /word\/taskpane\.html\?v=0\.1\.7/);
-  assert.match(html, /word\/taskpane\.css\?v=0\.1\.7/);
-  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.7/);
-  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.7/);
-  assert.match(html, /common\/logger\.js\?v=0\.1\.7/);
-  assert.match(html, /common\/task-history\.js\?v=0\.1\.7/);
-  assert.match(html, /word\/taskpane\.js\?v=0\.1\.7/);
+  assert.match(manifest, /<Version>1\.0\.0\.8<\/Version>/);
+  assert.match(manifest, /word\/taskpane\.html\?v=0\.1\.8/);
+  assert.match(html, /word\/taskpane\.css\?v=0\.1\.8/);
+  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.8/);
+  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.8/);
+  assert.match(html, /common\/logger\.js\?v=0\.1\.8/);
+  assert.match(html, /common\/task-history\.js\?v=0\.1\.8/);
+  assert.match(html, /word\/taskpane\.js\?v=0\.1\.8/);
   assert.match(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
-  assert.match(js, /ADDIN_VERSION = '0\.1\.7'/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.8'/);
 });
 
 test('Office catalog registration wrapper delegates to shared Word and Excel catalog script', () => {
@@ -44,6 +44,8 @@ test('Office catalog registration wrapper delegates to shared Word and Excel cat
   assert.match(commonScript, /Word manifest:/);
   assert.match(commonScript, /Excel manifest:/);
   assert.match(commonScript, /TrustedCatalogs\\office-mcp/);
+  assert.match(commonScript, /ClearOfficeCache/);
+  assert.match(commonScript, /Close Office host processes before clearing add-in cache/);
   assert.match(commonScript, /SkipRegistry/);
   assert.match(commonScript, /Remove-DeveloperDebugRegistration/);
   assert.match(commonScript, /WEF\\\\Developer|WEF\\Developer/);
@@ -83,7 +85,7 @@ test('Office catalog registration script stages Word and Excel manifests without
     const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
     assert.match(wordManifest, /<OfficeApp/);
-    assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.7/);
+    assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.8/);
     assert.match(excelManifest, /<OfficeApp/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.7/);
     assert.doesNotMatch(wordManifest, /https:\/\/localhost:8765/);
@@ -122,7 +124,7 @@ test('Office catalog registration can sync its origin from running daemon status
     assert.match(result.stdout, /Manifest origin: https:\/\/localhost:8777/);
     const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
-    assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.7/);
+    assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.8/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.7/);
     assert.doesNotMatch(wordManifest, /https:\/\/localhost:8765/);
     assert.doesNotMatch(excelManifest, /https:\/\/localhost:8765/);
@@ -133,6 +135,7 @@ test('Office catalog registration can sync its origin from running daemon status
 
 test('Office catalog registration writes a shared folder URL to the trusted catalog registry', () => {
   const catalogPath = mkdtempSync(join(tmpdir(), 'office-mcp-catalog-registry-'));
+  const registryKey = 'HKCU:\\Software\\office-mcp-tests\\TrustedCatalogs\\office-mcp';
 
   try {
     const result = spawnSync(
@@ -143,12 +146,10 @@ test('Office catalog registration writes a shared folder URL to the trusted cata
         'Bypass',
         '-Command',
         [
-          '$old = Get-ItemProperty HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -ErrorAction SilentlyContinue',
-          `& '${join(ADDIN_ROOT, '..', 'common', 'scripts', 'register-office-catalog.ps1')}' -CatalogPath '${catalogPath}' -BaseUrl https://localhost:8778`,
-          '$entry = Get-ItemProperty HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp',
+          `& '${join(ADDIN_ROOT, '..', 'common', 'scripts', 'register-office-catalog.ps1')}' -CatalogPath '${catalogPath}' -BaseUrl https://localhost:8778 -TrustedCatalogRegistryKey '${registryKey}'`,
+          `$entry = Get-ItemProperty '${registryKey}'`,
           'Write-Output "REGISTRY_URL=$($entry.Url)"',
-          'Remove-Item HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -Recurse -Force',
-          'if ($old) { New-Item HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -Force | Out-Null; Set-ItemProperty HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -Name Id -Value $old.Id; Set-ItemProperty HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -Name Url -Value $old.Url; Set-ItemProperty HKCU:\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs\\office-mcp -Name Flags -Value $old.Flags -Type DWord }'
+          `Remove-Item '${registryKey}' -Recurse -Force`
         ].join('; ')
       ],
       { cwd: join(ADDIN_ROOT, '..', '..', '..'), encoding: 'utf8' }
