@@ -46,22 +46,31 @@ function pixel(size, x, y) {
   const scale = size / 256;
   const px = (x + 0.5) / scale;
   const py = (y + 0.5) / scale;
-  const radius = 56;
+  const radius = 54;
   if (!roundedRect(px, py, 0, 0, 256, 256, radius)) return [0, 0, 0, 0];
 
   let color = [15, 23, 42, 255];
-  if (roundedRect(px, py, 56, 66, 118, 124, 10)) color = [234, 242, 255, 255];
-  if (roundedRect(px, py, 112, 54, 110, 148, 10)) color = [72, 214, 164, 255];
-  if (line(px, py, 82, 92, 154, 92, 10) || line(px, py, 82, 118, 140, 118, 10) || line(px, py, 82, 144, 124, 144, 10)) {
+  if (roundedRect(px, py, 55, 58, 92, 122, 10)) color = [234, 242, 255, 255];
+  if (roundedRect(px, py, 109, 76, 92, 122, 10)) color = [72, 214, 164, 255];
+  if (line(px, py, 79, 88, 127, 88, 9) || line(px, py, 79, 114, 115, 114, 9) || line(px, py, 79, 140, 123, 140, 9)) {
     color = [36, 87, 214, 255];
   }
-  if (line(px, py, 134, 92, 192, 92, 10) || line(px, py, 134, 120, 178, 120, 10) || line(px, py, 134, 148, 192, 148, 10)) {
+  if (line(px, py, 133, 105, 175, 105, 9) || line(px, py, 133, 131, 163, 131, 9) || line(px, py, 133, 157, 175, 157, 9)) {
     color = [15, 23, 42, 184];
   }
-  const controlBorder = distance(px, py, 190, 188);
-  if (controlBorder <= 40) color = [15, 23, 42, 255];
-  if (controlBorder <= 28) color = [248, 216, 74, 255];
-  if (line(px, py, 178, 188, 202, 188, 10) || line(px, py, 190, 176, 190, 200, 10)) {
+  if (line(px, py, 70, 196, 132, 196, 12) || line(px, py, 132, 196, 192, 162, 12) || line(px, py, 192, 162, 207, 162, 12)) {
+    color = [36, 87, 214, 255];
+  }
+  const firstNode = distance(px, py, 70, 196);
+  if (firstNode <= 15.5) color = [15, 23, 42, 255];
+  if (firstNode <= 8.5) color = [72, 214, 164, 255];
+  const secondNode = distance(px, py, 132, 196);
+  if (secondNode <= 15.5) color = [15, 23, 42, 255];
+  if (secondNode <= 8.5) color = [234, 242, 255, 255];
+  const controlBorder = distance(px, py, 203, 162);
+  if (controlBorder <= 36.5) color = [15, 23, 42, 255];
+  if (controlBorder <= 25.5) color = [248, 216, 74, 255];
+  if (line(px, py, 190, 162, 216, 162, 9) || controlBorder <= 5) {
     color = [15, 23, 42, 255];
   }
   return color;

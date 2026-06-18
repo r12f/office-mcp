@@ -1,9 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Office MCP control mark">
-  <rect width="256" height="256" rx="56" fill="#0F172A" />
-  <path d="M56 66h96c12 0 22 10 22 22v102H80c-13 0-24-11-24-24V66Z" fill="#EAF2FF" />
-  <path d="M82 92h72M82 118h58M82 144h42" stroke="#2457D6" stroke-width="10" stroke-linecap="round" />
-  <path d="M112 54h88c12 0 22 10 22 22v104c0 12-10 22-22 22h-88V54Z" fill="#48D6A4" />
-  <path d="M134 92h58M134 120h44M134 148h58" stroke="#0F172A" stroke-width="10" stroke-linecap="round" opacity="0.72" />
-  <circle cx="190" cy="188" r="34" fill="#F8D84A" stroke="#0F172A" stroke-width="12" />
-  <path d="M178 188h24M190 176v24" stroke="#0F172A" stroke-width="10" stroke-linecap="round" />
+  <rect width="256" height="256" rx="54" fill="#0F172A" />
+  <path d="M55 58h74c10 0 18 8 18 18v104H73c-10 0-18-8-18-18V58Z" fill="#EAF2FF" />
+  <path d="M109 76h74c10 0 18 8 18 18v104h-74c-10 0-18-8-18-18V76Z" fill="#48D6A4" />
+  <path d="M79 88h48M79 114h36M79 140h44" stroke="#2457D6" stroke-width="9" stroke-linecap="round" />
+  <path d="M133 105h42M133 131h30M133 157h42" stroke="#0F172A" stroke-width="9" stroke-linecap="round" opacity="0.72" />
+  <path d="M70 196h62c24 0 36-34 60-34h15" fill="none" stroke="#2457D6" stroke-width="12" stroke-linecap="round" />
+  <circle cx="70" cy="196" r="12" fill="#48D6A4" stroke="#0F172A" stroke-width="7" />
+  <circle cx="132" cy="196" r="12" fill="#EAF2FF" stroke="#0F172A" stroke-width="7" />
+  <circle cx="203" cy="162" r="31" fill="#F8D84A" stroke="#0F172A" stroke-width="11" />
+  <path d="M190 162h26" stroke="#0F172A" stroke-width="9" stroke-linecap="round" />
+  <circle cx="203" cy="162" r="5" fill="#0F172A" />
 </svg>
