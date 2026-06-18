@@ -318,7 +318,9 @@ and server/protocol metadata fits on one row.
 
 ### M6.5.3 — Product identity, add-in metadata, and native tray polish
 
-User-reported follow-up from live Word add-in and tray testing:
+User-reported follow-up from live Word add-in and tray testing. This milestone
+owns the product identity layer, not protocol behavior: the add-in and tray must
+feel like a finished local desktop utility rather than an experimental scaffold.
 
 - [x] Design an original office-control product logo and icon system. It must
       avoid Microsoft Office product marks while still communicating office
@@ -326,6 +328,11 @@ User-reported follow-up from live Word add-in and tray testing:
       futuristic desktop utility style. The first implemented identity is the
       Office MCP Control mark: abstract document panes plus a control node,
       generated from `src/office-ctl/common/assets/brand-mark.svg`.
+- [ ] Add an explicit brand guard so generated/source assets cannot regress to
+      Microsoft Office-owned visual marks, placeholder initials, generic gear
+      icons, or single-color debug glyphs. The guard should verify the source
+      logo exists, generated icons are non-empty and multi-color, and manifests
+      never reference Office product logos as the add-in identity.
 - [x] Add reproducible brand assets: source artwork, generated 16/20/24/32/48/
       64/128/256 px app icons, Office add-in command icons, and a monochrome
       tray/menu-bar glyph that remains legible at 16 px in light, dark, and
@@ -339,6 +346,11 @@ User-reported follow-up from live Word add-in and tray testing:
       product icons. Placeholder labels such as `office-mcp`, generic `Open`,
       blank icons, or debug/experimental naming fail this item. Covered by Word
       and Excel task pane tests plus catalog renderer assertions.
+- [ ] Tighten add-in product metadata and chrome so the title, icon, provider,
+      ribbon group, action label, catalog entry, and task pane header read as a
+      stable product. Labels must avoid raw implementation names, lowercase
+      project slugs, vague commands such as `Open`, missing add-in type/context,
+      or wording that looks like a prototype/debug build.
 - [x] Update task pane visible title/chrome and any in-app product references
       to match the new identity while keeping host-specific Word/Excel accents
       restrained and secondary. Word and Excel task panes now use `Office MCP
@@ -356,6 +368,11 @@ User-reported follow-up from live Word add-in and tray testing:
       acceptable for release. Existing automated tests verify the Rust tray host
       uses `tray_icon::menu`; manual Windows evidence is still required for the
       native look and interaction.
+- [ ] Polish the tray product surface so normal Windows users see a deliberate
+      app icon, native tooltip/title, native context menu text, disabled status
+      rows, and confirmation dialogs that match the add-in product name. The
+      tray must not expose placeholder labels, missing icons, web-rendered menu
+      panels, or debug-only commands in the primary right-click menu.
 - [x] Update MSI/package asset installation and manifest renderer tests so the
       generated logo/icon files and product metadata are packaged and referenced
       from the installed add-in catalog without loopback or missing-icon paths.
@@ -367,11 +384,19 @@ User-reported follow-up from live Word add-in and tray testing:
       tests now cover metadata/icon substitution, generated asset dimensions,
       static asset serving, packaging presence, and tray glyph generation; the
       remaining open portion is live Windows ribbon/tray visual evidence.
+- [ ] Capture visual evidence for the finished identity on Windows: Word ribbon
+      command, Word catalog entry, Word task pane title/icon, Excel equivalents,
+      visible notification-area tray icon, native right-click menu, and tray
+      tooltip/confirmation dialog. The evidence must be tied to the same local
+      daemon build under test and stored as release-checkable artifacts.
 
 **Exit criterion**: Word and Excel show a mature product add-in name and icon in
-the ribbon/catalog; the task pane title matches the product identity; the tray
-has a visible original glyph and native right-click menu; packaged builds carry
-the same assets without blank placeholders or Microsoft-owned marks.
+the ribbon/catalog; the task pane title and chrome match the product identity;
+the logo communicates office productivity and user control without using Office
+owned marks; the tray has a visible original glyph, native tooltip, native
+right-click menu, and product-consistent labels; packaged builds carry the same
+assets without blank placeholders, generic debug names, or Microsoft-owned
+marks.
 
 ### M6.6 — Rust native daemon migration
 
