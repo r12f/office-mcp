@@ -258,7 +258,7 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       writeFileSync(manualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
       assert.notEqual(result.status, 0);
-      assert.match(outputText(result.stdout), /Manual tray daemon context missing live menu item: Documents:/);
+      assert.match(outputText(result.stdout), /Manual tray daemon context live missing menu item: Documents:/);
     });
   });
 });
@@ -363,6 +363,7 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     right_click_menu: passed,
     show_ui_opened: passed,
     observed_menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP'],
+    observed_tooltip: 'Office MCP - Up - 0 clients - 0 documents',
     expected_menu_items: ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'],
     menu_contains_required_items: passed,
     screenshot_path: screenshotPath,
@@ -372,7 +373,7 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
   };
 }
 
-function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP']) {
+function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']) {
   return {
     binary_path: 'C:\\Code\\office-mcp\\target\\debug\\office-mcp-daemon.exe',
     status: {
@@ -386,6 +387,8 @@ function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Docum
       native_host: true,
       snapshot: {
         menu_items: menuItems,
+        menu: structuredMenu(menuItems),
+        tooltip: 'Office MCP - Up - 0 clients - 0 documents',
         platform: 'windows-notification-area'
       },
       state_fetch_ok: true
@@ -404,4 +407,13 @@ function excelOnlyReport() {
       gate('excel.runtime_smoke', 'passed')
     ]
   };
+}
+
+function structuredMenu(menuItems: string[]) {
+  return menuItems.map((label, index) => {
+    if (label === '---') return { kind: 'separator', label, enabled: false };
+    if (label === 'Show Office MCP') return { kind: 'action', label, action: 'show_ui', enabled: true };
+    if (label === 'Quit Office MCP') return { kind: 'action', label, action: 'quit', enabled: true };
+    return { kind: 'read_only', label, enabled: false };
+  });
 }

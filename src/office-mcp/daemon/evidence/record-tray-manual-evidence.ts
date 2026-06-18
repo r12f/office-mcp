@@ -9,6 +9,7 @@ const outputPath = resolve(readOption('--output') ?? join(repoRoot, 'artifacts/t
 const tester = readOption('--tester') ?? process.env.USERNAME ?? process.env.USER ?? 'unknown';
 const screenshotPath = readOption('--screenshot-path');
 const notes = readOption('--notes');
+const observedTooltip = readOption('--tooltip');
 const daemonBin = readOption('--daemon-bin');
 
 const visibleIcon = booleanFlag('--visible-icon');
@@ -20,7 +21,8 @@ const menuContainsRequiredItems = expectedItems.every((expected) =>
   observedMenuItems.some((item) => item.includes(expected))
 );
 const screenshotExists = screenshotPath ? existsSync(resolve(screenshotPath)) : false;
-const passed = visibleIcon && rightClickMenu && showUiOpened && menuContainsRequiredItems && screenshotExists;
+const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
+const passed = visibleIcon && rightClickMenu && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists;
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 
 const evidence = {
@@ -33,8 +35,10 @@ const evidence = {
   right_click_menu: rightClickMenu,
   show_ui_opened: showUiOpened,
   observed_menu_items: observedMenuItems,
+  observed_tooltip: observedTooltip,
   expected_menu_items: expectedItems,
   menu_contains_required_items: menuContainsRequiredItems,
+  tooltip_product_ready: tooltipLooksProductReady,
   screenshot_path: screenshotPath ? resolve(screenshotPath) : undefined,
   screenshot_exists: screenshotExists,
   daemon_context: daemonContext,

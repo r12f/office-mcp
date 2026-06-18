@@ -134,6 +134,7 @@ impl TraySnapshot {
             "platform": self.platform.label(),
             "tooltip": self.tooltip,
             "menu_items": self.menu.iter().map(TrayMenuItem::probe_label).collect::<Vec<_>>(),
+            "menu": self.menu.iter().map(TrayMenuItem::probe_item_json).collect::<Vec<_>>(),
             "quit_confirmation": {
                 "title": self.quit_confirmation.title,
                 "body": self.quit_confirmation.body,
@@ -178,12 +179,44 @@ impl TrayMenuItem {
         self.label()
             .map_or_else(|| "---".to_string(), str::to_string)
     }
+
+    #[must_use]
+    pub fn probe_item_json(&self) -> serde_json::Value {
+        match self {
+            Self::ReadOnly { label } => serde_json::json!({
+                "kind": "read_only",
+                "label": label,
+                "enabled": false
+            }),
+            Self::Action { action, label } => serde_json::json!({
+                "kind": "action",
+                "label": label,
+                "action": action.id(),
+                "enabled": true
+            }),
+            Self::Separator => serde_json::json!({
+                "kind": "separator",
+                "label": "---",
+                "enabled": false
+            }),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayAction {
     ShowUi,
     Quit,
+}
+
+impl TrayAction {
+    #[must_use]
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::ShowUi => "show_ui",
+            Self::Quit => "quit",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

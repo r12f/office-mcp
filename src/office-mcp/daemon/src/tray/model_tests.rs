@@ -67,7 +67,15 @@ fn tray_status_can_be_derived_from_redacted_ui_state() {
     assert_eq!(snapshot.menu[1].label(), Some("Clients: 1"));
     assert_eq!(snapshot.menu[2].label(), Some("Documents: 2"));
     assert!(snapshot.quit_confirmation.body.contains("1 running tasks"));
-    assert_eq!(snapshot.probe_json()["menu_items"][3], "---");
+    let probe = snapshot.probe_json();
+    assert_eq!(probe["menu_items"][3], "---");
+    assert_eq!(probe["tooltip"], "Office MCP - Degraded - 1 clients - 2 documents");
+    assert_eq!(probe["menu"][0]["kind"], "read_only");
+    assert_eq!(probe["menu"][0]["enabled"], false);
+    assert_eq!(probe["menu"][3]["kind"], "separator");
+    assert_eq!(probe["menu"][4]["kind"], "action");
+    assert_eq!(probe["menu"][4]["action"], "show_ui");
+    assert_eq!(probe["menu"][5]["action"], "quit");
 }
 
 #[test]

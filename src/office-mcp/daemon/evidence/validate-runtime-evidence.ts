@@ -162,10 +162,9 @@ function validateManualTrayEvidence(): void {
   if (manual.kind !== 'tray_manual_evidence') failures.push(`Unsupported manual tray evidence kind: ${manual.kind ?? 'missing'}`);
   if (manual.platform !== 'win32') failures.push(`Manual tray evidence platform is ${manual.platform}, expected win32.`);
   const observedMenuItems = Array.isArray(manual.observed_menu_items) ? manual.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];
-  for (const expected of ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP']) {
-    if (!observedMenuItems.some((item) => item.includes(expected))) {
-      failures.push(`Manual tray evidence missing menu item: ${expected}`);
-    }
+  validateTrayMenuLabels(observedMenuItems, 'Manual tray evidence');
+  if (typeof manual.observed_tooltip !== 'string' || !trayTooltipLooksProductReady(manual.observed_tooltip)) {
+    failures.push('Manual tray evidence missing product tray tooltip.');
   }
   if (typeof manual.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(manual.screenshot_path))) {
     failures.push('Manual tray evidence screenshot file does not exist.');
@@ -200,13 +199,56 @@ function validateManualTrayDaemonContext(context: unknown): void {
   const menuItems = isRecord(snapshot) && Array.isArray(snapshot.menu_items)
     ? snapshot.menu_items.filter((item): item is string => typeof item === 'string')
     : [];
+  validateTrayMenuLabels(menuItems, 'Manual tray daemon context live');
+  validateStructuredTraySnapshot(snapshot, 'Manual tray daemon context live');
+}
+
+
+function validateTrayMenuLabels(menuItems: string[], label: string): void {
   for (const expected of ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP']) {
     if (!menuItems.some((item) => item.includes(expected))) {
-      failures.push(`Manual tray daemon context missing live menu item: ${expected}`);
+      failures.push(`${label} missing menu item: ${expected}`);
     }
   }
 }
 
+function validateStructuredTraySnapshot(snapshot: unknown, label: string): void {
+  if (!isRecord(snapshot)) {
+    failures.push(`${label} tray snapshot is malformed.`);
+    return;
+  }
+  if (typeof snapshot.tooltip !== 'string' || !trayTooltipLooksProductReady(snapshot.tooltip)) {
+    failures.push(`${label} tray snapshot missing product tooltip.`);
+  }
+  const menu = Array.isArray(snapshot.menu) ? snapshot.menu : [];
+  const expected = [
+    { kind: 'read_only', enabled: false, label: /^Status: (Up|Degraded|Down)$/ },
+    { kind: 'read_only', enabled: false, label: /^Clients: \d+$/ },
+    { kind: 'read_only', enabled: false, label: /^Documents: \d+$/ },
+    { kind: 'separator', enabled: false, label: /^---$/ },
+    { kind: 'action', enabled: true, label: /^Show Office MCP$/, action: 'show_ui' },
+    { kind: 'action', enabled: true, label: /^Quit Office MCP$/, action: 'quit' }
+  ];
+  if (menu.length !== expected.length) {
+    failures.push(`${label} tray menu has ${menu.length} structured items, expected ${expected.length}.`);
+    return;
+  }
+  expected.forEach((rule, index) => {
+    const item = menu[index];
+    if (!isRecord(item)) {
+      failures.push(`${label} tray menu item ${index} is malformed.`);
+      return;
+    }
+    if (item.kind !== rule.kind) failures.push(`${label} tray menu item ${index} has kind ${String(item.kind)}, expected ${rule.kind}.`);
+    if (item.enabled !== rule.enabled) failures.push(`${label} tray menu item ${index} has enabled ${String(item.enabled)}, expected ${rule.enabled}.`);
+    if (typeof item.label !== 'string' || !rule.label.test(item.label)) failures.push(`${label} tray menu item ${index} has wrong label.`);
+    if ('action' in rule && item.action !== rule.action) failures.push(`${label} tray menu item ${index} has action ${String(item.action)}, expected ${rule.action}.`);
+  });
+}
+
+function trayTooltipLooksProductReady(value: string): boolean {
+  return /^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(value);
+}
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

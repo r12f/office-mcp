@@ -165,6 +165,7 @@ async function runTrayProbeGate(): Promise<void> {
     if (evidence.native_host !== true) throw new Error('Tray probe did not use the native tray host.');
     if (evidence.state_fetch_ok !== true) throw new Error('Tray probe could not fetch UI state.');
     if (snapshot?.platform !== 'windows-notification-area') throw new Error(`Tray probe reported wrong platform: ${snapshot?.platform}`);
+    assertStructuredTraySnapshot(snapshot, 'Tray probe');
     if ((snapshot?.quit_confirmation as Record<string, unknown> | undefined)?.secondary_action !== 'Keep Running') throw new Error('Tray probe did not include quit confirmation details.');
     return evidence;
   });
@@ -210,6 +211,7 @@ async function runProductionDaemonTrayGate(): Promise<void> {
       if (probeJson.state_fetch_ok !== true) throw new Error(`Production tray probe could not fetch UI state: ${probe.stdout}`);
       if (probeSnapshot?.platform !== 'windows-notification-area') throw new Error(`Wrong tray platform: ${probeSnapshot?.platform}`);
       if (!Array.isArray(probeSnapshot?.menu_items) || probeSnapshot.menu_items[0] !== 'Status: Up') throw new Error(`Tray menu did not report Up: ${probe.stdout}`);
+      assertStructuredTraySnapshot(probeSnapshot, 'Production tray probe');
       const logText = await waitForLogLine(productionLogPath, 'created native tray icon', daemonRun);
       if (!logText.includes('windows-notification-area')) throw new Error('Native tray creation log did not include Windows platform evidence.');
       return {
@@ -226,6 +228,35 @@ async function runProductionDaemonTrayGate(): Promise<void> {
   });
 }
 
+
+function assertStructuredTraySnapshot(snapshot: Record<string, unknown> | undefined, label: string): void {
+  if (!snapshot) throw new Error(`${label} did not include a tray snapshot.`);
+  if (typeof snapshot.tooltip !== 'string' || !/^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(snapshot.tooltip)) {
+    throw new Error(`${label} did not include a product tooltip: ${JSON.stringify(snapshot)}`);
+  }
+  const menu = Array.isArray(snapshot.menu) ? snapshot.menu : [];
+  const expected = [
+    { kind: 'read_only', enabled: false, label: /^Status: (Up|Degraded|Down)$/ },
+    { kind: 'read_only', enabled: false, label: /^Clients: \d+$/ },
+    { kind: 'read_only', enabled: false, label: /^Documents: \d+$/ },
+    { kind: 'separator', enabled: false, label: /^---$/ },
+    { kind: 'action', enabled: true, label: /^Show Office MCP$/, action: 'show_ui' },
+    { kind: 'action', enabled: true, label: /^Quit Office MCP$/, action: 'quit' }
+  ];
+  if (menu.length !== expected.length) throw new Error(`${label} structured menu has ${menu.length} items: ${JSON.stringify(snapshot)}`);
+  expected.forEach((rule, index) => {
+    const item = menu[index];
+    if (!isRecord(item)) throw new Error(`${label} structured menu item ${index} is malformed: ${JSON.stringify(item)}`);
+    if (item.kind !== rule.kind || item.enabled !== rule.enabled || typeof item.label !== 'string' || !rule.label.test(item.label)) {
+      throw new Error(`${label} structured menu item ${index} is wrong: ${JSON.stringify(item)}`);
+    }
+    if ('action' in rule && item.action !== rule.action) throw new Error(`${label} structured menu action ${index} is wrong: ${JSON.stringify(item)}`);
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 function prepareTrayProbeInstallRoot(): string {
   const daemonExe = daemonExecutablePath();
   if (!existsSync(daemonExe)) {
