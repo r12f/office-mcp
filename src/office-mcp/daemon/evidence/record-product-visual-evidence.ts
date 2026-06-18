@@ -36,6 +36,9 @@ const catalogIconVisible = booleanFlag('--catalog-icon-visible');
 const trayMenuNative = booleanFlag('--tray-menu-native');
 const trayIconVisible = booleanFlag('--tray-icon-visible');
 const quitConfirmationVisible = booleanFlag('--quit-confirmation-visible');
+const logoQualityReviewed = booleanFlag('--logo-quality-reviewed');
+const addinIdentityReviewed = booleanFlag('--addin-identity-reviewed');
+const trayProductPolishReviewed = booleanFlag('--tray-product-polish-reviewed');
 const excelCompactTopBlock = booleanFlag('--excel-compact-top-block');
 const excelToolsPermissionsMerged = booleanFlag('--excel-tools-permissions-merged');
 const excelInlineSettings = booleanFlag('--excel-inline-settings');
@@ -51,7 +54,8 @@ const catalogTypeReady = typeof catalogType === 'string' && /local productivity 
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady;
-const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && excelTaskpaneDensityReady && daemonContextReady;
+const productIdentityReviewReady = logoQualityReviewed && addinIdentityReviewed && trayProductPolishReviewed;
+const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && excelTaskpaneDensityReady && productIdentityReviewReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -73,6 +77,12 @@ const evidence = {
   tray_icon_visible: trayIconVisible,
   tray_menu_native: trayMenuNative,
   quit_confirmation_visible: quitConfirmationVisible,
+  product_identity_review: {
+    logo_quality_reviewed: logoQualityReviewed,
+    addin_identity_reviewed: addinIdentityReviewed,
+    tray_product_polish_reviewed: trayProductPolishReviewed,
+    ready: productIdentityReviewReady
+  },
   excel_taskpane: {
     compact_top_block: excelCompactTopBlock,
     tools_permissions_merged: excelToolsPermissionsMerged,

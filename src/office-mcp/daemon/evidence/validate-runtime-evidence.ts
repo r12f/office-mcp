@@ -217,11 +217,27 @@ function validateProductVisualEvidence(): void {
   }
   validateProductVisualScreenshots(visual.screenshot_paths);
   validateProductVisualObservations(visual.observations);
+  validateProductIdentityReview(visual.product_identity_review);
   validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
   if (visual.daemon_context_ready !== true) {
     failures.push('Product visual evidence daemon context is not recorder-ready.');
   }
   validateProductVisualDaemonContext(visual.daemon_context);
+}
+
+function validateProductIdentityReview(review: unknown): void {
+  if (!isRecord(review)) {
+    failures.push('Product visual evidence missing product identity review.');
+    return;
+  }
+  for (const [key, label] of [
+    ['logo_quality_reviewed', 'logo quality review'],
+    ['addin_identity_reviewed', 'add-in first-run identity review'],
+    ['tray_product_polish_reviewed', 'tray product polish review'],
+    ['ready', 'product identity review ready flag']
+  ] as const) {
+    if (review[key] !== true) failures.push(`Product visual evidence missing ${label}.`);
+  }
 }
 
 function validateProductVisualScreenshots(paths: unknown): void {

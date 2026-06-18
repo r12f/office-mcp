@@ -33,6 +33,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal(evidence.catalog_type_ready, true);
     assert.equal(evidence.tray_tooltip_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, true);
     assert.equal(evidence.daemon_context_ready, true);
     assert.equal(evidence.passed, true);
 
@@ -43,6 +44,18 @@ test('product visual evidence recorder requires all product surfaces', () => {
     const failed = JSON.parse(outputText(missingTray.stdout)) as Record<string, unknown>;
     assert.equal(failed.passed, false);
     assert.equal((failed.screenshots_exist as Record<string, unknown>).tray_native_menu, false);
+  });
+});
+
+test('product visual evidence recorder requires product identity review flags', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'missing-product-review.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--skip-product-review-flags');
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, false);
+    assert.equal(evidence.passed, false);
   });
 });
 
@@ -110,6 +123,8 @@ test('product visual evidence recorder can bind evidence to daemon context', () 
 });
 
 function runRecorder(output: string, screenshots: Record<string, string>, ...extra: string[]): ReturnType<typeof spawnSync> {
+  const skipProductReviewFlags = extra.includes('--skip-product-review-flags');
+  const filteredExtra = extra.filter((item) => item !== '--skip-product-review-flags');
   const args = [
     TSX,
     RECORDER,
@@ -126,11 +141,18 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     '--excel-server-protocol-row', 'Server 0.1.0 / Protocol 1.0',
     '--excel-document-state', 'Editable'
   ];
+  if (!skipProductReviewFlags) {
+    args.push(
+      '--logo-quality-reviewed', 'true',
+      '--addin-identity-reviewed', 'true',
+      '--tray-product-polish-reviewed', 'true'
+    );
+  }
   for (const surface of SURFACES) {
     args.push(`--${surface}`, `Office MCP Control ${surface}`);
     args.push(`--${surface}-screenshot`, screenshots[surface]);
   }
-  args.push(...extra);
+  args.push(...filteredExtra);
   return spawnSync(process.execPath, args, { cwd: process.cwd(), encoding: 'utf8' });
 }
 

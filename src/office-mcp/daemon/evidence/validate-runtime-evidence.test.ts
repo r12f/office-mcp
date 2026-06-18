@@ -297,6 +297,19 @@ test('runtime evidence validator can require product visual evidence', () => {
       assert.match(outputText(result.stdout), /Product visual evidence daemon context is not recorder-ready/);
     });
   });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.product_identity_review.logo_quality_reviewed = false;
+      broken.product_identity_review.ready = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual evidence missing logo quality review/);
+      assert.match(outputText(result.stdout), /Product visual evidence missing product identity review ready flag/);
+    });
+  });
 });
 test('runtime evidence validator can require manual Windows tray evidence', () => {
   const ui = uiReport();
@@ -539,6 +552,12 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     tray_icon_visible: passed,
     tray_menu_native: passed,
     quit_confirmation_visible: passed,
+    product_identity_review: {
+      logo_quality_reviewed: passed,
+      addin_identity_reviewed: passed,
+      tray_product_polish_reviewed: passed,
+      ready: passed
+    },
     excel_taskpane: {
       compact_top_block: passed,
       tools_permissions_merged: passed,
