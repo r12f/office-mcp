@@ -126,6 +126,24 @@ test('product visual evidence recorder requires Excel runtime evidence', () => {
   });
 });
 
+test('product visual evidence recorder requires embedded manual tray evidence', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const output = join(dir, 'missing-manual-tray-evidence.json');
+    const missing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--manual-tray-evidence-path', join(dir, 'missing-tray.json'));
+    assert.notEqual(missing.status, 0);
+    let evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.manual_tray_evidence_ready, false);
+    assert.equal(evidence.passed, false);
+
+    const broken = runRecorder(join(dir, 'broken-manual-tray-evidence.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--manual-tray-evidence-path', writeManualTrayEvidence(dir, false));
+    assert.notEqual(broken.status, 0);
+    evidence = JSON.parse(outputText(broken.stdout)) as Record<string, unknown>;
+    assert.equal(evidence.manual_tray_evidence_ready, false);
+  });
+});
+
 test('product visual evidence recorder requires daemon context before passing', () => {
   withScreenshots((dir, screenshots) => {
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
@@ -201,6 +219,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const hasWordManifest = filteredExtra.includes('--word-manifest-path');
   const hasExcelManifest = filteredExtra.includes('--excel-manifest-path');
   const hasExcelRuntimeEvidence = filteredExtra.includes('--excel-runtime-evidence-path');
+  const hasManualTrayEvidence = filteredExtra.includes('--manual-tray-evidence-path');
   const outputDir = dirname(output);
   const args = [
     TSX,
@@ -227,6 +246,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   if (!hasWordManifest) args.push('--word-manifest-path', writeManifest(outputDir, 'word'));
   if (!hasExcelManifest) args.push('--excel-manifest-path', writeManifest(outputDir, 'excel'));
   if (!hasExcelRuntimeEvidence) args.push('--excel-runtime-evidence-path', writeExcelRuntimeEvidence(outputDir));
+  if (!hasManualTrayEvidence) args.push('--manual-tray-evidence-path', writeManualTrayEvidence(outputDir));
   if (!skipProductReviewFlags) {
     args.push(
       '--logo-quality-reviewed', 'true',
@@ -352,6 +372,44 @@ function writeExcelRuntimeEvidence(dir: string, ready = true): string {
     ]
   }, null, 2));
   return path;
+}
+
+function writeManualTrayEvidence(dir: string, ready = true): string {
+  const screenshotPath = join(dir, `manual-tray-${ready ? 'ready' : 'broken'}.png`);
+  writeFileSync(screenshotPath, tinyPng());
+  const path = join(dir, `manual-tray-${ready ? 'ready' : 'broken'}.json`);
+  writeFileSync(path, JSON.stringify({
+    schema_version: 1,
+    kind: 'tray_manual_evidence',
+    platform: 'win32',
+    visible_icon: ready,
+    right_click_menu: ready,
+    menu_opened_from_tray_icon: ready,
+    native_menu_appearance_reviewed: ready,
+    show_ui_opened: ready,
+    observed_menu_items: ready ? ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP', 'Quit Office MCP'] : ['Status: Up'],
+    observed_tooltip: 'Office MCP - Up - 0 clients - 0 documents',
+    screenshot_path: screenshotPath,
+    daemon_context: manualTrayDaemonContext(ready),
+    daemon_context_ready: ready,
+    passed: ready
+  }, null, 2));
+  return path;
+}
+
+function manualTrayDaemonContext(ready = true) {
+  return {
+    status: { ok: ready, running: ready, uiUrl: 'https://localhost:8765/ui/' },
+    tray_probe: {
+      ok: ready,
+      native_host: ready,
+      state_fetch_ok: ready,
+      snapshot: {
+        tooltip: 'Office MCP - Up - 0 clients - 0 documents',
+        menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP', 'Quit Office MCP']
+      }
+    }
+  };
 }
 
 function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[]): string {

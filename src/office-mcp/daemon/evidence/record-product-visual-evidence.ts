@@ -12,6 +12,7 @@ const notes = readOption('--notes');
 const daemonBin = readOption('--daemon-bin');
 const renderedLogoReviewPath = readOption('--rendered-logo-review-path');
 const excelRuntimeEvidencePath = readOption('--excel-runtime-evidence-path');
+const manualTrayEvidencePath = readOption('--manual-tray-evidence-path');
 const wordManifestPath = resolve(readOption('--word-manifest-path') ?? join(repoRoot, 'src/office-ctl/word/manifest.xml'));
 const excelManifestPath = resolve(readOption('--excel-manifest-path') ?? join(repoRoot, 'src/office-ctl/excel/manifest.xml'));
 
@@ -68,6 +69,8 @@ const renderedLogoReview = renderedLogoReviewPath ? readRenderedLogoReview(resol
 const renderedLogoReviewReady = renderedLogoReviewLooksReady(renderedLogoReview);
 const excelRuntimeEvidence = excelRuntimeEvidencePath ? readExcelRuntimeEvidence(resolve(excelRuntimeEvidencePath)) : undefined;
 const excelRuntimeEvidenceReady = excelRuntimeEvidenceLooksReady(excelRuntimeEvidence);
+const manualTrayEvidence = manualTrayEvidencePath ? readManualTrayEvidence(resolve(manualTrayEvidencePath)) : undefined;
+const manualTrayEvidenceReady = manualTrayEvidenceLooksReady(manualTrayEvidence);
 const wordManifestIdentity = readManifestIdentity(wordManifestPath);
 const excelManifestIdentity = readManifestIdentity(excelManifestPath);
 
@@ -83,7 +86,7 @@ const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady && excelRuntimeEvidenceReady;
 const productIdentityReviewReady = logoQualityReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && trayProductPolishReviewed;
-const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && excelTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && daemonContextReady;
+const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && excelTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -105,6 +108,8 @@ const evidence = {
   tray_icon_visible: trayIconVisible,
   tray_menu_native: trayMenuNative,
   quit_confirmation_visible: quitConfirmationVisible,
+  manual_tray_evidence: manualTrayEvidence,
+  manual_tray_evidence_ready: manualTrayEvidenceReady,
   product_identity_review: {
     logo_quality_reviewed: logoQualityReviewed,
     rendered_size_logo_reviewed: renderedSizeLogoReviewed,
@@ -298,6 +303,27 @@ function excelRuntimeDetailsLookReady(session: Record<string, unknown> | undefin
     && isRecord(details.table) && typeof details.table.table === 'string'
     && isRecord(details.chart) && typeof details.chart.chart === 'string'
     && isRecord(details.sheet) && details.sheet.activated === true;
+}
+
+function readManualTrayEvidence(path: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    return { path, ok: true, ...parsed };
+  } catch (error) {
+    return { path, ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function manualTrayEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
+  if (!evidence) return false;
+  if (evidence.ok !== true || evidence.schema_version !== 1 || evidence.kind !== 'tray_manual_evidence' || evidence.platform !== 'win32' || evidence.passed !== true) return false;
+  if (evidence.visible_icon !== true || evidence.right_click_menu !== true || evidence.menu_opened_from_tray_icon !== true || evidence.native_menu_appearance_reviewed !== true || evidence.show_ui_opened !== true) return false;
+  if (typeof evidence.observed_tooltip !== 'string' || !/^Office MCP - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(evidence.observed_tooltip)) return false;
+  if (typeof evidence.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(evidence.screenshot_path))) return false;
+  const items = Array.isArray(evidence.observed_menu_items) ? evidence.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];
+  return ['Status:', 'Clients:', 'Documents:', 'Show Office MCP', 'Quit Office MCP'].every((expected) => items.some((item) => item.includes(expected)))
+    && evidence.daemon_context_ready === true
+    && daemonContextLooksReady(isRecord(evidence.daemon_context) ? evidence.daemon_context : undefined);
 }
 
 function readDaemonContext(binaryPath: string): Record<string, unknown> {

@@ -284,6 +284,22 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.manual_tray_evidence.menu_opened_from_tray_icon = false;
+      broken.manual_tray_evidence.native_menu_appearance_reviewed = false;
+      broken.manual_tray_evidence_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /embedded manual tray evidence ready flag/);
+      assert.match(outputText(result.stdout), /right-click menu opened from the notification-area tray icon/);
+      assert.match(outputText(result.stdout), /native tray menu appearance review/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.daemon_context = manualTrayDaemonContext(['Status: Up', 'Clients: 0']);
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -635,6 +651,8 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     tray_icon_visible: passed,
     tray_menu_native: passed,
     quit_confirmation_visible: passed,
+    manual_tray_evidence: manualTrayReport(passed, screenshots.tray_icon),
+    manual_tray_evidence_ready: passed,
     product_identity_review: {
       logo_quality_reviewed: passed,
       rendered_size_logo_reviewed: passed,
@@ -766,6 +784,7 @@ function productVisualSurfaces(): string[] {
 }
 function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png') {
   return {
+    ok: passed,
     schema_version: 1,
     kind: 'tray_manual_evidence',
     recorded_at: new Date().toISOString(),

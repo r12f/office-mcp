@@ -464,7 +464,12 @@ feel like a finished local desktop utility rather than an experimental scaffold.
       and the native quit confirmation dialog. The tray must use the generated
       product glyph and product-consistent labels, with no missing/default icon,
       debug wording, browser/webview menu, frameless HTML panel, or custom-drawn
-      menu imitation.
+      menu imitation. Product visual evidence now embeds and revalidates the
+      manual tray evidence artifact, including visible icon, right-click menu,
+      menu-opened-from-tray-icon proof, native appearance review, product
+      tooltip, required menu items, screenshot image, and live daemon/tray probe
+      context. This item remains open until those fields are backed by a real
+      interactive Windows tray capture.
 - [x] Polish the automated tray product surface model so normal Windows users
       are expected to see a deliberate app icon, native tooltip/title, native
       context menu text, disabled status rows, and confirmation dialogs that

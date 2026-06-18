@@ -214,6 +214,7 @@ function validateProductVisualEvidence(): void {
   if (typeof visual.tray_tooltip !== 'string' || !trayTooltipLooksProductReady(visual.tray_tooltip)) {
     failures.push('Product visual evidence missing product tray tooltip text.');
   }
+  validateEmbeddedManualTrayEvidence(visual.manual_tray_evidence, visual.manual_tray_evidence_ready);
   if (typeof visual.catalog_type !== 'string' || !/local productivity automation control utility/i.test(visual.catalog_type)) {
     failures.push('Product visual evidence missing local productivity automation/control type metadata.');
   }
@@ -227,6 +228,34 @@ function validateProductVisualEvidence(): void {
     failures.push('Product visual evidence daemon context is not recorder-ready.');
   }
   validateProductVisualDaemonContext(visual.daemon_context);
+}
+
+function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): void {
+  if (ready !== true) failures.push('Product visual evidence missing embedded manual tray evidence ready flag.');
+  if (!isRecord(manual)) {
+    failures.push('Product visual evidence missing embedded manual tray evidence.');
+    return;
+  }
+  if (manual.ok !== true) failures.push('Embedded manual tray evidence was not read successfully.');
+  if (manual.schema_version !== 1) failures.push(`Unsupported embedded manual tray schema_version: ${manual.schema_version}`);
+  if (manual.kind !== 'tray_manual_evidence') failures.push(`Unsupported embedded manual tray evidence kind: ${manual.kind ?? 'missing'}`);
+  if (manual.platform !== 'win32') failures.push(`Embedded manual tray evidence platform is ${manual.platform}, expected win32.`);
+  const observedMenuItems = Array.isArray(manual.observed_menu_items) ? manual.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];
+  validateTrayMenuLabels(observedMenuItems, 'Embedded manual tray evidence');
+  if (typeof manual.observed_tooltip !== 'string' || !trayTooltipLooksProductReady(manual.observed_tooltip)) failures.push('Embedded manual tray evidence missing product tray tooltip.');
+  if (typeof manual.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(manual.screenshot_path))) failures.push('Embedded manual tray evidence screenshot file does not exist.');
+  if (manual.daemon_context_ready !== true) failures.push('Embedded manual tray evidence daemon context is not recorder-ready.');
+  validateManualTrayDaemonContext(manual.daemon_context);
+  for (const [key, label] of [
+    ['visible_icon', 'visible tray icon'],
+    ['right_click_menu', 'right-click menu'],
+    ['menu_opened_from_tray_icon', 'right-click menu opened from the notification-area tray icon'],
+    ['native_menu_appearance_reviewed', 'native tray menu appearance review'],
+    ['show_ui_opened', 'Show Office MCP opened UI'],
+    ['passed', 'manual tray evidence passed']
+  ] as const) {
+    if (manual[key] !== true) failures.push(`Embedded manual tray evidence missing ${label}.`);
+  }
 }
 
 function validateProductIdentityReview(review: unknown): void {
