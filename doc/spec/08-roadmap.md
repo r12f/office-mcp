@@ -340,12 +340,16 @@ Latest UI feedback to preserve in implementation planning:
 - The product mark must not use Microsoft Office logos or near-logo variants,
   but it must still read as office productivity under local user control. The
   preferred direction is a mature, slightly futuristic control-surface mark:
-  document/window panes, routing geometry, and an explicit operator/control
-  affordance that remains legible at tray and ribbon sizes.
+  document/window panes, routing geometry, layered surfaces, and an explicit
+  operator/control affordance that remains legible at tray and ribbon sizes. It
+  must not read as a generic settings/file/debug/AI icon.
 - The add-in first-run surface must be treated as one product impression. Title,
   icon, provider, description, ribbon command, catalog type/category, and task
   pane chrome must all change together; a polished title paired with a missing
-  icon or experimental type/category is still a release failure.
+  icon or experimental type/category is still a release failure. The installed
+  Word, Excel, and PowerPoint catalogs must all show the same mature identity
+  after a fresh install; disappearing catalog entries or stale generated
+  manifests are installer bugs.
 - The tray must look like native desktop software. A missing/default tray icon,
   non-native-looking right-click surface, webview/HTML imitation menu, or debug
   wording makes the product feel unfinished and must remain blocked until live
@@ -358,14 +362,25 @@ Latest UI feedback to preserve in implementation planning:
       user control with a mature, slightly futuristic control-surface feel. The
       task must produce source artwork, generated icon assets, a short design
       rationale, rendered-size review images, and explicit rejection of generic
-      file/settings/debug/AI-only marks.
+      file/settings/debug/AI-only marks. The review must judge the icon from the
+      sizes users actually see in Office catalogs, ribbon commands, task pane
+      chrome, Windows tray, installer metadata, and the daemon title bar.
 - [ ] Re-audit every add-in first-contact surface after install: title, icon,
       provider, description, ribbon command, task pane chrome, and catalog
       type/category for Word, Excel, and PowerPoint. The installed catalog must
       look like mature product software, not an experimental add-in, sample,
       debug panel, protocol bridge, or raw package. The install/catalog scripts
       must be fixed whenever a host entry disappears, loses its icon, points at
-      a stale daemon origin, or shows mismatched title/type metadata.
+      a stale daemon origin, or shows mismatched title/type metadata. This item
+      includes the generated Word catalog, which must remain present and show
+      the correct product title, icon, description, provider, and local
+      productivity automation/control type after reinstall.
+- [ ] Replace prototype add-in identity copy everywhere it can appear in Office:
+      manifest `DisplayName`, provider, description, support metadata, ribbon
+      group, primary command label, task pane title/chrome, catalog title, and
+      catalog type/category. The release identity should read as a finished
+      local desktop control product, not a lowercase package slug, raw MCP
+      protocol adapter, internal scaffold, or generic `Task Pane` add-in.
 - [ ] Replace any tray placeholder/default icon and non-native-looking menu
       surface in the normal daemon launch path. Right-click must open a real
       OS-native notification-area context menu with native separators,
@@ -373,6 +388,12 @@ Latest UI feedback to preserve in implementation planning:
       tooltip text, `Show Office MCP`, `Quit Office MCP`, and native quit
       confirmation. A webview, frameless HTML panel, CSS popup, or toolkit-demo
       menu fails this item even if automated probes pass.
+- [ ] Replace any tray implementation path that draws its own menu surface. The
+      Windows build must use native notification-area and menu primitives for
+      the visible user interaction, including the right-click menu opened from
+      the actual tray icon and the quit confirmation dialog. Automated probe
+      output is not enough; this stays open until live Windows evidence proves
+      the menu is visually native.
 - [x] Design an original office-control product logo and icon system. It must
       avoid Microsoft Office product marks while still communicating office
       productivity, local automation, and user control with a mature, slightly
