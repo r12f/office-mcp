@@ -258,6 +258,7 @@ function validateProductVisualEvidence(): void {
     failures.push('Product visual evidence tray menu surface is not native.');
   }
   validateProductVisualScreenshots(visual.screenshot_paths);
+  validateProductVisualScreenshotFreshness(visual.screenshot_paths, visual.screenshot_metadata, visual.screenshots_fresh, visual.screenshots_fresh_ready, visual.recorded_at);
   validateDistinctProductVisualScreenshots(visual.screenshot_paths);
   validateProductVisualObservations(visual.observations);
   validateProductIdentityReview(visual.product_identity_review);
@@ -556,6 +557,37 @@ function validateProductVisualScreenshots(paths: unknown): void {
     const path = paths[surface];
     if (typeof path !== 'string' || !screenshotFileLooksLikeImage(resolve(path))) {
       failures.push(`Product visual evidence screenshot missing or invalid: ${surface}.`);
+    }
+  }
+}
+
+function validateProductVisualScreenshotFreshness(paths: unknown, metadata: unknown, freshFlags: unknown, ready: unknown, recordedAt: unknown): void {
+  if (ready !== true) failures.push('Product visual evidence screenshots are not fresh for the recorded run.');
+  if (!isRecord(paths) || !isRecord(metadata) || !isRecord(freshFlags)) {
+    failures.push('Product visual evidence screenshot freshness metadata is malformed.');
+    return;
+  }
+  const recordedAtMs = typeof recordedAt === 'string' ? Date.parse(recordedAt) : Number.NaN;
+  if (!Number.isFinite(recordedAtMs)) failures.push('Product visual evidence missing valid recorded_at timestamp for screenshot freshness.');
+  for (const surface of productVisualSurfaces()) {
+    const path = paths[surface];
+    const item = metadata[surface];
+    if (!isRecord(item)) {
+      failures.push(`Product visual evidence missing screenshot freshness metadata: ${surface}.`);
+      continue;
+    }
+    const resolvedPath = typeof path === 'string' ? resolve(path) : undefined;
+    if (typeof item.path !== 'string' || !resolvedPath || resolve(item.path) !== resolvedPath) failures.push(`Product visual evidence screenshot freshness path mismatch: ${surface}.`);
+    if (item.ready !== true || item.fresh !== true || freshFlags[surface] !== true) failures.push(`Product visual evidence screenshot is stale: ${surface}.`);
+    if (typeof item.mtime !== 'string' || !Number.isFinite(Date.parse(item.mtime))) failures.push(`Product visual evidence screenshot missing valid mtime: ${surface}.`);
+    if (typeof item.recorded_at !== 'string' || !Number.isFinite(Date.parse(item.recorded_at))) failures.push(`Product visual evidence screenshot missing valid metadata recorded_at: ${surface}.`);
+    if (typeof item.age_ms !== 'number' || item.age_ms < 0) failures.push(`Product visual evidence screenshot missing non-negative age: ${surface}.`);
+    if (typeof item.freshness_window_ms !== 'number' || item.freshness_window_ms < 0) failures.push(`Product visual evidence screenshot missing freshness window: ${surface}.`);
+    if (typeof item.size_bytes !== 'number' || item.size_bytes <= 0) failures.push(`Product visual evidence screenshot missing file size: ${surface}.`);
+    if (Number.isFinite(recordedAtMs) && typeof item.mtime === 'string') {
+      const mtimeMs = Date.parse(item.mtime);
+      const windowMs = typeof item.freshness_window_ms === 'number' ? item.freshness_window_ms : 0;
+      if (!Number.isFinite(mtimeMs) || recordedAtMs - mtimeMs > windowMs) failures.push(`Product visual evidence screenshot is older than freshness window: ${surface}.`);
     }
   }
 }

@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { screenshotFileLooksLikeImage } from './image-evidence.js';
@@ -54,6 +54,8 @@ const screenshotPaths = Object.fromEntries(requiredSurfaces.map((surface) => [su
 const screenshotsExist = Object.fromEntries(
   requiredSurfaces.map((surface) => [surface, typeof screenshotPaths[surface] === 'string' && screenshotFileLooksLikeImage(resolve(screenshotPaths[surface] as string))])
 );
+const screenshotMetadata = Object.fromEntries(requiredSurfaces.map((surface) => [surface, screenshotMetadataFor(screenshotPaths[surface])]));
+const screenshotsFresh = Object.fromEntries(requiredSurfaces.map((surface) => [surface, screenshotMetadata[surface]?.fresh === true]));
 const trayTooltip = readOption('--tray-tooltip');
 const catalogType = readOption('--catalog-type') ?? (typeof catalogIdentityReview?.catalog_type === 'string' ? catalogIdentityReview.catalog_type : undefined);
 const catalogIconVisible = booleanFlag('--catalog-icon-visible');
@@ -114,6 +116,7 @@ const powerPointManifestIdentity = readManifestIdentity(powerPointManifestPath);
 
 const productTextReady = requiredSurfaces.filter((surface) => surface !== 'tray_tooltip').every((surface) => typeof observations[surface] === 'string' && (observations[surface] as string).includes(productName));
 const allScreenshotsExist = Object.values(screenshotsExist).every(Boolean);
+const allScreenshotsFresh = Object.values(screenshotsFresh).every(Boolean);
 const trayTooltipReady = typeof trayTooltip === 'string' && /^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(trayTooltip);
 const catalogTypeReady = productCatalogTypeLooksReady(catalogType);
 const wordFirstRunIdentity = firstRunIdentity(wordManifestIdentity, wordCatalogProvider, wordCatalogDescription, wordCatalogType, catalogType);
@@ -133,7 +136,7 @@ const powerPointDocumentStateReady = typeof powerPointDocumentState === 'string'
 const powerPointTaskpaneDensityReady = powerPointCompactTopBlock && powerPointToolsPermissionsMerged && powerPointInlineSettings && powerPointServerProtocolReady && powerPointDocumentStateReady && powerPointRuntimeEvidenceReady;
 const currentScreenshotFeedbackReady = currentLogoScreenshotFeedbackReviewed && currentAddinScreenshotFeedbackReviewed && currentTrayScreenshotFeedbackReviewed;
 const productIdentityReviewReady = logoQualityReviewed && logoFutureOfficeControlReviewed && finalLogoUserSurfaceReviewed && currentLogoScreenshotFeedbackReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinTitleIconTypeReviewed && addinInstallableSurfaceReviewed && currentAddinScreenshotFeedbackReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNativeFirstImpressionReviewed && trayNormalWindowsLaunchReviewed && currentTrayScreenshotFeedbackReviewed;
-const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
+const passed = productTextReady && allScreenshotsExist && allScreenshotsFresh && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -146,6 +149,9 @@ const evidence = {
   observations,
   screenshot_paths: screenshotPaths,
   screenshots_exist: screenshotsExist,
+  screenshot_metadata: screenshotMetadata,
+  screenshots_fresh: screenshotsFresh,
+  screenshots_fresh_ready: allScreenshotsFresh,
   product_text_ready: productTextReady,
   catalog_type: catalogType,
   catalog_type_ready: catalogTypeReady,
@@ -266,6 +272,35 @@ function observationFor(surface: string): string | undefined {
 
 function screenshotPathFor(surface: string): string | undefined {
   return readOption(`--${surface.replaceAll('_', '-')}-screenshot`) ?? renderedLogoReviewScreenshotPath(surface) ?? manualTrayScreenshotPath(surface);
+}
+
+function screenshotMetadataFor(path: string | undefined): Record<string, unknown> {
+  if (!path) return { ready: false, fresh: false, error: 'missing path' };
+  const resolvedPath = resolve(path);
+  try {
+    const stats = statSync(resolvedPath);
+    const recordedAtMs = Date.now();
+    const ageMs = Math.max(0, recordedAtMs - stats.mtimeMs);
+    const fresh = ageMs <= screenshotFreshnessWindowMs();
+    return {
+      path: resolvedPath,
+      size_bytes: stats.size,
+      mtime: stats.mtime.toISOString(),
+      recorded_at: new Date(recordedAtMs).toISOString(),
+      age_ms: ageMs,
+      freshness_window_ms: screenshotFreshnessWindowMs(),
+      fresh,
+      ready: fresh
+    };
+  } catch (error) {
+    return { path: resolvedPath, ready: false, fresh: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function screenshotFreshnessWindowMs(): number {
+  const value = readOption('--screenshot-freshness-window-ms') ?? process.env.OFFICE_MCP_SCREENSHOT_FRESHNESS_WINDOW_MS;
+  const parsed = value ? Number(value) : 30 * 60 * 1000;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 30 * 60 * 1000;
 }
 
 function manualTrayScreenshotPath(surface: string): string | undefined {

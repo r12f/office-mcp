@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -246,6 +246,10 @@ test('runtime evidence validator can require product visual evidence', () => {
       passing.screenshot_paths.logo_catalog_thumbnail = passing.screenshot_paths.logo_tray_size;
       passing.screenshot_paths.logo_daemon_titlebar = passing.screenshot_paths.logo_tray_size;
       passing.screenshot_paths.logo_installer_metadata = passing.screenshot_paths.logo_tray_size;
+      passing.screenshot_metadata.logo_ribbon_size = passing.screenshot_metadata.logo_tray_size;
+      passing.screenshot_metadata.logo_catalog_thumbnail = passing.screenshot_metadata.logo_tray_size;
+      passing.screenshot_metadata.logo_daemon_titlebar = passing.screenshot_metadata.logo_tray_size;
+      passing.screenshot_metadata.logo_installer_metadata = passing.screenshot_metadata.logo_tray_size;
       writeFileSync(visualPath, JSON.stringify(passing, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
       assert.equal(result.status, 0, outputText(result.stdout) + outputText(result.stderr));
@@ -292,6 +296,24 @@ test('runtime evidence validator can require product visual evidence', () => {
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /screenshot missing or invalid: tray_icon/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.screenshots_fresh_ready = false;
+      broken.screenshots_fresh.word_ribbon_command = false;
+      broken.screenshot_metadata.word_ribbon_command.fresh = false;
+      broken.screenshot_metadata.word_ribbon_command.ready = false;
+      broken.screenshot_metadata.word_ribbon_command.mtime = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      broken.screenshot_metadata.word_ribbon_command.age_ms = 60 * 60 * 1000;
+      broken.screenshot_metadata.word_ribbon_command.freshness_window_ms = 1000;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /screenshots are not fresh for the recorded run/);
+      assert.match(outputText(result.stdout), /screenshot is stale: word_ribbon_command/);
     });
   });
 
@@ -923,6 +945,9 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     observations,
     screenshot_paths: screenshots,
     screenshots_exist: Object.fromEntries(productVisualSurfaces().map((surface) => [surface, passed])),
+    screenshot_metadata: screenshotMetadataFor(screenshots, passed),
+    screenshots_fresh: Object.fromEntries(productVisualSurfaces().map((surface) => [surface, passed])),
+    screenshots_fresh_ready: passed,
     product_text_ready: passed,
     catalog_type: 'Local productivity automation control utility',
     catalog_type_ready: passed,
@@ -1037,6 +1062,24 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     daemon_context_ready: passed,
     passed
   };
+}
+
+function screenshotMetadataFor(screenshots: Record<string, string>, passed: boolean): Record<string, Record<string, unknown>> {
+  return Object.fromEntries(productVisualSurfaces().map((surface) => {
+    const path = screenshots[surface];
+    if (!passed) return [surface, { path, ready: false, fresh: false }];
+    const stats = statSync(path);
+    return [surface, {
+      path,
+      size_bytes: stats.size,
+      mtime: stats.mtime.toISOString(),
+      recorded_at: new Date().toISOString(),
+      age_ms: 0,
+      freshness_window_ms: 30 * 60 * 1000,
+      fresh: true,
+      ready: true
+    }];
+  }));
 }
 
 function catalogIdentityReview(passed: boolean) {

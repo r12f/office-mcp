@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -59,6 +59,9 @@ test('product visual evidence recorder requires all product surfaces', () => {
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.kind, 'product_visual_evidence');
     assert.equal(evidence.product_text_ready, true);
+    assert.equal(evidence.screenshots_fresh_ready, true);
+    assert.equal((evidence.screenshots_fresh as Record<string, unknown>).word_ribbon_command, true);
+    assert.equal(typeof ((evidence.screenshot_metadata as Record<string, Record<string, unknown>>).word_ribbon_command.age_ms), 'number');
     assert.equal(evidence.catalog_type_ready, true);
     assert.equal(evidence.tray_tooltip_ready, true);
     assert.equal(evidence.tray_menu_surface_kind, 'native');
@@ -96,6 +99,24 @@ test('product visual evidence recorder requires all product surfaces', () => {
     const failed = JSON.parse(outputText(missingTray.stdout)) as Record<string, unknown>;
     assert.equal(failed.passed, false);
     assert.equal((failed.screenshots_exist as Record<string, unknown>).tray_native_menu, false);
+  });
+});
+
+test('product visual evidence recorder rejects stale screenshots', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const staleDate = new Date(Date.now() - 60 * 60 * 1000);
+    utimesSync(screenshots['word-ribbon-command'], staleDate, staleDate);
+    const output = join(dir, 'stale-screenshot.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--screenshot-freshness-window-ms', '1000');
+
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.screenshots_fresh_ready, false);
+    assert.equal((evidence.screenshots_fresh as Record<string, unknown>).word_ribbon_command, false);
+    assert.equal((evidence.screenshot_metadata as Record<string, Record<string, unknown>>).word_ribbon_command.fresh, false);
+    assert.equal(evidence.passed, false);
   });
 });
 
