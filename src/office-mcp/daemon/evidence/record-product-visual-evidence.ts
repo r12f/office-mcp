@@ -589,13 +589,26 @@ function excelRuntimeDetailsLookReady(session: Record<string, unknown> | undefin
     && document.title.length > 0
     && host?.app === 'excel'
     && typeof session.available_tool_count === 'number'
-    && session.available_tool_count >= 7
+    && session.available_tool_count >= 20
     && details.marker_found === true
+    && isRecord(details.workbook_info)
+    && typeof details.sheet_list_count === 'number'
+    && isRecord(details.updated_sheet)
+    && isRecord(details.deleted_sheet) && details.deleted_sheet.deleted === true
+    && isRecord(details.used_range)
+    && isRecord(details.find_replace)
+    && isRecord(details.clear)
     && isRecord(details.write) && details.write.wrote_values === true
     && isRecord(details.formula) && details.formula.wrote_formula === true
     && isRecord(details.format) && details.format.formatted === true
     && isRecord(details.table) && typeof details.table.table === 'string'
+    && isRecord(details.table_update)
+    && isRecord(details.sort) && details.sort.sorted === true
+    && isRecord(details.filter) && details.filter.filtered === true
     && isRecord(details.chart) && typeof details.chart.chart === 'string'
+    && isRecord(details.chart_update) && details.chart_update.updated === true
+    && isRecord(details.pivot_table) && typeof details.pivot_table.pivot_table === 'string'
+    && isRecord(details.pivot_update) && details.pivot_update.refreshed === true
     && isRecord(details.sheet) && details.sheet.activated === true;
 }
 

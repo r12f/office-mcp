@@ -63,20 +63,44 @@ test('runtime evidence harness writes structured failure evidence when daemon is
 
 test('Excel capability spec exists and tracks the v1 tool catalog', () => {
   const spec = readFileSync(resolve(process.cwd(), '../../../../doc/spec/04-excel-capabilities.md'), 'utf8');
+  const source = readFileSync(evidencePath('runtime-evidence.ts'), 'utf8');
 
   for (const tool of [
+    'excel.get_workbook_info',
+    'excel.list_sheets',
     'excel.read_range',
     'excel.write_range',
     'excel.add_sheet',
+    'excel.update_sheet',
+    'excel.delete_sheet',
+    'excel.get_used_range',
+    'excel.clear_range',
+    'excel.find_replace_cells',
     'excel.set_formula',
     'excel.format_range',
+    'excel.sort_range',
+    'excel.apply_filter',
     'excel.create_table',
-    'excel.create_chart'
+    'excel.update_table',
+    'excel.create_chart',
+    'excel.update_chart',
+    'excel.create_pivot_table',
+    'excel.update_pivot_table'
   ]) {
     assert.match(spec, new RegExp(tool.replace('.', '\\.')));
+    assert.match(source, new RegExp(tool.replace('.', '\\.')));
   }
   assert.match(spec, /ExcelApi 1\.1/);
   assert.match(spec, /npm run evidence:excel/);
+  assert.match(source, /workbook_info/);
+  assert.match(source, /sheet_list_count/);
+  assert.match(source, /used_range/);
+  assert.match(source, /find_replace/);
+  assert.match(source, /sort/);
+  assert.match(source, /filter/);
+  assert.match(source, /table_update/);
+  assert.match(source, /chart_update/);
+  assert.match(source, /pivot_table/);
 });
 
 test('add-in communication specs stay metadata-only at the local boundary', () => {

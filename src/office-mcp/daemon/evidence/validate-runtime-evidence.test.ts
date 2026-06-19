@@ -1154,18 +1154,31 @@ function excelRuntimeEvidence(passed: boolean) {
       app: 'excel',
       status: 'active',
       session_id: sessionId,
-      available_tool_count: 7,
+      available_tool_count: 20,
       document: { title: 'Excel Workbook' },
       host: { app: 'excel', platform: 'pc', version: '16.0' }
     },
     smoke_details: {
       session_id: sessionId,
       marker_found: passed,
+      workbook_info: { sheet_count: 2, table_count: 1 },
+      sheet_list_count: 1,
+      updated_sheet: { updated: passed },
+      deleted_sheet: { deleted: passed },
+      used_range: { address: 'Sheet1!A1:C5' },
+      find_replace: { replaced: passed, replaced_count: 1 },
+      clear: { cleared: passed },
       write: { wrote_values: passed },
       formula: { wrote_formula: passed },
       format: { formatted: passed },
       table: { table: 'OfficeMcpTable' },
+      table_update: { updated: passed },
+      sort: { sorted: passed },
+      filter: { filtered: passed },
       chart: { chart: 'Chart 1' },
+      chart_update: { updated: passed },
+      pivot_table: { pivot_table: 'OfficeMcpPivot' },
+      pivot_update: { refreshed: passed },
       sheet: { activated: passed }
     }
   };

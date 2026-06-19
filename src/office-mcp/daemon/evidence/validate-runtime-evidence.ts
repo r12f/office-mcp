@@ -725,13 +725,26 @@ function validateExcelRuntimeEvidence(evidence: unknown, ready: unknown): void {
   if (typeof session.session_id !== 'string' || details.session_id !== session.session_id) failures.push('Product visual Excel runtime evidence session_id mismatch.');
   if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual Excel runtime evidence missing workbook title.');
   if (host?.app !== 'excel') failures.push('Product visual Excel runtime evidence missing Excel host metadata.');
-  if (typeof session.available_tool_count !== 'number' || session.available_tool_count < 7) failures.push('Product visual Excel runtime evidence missing available tool count.');
+  if (typeof session.available_tool_count !== 'number' || session.available_tool_count < 20) failures.push('Product visual Excel runtime evidence missing 20-tool available tool count.');
   if (details.marker_found !== true) failures.push('Product visual Excel runtime evidence missing marker readback.');
+  if (!isRecord(details.workbook_info)) failures.push('Product visual Excel runtime evidence missing get_workbook_info proof.');
+  if (typeof details.sheet_list_count !== 'number') failures.push('Product visual Excel runtime evidence missing list_sheets proof.');
+  if (!isRecord(details.updated_sheet)) failures.push('Product visual Excel runtime evidence missing update_sheet proof.');
+  if (!isRecord(details.deleted_sheet) || details.deleted_sheet.deleted !== true) failures.push('Product visual Excel runtime evidence missing delete_sheet proof.');
+  if (!isRecord(details.used_range)) failures.push('Product visual Excel runtime evidence missing get_used_range proof.');
+  if (!isRecord(details.find_replace)) failures.push('Product visual Excel runtime evidence missing find_replace_cells proof.');
+  if (!isRecord(details.clear)) failures.push('Product visual Excel runtime evidence missing clear_range proof.');
   if (!isRecord(details.write) || details.write.wrote_values !== true) failures.push('Product visual Excel runtime evidence missing write_range proof.');
   if (!isRecord(details.formula) || details.formula.wrote_formula !== true) failures.push('Product visual Excel runtime evidence missing set_formula proof.');
   if (!isRecord(details.format) || details.format.formatted !== true) failures.push('Product visual Excel runtime evidence missing format_range proof.');
   if (!isRecord(details.table) || typeof details.table.table !== 'string') failures.push('Product visual Excel runtime evidence missing create_table proof.');
+  if (!isRecord(details.table_update)) failures.push('Product visual Excel runtime evidence missing update_table proof.');
+  if (!isRecord(details.sort) || details.sort.sorted !== true) failures.push('Product visual Excel runtime evidence missing sort_range proof.');
+  if (!isRecord(details.filter) || details.filter.filtered !== true) failures.push('Product visual Excel runtime evidence missing apply_filter proof.');
   if (!isRecord(details.chart) || typeof details.chart.chart !== 'string') failures.push('Product visual Excel runtime evidence missing create_chart proof.');
+  if (!isRecord(details.chart_update) || details.chart_update.updated !== true) failures.push('Product visual Excel runtime evidence missing update_chart proof.');
+  if (!isRecord(details.pivot_table) || typeof details.pivot_table.pivot_table !== 'string') failures.push('Product visual Excel runtime evidence missing create_pivot_table proof.');
+  if (!isRecord(details.pivot_update) || details.pivot_update.refreshed !== true) failures.push('Product visual Excel runtime evidence missing update_pivot_table proof.');
   if (!isRecord(details.sheet) || details.sheet.activated !== true) failures.push('Product visual Excel runtime evidence missing add_sheet activation proof.');
 }
 

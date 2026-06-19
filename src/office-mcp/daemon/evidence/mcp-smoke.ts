@@ -46,8 +46,8 @@ if (mode === 'sessions') {
   const beforeStructure = resourceJson(await client.readResource({ uri: 'office://word/' + sessionId + '/structure' }));
   const tableIndex = Array.isArray(beforeStructure.tables) ? beforeStructure.tables.length : 0;
   const heading = await client.callTool({
-    name: 'word.insert_heading',
-    arguments: { session_id: sessionId, text: `Core Smoke ${suffix}`, level: 1, anchor: { kind: 'end_of_document' } }
+    name: 'word.insert_paragraph',
+    arguments: { session_id: sessionId, text: `Core Smoke ${suffix}`, heading_level: 1, anchor: { kind: 'end_of_document' } }
   });
   const paragraph = await client.callTool({
     name: 'word.insert_paragraph',
@@ -58,12 +58,12 @@ if (mode === 'sessions') {
     name: 'word.insert_table',
     arguments: { session_id: sessionId, anchor: { kind: 'end_of_document' }, rows: 2, cols: 2, data: [['A', 'B'], ['C', 'D']] }
   });
-  const cell = await client.callTool({ name: 'word.update_cell', arguments: { session_id: sessionId, table_index: tableIndex, row: 1, col: 1, text: `Z${suffix}` } });
-  const addedRow = await client.callTool({ name: 'word.add_row', arguments: { session_id: sessionId, table_index: tableIndex, values: ['E', `F${suffix}`] } });
-  const addedColumn = await client.callTool({ name: 'word.add_column', arguments: { session_id: sessionId, table_index: tableIndex, values: ['G', 'H', `I${suffix}`] } });
+  const cell = await client.callTool({ name: 'word.update_table', arguments: { session_id: sessionId, action: 'update_cell', table_index: tableIndex, row: 1, col: 1, text: `Z${suffix}` } });
+  const addedRow = await client.callTool({ name: 'word.update_table', arguments: { session_id: sessionId, action: 'add_row', table_index: tableIndex, values: ['E', `F${suffix}`] } });
+  const addedColumn = await client.callTool({ name: 'word.update_table', arguments: { session_id: sessionId, action: 'add_column', table_index: tableIndex, values: ['G', 'H', `I${suffix}`] } });
   const formattedCell = await client.callTool({
-    name: 'word.format_cell',
-    arguments: { session_id: sessionId, table_index: tableIndex, row: 0, col: 0, background_color: '#ffeecc', horizontal_alignment: 'center', vertical_alignment: 'center', padding_pt: 2, formatting: { bold: true } }
+    name: 'word.update_table',
+    arguments: { session_id: sessionId, action: 'format_cell', table_index: tableIndex, row: 0, col: 0, background_color: '#ffeecc', horizontal_alignment: 'center', vertical_alignment: 'center', padding_pt: 2, formatting: { bold: true } }
   });
   const readTable = await client.callTool({ name: 'word.read_table', arguments: { session_id: sessionId, table_index: tableIndex } });
   assertToolData('core add row smoke', addedRow, (data) => Number.isInteger(data.added_row_index));
@@ -88,7 +88,7 @@ if (mode === 'sessions') {
     name: 'word.apply_formatting',
     arguments: { session_id: sessionId, anchor: { kind: 'after_text', text: updatedText }, extent: 'paragraph', formatting: { italic: true, highlight: '#ffff00' } }
   });
-  const heading = await client.callTool({ name: 'word.set_heading_level', arguments: { session_id: sessionId, index: paragraph.index, level: 3 } });
+  const heading = await client.callTool({ name: 'word.apply_style', arguments: { session_id: sessionId, anchor: { kind: 'paragraph_index', index: paragraph.index }, heading_level: 3 } });
   const styled = await client.callTool({ name: 'word.apply_style', arguments: { session_id: sessionId, anchor: { kind: 'paragraph_index', index: paragraph.index }, style: 'Normal' } });
   const pageBreak = await client.callTool({ name: 'word.insert_page_break', arguments: { session_id: sessionId, anchor: { kind: 'end_of_document' } } });
   const saved = await client.callTool({ name: 'word.save', arguments: { session_id: sessionId } });
@@ -103,8 +103,8 @@ if (mode === 'sessions') {
   const firstTarget = 'scope target first ' + suffix;
   const secondTarget = 'scope target second ' + suffix;
   const heading = await client.callTool({
-    name: 'word.insert_heading',
-    arguments: { session_id: sessionId, text: headingText, level: 2, anchor: { kind: 'end_of_document' } }
+    name: 'word.insert_paragraph',
+    arguments: { session_id: sessionId, text: headingText, heading_level: 2, anchor: { kind: 'end_of_document' } }
   });
   const formatted = await client.callTool({
     name: 'word.insert_paragraph',
@@ -251,8 +251,8 @@ async function mutateFirstTrackedChange(sessionId: string, action: TrackChangeAc
   const change = data.changes?.[0];
   if (!change) return { skipped: true, reason: 'No tracked changes are present in the document.', trackChanges: data };
   const result = await client.callTool({
-    name: action === 'accept' ? 'word.accept_change' : 'word.reject_change',
-    arguments: { session_id: sessionId, change_index: change.index, expected_fingerprint: change.fingerprint }
+    name: 'word.update_tracked_change',
+    arguments: { session_id: sessionId, action, change_index: change.index, expected_fingerprint: change.fingerprint }
   });
   return { skipped: false, action, before: change, result };
 }

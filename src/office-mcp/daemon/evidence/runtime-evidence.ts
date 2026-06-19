@@ -224,59 +224,168 @@ async function runExcelSmokeGate(sessionId: string): Promise<void> {
   await runGate('excel.runtime_smoke', async () => {
     const marker = `OfficeMCP${Date.now()}`;
     const sheetName = `OfficeMcpSmoke${Date.now()}`;
+    const renamedSheetName = `${sheetName}Renamed`;
+    const cleanupSheetName = `${sheetName}Cleanup`;
+    const tableName = `OfficeMcpTable${Date.now()}`;
+    const chartTitle = 'Office MCP Smoke Updated';
+    const pivotName = `OfficeMcpPivot${Date.now()}`;
     const info = await callToolData('office.get_session_info', { session_id: sessionId });
+    const workbookInfo = await callToolData('excel.get_workbook_info', { session_id: sessionId });
+    const sheetListBefore = await callToolData('excel.list_sheets', { session_id: sessionId });
     const sheet = await callToolData('excel.add_sheet', {
       session_id: sessionId,
       name: sheetName,
       activate: true
     });
-    const readBefore = await callToolData('excel.read_range', { session_id: sessionId, sheet: sheetName, address: 'A1:B2' });
+    const updatedSheet = await callToolData('excel.update_sheet', {
+      session_id: sessionId,
+      sheet: sheetName,
+      name: renamedSheetName,
+      tab_color: '#4472C4',
+      activate: true
+    });
+    const cleanupSheet = await callToolData('excel.add_sheet', {
+      session_id: sessionId,
+      name: cleanupSheetName,
+      activate: false
+    });
+    const deletedSheet = await callToolData('excel.delete_sheet', {
+      session_id: sessionId,
+      sheet: cleanupSheetName
+    });
+    const readBefore = await callToolData('excel.read_range', { session_id: sessionId, sheet: renamedSheetName, address: 'A1:B2' });
     const write = await callToolData('excel.write_range', {
       session_id: sessionId,
-      sheet: sheetName,
-      address: 'A1:B2',
-      values: [['Label', 'Value'], [marker, 42]]
+      sheet: renamedSheetName,
+      address: 'A1:C5',
+      values: [
+        ['Label', 'Region', 'Value'],
+        [marker, 'West', 42],
+        [`${marker}B`, 'East', 24],
+        [`${marker}C`, 'West', 12],
+        ['Total', 'All', 0]
+      ]
     });
-    const formula = await callToolData('excel.set_formula', { session_id: sessionId, sheet: sheetName, address: 'C2', formula: '=B2*2' });
+    const formula = await callToolData('excel.set_formula', { session_id: sessionId, sheet: renamedSheetName, address: 'C5', formula: '=SUM(C2:C4)' });
     const format = await callToolData('excel.format_range', {
       session_id: sessionId,
-      sheet: sheetName,
-      address: 'A1:C2',
+      sheet: renamedSheetName,
+      address: 'A1:C5',
       bold: true,
       fill_color: '#DDEEFF',
-      number_format: 'General'
+      number_format: 'General',
+      horizontal_alignment: 'center',
+      wrap_text: true
+    });
+    const usedRange = await callToolData('excel.get_used_range', {
+      session_id: sessionId,
+      sheet: renamedSheetName
+    });
+    const findReplace = await callToolData('excel.find_replace_cells', {
+      session_id: sessionId,
+      sheet: renamedSheetName,
+      address: 'A1:C5',
+      query: marker,
+      replacement: `${marker}Updated`,
+      complete_match: false,
+      match_case: true
+    });
+    const clear = await callToolData('excel.clear_range', {
+      session_id: sessionId,
+      sheet: renamedSheetName,
+      address: 'D1:D1',
+      apply_to: 'contents'
     });
     const table = await callToolData('excel.create_table', {
       session_id: sessionId,
-      sheet: sheetName,
-      address: 'A1:C2',
+      sheet: renamedSheetName,
+      address: 'A1:C5',
       has_headers: true,
-      name: `OfficeMcpTable${Date.now()}`
+      name: tableName
+    });
+    const tableUpdate = await callToolData('excel.update_table', {
+      session_id: sessionId,
+      table: tableName,
+      action: 'options',
+      show_filter_button: true,
+      show_banded_rows: true,
+      style: 'TableStyleMedium2'
+    });
+    const sort = await callToolData('excel.sort_range', {
+      session_id: sessionId,
+      target_type: 'table',
+      table: tableName,
+      fields: [{ key: 2, ascending: false }]
+    });
+    const filter = await callToolData('excel.apply_filter', {
+      session_id: sessionId,
+      target_type: 'table',
+      table: tableName,
+      column: 'Region',
+      criteria: { filter_on: 'values', values: ['West', 'All'] }
     });
     const chart = await callToolData('excel.create_chart', {
       session_id: sessionId,
-      sheet: sheetName,
-      address: 'A1:C2',
+      sheet: renamedSheetName,
+      address: 'A1:C5',
       type: 'columnClustered',
       title: 'Office MCP Smoke'
     });
-    const readAfter = await callToolData('excel.read_range', { session_id: sessionId, sheet: sheetName, address: 'A1:C2' });
+    const chartName = String(chart.chart ?? '');
+    const chartUpdate = await callToolData('excel.update_chart', {
+      session_id: sessionId,
+      sheet: renamedSheetName,
+      chart: chartName,
+      action: 'title',
+      title: chartTitle,
+      visible: true
+    });
+    const pivotTable = await callToolData('excel.create_pivot_table', {
+      session_id: sessionId,
+      name: pivotName,
+      table: tableName,
+      destination: `${renamedSheetName}!E3`
+    });
+    const pivotUpdate = await callToolData('excel.update_pivot_table', {
+      session_id: sessionId,
+      pivot_table: pivotName,
+      action: 'refresh'
+    });
+    const readAfter = await callToolData('excel.read_range', { session_id: sessionId, sheet: renamedSheetName, address: 'A1:C5' });
     const values = readAfter.values as unknown[][] | undefined;
-    if (!Array.isArray(values) || String(values[1]?.[0] ?? '') !== marker) {
+    if (!Array.isArray(values) || !String(values.flat().join(' ')).includes(`${marker}Updated`)) {
       throw new Error('Excel smoke marker was not found after write_range.');
     }
     return {
       session_id: sessionId,
-      sheet_name: sheetName,
+      sheet_name: renamedSheetName,
       document_title: (info.document as { title?: string } | undefined)?.title,
       available_tool_count: Array.isArray(info.available_tools) ? info.available_tools.length : undefined,
+      workbook_info: {
+        sheet_count: workbookInfo.sheet_count,
+        table_count: workbookInfo.table_count,
+        active_sheet: workbookInfo.active_sheet
+      },
+      sheet_list_count: Array.isArray(sheetListBefore.sheets) ? sheetListBefore.sheets.length : undefined,
       read_before_address: readBefore.address,
       write,
       formula,
       format,
+      used_range: usedRange,
+      find_replace: findReplace,
+      clear,
       table,
+      table_update: tableUpdate,
+      sort,
+      filter,
       chart,
+      chart_update: chartUpdate,
+      pivot_table: pivotTable,
+      pivot_update: pivotUpdate,
       sheet,
+      updated_sheet: updatedSheet,
+      cleanup_sheet: cleanupSheet,
+      deleted_sheet: deletedSheet,
       marker_found: true
     };
   });

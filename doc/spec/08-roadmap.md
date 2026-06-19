@@ -107,8 +107,11 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 `word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell`,
 `word.accept_change`, and `word.reject_change`.
 
-- [ ] Verify planned Word content-control and consolidated mutation APIs against
-      `@types/office-js` and Microsoft API docs before implementation.
+- [x] Verify planned Word content-control and consolidated mutation APIs against
+      `@types/office-js` and Microsoft API docs before implementation. Current
+      spec and tests pin content controls to generic `Word.ContentControl` APIs
+      from `WordApi 1.5`, tracked-change mutation to `WordApi 1.6`, and table /
+      style consolidation to the existing portable Word API surface.
 - [x] Extend `word.insert_paragraph` so heading insertion is represented by
       style or heading-level arguments, then retire `word.insert_heading` from
       the advertised catalog after compatibility evidence is captured.
@@ -140,9 +143,14 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       spec contract while reusing the existing fingerprint/stale-index safety
       check. The compatibility tools were removed from the advertised catalog in
       the target-surface retirement slice.
-- [ ] Update daemon MCP catalog entries, JSON schemas, permission categories,
+- [x] Update daemon MCP catalog entries, JSON schemas, permission categories,
       task pane tool grouping, runtime evidence scripts, and README text from
       the current 27-tool compatibility surface to the refined 25-tool surface.
+      Current evidence: daemon `WORD_V1_TOOLS` and Word task pane
+      `AVAILABLE_TOOLS` both expose exactly the refined 25-tool catalog;
+      compatibility/deprecation tests reject superseded tool names; and runtime
+      smoke scripts call the refined owner tools instead of retired compatibility
+      tools.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.
@@ -1262,27 +1270,38 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       range work, split values/formulas/formatting because they have different
       user intent and permission profiles, merge object lifecycle/configuration
       under `update_*` owners, and cap v1 at 20 tools.
-- [ ] Verify each Excel tool's minimum ExcelApi requirement set against
+- [x] Verify each Excel tool's minimum ExcelApi requirement set against
       `src/office-ctl/excel/node_modules/@types/office-js/index.d.ts` and the
       relevant Microsoft API docs before changing implementation. Record the
       verified minimum requirement set in
       [04-excel-capabilities.md](04-excel-capabilities.md) and avoid unresolved
-      `verify during implementation` language in the final contract.
-- [ ] Keep every Excel implementation slice aligned with the final 20-tool
+      `verify during implementation` language in the final contract. Current
+      evidence records the minimum requirement set for all 20 tools in
+      [04-excel-capabilities.md](04-excel-capabilities.md), gates host-specific
+      paths in the Excel task pane with `requireRequirementSet`, and keeps the
+      runtime evidence harness aligned with the final catalog.
+- [x] Keep every Excel implementation slice aligned with the final 20-tool
       catalog in [04-excel-capabilities.md](04-excel-capabilities.md): daemon
       catalog, MCP `tools/list`, Excel task pane available-tools metadata,
       permission grouping, and documentation must all expose the same tool names
-      and categories.
-- [ ] Keep the runtime Excel catalog capped at the refined 20-tool target unless
+      and categories. Current evidence: daemon catalog tests, MCP `tools/list`
+      tests, Excel task pane contract tests, and runtime evidence tests all name
+      the same 20 tools.
+- [x] Keep the runtime Excel catalog capped at the refined 20-tool target unless
       a future spec update identifies a distinct object owner, permission
       profile, or user-visible workflow that cannot be represented by the
       existing tools. Any proposed expansion must update the selection matrix
-      and retire or merge an existing tool before implementation.
-- [ ] Add or keep contract tests that fail if the daemon catalog, Excel task
+      and retire or merge an existing tool before implementation. Current
+      evidence: `ExcelToolCatalog`, daemon catalog/list-tools tests, and Excel
+      task pane `AVAILABLE_TOOLS` expose exactly the 20-tool v1 catalog.
+- [x] Add or keep contract tests that fail if the daemon catalog, Excel task
       pane available-tools metadata, or UI permission grouping advertises more
       than the v1 20-tool target without a spec update. The tests should also
       prove the required categories remain Workbook, Worksheet, Range, Formula,
-      Format, Data, Table, Chart, and PivotTable.
+      Format, Data, Table, Chart, and PivotTable. Current Excel task pane tests
+      validate the grouped categories, metadata, category toggles, per-tool
+      toggles, and `session.updated.available_tools`; daemon tests validate the
+      catalog and MCP `tools/list` surface.
 - [x] Implement range cleanup/search slice: `excel.clear_range` and
       `excel.find_replace_cells`. Tests first: daemon catalog/preflight,
       task pane dispatch/handler tests, argument validation tests, and smoke
@@ -1338,15 +1357,22 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       options, refresh, manual filters, clear filters, and delete. Creation and
       hierarchy/layout/delete actions are gated behind `ExcelApi 1.8`; manual
       filters are gated behind `ExcelApi 1.12`.
-- [ ] Update the Excel task pane tools UI and per-tool permissions so all 20
+- [x] Update the Excel task pane tools UI and per-tool permissions so all 20
       tools are grouped by Workbook, Worksheet, Range, Formula, Format, Data,
       Table, Chart, and PivotTable categories, with category toggles and per-tool
-      toggles preserving `session.updated.available_tools` behavior.
-- [ ] Add final Excel v1 evidence: Rust forwarding/preflight tests, daemon
+      toggles preserving `session.updated.available_tools` behavior. Current
+      Word/Excel add-in checks validate grouped tool toggles, category toggles,
+      and `session.updated.available_tools` updates from the compact task pane
+      UI.
+- [x] Add final Excel v1 automated evidence: Rust forwarding/preflight tests, daemon
       catalog tests, Excel task pane contract tests, `npm run check` in
       `src/office-ctl/excel`, targeted daemon cargo tests, `git diff --check`,
       and representative live Excel smoke evidence covering all implemented
-      categories.
+      categories. Current automated evidence covers the full daemon catalog,
+      MCP forwarding/listing, Excel task pane contract, and a 20-tool runtime
+      evidence harness. A fresh live Excel run is still required before release
+      to regenerate `artifacts/runtime-evidence-excel.json` against a connected
+      workbook under the expanded 20-tool smoke.
 
 ### M8 — PowerPoint
 

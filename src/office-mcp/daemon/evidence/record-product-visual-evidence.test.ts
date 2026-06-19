@@ -970,7 +970,7 @@ function writeExcelRuntimeEvidence(dir: string, ready = true): string {
   const sessionId = '11111111-2222-3333-4444-555555555555';
   const sessions = ready ? [{
     app: 'excel',
-    available_tool_count: 7,
+    available_tool_count: 20,
     document: { title: 'Excel Workbook' },
     host: { app: 'excel', platform: 'pc', version: '16.0' },
     session_id: sessionId,
@@ -979,11 +979,24 @@ function writeExcelRuntimeEvidence(dir: string, ready = true): string {
   const smokeDetails = {
     session_id: sessionId,
     marker_found: ready,
+    workbook_info: ready ? { sheet_count: 2, table_count: 1 } : {},
+    sheet_list_count: ready ? 1 : undefined,
+    updated_sheet: ready ? { updated: true } : {},
+    deleted_sheet: { deleted: ready },
+    used_range: ready ? { address: 'Sheet1!A1:C5' } : {},
+    find_replace: ready ? { replaced: true, replaced_count: 1 } : {},
+    clear: ready ? { cleared: true } : {},
     write: { wrote_values: ready },
     formula: { wrote_formula: ready },
     format: { formatted: ready },
     table: ready ? { table: 'OfficeMcpTable' } : {},
+    table_update: ready ? { updated: true } : {},
+    sort: { sorted: ready },
+    filter: { filtered: ready },
     chart: ready ? { chart: 'Chart 1' } : {},
+    chart_update: { updated: ready },
+    pivot_table: ready ? { pivot_table: 'OfficeMcpPivot' } : {},
+    pivot_update: { refreshed: ready },
     sheet: { activated: ready }
   };
   writeFileSync(path, JSON.stringify({
