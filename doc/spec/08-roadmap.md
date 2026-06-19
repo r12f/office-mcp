@@ -132,9 +132,14 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       supports rich text and plain text controls, lists metadata without
       duplicating contained document text, updates tag/title/lock/text metadata,
       and deletes controls with explicit keep/delete content handling.
-- [ ] Implement `word.update_tracked_change` with an explicit `action` argument
+- [x] Implement `word.update_tracked_change` with an explicit `action` argument
       for accept/reject, then retire `word.accept_change` and
-      `word.reject_change` from the advertised catalog.
+      `word.reject_change` from the advertised catalog. Current implementation
+      adds the target owner to the daemon catalog, MCP `tools/list`, Word task
+      pane available-tools metadata, permission grouping, dispatch path, and
+      spec contract while reusing the existing fingerprint/stale-index safety
+      check. The compatibility tools remain advertised until the dedicated
+      retirement slice removes them without breaking existing clients.
 - [ ] Update daemon MCP catalog entries, JSON schemas, permission categories,
       task pane tool grouping, runtime evidence scripts, and README text from
       the current 27-tool compatibility surface to the refined 25-tool surface.

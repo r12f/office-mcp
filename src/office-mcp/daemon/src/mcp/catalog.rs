@@ -33,6 +33,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.update_content_control",
     "word.update_paragraph",
     "word.update_table",
+    "word.update_tracked_change",
 ];
 
 const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[

@@ -85,6 +85,7 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
             "word.update_content_control",
             "word.update_paragraph",
             "word.update_table",
+            "word.update_tracked_change",
         ]
     );
 

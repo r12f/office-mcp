@@ -47,7 +47,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current implemented Word v1 tool surface has 32 tools, grouped by category.
+The current implemented Word v1 tool surface has 33 tools, grouped by category.
 The per-tool JSON Schemas follow in §2-§8.
 
 | Category | Tools |
@@ -58,7 +58,7 @@ The per-tool JSON Schemas follow in §2-§8.
 | **Tables** | `word.read_table`, `word.update_table`, `word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell` |
 | **Content Controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Structure** | `word.set_heading_level`, `word.apply_style` |
-| **Review** | `word.add_comment`, `word.resolve_comment`, `word.accept_change`, `word.reject_change` |
+| **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_tracked_change`, `word.accept_change`, `word.reject_change` |
 | **Document** | `word.save` |
 
 ### 1.2 Target refined Word tool surface
@@ -99,7 +99,7 @@ compatibility tools remain documented below until the migration TODO in
 | `word.delete_content_control` | implemented | ContentControl | destructive | `WordApi 1.5` | Delete a content control, preserving or deleting contents according to an explicit mode. |
 | `word.add_comment` | implemented | Review | comment | `WordApi 1.4` | Add a comment to an anchored range as the signed-in Office user. |
 | `word.resolve_comment` | implemented | Review | comment | `WordApi 1.4` | Resolve an existing comment. |
-| `word.update_tracked_change` | planned | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint. |
+| `word.update_tracked_change` | implemented | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint. |
 | `word.save` | implemented | Document | edit | `WordApi 1.1` | Save the current document with the host save behavior. |
 
 Superseded target-surface tools:
@@ -786,7 +786,35 @@ indistinguishable from the user doing it themselves.
 }
 ```
 
-### 8.3 `word.accept_change` and `word.reject_change`
+### 8.3 `word.update_tracked_change`
+
+Stable Office.js tracked-change objects do not expose an ID. The tracked
+changes resource therefore returns each item as
+`{ index, author, date, type, text, fingerprint }`, where `index` is the
+current collection index and `fingerprint` is a daemon-defined hash of the
+loaded fields.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "action", "change_index", "expected_fingerprint"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "action": { "enum": ["accept", "reject"] },
+    "change_index": { "type": "integer", "minimum": 0 },
+    "expected_fingerprint": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}
+```
+
+The add-in reloads the collection immediately before mutation. An index or
+fingerprint mismatch returns `STALE_INDEX`; clients must re-read the resource.
+
+### 8.4 `word.accept_change` and `word.reject_change`
+
+Compatibility tools retained until the target-surface migration removes them
+from the advertised catalog. New clients should call `word.update_tracked_change`.
 
 Stable Office.js tracked-change objects do not expose an ID. The tracked
 changes resource therefore returns each item as

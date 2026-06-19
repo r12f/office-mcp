@@ -71,6 +71,7 @@
     'word.apply_style',
     'word.add_comment',
     'word.resolve_comment',
+    'word.update_tracked_change',
     'word.accept_change',
     'word.reject_change',
     'word.save'
@@ -81,7 +82,7 @@
     { label: 'Edit', tools: ['word.replace_text', 'word.update_paragraph', 'word.delete_range', 'word.apply_formatting', 'word.set_heading_level', 'word.apply_style'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table', 'word.update_cell', 'word.add_row', 'word.add_column', 'word.format_cell'] },
     { label: 'Content Controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
-    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.accept_change', 'word.reject_change'] },
+    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_tracked_change', 'word.accept_change', 'word.reject_change'] },
     { label: 'Document', tools: ['word.save'] }
   ];
   const TOOL_METADATA = new Map([
@@ -114,6 +115,7 @@
     ['word.apply_style', { category: 'Edit', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
     ['word.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a comment to an anchored range.' }],
     ['word.resolve_comment', { category: 'Review', sideEffect: 'mutating', description: 'Resolve an existing comment.' }],
+    ['word.update_tracked_change', { category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint.' }],
     ['word.accept_change', { category: 'Review', sideEffect: 'mutating', description: 'Accept a tracked change by fingerprint.' }],
     ['word.reject_change', { category: 'Review', sideEffect: 'mutating', description: 'Reject a tracked change by fingerprint.' }],
     ['word.save', { category: 'Document', sideEffect: 'mutating', description: 'Save the current document.' }]
@@ -417,6 +419,9 @@
           break;
         case 'word.resolve_comment':
           data = await resolveComment(args);
+          break;
+        case 'word.update_tracked_change':
+          data = await updateTrackedChange(args);
           break;
         case 'word.accept_change':
           data = await mutateTrackedChange(args, 'accept');
@@ -1123,6 +1128,14 @@
       await context.sync();
       return { comment_id: args.comment_id, resolved: true };
     });
+  }
+
+  async function updateTrackedChange(args) {
+    const action = String(args.action || '').trim().toLowerCase();
+    if (action !== 'accept' && action !== 'reject') {
+      throw Object.assign(new Error(`Unsupported tracked-change action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return mutateTrackedChange(args, action);
   }
 
   async function mutateTrackedChange(args, action) {
