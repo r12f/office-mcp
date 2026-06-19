@@ -1175,11 +1175,12 @@ Microsoft workbook -> worksheet -> range -> table/chart/pivot object workflow.
 
 Research basis: Microsoft Excel add-in docs identify the most common workflow as
 `Workbook` -> `Worksheet` -> `Range`, then higher-level `Table`, `Chart`, and
-`PivotTable` objects. The refined catalog must stay under 25 tools and should
-prefer about 20 tools by grouping common object mutations under `update_*`
-commands instead of exposing every Excel.js method. Each tool must own one
-distinct user intent; overlapping behavior should be removed or assigned to one
-owner before implementation.
+`PivotTable` objects. Cells are represented as one-cell `Range` objects, so v1
+must not add separate cell CRUD tools. The refined catalog is fixed at 20 core
+tools by grouping common object lifecycle/configuration operations under
+`update_*` commands instead of exposing every Excel.js method. Each tool must
+own one distinct user intent; overlapping behavior must be removed or assigned
+to one owner before implementation.
 
 Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
@@ -1190,38 +1191,52 @@ Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
 `excel.update_chart`, `excel.create_pivot_table`, and
 `excel.update_pivot_table`.
 
-- [ ] Verify the planned tools' minimum ExcelApi requirement sets against
-      `@types/office-js` and Microsoft API docs before implementation.
-- [ ] Add daemon MCP catalog entries, schemas, metadata, and permission
-      categories for all planned Excel tools.
-- [ ] Implement workbook and worksheet tools:
+- [x] Implement workbook and worksheet discovery/lifecycle slice:
       `excel.get_workbook_info`, `excel.list_sheets`, `excel.update_sheet`,
-      and `excel.delete_sheet`.
-- [ ] Implement range and data tools: `excel.get_used_range`,
-      `excel.clear_range`, `excel.find_replace_cells`, `excel.sort_range`, and
-      `excel.apply_filter`, with `excel.sort_range` and `excel.apply_filter` as
-      the single owners for sorting/filtering both ranges and table bodies.
-- [ ] Extend existing formula and format contracts where needed so
-      `excel.set_formula` accepts formula matrices and `excel.format_range`
-      covers borders, alignment, and autofit basics.
-- [ ] Implement table update behavior in `excel.update_table`, including table
-      metadata/structure reads, rows/columns, resize, rename, table style/options,
-      and deletion modes; table cell contents stay owned by `excel.read_range`,
-      and this tool must not duplicate generic range sort/filter or cell-format
-      behavior.
-- [ ] Implement chart update behavior in `excel.update_chart`, including title,
-      axes, legend, series, position, size, deletion, and image export where the
-      host supports it.
-- [ ] Implement PivotTable creation and update behavior for normal range/table
-      sources, hierarchy placement, aggregation, refresh, filtering, and
-      deletion, while keeping OLAP, Power Pivot, slicers, and preview-only APIs
-      deferred.
-- [ ] Update the Excel task pane tools UI and permissions so the new tools are
-      grouped by Workbook, Worksheet, Range, Formula, Format, Data, Table,
-      Chart, and PivotTable categories.
-- [ ] Add Rust forwarding/preflight tests, daemon catalog tests, Excel task pane
-      contract tests, and representative live Excel smoke evidence covering the
-      new surface.
+      `excel.delete_sheet`, and `excel.get_used_range`, including daemon catalog
+      entries, task pane handlers, and Rust/JS tests. Committed as
+      `excel: add workbook and worksheet tools`.
+- [ ] Verify each remaining planned tool's minimum ExcelApi requirement set
+      against `src/office-ctl/excel/node_modules/@types/office-js/index.d.ts`
+      and Microsoft API docs before implementation. Record the verified minimum
+      requirement set in [04-excel-capabilities.md](04-excel-capabilities.md)
+      instead of leaving `verify during implementation` in the final contract.
+- [ ] Implement range cleanup/search slice: `excel.clear_range` and
+      `excel.find_replace_cells`. Tests first: daemon catalog/preflight,
+      task pane dispatch/handler tests, argument validation tests, and smoke
+      coverage for clear contents/formats/all plus read-only find and replace.
+- [ ] Extend formula/format slice: update `excel.set_formula` to accept formula
+      matrices, and update `excel.format_range` to cover borders, horizontal and
+      vertical alignment, wrap text, autofit rows/columns, and number-format
+      matrices. Tests first: shape validation, generated Office.js calls, and
+      no regression for existing scalar formula/basic format behavior.
+- [ ] Implement data operations slice: `excel.sort_range` and
+      `excel.apply_filter`. These are the only owners for sorting/filtering both
+      plain ranges and table bodies; `excel.update_table` must not duplicate
+      this behavior. Tests first: plain range target, table target, clear filter,
+      multi-key sort, and metadata/permission categories.
+- [ ] Implement table object-owner slice: `excel.update_table` with explicit
+      actions for metadata read, add rows, add columns, resize, rename, table
+      style/options, and delete. Table cell contents stay owned by
+      `excel.read_range`; generic sort/filter stays owned by data tools; generic
+      cell formatting stays owned by `excel.format_range`.
+- [ ] Implement chart object-owner slice: `excel.update_chart` with explicit
+      actions for metadata read, title, axes, legend, series source, position,
+      size, delete, and image export where the host supports it. Unsupported
+      export must return a host-capability error, not a silent partial result.
+- [ ] Implement PivotTable slice: `excel.create_pivot_table` and
+      `excel.update_pivot_table` for normal range/table sources, row/column/data
+      fields, filters, aggregation/calculation, refresh, metadata read, and
+      delete. OLAP, Power Pivot, slicers, and preview-only APIs remain deferred.
+- [ ] Update the Excel task pane tools UI and per-tool permissions so all 20
+      tools are grouped by Workbook, Worksheet, Range, Formula, Format, Data,
+      Table, Chart, and PivotTable categories, with category toggles and per-tool
+      toggles preserving `session.updated.available_tools` behavior.
+- [ ] Add final Excel v1 evidence: Rust forwarding/preflight tests, daemon
+      catalog tests, Excel task pane contract tests, `npm run check` in
+      `src/office-ctl/excel`, targeted daemon cargo tests, `git diff --check`,
+      and representative live Excel smoke evidence covering all implemented
+      categories.
 
 ### M8 — PowerPoint
 

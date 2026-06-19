@@ -18,6 +18,26 @@ most useful workflows start at `Workbook`, move to `Worksheet`, operate on
 `Table`, `Chart`, or `PivotTable` objects. `office-mcp` exposes task-oriented
 tools for those workflows instead of mirroring every Excel.js class and method.
 
+Research basis:
+
+- Microsoft Learn's "Core Excel object model concepts" describes the common
+  Excel add-in workflow as starting from a `Workbook`, moving to a `Worksheet`,
+  then working with `Range` values, formulas, and formats before creating
+  higher-level `Table` or `Chart` objects.
+- The same documentation states that cells are represented as one-cell
+  `Range` objects, so v1 must not add separate cell CRUD tools. Single-cell
+  reads, writes, formulas, formatting, clearing, search, sorting, and filtering
+  are all range operations.
+- Tables and charts are the most common promotion step after range work.
+  PivotTables are included in the core target because they are a high-value
+  analysis workflow, but the v1 contract is intentionally limited to normal
+  range/table sources and non-preview APIs.
+
+The refined v1 target is 20 tools. That is the upper bound for the core Excel
+surface unless a future workflow proves that a distinct object owner or
+permission profile is missing. Do not expand the catalog by copying individual
+Excel.js methods into MCP tools.
+
 Out of scope for the core Excel surface: shapes and images, comments and notes,
 slicers as first-class tools, events/subscriptions, custom XML, external data
 connections, Power Query, Python/preview-only APIs, OLAP/Power Pivot, arbitrary
@@ -71,7 +91,10 @@ Target core Excel tool surface:
 
 The planned tools above are the Excel implementation backlog, not the current
 runtime catalog. Before implementation, each planned tool must verify its
-minimum requirement set against `@types/office-js` and the Microsoft API docs.
+minimum requirement set against `@types/office-js` and the Microsoft API docs,
+then land as a test-first implementation slice with daemon catalog coverage,
+task pane contract coverage, and live Excel smoke evidence where the host API
+cannot be fully proven statically.
 
 Tool ownership rules:
 
@@ -100,6 +123,20 @@ Tool ownership rules:
   `excel.update_pivot_table` are object-owner tools. They group lifecycle and
   configuration operations for their object type, but must not absorb generic
   range, formula, or cell-format operations.
+
+API shape rules:
+
+- Prefer explicit `action` fields for object-owner update tools when one tool
+  owns multiple lifecycle operations, for example `{ "action": "rename" }`,
+  `{ "action": "resize" }`, or `{ "action": "delete" }`.
+- Prefer narrow structured option objects over free-form property bags. This
+  keeps host validation understandable and avoids exposing unsupported Excel.js
+  properties as accidental public API.
+- Read operations must return metadata, addresses, dimensions, and object IDs
+  where useful, but must not return large cell contents unless the tool is
+  explicitly `excel.read_range`.
+- Destructive actions must be explicit in the tool arguments and must set
+  destructive metadata in the daemon catalog.
 
 ## 2. Shared Arguments
 
