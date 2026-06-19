@@ -40,6 +40,7 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
             "excel.read_range",
             "excel.set_formula",
             "excel.sort_range",
+            "excel.update_chart",
             "excel.update_sheet",
             "excel.update_table",
             "excel.write_range",

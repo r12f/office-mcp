@@ -1277,10 +1277,16 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       metadata/permission grouping, dispatch coverage, Office.js table rows,
       columns, resize, rename, style/options, delete actions, and gates visual
       table options behind `ExcelApi 1.3` and resize behind `ExcelApi 1.13`.
-- [ ] Implement chart object-owner slice: `excel.update_chart` with explicit
+- [x] Implement chart object-owner slice: `excel.update_chart` with explicit
       actions for metadata read, title, axes, legend, series source, position,
       size, delete, and image export where the host supports it. Unsupported
       export must return a host-capability error, not a silent partial result.
+      Current implementation adds daemon catalog/list-tools coverage, Excel
+      task pane metadata/permission grouping, dispatch coverage, chart metadata,
+      title, legend, axis title/visibility, source range, position, size,
+      `getImage` export, and delete actions. Image export is gated behind
+      `ExcelApi 1.2`; axis selection and chart type/id metadata are gated behind
+      `ExcelApi 1.7`.
 - [ ] Implement PivotTable slice: `excel.create_pivot_table` and
       `excel.update_pivot_table` for normal range/table sources, row/column/data
       fields, filters, aggregation/calculation, refresh, metadata read, and

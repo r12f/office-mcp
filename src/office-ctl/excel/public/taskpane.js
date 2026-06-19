@@ -51,7 +51,8 @@
     'excel.apply_filter',
     'excel.create_table',
     'excel.update_table',
-    'excel.create_chart'
+    'excel.create_chart',
+    'excel.update_chart'
   ];
   const TOOL_GROUPS = [
     { label: 'Workbook', tools: ['excel.get_workbook_info'] },
@@ -61,7 +62,7 @@
     { label: 'Format', tools: ['excel.format_range'] },
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
     { label: 'Table', tools: ['excel.create_table', 'excel.update_table'] },
-    { label: 'Chart', tools: ['excel.create_chart'] }
+    { label: 'Chart', tools: ['excel.create_chart', 'excel.update_chart'] }
   ];
   const TOOL_METADATA = new Map([
     ['excel.get_workbook_info', { category: 'Workbook', sideEffect: 'read', description: 'Read workbook state and aggregate object counts.' }],
@@ -80,7 +81,8 @@
     ['excel.apply_filter', { category: 'Data', sideEffect: 'mutating', description: 'Apply, clear, remove, or reapply range and table filters.' }],
     ['excel.create_table', { category: 'Table', sideEffect: 'mutating', description: 'Create a table from a range.' }],
     ['excel.update_table', { category: 'Table', sideEffect: 'destructive', description: 'Read or update table structure, style, options, and lifecycle.' }],
-    ['excel.create_chart', { category: 'Chart', sideEffect: 'mutating', description: 'Create a chart from a range.' }]
+    ['excel.create_chart', { category: 'Chart', sideEffect: 'mutating', description: 'Create a chart from a range.' }],
+    ['excel.update_chart', { category: 'Chart', sideEffect: 'destructive', description: 'Read or update chart title, legend, axes, source, position, size, export, and lifecycle.' }]
   ]);
   const { instanceId, sessionId } = runtimeIds();
   const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.excel.tool-permissions.${sessionId}`;
@@ -348,6 +350,9 @@
           break;
         case 'excel.create_chart':
           data = await createChart(args);
+          break;
+        case 'excel.update_chart':
+          data = await updateChart(args);
           break;
         default:
           throw Object.assign(new Error(`Unsupported tool ${tool}`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE' });
@@ -752,6 +757,74 @@
     });
   }
 
+  async function updateChart(args) {
+    const action = String(args.action || 'metadata').trim().toLowerCase();
+    return Excel.run(async (context) => {
+      const chart = targetChart(context, args);
+      if (action === 'metadata' || action === 'read') {
+        const chartProperties = supportsRequirementSet('ExcelApi', '1.7')
+          ? 'id,name,chartType,left,top,width,height'
+          : 'name,left,top,width,height';
+        chart.load(chartProperties);
+        chart.title.load('text,visible');
+        chart.legend.load('visible,position,overlay');
+        chart.series.load('count');
+        await context.sync();
+        return chartMetadata(chart);
+      }
+      if (action === 'title') {
+        chart.title.text = requiredString(args, 'title', 'excel.update_chart title requires title.');
+        if (args.visible !== undefined) chart.title.visible = Boolean(args.visible);
+        await context.sync();
+        return { chart: args.chart, action, updated: true };
+      }
+      if (action === 'legend') {
+        if (args.visible !== undefined) chart.legend.visible = Boolean(args.visible);
+        if (args.position !== undefined) chart.legend.position = chartLegendPositionFrom(args.position);
+        if (args.overlay !== undefined) chart.legend.overlay = Boolean(args.overlay);
+        await context.sync();
+        return { chart: args.chart, action, updated: true };
+      }
+      if (action === 'axis') {
+        requireRequirementSet('ExcelApi', '1.7', 'chart axis selection');
+        const axis = chart.axes.getItem(chartAxisTypeFrom(args.axis), chartAxisGroupFrom(args.axis_group));
+        if (args.title !== undefined) axis.title.text = String(args.title);
+        if (args.title_visible !== undefined) axis.title.visible = Boolean(args.title_visible);
+        if (args.visible !== undefined) axis.visible = Boolean(args.visible);
+        await context.sync();
+        return { chart: args.chart, action, axis: String(args.axis || 'value'), updated: true };
+      }
+      if (action === 'data' || action === 'series_source') {
+        chart.setData(targetRange(context, args), chartSeriesByFrom(args.series_by));
+        await context.sync();
+        return { chart: args.chart, action, source: args.address, updated: true };
+      }
+      if (action === 'position') {
+        chart.setPosition(requiredString(args, 'start_cell', 'excel.update_chart position requires start_cell.'), optionalName(args.end_cell));
+        await context.sync();
+        return { chart: args.chart, action, positioned: true };
+      }
+      if (action === 'size') {
+        if (args.width !== undefined) chart.width = Number(args.width);
+        if (args.height !== undefined) chart.height = Number(args.height);
+        await context.sync();
+        return { chart: args.chart, action, width: args.width ?? null, height: args.height ?? null, resized: true };
+      }
+      if (action === 'export_image') {
+        requireRequirementSet('ExcelApi', '1.2', 'chart image export');
+        const image = chart.getImage(optionalNumber(args.width), optionalNumber(args.height), chartImageFittingModeFrom(args.fitting_mode));
+        await context.sync();
+        return { chart: args.chart, action, image_base64: image.value, mime_type: 'image/png', untrusted_source: true };
+      }
+      if (action === 'delete') {
+        chart.delete();
+        await context.sync();
+        return { chart: args.chart, action, deleted: true };
+      }
+      throw Object.assign(new Error(`Unsupported chart action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    });
+  }
+
   function targetWorksheet(context, args) {
     return args.sheet
       ? context.workbook.worksheets.getItem(String(args.sheet))
@@ -761,6 +834,14 @@
   function targetTable(context, args) {
     const table = requiredString(args, 'table', 'Table name is required.');
     return context.workbook.tables.getItem(table);
+  }
+
+  function targetChart(context, args) {
+    const chart = requiredString(args, 'chart', 'Chart name is required.');
+    const worksheet = args.sheet
+      ? context.workbook.worksheets.getItem(String(args.sheet))
+      : context.workbook.worksheets.getActiveWorksheet();
+    return worksheet.charts.getItem(chart);
   }
 
   function targetSortObject(context, args) {
@@ -851,6 +932,86 @@
   function optionalName(value) {
     const name = optionalTrimmedString(value);
     return name || undefined;
+  }
+
+  function chartMetadata(chart) {
+    return {
+      chart: chart.name,
+      id: chart.id || null,
+      chart_type: chart.chartType || null,
+      title: { text: chart.title.text || '', visible: Boolean(chart.title.visible) },
+      legend: {
+        visible: Boolean(chart.legend.visible),
+        position: chart.legend.position || null,
+        overlay: Boolean(chart.legend.overlay)
+      },
+      series_count: chart.series.count,
+      position: {
+        left: chart.left,
+        top: chart.top,
+        width: chart.width,
+        height: chart.height
+      }
+    };
+  }
+
+  function chartLegendPositionFrom(value) {
+    const positions = {
+      top: Excel.ChartLegendPosition.top,
+      bottom: Excel.ChartLegendPosition.bottom,
+      left: Excel.ChartLegendPosition.left,
+      right: Excel.ChartLegendPosition.right,
+      corner: Excel.ChartLegendPosition.corner,
+      custom: Excel.ChartLegendPosition.custom
+    };
+    return enumValueFrom(positions, value, 'chart legend position');
+  }
+
+  function chartAxisTypeFrom(value) {
+    const types = {
+      category: Excel.ChartAxisType.category,
+      value: Excel.ChartAxisType.value,
+      series: Excel.ChartAxisType.series
+    };
+    return enumValueFrom(types, value || 'value', 'chart axis type');
+  }
+
+  function chartAxisGroupFrom(value) {
+    if (value === undefined || value === null || value === '') return undefined;
+    const groups = {
+      primary: Excel.ChartAxisGroup.primary,
+      secondary: Excel.ChartAxisGroup.secondary
+    };
+    return enumValueFrom(groups, value, 'chart axis group');
+  }
+
+  function chartSeriesByFrom(value) {
+    if (value === undefined || value === null || value === '') return Excel.ChartSeriesBy.auto;
+    const values = {
+      auto: Excel.ChartSeriesBy.auto,
+      columns: Excel.ChartSeriesBy.columns,
+      rows: Excel.ChartSeriesBy.rows
+    };
+    return enumValueFrom(values, value, 'chart series orientation');
+  }
+
+  function chartImageFittingModeFrom(value) {
+    if (value === undefined || value === null || value === '') return undefined;
+    const modes = {
+      fit: Excel.ImageFittingMode.fit,
+      fitAndCenter: Excel.ImageFittingMode.fitAndCenter,
+      fill: Excel.ImageFittingMode.fill
+    };
+    return enumValueFrom(modes, value, 'chart image fitting mode');
+  }
+
+  function optionalNumber(value) {
+    if (value === undefined || value === null || value === '') return undefined;
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      throw Object.assign(new Error('Expected a finite number.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return number;
   }
 
   function sheetInfo(sheet, active) {
@@ -1204,6 +1365,7 @@
       excel_api_1_2: requirements.isSetSupported('ExcelApi', '1.2'),
       excel_api_1_3: requirements.isSetSupported('ExcelApi', '1.3'),
       excel_api_1_4: requirements.isSetSupported('ExcelApi', '1.4'),
+      excel_api_1_7: requirements.isSetSupported('ExcelApi', '1.7'),
       excel_api_1_9: requirements.isSetSupported('ExcelApi', '1.9'),
       excel_api_1_13: requirements.isSetSupported('ExcelApi', '1.13')
     };
