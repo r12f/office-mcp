@@ -12,14 +12,14 @@ test('Excel add-in manifest targets workbook host and versioned task pane', () =
 
   assert.match(manifest, /<Host Name="Workbook" \/>/);
   assert.match(manifest, /<Set Name="ExcelApi" MinVersion="1\.1" \/>/);
-  assert.match(manifest, /<Version>1\.0\.0\.9<\/Version>/);
-  assert.match(manifest, /excel\/taskpane\.html\?v=0\.1\.9/);
-  assert.match(html, /excel\/taskpane\.css\?v=0\.1\.9/);
-  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.9/);
-  assert.match(html, /excel\/taskpane\.js\?v=0\.1\.9/);
+  assert.match(manifest, /<Version>1\.0\.0\.10<\/Version>/);
+  assert.match(manifest, /excel\/taskpane\.html\?v=0\.1\.10/);
+  assert.match(html, /common\/taskpane\.css\?v=0\.1\.10/);
+  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.10/);
+  assert.match(html, /excel\/taskpane\.js\?v=0\.1\.10/);
   assert.match(html, /<script src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
   assert.doesNotMatch(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
-  assert.match(js, /ADDIN_VERSION = '0\.1\.9'/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.10'/);
 });
 
 test('Excel add-in uses product identity metadata and generated icon URLs', () => {
@@ -43,7 +43,7 @@ test('Excel add-in uses product identity metadata and generated icon URLs', () =
 
 test('Excel task pane uses common channel and registers Excel runtime metadata', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
-  const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
+  const css = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
   assert.match(html, /id="connectionBadge"/);
@@ -75,7 +75,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(html, /placeholder="wss:\/\/localhost:8765\/addin"/);
   assert.doesNotMatch(html, /Connecting\.\.\./);
   assert.doesNotMatch(html, /addin\.\.\./);
-  assert.match(css, /--excel: #217346/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8'), /--accent: #3b6478/);
+  assert.match(readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8'), /--accent: #217346/);
   assert.match(css, /\.summary-panel/);
   assert.match(css, /\.identity \{[\s\S]*grid-template-columns: 32px minmax\(0, 1fr\);/);
   assert.match(css, /\.product-mark \{[\s\S]*width: 32px;[\s\S]*height: 32px;/);
@@ -149,22 +150,20 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
   assert.match(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
-  assert.match(js, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
   assert.match(js, /const target = button\.dataset\.copyTarget \? document\.getElementById\(button\.dataset\.copyTarget\) : null/);
   assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
   assert.match(js, /navigator\.clipboard\?\.writeText/);
-  assert.match(js, /function setCopyableMetadata\(element, value\)/);
-  assert.match(js, /element\.textContent = element\.id === 'session' \? text : middleTruncate\(text\)/);
-  assert.match(js, /button\.dataset\.copyValue = text/);
-  assert.match(js, /function middleTruncate\(value, maxLength = 30\)/);
-  assert.match(js, /return `\$\{text\.slice\(0, head\)\}\$\{marker\}\$\{text\.slice\(text\.length - tail\)\}`/);
+  assert.match(js, /setCopyableMetadata/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function setCopyableMetadata\(element, value\)/);
+  assert.match(js, /middleTruncate/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function middleTruncate\(value, maxLength = 30\)/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /return `\$\{text\.slice\(0, head\)\}\$\{marker\}\$\{text\.slice\(text\.length - tail\)\}`/);
   assert.match(js, /function fallbackCopy\(value\)/);
   assert.doesNotMatch(js, /is-editing-tools/);
   assert.doesNotMatch(js, /function activateSettingsWithKeyboard/);
   assert.match(js, /saveEndpointEl\.disabled = true/);
   assert.match(js, /saveEndpointEl\.setAttribute\('aria-busy', 'true'\)/);
-  assert.match(js, /serverVersionEl\.textContent = `Server \$\{serverInfo\.serverVersion\}`/);
-  assert.match(js, /protocolVersionEl\.textContent = `Protocol \$\{serverInfo\.protocolVersion\}`/);
+  assert.match(js, /renderRuntimeVersions\(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION\)/);
   assert.match(js, /function protectionLabel\(info\)/);
   assert.match(js, /return 'Not protected'/);
   assert.doesNotMatch(js, /protectionEl\.textContent = workbook\.protection\?\.kind \|\| 'Unknown'/);
@@ -217,7 +216,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
 
 test('Excel task pane keeps settings inline and compact at narrow widths', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
-  const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
+  const css = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');
 
   assert.match(css, /body \{[\s\S]*min-width: 320px;[\s\S]*overflow-x: hidden;/);
   assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);

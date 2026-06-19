@@ -71,11 +71,11 @@ function Write-LocalManifest {
 
   foreach ($xpath in @(
       "/o:OfficeApp/o:IconUrl",
-      "//bt:Image[@id='Icon.16x16']",
       "//bt:Image[@id='Icon.32x32']"
     )) {
     Set-DefaultValue $manifest $ns $xpath "$Origin/assets/icon-32.png"
   }
+  Set-DefaultValue $manifest $ns "//bt:Image[@id='Icon.16x16']" "$Origin/assets/icon-16.png"
   foreach ($xpath in @(
       "/o:OfficeApp/o:HighResolutionIconUrl",
       "//bt:Image[@id='Icon.80x80']"

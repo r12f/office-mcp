@@ -12,19 +12,25 @@ fn serves_word_taskpane_static_asset() {
     assert!(response.contains("/common/addin-channel.js"));
     assert!(response.contains("/common/logger.js"));
     assert!(response.contains("/common/task-history.js"));
+    assert!(response.contains("/common/main-ui.js"));
+    assert!(response.contains("/common/taskpane.css"));
 }
 
 #[test]
 fn serves_versioned_addin_static_assets_with_query_strings() {
-    let word_js = response_text(&service().serve_addin_asset("/word/taskpane.js?v=0.1.11"));
+    let word_js = response_text(&service().serve_addin_asset("/word/taskpane.js?v=0.1.12"));
     assert!(word_js.starts_with("HTTP/1.1 200 OK"));
     assert!(word_js.contains("__OFFICE_MCP_TASKPANE_READY__"));
 
-    let common_js = response_text(&service().serve_addin_asset("/common/addin-channel.js?v=0.1.11"));
+    let common_js = response_text(&service().serve_addin_asset("/common/addin-channel.js?v=0.1.12"));
     assert!(common_js.starts_with("HTTP/1.1 200 OK"));
     assert!(common_js.contains("OfficeCtlAddinChannel"));
 
-    let excel_js = response_text(&service().serve_addin_asset("/excel/taskpane.js?v=0.1.9"));
+    let main_ui_js = response_text(&service().serve_addin_asset("/common/main-ui.js?v=0.1.12"));
+    assert!(main_ui_js.starts_with("HTTP/1.1 200 OK"));
+    assert!(main_ui_js.contains("OfficeCtlMainUi"));
+
+    let excel_js = response_text(&service().serve_addin_asset("/excel/taskpane.js?v=0.1.10"));
     assert!(excel_js.starts_with("HTTP/1.1 200 OK"));
     assert!(excel_js.contains("function isExcelHost"));
     assert!(excel_js.contains("Office.HostType?.Excel"));
@@ -35,8 +41,8 @@ fn serves_excel_taskpane_static_assets() {
     let html = response_text(&service().serve_addin_asset("/excel/taskpane.html"));
     assert!(html.starts_with("HTTP/1.1 200 OK"));
     assert!(html.contains("Office MCP Control"));
-    assert!(html.contains("/excel/taskpane.js?v=0.1.9"));
-    assert!(html.contains("/common/addin-channel.js?v=0.1.9"));
+    assert!(html.contains("/excel/taskpane.js?v=0.1.10"));
+    assert!(html.contains("/common/addin-channel.js?v=0.1.10"));
 
     let js = response_text(&service().serve_addin_asset("/excel/taskpane.js"));
     assert!(js.starts_with("HTTP/1.1 200 OK"));
@@ -44,9 +50,13 @@ fn serves_excel_taskpane_static_assets() {
     assert!(js.contains("Office.HostType?.Excel"));
     assert!(js.contains("sessionAddedNotification"));
 
-    let css = response_text(&service().serve_addin_asset("/excel/taskpane.css"));
+    let css = response_text(&service().serve_addin_asset("/common/taskpane.css"));
     assert!(css.starts_with("HTTP/1.1 200 OK"));
-    assert!(css.contains("--excel: #217346"));
+    assert!(css.contains("--accent: #3b6478"));
+
+    let excel_css = response_text(&service().serve_addin_asset("/excel/taskpane.css"));
+    assert!(excel_css.starts_with("HTTP/1.1 200 OK"));
+    assert!(excel_css.contains("--accent: #217346"));
 }
 
 #[test]

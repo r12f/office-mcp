@@ -1,5 +1,5 @@
 (() => {
-  const ADDIN_VERSION = '0.1.9';
+  const ADDIN_VERSION = '0.1.10';
   const PROTOCOL_VERSION = '1.0';
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
   const {
@@ -26,6 +26,13 @@
   } = window.OfficeCtlAddinChannel;
   const { AddinLogger } = window.OfficeCtlLogger;
   const { TaskHistoryStore } = window.OfficeCtlTaskHistory;
+  const {
+    bindDetailsControl,
+    middleTruncate,
+    officeHostSummary,
+    renderRuntimeVersions,
+    setCopyableMetadata
+  } = window.OfficeCtlMainUi;
 
   const AVAILABLE_TOOLS = [
     'excel.read_range',
@@ -231,8 +238,7 @@
       return;
     }
     serverInfo = registerResult(message, PROTOCOL_VERSION);
-    serverVersionEl.textContent = serverInfo.serverVersion;
-    protocolVersionEl.textContent = serverInfo.protocolVersion;
+    renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
     connectionDetailEl.textContent = 'None';
     enableAutoOpen().then(() => announceSession()).catch((error) => {
       logger.error('session.announce.failed', error);
@@ -504,9 +510,8 @@
   function renderStaticState() {
     setCopyableMetadata(sessionEl, sessionId);
     setCopyableMetadata(daemonEl, configuredEndpoint());
-    serverVersionEl.textContent = `Server ${serverInfo.serverVersion}`;
-    protocolVersionEl.textContent = `Protocol ${serverInfo.protocolVersion}`;
-    hostPlatformEl.textContent = 'Excel / Unknown';
+    renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
+    hostPlatformEl.textContent = officeHostSummary('Excel');
     renderToolSummary();
     renderCurrentTask();
     renderHistory();
@@ -514,6 +519,9 @@
 
   function renderToolSummary() {
     const effective = effectiveTools();
+    const openGroups = new Set([...toolListEl.querySelectorAll('[data-tool-group]')]
+      .filter((input) => input.closest('details')?.open)
+      .map((input) => input.dataset.toolGroup));
     toolCountEl.textContent = `Enabled ${effective.length} of ${AVAILABLE_TOOLS.length}`;
     toolListEl.textContent = '';
     for (const group of TOOL_GROUPS) {
@@ -522,7 +530,7 @@
       const enabledInGroup = tools.filter((tool) => effective.includes(tool));
       const groupEl = document.createElement('details');
       groupEl.className = 'tool-group';
-      groupEl.open = false;
+      groupEl.open = openGroups.has(group.label);
       groupEl.innerHTML = [
         '<summary class="tool-group-title">',
         `<span>${escapeHtml(group.label)}</span>`,
@@ -534,11 +542,10 @@
       toolListEl.appendChild(groupEl);
     }
     toolListEl.querySelectorAll('[data-tool]').forEach((input) => {
-      input.addEventListener('change', handleToolPermissionChange);
+      bindDetailsControl(input, handleToolPermissionChange);
     });
     toolListEl.querySelectorAll('[data-tool-group]').forEach((input) => {
-      input.addEventListener('click', (event) => event.stopPropagation());
-      input.addEventListener('change', handleToolGroupPermissionChange);
+      bindDetailsControl(input, handleToolGroupPermissionChange);
     });
   }
 
@@ -757,26 +764,6 @@
     }
   }
 
-  function setCopyableMetadata(element, value) {
-    const text = value || '-';
-    element.textContent = element.id === 'session' ? text : middleTruncate(text);
-    element.title = text;
-    const button = element.closest('[data-copy-target]');
-    if (button) {
-      button.dataset.copyValue = text;
-      button.title = text === '-' ? button.getAttribute('aria-label') || '' : text;
-    }
-  }
-
-  function middleTruncate(value, maxLength = 30) {
-    const text = String(value || '');
-    if (text.length <= maxLength) return text;
-    const marker = '...';
-    const available = maxLength - marker.length;
-    const head = Math.ceil(available / 2);
-    const tail = Math.floor(available / 2);
-    return `${text.slice(0, head)}${marker}${text.slice(text.length - tail)}`;
-  }
 
   function fallbackCopy(value) {
     const area = document.createElement('textarea');

@@ -31,6 +31,7 @@ if (-not (Test-Path -LiteralPath $SourceManifest)) {
 
 $base = $BaseUrl.TrimEnd('/')
 $taskpaneUrl = "$base/taskpane.html?v=$AssetVersion"
+$icon16Url = "$base/assets/icon-16.png"
 $icon32Url = "$base/assets/icon-32.png"
 $icon80Url = "$base/assets/icon-80.png"
 
@@ -60,7 +61,7 @@ Set-DefaultValue $manifest $ns "/o:OfficeApp/o:HighResolutionIconUrl" $icon80Url
 Set-DefaultValue $manifest $ns "/o:OfficeApp/o:SupportUrl" $SupportUrl
 Set-DefaultValue $manifest $ns "/o:OfficeApp/o:DefaultSettings/o:SourceLocation" $taskpaneUrl
 
-Set-DefaultValue $manifest $ns "//bt:Image[@id='Icon.16x16']" $icon32Url
+Set-DefaultValue $manifest $ns "//bt:Image[@id='Icon.16x16']" $icon16Url
 Set-DefaultValue $manifest $ns "//bt:Image[@id='Icon.32x32']" $icon32Url
 Set-DefaultValue $manifest $ns "//bt:Image[@id='Icon.80x80']" $icon80Url
 Set-DefaultValue $manifest $ns "//bt:Url[@id='Taskpane.Url']" $taskpaneUrl

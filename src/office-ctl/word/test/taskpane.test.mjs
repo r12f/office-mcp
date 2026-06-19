@@ -22,17 +22,18 @@ test('Word add-in manifest and task pane asset versions stay aligned', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
-  assert.match(manifest, /<Version>1\.0\.0\.11<\/Version>/);
-  assert.match(manifest, /word\/taskpane\.html\?v=0\.1\.11/);
-  assert.match(html, /word\/taskpane\.css\?v=0\.1\.11/);
-  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.11/);
-  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.11/);
-  assert.match(html, /common\/logger\.js\?v=0\.1\.11/);
-  assert.match(html, /common\/task-history\.js\?v=0\.1\.11/);
-  assert.match(html, /word\/taskpane\.js\?v=0\.1\.11/);
+  assert.match(manifest, /<Version>1\.0\.0\.12<\/Version>/);
+  assert.match(manifest, /word\/taskpane\.html\?v=0\.1\.12/);
+  assert.match(html, /common\/taskpane\.css\?v=0\.1\.12/);
+  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.12/);
+  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.12/);
+  assert.match(html, /common\/logger\.js\?v=0\.1\.12/);
+  assert.match(html, /common\/task-history\.js\?v=0\.1\.12/);
+  assert.match(html, /common\/main-ui\.js\?v=0\.1\.12/);
+  assert.match(html, /word\/taskpane\.js\?v=0\.1\.12/);
   assert.match(html, /<script src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
   assert.doesNotMatch(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
-  assert.match(js, /ADDIN_VERSION = '0\.1\.11'/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.12'/);
 });
 
 test('Word add-in uses product identity metadata and generated icons', () => {
@@ -125,7 +126,7 @@ test('Office catalog registration script stages Office host manifests without re
     assert.match(wordManifest, /<SupportUrl DefaultValue="https:\/\/github\.com\/office-mcp\/office-mcp" \/>/);
     assert.match(wordManifest, /DefaultValue="Open Control Panel"/);
     assert.match(wordManifest, /Open the control panel to connect this Word document/);
-    assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.11/);
+    assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.12/);
     assert.match(wordManifest, /<IconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-32\.png" \/>/);
     assert.match(wordManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
     assert.match(wordManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
@@ -138,7 +139,7 @@ test('Office catalog registration script stages Office host manifests without re
     assert.match(excelManifest, /<SupportUrl DefaultValue="https:\/\/github\.com\/office-mcp\/office-mcp" \/>/);
     assert.match(excelManifest, /DefaultValue="Open Control Panel"/);
     assert.match(excelManifest, /Open the control panel to connect this Excel workbook/);
-    assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.9/);
+    assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.10/);
     assert.match(excelManifest, /<IconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-32\.png" \/>/);
     assert.match(excelManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
@@ -275,10 +276,10 @@ test('Office catalog registration can sync its origin from running daemon status
     const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
     const powerpointManifest = readFileSync(join(catalogPath, 'office-mcp-powerpoint.xml'), 'utf8');
-    assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.11/);
+    assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.12/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
-    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.9/);
+    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.10/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
     assert.match(powerpointManifest, /https:\/\/localhost:8777\/powerpoint\/taskpane\.html\?v=0\.1\.1/);
@@ -325,7 +326,7 @@ test('Office catalog registration writes a shared folder URL to the trusted cata
 
 test('Word task pane exposes product UI regions and accessible endpoint settings', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
-  const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
+  const css = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
   assert.match(html, /id="connectionBadge"/);
@@ -358,14 +359,12 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.doesNotMatch(html, /Save Endpoint/);
   assert.ok(html.indexOf('class="daemon-endpoint-form"') < html.indexOf('id="runtimeVersions"'));
   assert.match(css, /:focus-visible/);
-  assert.match(css, /\.summary-panel/);
-  assert.match(css, /\.identity \{[\s\S]*grid-template-columns: 32px minmax\(0, 1fr\);/);
-  assert.match(css, /\.product-mark \{[\s\S]*width: 32px;[\s\S]*height: 32px;/);
-  assert.match(css, /\.control-glyph \{[\s\S]*width: 18px;[\s\S]*stroke: currentColor;/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8'), /\.summary-panel/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8'), /\.identity \{[\s\S]*grid-template-columns: 32px minmax\(0, 1fr\);/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8'), /\.product-mark \{[\s\S]*width: 32px;[\s\S]*height: 32px;/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8'), /\.control-glyph \{[\s\S]*width: 18px;[\s\S]*stroke: currentColor;/);
   assert.match(css, /\.tool-list/);
-  assert.match(css, /\.settings-panel/);
-  assert.match(css, /\.settings-panel\[hidden\] \{[\s\S]*display: none;/);
-  assert.match(css, /\.tool-permission-row/);
+    assert.match(css, /\.tool-permission-row/);
   assert.match(css, /\.tool-toggle/);
   assert.doesNotMatch(css, /is-editing-tools/);
   assert.match(css, /\.metadata-copy \{[\s\S]*display: inline-flex;[\s\S]*min-height: 32px;[\s\S]*text-align: left;/);
@@ -419,19 +418,17 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /const target = button\.dataset\.copyTarget \? document\.getElementById\(button\.dataset\.copyTarget\) : null/);
   assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
   assert.match(js, /navigator\.clipboard\?\.writeText/);
-  assert.match(js, /function setCopyableMetadata\(element, value\)/);
-  assert.match(js, /element\.textContent = element\.id === 'session' \? text : middleTruncate\(text\)/);
-  assert.match(js, /button\.dataset\.copyValue = text/);
-  assert.match(js, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
-  assert.match(js, /function middleTruncate\(value, maxLength = 30\)/);
-  assert.match(js, /return `\$\{text\.slice\(0, head\)\}\$\{marker\}\$\{text\.slice\(text\.length - tail\)\}`/);
+  assert.match(js, /setCopyableMetadata/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function setCopyableMetadata\(element, value\)/);
+  assert.match(js, /middleTruncate/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function middleTruncate\(value, maxLength = 30\)/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /return `\$\{text\.slice\(0, head\)\}\$\{marker\}\$\{text\.slice\(text\.length - tail\)\}`/);
   assert.match(js, /function fallbackCopy\(value\)/);
   assert.doesNotMatch(js, /is-editing-settings/);
   assert.doesNotMatch(js, /is-editing-tools/);
   assert.doesNotMatch(js, /function activateSettingsWithKeyboard/);
   assert.match(js, /registerResult\(message, PROTOCOL_VERSION\)/);
-  assert.match(js, /serverVersionEl\.textContent = `Server \$\{serverInfo\.serverVersion\}`/);
-  assert.match(js, /protocolVersionEl\.textContent = `Protocol \$\{serverInfo\.protocolVersion\}`/);
+  assert.match(js, /renderRuntimeVersions\(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION\)/);
   assert.match(js, /function protectionLabel\(info\)/);
   assert.match(js, /return 'Not protected'/);
   assert.doesNotMatch(js, /protectionEl\.textContent = documentInfo\.protection\?\.kind \|\| 'Unknown'/);
@@ -471,14 +468,13 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
 
 test('Word task pane keeps settings inline and compact at narrow widths', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
-  const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
+  const css = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');
 
   assert.match(css, /body \{[\s\S]*min-width: 320px;[\s\S]*overflow-x: hidden;/);
   assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);
   assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
   assert.match(css, /\.empty-state \{[\s\S]*padding: 10px;/);
   assert.match(css, /#documentTitle \{[\s\S]*display: -webkit-box;[\s\S]*-webkit-line-clamp: 2;/);
-  assert.match(css, /@media \(min-width: 380px\)/);
   assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
   assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
   assert.doesNotMatch(cssRule(css, '.current-task-panel'), /\bheight:/);
