@@ -6,8 +6,13 @@ $('resultFilter').addEventListener('change', (event) => { state.result = event.t
 $('clearInspector').addEventListener('click', () => { $('inspector').textContent = 'Select a row.'; announce('Inspector cleared'); });
 
 document.addEventListener('click', async (event) => {
-  const copy = event.target.closest('[data-copy]');
-  if (copy) await copyText($(copy.dataset.copy).textContent, copy);
+  const copy = event.target.closest('[data-copy], [data-copy-value]');
+  if (copy) {
+    event.stopPropagation();
+    const value = copy.dataset.copyValue || $(copy.dataset.copy)?.textContent;
+    await copyText(value, copy);
+    return;
+  }
   const toggle = event.target.closest('[data-document-toggle]');
   if (toggle) toggleDocument(toggle.dataset.documentToggle);
   const inspect = event.target.closest('[data-inspect]');
@@ -78,7 +83,7 @@ function renderDocuments(groups) {
       const connection = documentConnectionLabel(doc.status);
       const expanded = state.expandedDocuments.has(doc.session_id);
       const detailId = `document-detail-${safeId(doc.session_id)}`;
-      rows.push(`<button class="row ${esc(app)}" type="button" data-key-activate data-document-toggle="${esc(doc.session_id)}" data-inspect='${attr(doc)}' aria-expanded="${expanded}" aria-controls="${detailId}"><strong>${esc(label)}</strong><span>${esc(connection)} | ${esc(doc.session_id)}</span><span class="meta">${expanded ? 'Hide details' : 'Show details'} | ${esc(doc.host?.version || '-')} | ${esc(doc.available_tool_count || 0)} tools | queue ${esc(doc.queue_depth || 0)}</span></button>`);
+      rows.push(`<button class="row ${esc(app)}" type="button" data-key-activate data-document-toggle="${esc(doc.session_id)}" data-inspect='${attr(doc)}' aria-expanded="${expanded}" aria-controls="${detailId}"><strong>${esc(label)}</strong><span>${esc(connection)} | ${copyableId(doc.session_id, 'Copy session ID')}</span><span class="meta">${expanded ? 'Hide details' : 'Show details'} | ${esc(doc.host?.version || '-')} | ${esc(doc.available_tool_count || 0)} tools | queue ${esc(doc.queue_depth || 0)}</span></button>`);
       rows.push(renderDocumentHistory(doc.session_id, documentCommandHistory[doc.session_id] || [], expanded, detailId));
     }
   }
@@ -88,7 +93,7 @@ function renderDocuments(groups) {
 function renderDocumentHistory(sessionId, commands, expanded, detailId) {
   const hidden = expanded ? '' : ' hidden';
   if (!commands.length) return `<div id="${detailId}" class="doc-history" aria-label="Command history for ${esc(sessionId)}"${hidden}>${emptyState('No recent commands for this document', 'Completed commands for this document appear here.')}</div>`;
-  const rows = commands.slice(0, 10).map((command) => `<button class="history-row" type="button" data-inspect='${attr(command)}'><span><strong>${esc(command.tool)}</strong><small>${esc(relative(command.completed_at || command.started_at))}</small></span><span class="pill ${tone(command.status)}">${esc(title(command.status))}</span><small>${esc(command.error?.office_mcp_code || '')}</small></button>`).join('');
+  const rows = commands.slice(0, 10).map((command) => `<button class="history-row" type="button" data-inspect='${attr(command)}'><span><strong>${esc(command.tool)}</strong><small>${copyableId(command.command_id || command.mcp_request_id, 'Copy command ID')} | ${esc(relative(command.completed_at || command.started_at))}</small></span><span class="pill ${tone(command.status)}">${esc(title(command.status))}</span><small>${esc(command.error?.office_mcp_code || '')}</small></button>`).join('');
   return `<div id="${detailId}" class="doc-history" aria-label="Command history for ${esc(sessionId)}"${hidden}>${rows}</div>`;
 }
 
@@ -101,7 +106,7 @@ function renderCommands(target, commands, running) {
     $(target).innerHTML = running ? emptyState('No command is running', 'New tool calls appear here while they are in flight.') : emptyState('No command history yet', 'Completed, failed, cancelled, and timed-out commands appear here.');
     return;
   }
-  const rows = commands.map((command) => `<tr tabindex="0" role="button" aria-label="Inspect ${esc(command.tool)} ${esc(title(command.status))}" data-key-activate data-inspect='${attr(command)}'><td><strong>${esc(command.tool)}</strong><br><small>${esc(command.session_id || '-')}</small></td><td>${esc(command.client_name || command.client_id || '-')}</td><td><span class="pill ${tone(command.status)}">${esc(title(command.status))}</span></td><td>${running ? duration(Date.now() - (command.started_at || Date.now())) : duration(command.elapsed_ms || 0)}</td><td>${esc(command.error?.office_mcp_code || '')}<br><small>${esc(command.error?.message || '')}</small></td></tr>`).join('');
+  const rows = commands.map((command) => `<tr tabindex="0" role="button" aria-label="Inspect ${esc(command.tool)} ${esc(title(command.status))}" data-key-activate data-inspect='${attr(command)}'><td><strong>${esc(command.tool)}</strong><br><small>${copyableId(command.command_id || command.mcp_request_id, 'Copy command ID')} / ${copyableId(command.session_id, 'Copy session ID')}</small></td><td>${esc(command.client_name || command.client_id || '-')}</td><td><span class="pill ${tone(command.status)}">${esc(title(command.status))}</span></td><td>${running ? duration(Date.now() - (command.started_at || Date.now())) : duration(command.elapsed_ms || 0)}</td><td>${esc(command.error?.office_mcp_code || '')}<br><small>${esc(command.error?.message || '')}</small></td></tr>`).join('');
   $(target).innerHTML = `<table><thead><tr><th>Tool</th><th>Client</th><th>Status</th><th>Time</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -117,6 +122,22 @@ async function copyText(text, button) {
 function emptyState(titleText, bodyText, codeText) {
   const code = codeText ? `<code>${esc(codeText)}</code>` : '';
   return `<p class="empty"><strong>${esc(titleText)}</strong>${esc(bodyText)}${code}</p>`;
+}
+
+function copyableId(value, label) {
+  const text = String(value || '-');
+  if (text === '-') return '-';
+  return `<button type="button" class="id-copy" data-copy-value="${esc(text)}" aria-label="${esc(label)}" title="${esc(text)}"><code>${esc(middleTruncate(text))}</code></button>`;
+}
+
+function middleTruncate(value, maxLength = 30) {
+  const text = String(value || '');
+  if (text.length <= maxLength) return text;
+  const marker = '...';
+  const available = maxLength - marker.length;
+  const head = Math.ceil(available / 2);
+  const tail = Math.floor(available / 2);
+  return `${text.slice(0, head)}${marker}${text.slice(text.length - tail)}`;
 }
 
 function fallbackCopy(text) {
