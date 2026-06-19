@@ -396,6 +396,41 @@ Latest visible-build feedback to carry into the next implementation goal:
   icon, non-native menu, webview/CSS popup, toolkit-demo surface, or prototype
   wording keeps the tray task open.
 
+Current reported issues to carry as TODO requirements:
+
+- The logo needs another design-quality pass, not only an asset-generation pass.
+  It must avoid Office logos and near-logo shapes, but it still needs a clear
+  office-and-control feeling with a mature, futuristic product tone.
+- The add-in title, icon, and visible type/category must be corrected together.
+  These fields are one first-contact surface and must make Word, Excel, and
+  PowerPoint look like finished software rather than a test add-in or prototype.
+- The tray must be corrected as a native Windows product surface. It needs the
+  accepted product icon, product tooltip, OS-native right-click menu, native menu
+  behavior, and native quit confirmation; custom/web-styled menus are blockers.
+
+- [ ] Redesign or re-approve the logo from the current visible user surfaces.
+      The review must answer the user's current complaint directly: the logo
+      cannot use Office logos, but it must still visibly communicate office
+      productivity and control with a mature, slightly futuristic feel. Passing
+      generated-asset tests is not enough. If the icon reads as a generic add-in,
+      settings mark, debug badge, placeholder tile, AI decoration, or legally
+      distinct but weak office-control metaphor at tray/ribbon/catalog sizes,
+      redesign the source mark and regenerate the asset set before closing this
+      item.
+- [ ] Rework the add-in title, icon, and visible type/category as one mature
+      installed-software surface for Word, Excel, and PowerPoint. The catalog
+      card, ribbon command, task pane chrome, provider, description, and
+      generated catalog metadata must all present `Office MCP Control` as a
+      finished local productivity/control product. Generic `Add-in`/`Task Pane`
+      type text, default/missing icons, raw MCP/protocol wording, host package
+      names, or experimental sideload presentation keep this item open.
+- [ ] Rework the tray first impression until it looks native and product-grade
+      in a normal Windows daemon launch. The tray must show the accepted product
+      glyph, product tooltip, OS-native right-click menu anchored to the visible
+      notification-area icon, native separators/disabled rows, keyboardable menu
+      behavior, and native quit confirmation. A custom-drawn, webview, CSS,
+      frameless, or toolkit-demo-looking menu fails this item even when actions
+      work.
 - [x] Run a full product logo concept pass before accepting the final mark. The
       pass must produce multiple original concept directions that communicate
       office productivity plus local control without Office-owned marks, Office
