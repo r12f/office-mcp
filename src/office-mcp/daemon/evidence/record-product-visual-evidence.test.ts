@@ -116,7 +116,7 @@ test('README manual tray evidence command matches current native tray gates', ()
   }
 });
 
-test('README product visual evidence command matches current PowerPoint gates', () => {
+test('README product visual evidence command matches current product visual gates', () => {
   const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
   const commandLine = readme.split('\n').find((line) => line.includes('npm run evidence:record-product-visual')) ?? '';
   const catalogIdentityLine = readme.split('\n').find((line) => line.includes('record-catalog-identity-review.mjs')) ?? '';
@@ -140,6 +140,11 @@ test('README product visual evidence command matches current PowerPoint gates', 
     '--powerpoint-first-run-identity-reviewed',
     '--tray-product-polish-reviewed',
     '--tray-normal-windows-launch-reviewed',
+    '--word-compact-top-block',
+    '--word-tools-permissions-merged',
+    '--word-inline-settings',
+    '--word-server-protocol-row',
+    '--word-document-state',
     '--excel-compact-top-block',
     '--excel-tools-permissions-merged',
     '--excel-inline-settings',
