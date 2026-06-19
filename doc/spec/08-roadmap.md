@@ -408,6 +408,21 @@ Current reported issues to carry as TODO requirements:
   accepted product icon, product tooltip, OS-native right-click menu, native menu
   behavior, and native quit confirmation; custom/web-styled menus are blockers.
 
+Latest current-build feedback to carry as TODO requirements:
+
+- Design or materially refine the logo so it clearly says future office control:
+  office/document work under explicit user control, using precise layered panes,
+  routing/command geometry, and an operator affordance. It must not use Office
+  logos, Office app tiles, Microsoft 365 color ownership, host-app silhouettes,
+  gear-only symbolism, debug/terminal motifs, or decorative AI/neon styling.
+- Re-audit the add-in first-run surface from the user's point of view. The
+  title, icon, provider, description, ribbon command, task pane chrome, and
+  catalog-visible type/category must look like mature software, not an Office
+  scaffold or experimental sideload.
+- Re-audit the tray from a normal Windows launch. The tray must have the final
+  product icon and an OS-native right-click menu. A missing/default icon or a
+  custom/web-styled menu keeps the tray work open even if automated probes pass.
+
 Current screenshot feedback to preserve for the next implementation goal:
 
 - Redesign or materially refine the logo as a product-design deliverable. The
@@ -437,6 +452,14 @@ Current screenshot feedback to preserve for the next implementation goal:
       real add-in catalog, ribbon, task pane chrome, tray, installer, and daemon
       title-bar surfaces or in release-equivalent rendered evidence tied to the
       current asset fingerprints.
+- [ ] Produce and review a new future-office-control logo direction if the
+      current mark still feels generic in the latest visible surfaces. The
+      design must communicate office productivity plus deliberate control
+      without using Office logos, Office-like tiles, Microsoft app-color
+      ownership, host-app silhouettes, gear-only settings symbols, terminal or
+      debug motifs, or decorative AI/neon effects. The accepted mark must be
+      judged at tray, ribbon, catalog, task-pane, daemon title-bar, and
+      installer sizes before implementation closes this item.
 - [ ] Rework the add-in title, icon, and visible type/category as one mature
       installed-software surface for Word, Excel, and PowerPoint. The catalog
       card, ribbon command, task pane chrome, provider, description, and
@@ -447,6 +470,13 @@ Current screenshot feedback to preserve for the next implementation goal:
       install/catalog scripts must be fixed as part of this item if any host
       catalog disappears, points to stale assets, or renders the wrong title,
       icon, provider, description, or type/category after reinstall.
+- [ ] Re-audit and correct the add-in first-contact package after a clean
+      install. `DisplayName`, visible catalog title, icon, provider, short
+      description, ribbon group, primary command, task pane title/chrome, and
+      catalog-visible type/category must be reviewed as one surface. The result
+      must look like a finished local productivity/control product, not a
+      default Office task-pane add-in, generic `Add-in`, experimental sideload,
+      raw MCP/protocol bridge, or half-finished package.
 - [ ] Rework the tray first impression until it looks native and product-grade
       in a normal Windows daemon launch. The tray must show the accepted product
       glyph, product tooltip, OS-native right-click menu anchored to the visible
@@ -456,6 +486,13 @@ Current screenshot feedback to preserve for the next implementation goal:
       work. This item cannot close from `tray --probe` alone; it requires live
       interactive Windows evidence showing the icon and native menu opened from
       that exact notification-area icon.
+- [ ] Rework the tray icon/menu implementation until a normal Windows launch
+      looks native and installed. The notification area must show the final
+      product glyph, and right-click must open a real OS-native menu from that
+      icon. A missing icon, default/framework icon, blank square, custom-drawn
+      menu, webview/HTML/CSS popup, frameless utility panel, toolkit demo menu,
+      or non-native-looking menu keeps this item open regardless of functional
+      menu actions.
 - [x] Run a full product logo concept pass before accepting the final mark. The
       pass must produce multiple original concept directions that communicate
       office productivity plus local control without Office-owned marks, Office
