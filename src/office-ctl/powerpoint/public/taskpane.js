@@ -691,11 +691,33 @@
         await context.sync();
         return { action, shape_id: shapeId, deleted: true };
       }
-      if (action === 'bring_to_front' && typeof shape.setZOrder === 'function') shape.setZOrder('bringToFront');
-      else if (action === 'send_to_back' && typeof shape.setZOrder === 'function') shape.setZOrder('sendToBack');
-      else if (!['set_properties', 'bring_to_front', 'send_to_back'].includes(action)) throw invalidArgument(`Unsupported powerpoint.update_shape action ${action}.`);
+      if (action === 'group') {
+        requireRequirementSet('PowerPointApi', '1.8', 'shape grouping');
+        if (!Array.isArray(args.shape_ids) || args.shape_ids.length < 2) throw invalidArgument('powerpoint.update_shape group requires at least two shape_ids.');
+        if (typeof slide.shapes.addGroup !== 'function') throw hostCapabilityUnavailable('Shape grouping is not available in this PowerPoint host.');
+        const grouped = slide.shapes.addGroup(args.shape_ids);
+        grouped.load('id,name,type,left,top,width,height,rotation,zOrderPosition');
+        slide.load('id,index');
+        await context.sync();
+        return { action, slide_id: slide.id, slide_index: slide.index, shape: shapeMetadata(grouped), grouped_shape_ids: args.shape_ids.map(String) };
+      }
+      if (action === 'ungroup') {
+        requireRequirementSet('PowerPointApi', '1.8', 'shape grouping');
+        if (!shape.group || typeof shape.group.ungroup !== 'function') throw hostCapabilityUnavailable('Shape ungrouping is not available for this shape or host.');
+        shape.load('id');
+        await context.sync();
+        const shapeId = shape.id;
+        shape.group.ungroup();
+        await context.sync();
+        return { action, shape_id: shapeId, ungrouped: true };
+      }
+      if (['bring_forward', 'bring_to_front', 'send_backward', 'send_to_back'].includes(action)) {
+        requireRequirementSet('PowerPointApi', '1.8', 'shape z-order updates');
+        if (typeof shape.setZOrder !== 'function') throw hostCapabilityUnavailable('Shape z-order updates are not available in this PowerPoint host.');
+        shape.setZOrder(shapeZOrderAction(action));
+      } else if (action !== 'set_properties') throw invalidArgument(`Unsupported powerpoint.update_shape action ${action}.`);
       applyShapeProperties(shape, args);
-      shape.load('id,name,type,left,top,width,height,rotation');
+      shape.load('id,name,type,left,top,width,height,rotation,altTextTitle,altTextDescription,isDecorative,visible,zOrderPosition');
       slide.load('id,index');
       await context.sync();
       return { action, slide_id: slide.id, slide_index: slide.index, shape: shapeMetadata(shape) };
@@ -770,6 +792,7 @@
       shape.load('id,table/rowCount,table/columnCount,table/values');
       await context.sync();
       if (!shape.table) throw invalidArgument('Target shape is not a table.');
+      const table = shape.table;
       const action = String(args.action || 'set_values').toLowerCase();
       if (action === 'delete') {
         const shapeId = shape.id;
@@ -777,8 +800,42 @@
         await context.sync();
         return { action, shape_id: shapeId, deleted: true };
       }
-      if (action === 'set_values') applyTableValues(shape.table, args.values || []);
-      else if (action !== 'style') throw invalidArgument(`Unsupported powerpoint.update_table action ${action}.`);
+      if (action === 'set_values') applyTableValues(table, args.values || []);
+      else if (action === 'set_cell') tableCell(table, requiredInteger(args, 'row_index', 'powerpoint.update_table set_cell requires row_index.'), requiredInteger(args, 'column_index', 'powerpoint.update_table set_cell requires column_index.')).text = String(args.value ?? '');
+      else if (action === 'add_rows') {
+        requireRequirementSet('PowerPointApi', '1.9', 'table structural updates');
+        table.rows.add(optionalInteger(args.row_index, null), positiveInteger(args.count, 1));
+      } else if (action === 'delete_rows') {
+        requireRequirementSet('PowerPointApi', '1.9', 'table structural updates');
+        table.rows.deleteRows(indexedItems(table.rows, args.row_indices, 'row_indices'));
+      } else if (action === 'add_columns') {
+        requireRequirementSet('PowerPointApi', '1.9', 'table structural updates');
+        table.columns.add(optionalInteger(args.column_index, null), positiveInteger(args.count, 1));
+      } else if (action === 'delete_columns') {
+        requireRequirementSet('PowerPointApi', '1.9', 'table structural updates');
+        table.columns.deleteColumns(indexedItems(table.columns, args.column_indices, 'column_indices'));
+      } else if (action === 'merge_cells') {
+        requireRequirementSet('PowerPointApi', '1.9', 'table structural updates');
+        table.mergeCells(
+          requiredInteger(args, 'row_index', 'powerpoint.update_table merge_cells requires row_index.'),
+          requiredInteger(args, 'column_index', 'powerpoint.update_table merge_cells requires column_index.'),
+          positiveInteger(args.row_count, 1),
+          positiveInteger(args.column_count, 1)
+        );
+      } else if (action === 'split_cell') {
+        requireRequirementSet('PowerPointApi', '1.9', 'table structural updates');
+        const rowIndex = requiredInteger(args, 'row_index', 'powerpoint.update_table split_cell requires row_index.');
+        const columnIndex = requiredInteger(args, 'column_index', 'powerpoint.update_table split_cell requires column_index.');
+        tableCell(table, rowIndex, columnIndex).split(positiveInteger(args.row_count, 1), positiveInteger(args.column_count, 1));
+      } else if (action === 'clear') {
+        requireRequirementSet('PowerPointApi', '1.9', 'table structural updates');
+        table.clear(tableClearOptions(args));
+      } else if (action === 'style') {
+        requireRequirementSet('PowerPointApi', '1.9', 'table structural updates');
+        applyTableStyle(table, args);
+      } else throw invalidArgument(`Unsupported powerpoint.update_table action ${action}.`);
+      await context.sync();
+      table.load('rowCount,columnCount,values');
       await context.sync();
       return { action, table: tableMetadata(shape) };
     });
@@ -905,6 +962,11 @@
       width: numberOrNull(shape.width),
       height: numberOrNull(shape.height),
       rotation: numberOrNull(shape.rotation),
+      alt_text_title: shape.altTextTitle || null,
+      alt_text_description: shape.altTextDescription || null,
+      is_decorative: typeof shape.isDecorative === 'boolean' ? shape.isDecorative : null,
+      visible: typeof shape.visible === 'boolean' ? shape.visible : null,
+      z_order_position: numberOrNull(shape.zOrderPosition),
       has_text: Boolean(shape.textFrame?.hasText),
       text_preview: shape.textFrame?.hasText ? String(shape.textFrame.textRange?.text || '').slice(0, 200) : null,
       has_table: Boolean(shape.table)
@@ -927,10 +989,27 @@
     }
     const name = stringArg(args, 'name');
     if (name) shape.name = name;
+    if (args.alt_text_title !== undefined || args.alt_text_description !== undefined || args.is_decorative !== undefined || args.visible !== undefined) {
+      requireRequirementSet('PowerPointApi', '1.10', 'shape accessibility and visibility updates');
+      if (args.alt_text_title !== undefined) shape.altTextTitle = String(args.alt_text_title ?? '');
+      if (args.alt_text_description !== undefined) shape.altTextDescription = String(args.alt_text_description ?? '');
+      if (args.is_decorative !== undefined) shape.isDecorative = Boolean(args.is_decorative);
+      if (args.visible !== undefined) shape.visible = Boolean(args.visible);
+    }
     const fillColor = stringArg(args, 'fill_color');
+    if (args.clear_fill === true && shape.fill?.clear) shape.fill.clear();
     if (fillColor && shape.fill?.setSolidColor) shape.fill.setSolidColor(fillColor);
+    const fillTransparency = numberOrNull(args.fill_transparency);
+    if (fillTransparency !== null && shape.fill) shape.fill.transparency = fillTransparency;
     const lineColor = stringArg(args, 'line_color');
     if (lineColor && shape.lineFormat?.color !== undefined) shape.lineFormat.color = lineColor;
+    const lineWeight = numberOrNull(args.line_weight);
+    if (lineWeight !== null && shape.lineFormat) shape.lineFormat.weight = lineWeight;
+    const lineDashStyle = stringArg(args, 'line_dash_style');
+    if (lineDashStyle && shape.lineFormat) shape.lineFormat.dashStyle = lineDashStyle;
+    const lineTransparency = numberOrNull(args.line_transparency);
+    if (lineTransparency !== null && shape.lineFormat) shape.lineFormat.transparency = lineTransparency;
+    if (args.line_visible !== undefined && shape.lineFormat) shape.lineFormat.visible = Boolean(args.line_visible);
   }
 
   function applyTextFormat(textRange, args) {
@@ -952,10 +1031,53 @@
     for (let row = 0; row < values.length; row += 1) {
       if (!Array.isArray(values[row])) throw invalidArgument('Table values must be a two-dimensional array.');
       for (let column = 0; column < values[row].length; column += 1) {
-        const cell = table.getCell(row, column);
-        cell.value = values[row][column] == null ? '' : String(values[row][column]);
+        const cell = tableCell(table, row, column);
+        cell.text = values[row][column] == null ? '' : String(values[row][column]);
       }
     }
+  }
+
+  function tableCell(table, row, column) {
+    if (typeof table.getCellOrNullObject === 'function') return table.getCellOrNullObject(row, column);
+    if (typeof table.getCell === 'function') return table.getCell(row, column);
+    throw hostCapabilityUnavailable('Table cell access is not available in this PowerPoint host.');
+  }
+
+  function indexedItems(collection, indices, key) {
+    if (!Array.isArray(indices) || indices.length === 0) throw invalidArgument(`powerpoint.update_table requires ${key}.`);
+    return indices.map((value) => collection.getItemAt(Number(value)));
+  }
+
+  function tableClearOptions(args) {
+    if (args.all !== undefined || args.text !== undefined || args.format !== undefined) {
+      return { all: Boolean(args.all), text: Boolean(args.text), format: Boolean(args.format) };
+    }
+    return { text: true };
+  }
+
+  function applyTableStyle(table, args) {
+    if (!table.styleSettings) throw hostCapabilityUnavailable('Table style settings are not available in this PowerPoint host.');
+    const style = stringArg(args, 'style');
+    if (style) table.styleSettings.style = style;
+    for (const [argKey, property] of [
+      ['banded_rows', 'areRowsBanded'],
+      ['banded_columns', 'areColumnsBanded'],
+      ['first_row', 'isFirstRowHighlighted'],
+      ['last_row', 'isLastRowHighlighted'],
+      ['first_column', 'isFirstColumnHighlighted'],
+      ['last_column', 'isLastColumnHighlighted']
+    ]) {
+      if (args[argKey] !== undefined) table.styleSettings[property] = Boolean(args[argKey]);
+    }
+  }
+
+  function shapeZOrderAction(action) {
+    return ({
+      bring_forward: 'BringForward',
+      bring_to_front: 'BringToFront',
+      send_backward: 'SendBackward',
+      send_to_back: 'SendToBack'
+    })[action];
   }
 
   function shapeTypeFrom(value) {
@@ -1040,6 +1162,13 @@
     const value = Number(args?.[key]);
     if (!Number.isInteger(value)) throw invalidArgument(message);
     return value;
+  }
+
+  function optionalInteger(value, fallback) {
+    if (value === undefined || value === null || value === '') return fallback;
+    const number = Number(value);
+    if (!Number.isInteger(number)) throw invalidArgument('Optional integer argument must be an integer.');
+    return number;
   }
 
   function stringArg(args, key) {

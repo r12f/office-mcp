@@ -1474,47 +1474,48 @@ PowerPoint Designer, and macros.
       deck save tool because stable typings do not expose one, keeps slide
       move/export at `PowerPointApi 1.8`, applies layout at `PowerPointApi 1.8`,
       and reserves table operations for `PowerPointApi 1.8/1.9`.
-- [ ] Verify every planned PowerPoint tool's minimum `PowerPointApi` or Common
+- [x] Verify every planned PowerPoint tool's minimum `PowerPointApi` or Common
       API requirement set against the local `@types/office-js` baseline and the
-      relevant Microsoft API docs before implementation. Replace any remaining
-      host-gated or verify-during-implementation notes with exact gates or mark
-      the tool unadvertised.
-- [ ] Update daemon catalog and MCP `tools/list` from the current 5-tool
+      relevant Microsoft API docs before implementation. The implementation now
+      gates PowerPointApi 1.3/1.4/1.5/1.8/1.9/1.10 and Common API export/view
+      paths explicitly, returning `HOST_CAPABILITY_UNAVAILABLE` where the live
+      host lacks the required object model.
+- [x] Update daemon catalog and MCP `tools/list` from the current 5-tool
       PowerPoint runtime surface to the refined 25-tool surface. Remove
       `powerpoint.export_pdf` from the advertised catalog after
       `powerpoint.export_file` is implemented and covered.
-- [ ] Update the PowerPoint task pane `AVAILABLE_TOOLS`, permission grouping,
+- [x] Update the PowerPoint task pane `AVAILABLE_TOOLS`, permission grouping,
       metadata descriptions, category toggles, per-tool toggles, and
       `session.updated.available_tools` behavior so the UI exposes the same
       Presentation, Metadata, Slides, Layout, Selection, Shapes, Text, and
       Tables categories as the spec.
-- [ ] Implement Presentation and Metadata slice:
+- [x] Implement Presentation and Metadata slice:
       `powerpoint.get_presentation_info`, `powerpoint.get_active_view`,
       `powerpoint.export_file`, and `powerpoint.update_tags`. Do not implement
       a deck save tool unless stable PowerPoint save support is proven first.
-- [ ] Implement Slide and Layout slice: `powerpoint.list_slides`, extend
+- [x] Implement Slide and Layout slice: `powerpoint.list_slides`, extend
       `powerpoint.add_slide` as needed, add `powerpoint.update_slide`,
       `powerpoint.delete_slide`, `powerpoint.move_slide`,
       `powerpoint.export_slide`, `powerpoint.list_layouts`, and keep
       `powerpoint.apply_layout` aligned with its verified `PowerPointApi 1.8`
       requirement.
-- [ ] Implement Selection and Shape slice: `powerpoint.get_selection`,
+- [x] Implement Selection and Shape slice: `powerpoint.get_selection`,
       `powerpoint.set_selection`, `powerpoint.list_shapes`,
       `powerpoint.add_text_box`, `powerpoint.add_shape`, improve
       `powerpoint.insert_image` to a shape-owned implementation where host APIs
       support it, and add `powerpoint.update_shape` as the single owner for
       shape position, size, rotation, fill, line, z-order, grouping, alt text,
       and deletion.
-- [ ] Implement Text slice: `powerpoint.read_text`, refine
+- [x] Implement Text slice: `powerpoint.read_text`, refine
       `powerpoint.replace_text`, and add `powerpoint.format_text`. Do not add
       separate title, subtitle, body, placeholder, or selected-text mutation
       tools; text inside shapes belongs to the Text tools.
-- [ ] Implement Table slice: `powerpoint.add_table`, `powerpoint.read_table`,
+- [x] Implement Table slice: `powerpoint.add_table`, `powerpoint.read_table`,
       and `powerpoint.update_table` for cell values, row/column dimensions,
       add/delete rows and columns, merge cells, clear values/formatting, style
       settings, and table-shape deletion. Do not add separate row, column, or
       cell tools.
-- [ ] Add PowerPoint refinement contract tests: daemon catalog count and names,
+- [x] Add PowerPoint refinement contract tests: daemon catalog count and names,
       MCP `tools/list`, task pane available-tools metadata, grouped permission
       categories, no duplicate owner tools, no `powerpoint.save`, and no
       `powerpoint.export_pdf` after `powerpoint.export_file` lands.

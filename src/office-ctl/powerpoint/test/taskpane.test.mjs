@@ -263,6 +263,47 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   assert.doesNotMatch(js, /declared by the daemon contract but is not implemented/);
 });
 
+test('PowerPoint owner update tools cover the spec action surface', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const updateShapeBody = functionBody(js, 'updateShape');
+  const applyShapePropertiesBody = functionBody(js, 'applyShapeProperties');
+  const updateTableBody = functionBody(js, 'updateTable');
+  const applyTableValuesBody = functionBody(js, 'applyTableValues');
+  const indexedItemsBody = functionBody(js, 'indexedItems');
+
+  for (const action of ['set_properties', 'bring_forward', 'bring_to_front', 'send_backward', 'send_to_back', 'group', 'ungroup', 'delete']) {
+    assert.match(updateShapeBody, new RegExp(action), `update_shape must support ${action}`);
+  }
+  assert.match(updateShapeBody, /slide\.shapes\.addGroup\(args\.shape_ids\)/);
+  assert.match(updateShapeBody, /shape\.group\.ungroup\(\)/);
+  for (const property of ['left', 'top', 'width', 'height', 'rotation', 'alt_text_title', 'alt_text_description', 'is_decorative', 'visible']) {
+    assert.match(applyShapePropertiesBody, new RegExp(property), `update_shape must own ${property}`);
+  }
+  assert.match(applyShapePropertiesBody, /shape\.fill\.clear\(\)/);
+  assert.match(applyShapePropertiesBody, /shape\.fill\.setSolidColor\(fillColor\)/);
+  assert.match(applyShapePropertiesBody, /shape\.fill\.transparency = fillTransparency/);
+  assert.match(applyShapePropertiesBody, /shape\.lineFormat\.color = lineColor/);
+  assert.match(applyShapePropertiesBody, /shape\.lineFormat\.weight = lineWeight/);
+  assert.match(applyShapePropertiesBody, /shape\.lineFormat\.dashStyle = lineDashStyle/);
+  assert.match(applyShapePropertiesBody, /shape\.lineFormat\.transparency = lineTransparency/);
+  assert.match(applyShapePropertiesBody, /shape\.lineFormat\.visible = Boolean\(args\.line_visible\)/);
+  assert.match(applyShapePropertiesBody, /requireRequirementSet\('PowerPointApi', '1\.10', 'shape accessibility and visibility updates'\)/);
+
+  for (const action of ['set_values', 'set_cell', 'add_rows', 'delete_rows', 'add_columns', 'delete_columns', 'merge_cells', 'split_cell', 'clear', 'style', 'delete']) {
+    assert.match(updateTableBody, new RegExp(action), `update_table must support ${action}`);
+  }
+  assert.match(applyTableValuesBody, /tableCell\(table, row, column\)/);
+  assert.match(updateTableBody, /requireRequirementSet\('PowerPointApi', '1\.9', 'table structural updates'\)/);
+  assert.match(updateTableBody, /table\.rows\.add\(/);
+  assert.match(indexedItemsBody, /collection\.getItemAt\(Number\(value\)\)/);
+  assert.match(updateTableBody, /table\.columns\.add\(/);
+  assert.match(updateTableBody, /table\.columns\.deleteColumns\(indexedItems\(table\.columns/);
+  assert.match(updateTableBody, /table\.mergeCells\(/);
+  assert.match(updateTableBody, /tableCell\(table, rowIndex, columnIndex\)\.split\(/);
+  assert.match(updateTableBody, /table\.clear\(tableClearOptions\(args\)\)/);
+  assert.match(updateTableBody, /applyTableStyle\(table, args\)/);
+});
+
 test('PowerPoint task pane announces session only after successful register response', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const registerBody = functionBody(js, 'register');
