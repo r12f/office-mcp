@@ -46,50 +46,50 @@ function pixel(size, x, y) {
   const scale = size / 256;
   const px = (x + 0.5) / scale;
   const py = (y + 0.5) / scale;
-  const radius = 52;
+  const radius = 48;
   if (!roundedRect(px, py, 0, 0, 256, 256, radius)) return [0, 0, 0, 0];
 
   let color = [15, 23, 42, 255];
   if (leftPane(px, py)) color = [234, 242, 255, 255];
   if (middlePane(px, py)) color = [75, 215, 168, 255];
   if (rightPane(px, py)) color = [36, 59, 122, 255];
-  if (line(px, py, 70, 80, 119, 80, 9) || line(px, py, 70, 106, 106, 106, 9) || line(px, py, 70, 132, 118, 132, 9)) {
+  if (line(px, py, 64, 76, 130, 76, 10) || line(px, py, 64, 104, 118, 104, 10) || line(px, py, 64, 132, 128, 132, 10)) {
     color = [36, 87, 214, 255];
   }
-  if (line(px, py, 106, 102, 154, 102, 9) || line(px, py, 106, 128, 140, 128, 9) || line(px, py, 106, 154, 152, 154, 9)) {
+  if (line(px, py, 94, 104, 162, 104, 10) || line(px, py, 94, 132, 144, 132, 10) || line(px, py, 94, 160, 156, 160, 10)) {
     color = [15, 23, 42, 184];
   }
-  if (line(px, py, 146, 124, 182, 124, 9) || line(px, py, 146, 150, 172, 150, 9) || line(px, py, 146, 176, 180, 176, 9)) {
+  if (line(px, py, 124, 132, 178, 132, 10) || line(px, py, 124, 160, 160, 160, 10)) {
     color = [234, 242, 255, 235];
   }
-  if (line(px, py, 54, 198, 97, 198, 13) || line(px, py, 97, 198, 139, 180, 13) || line(px, py, 139, 180, 167, 180, 13) || line(px, py, 167, 180, 210, 152, 13) || line(px, py, 210, 152, 217, 152, 13)) {
+  if (line(px, py, 48, 199, 92, 199, 16) || line(px, py, 92, 199, 147, 173, 16) || line(px, py, 147, 173, 169, 173, 16) || line(px, py, 169, 173, 211, 152, 16) || line(px, py, 211, 152, 218, 152, 16)) {
     color = [36, 87, 214, 255];
   }
-  const firstNode = distance(px, py, 72, 198);
-  if (firstNode <= 16.5) color = [15, 23, 42, 255];
-  if (firstNode <= 9.5) color = [75, 215, 168, 255];
-  const secondNode = distance(px, py, 139, 180);
-  if (secondNode <= 16.5) color = [15, 23, 42, 255];
-  if (secondNode <= 9.5) color = [234, 242, 255, 255];
-  const controlBorder = distance(px, py, 210, 152);
-  if (controlBorder <= 35.5) color = [15, 23, 42, 255];
-  if (controlBorder <= 24.5) color = [248, 216, 74, 255];
-  if (line(px, py, 194, 152, 226, 152, 9) || line(px, py, 210, 136, 210, 168, 9) || controlBorder <= 6) {
+  const firstNode = distance(px, py, 88, 199);
+  if (firstNode <= 21) color = [15, 23, 42, 255];
+  if (firstNode <= 13) color = [75, 215, 168, 255];
+  const secondNode = distance(px, py, 147, 173);
+  if (secondNode <= 21) color = [15, 23, 42, 255];
+  if (secondNode <= 13) color = [234, 242, 255, 255];
+  const controlBorder = distance(px, py, 211, 152);
+  if (controlBorder <= 40) color = [15, 23, 42, 255];
+  if (controlBorder <= 28) color = [248, 216, 74, 255];
+  if (line(px, py, 192, 152, 230, 152, 10) || line(px, py, 211, 133, 211, 171, 10) || controlBorder <= 7) {
     color = [15, 23, 42, 255];
   }
   return color;
 }
 
 function leftPane(px, py) {
-  return roundedRect(px, py, 50, 48, 93, 116, 20);
+  return roundedRect(px, py, 46, 54, 122, 138, 22);
 }
 
 function middlePane(px, py) {
-  return roundedRect(px, py, 86, 70, 95, 118, 18);
+  return roundedRect(px, py, 74, 78, 126, 132, 22);
 }
 
 function rightPane(px, py) {
-  return roundedRect(px, py, 122, 92, 80, 112, 18);
+  return roundedRect(px, py, 102, 102, 108, 108, 22);
 }
 
 function roundedRect(px, py, x, y, width, height, radius) {

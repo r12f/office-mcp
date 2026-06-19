@@ -107,9 +107,13 @@ test('generated brand icons are original non-placeholder assets', () => {
   assert.match(svg, /#4BD7A8/);
   assert.match(svg, /#243B7A/);
   assert.match(svg, /#F8D84A/);
-  assert.match(svg, /M54 198h43c17 0 27-18 42-18h28c18 0 25-28 43-28h7/);
-  assert.match(svg, /cx="210" cy="152" r="30"/);
-  assert.match(svg, /M210 136v32/);
+  assert.match(svg, /M46 54h100/);
+  assert.match(svg, /M74 78h104/);
+  assert.match(svg, /M102 102h86/);
+  assert.match(svg, /M48 199h44c22 0 32-26 55-26h22c16 0 24-21 41-21h8/);
+  assert.match(svg, /stroke-width="16"/);
+  assert.match(svg, /cx="211" cy="152" r="34"/);
+  assert.match(svg, /M211 133v38/);
   assert.doesNotMatch(svg, /office[-_ ]?logo|word[-_ ]?logo|excel[-_ ]?logo|gear/i);
 
   for (const size of ICON_SIZES) {

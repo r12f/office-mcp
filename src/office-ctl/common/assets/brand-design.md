@@ -1,9 +1,9 @@
 # Office MCP Control Brand Mark
 
 The Office MCP Control mark represents local office automation under user
-control. The composition uses three abstract document/app panes as a compact
-control-console surface, then runs a visible command rail through operator
-nodes into a yellow control reticle. The reticle reads as a live approval and
+control. The composition uses three larger staggered abstract document/app panes
+as a compact control-console surface, then runs a heavier visible command rail
+through operator nodes into an oversized yellow control reticle. The reticle reads as a live approval and
 routing point instead of a settings gear, so the mark can stand for controlling
 live Office documents without looking like a generic preferences icon.
 
@@ -11,10 +11,11 @@ live Office documents without looking like a generic preferences icon.
 
 - Control-console panes: live Word, Excel, and PowerPoint work is present, but
   abstracted as layered productivity surfaces rather than host-specific
-  document, workbook, slide, or presentation silhouettes.
-- Command rail: the blue route with two operator nodes makes control and local
+  document, workbook, slide, or presentation silhouettes. The panes are scaled
+  up so the office-work metaphor survives tray and ribbon sizes.
+- Command rail: the heavier blue route with two operator nodes makes control and local
   command routing visible even at tray size.
-- Control reticle: the yellow reticle communicates user approval and command
+- Control reticle: the oversized yellow reticle communicates user approval and command
   control without becoming a gear icon or settings metaphor.
 - Dark shell: the dark rounded square gives the tray icon and installer icon a
   stable desktop utility silhouette at small sizes.
