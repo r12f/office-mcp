@@ -52,7 +52,9 @@
     'excel.create_table',
     'excel.update_table',
     'excel.create_chart',
-    'excel.update_chart'
+    'excel.update_chart',
+    'excel.create_pivot_table',
+    'excel.update_pivot_table'
   ];
   const TOOL_GROUPS = [
     { label: 'Workbook', tools: ['excel.get_workbook_info'] },
@@ -62,7 +64,8 @@
     { label: 'Format', tools: ['excel.format_range'] },
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
     { label: 'Table', tools: ['excel.create_table', 'excel.update_table'] },
-    { label: 'Chart', tools: ['excel.create_chart', 'excel.update_chart'] }
+    { label: 'Chart', tools: ['excel.create_chart', 'excel.update_chart'] },
+    { label: 'PivotTable', tools: ['excel.create_pivot_table', 'excel.update_pivot_table'] }
   ];
   const TOOL_METADATA = new Map([
     ['excel.get_workbook_info', { category: 'Workbook', sideEffect: 'read', description: 'Read workbook state and aggregate object counts.' }],
@@ -82,7 +85,9 @@
     ['excel.create_table', { category: 'Table', sideEffect: 'mutating', description: 'Create a table from a range.' }],
     ['excel.update_table', { category: 'Table', sideEffect: 'destructive', description: 'Read or update table structure, style, options, and lifecycle.' }],
     ['excel.create_chart', { category: 'Chart', sideEffect: 'mutating', description: 'Create a chart from a range.' }],
-    ['excel.update_chart', { category: 'Chart', sideEffect: 'destructive', description: 'Read or update chart title, legend, axes, source, position, size, export, and lifecycle.' }]
+    ['excel.update_chart', { category: 'Chart', sideEffect: 'destructive', description: 'Read or update chart title, legend, axes, source, position, size, export, and lifecycle.' }],
+    ['excel.create_pivot_table', { category: 'PivotTable', sideEffect: 'mutating', description: 'Create a PivotTable from a range or table source.' }],
+    ['excel.update_pivot_table', { category: 'PivotTable', sideEffect: 'destructive', description: 'Read or update PivotTable fields, layout, filters, refresh, and lifecycle.' }]
   ]);
   const { instanceId, sessionId } = runtimeIds();
   const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.excel.tool-permissions.${sessionId}`;
@@ -353,6 +358,12 @@
           break;
         case 'excel.update_chart':
           data = await updateChart(args);
+          break;
+        case 'excel.create_pivot_table':
+          data = await createPivotTable(args);
+          break;
+        case 'excel.update_pivot_table':
+          data = await updatePivotTable(args);
           break;
         default:
           throw Object.assign(new Error(`Unsupported tool ${tool}`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE' });
@@ -825,6 +836,62 @@
     });
   }
 
+  async function createPivotTable(args) {
+    requireRequirementSet('ExcelApi', '1.8', 'pivot table creation');
+    return Excel.run(async (context) => {
+      const pivot = context.workbook.pivotTables.add(requiredString(args, 'name', 'excel.create_pivot_table requires name.'), pivotSource(context, args), requiredString(args, 'destination', 'excel.create_pivot_table requires destination.'));
+      pivot.load('name');
+      await context.sync();
+      return { pivot_table: pivot.name, source: args.table || args.address, destination: args.destination, created: true };
+    });
+  }
+
+  async function updatePivotTable(args) {
+    const action = String(args.action || 'metadata').trim().toLowerCase();
+    return Excel.run(async (context) => {
+      const pivot = targetPivotTable(context, args);
+      if (action === 'metadata' || action === 'read') {
+        return readPivotTableMetadata(context, pivot);
+      }
+      if (action === 'refresh') {
+        pivot.refresh();
+        await context.sync();
+        return { pivot_table: args.pivot_table, action, refreshed: true };
+      }
+      if (action === 'add_hierarchy' || action === 'remove_hierarchy') {
+        requireRequirementSet('ExcelApi', '1.8', 'pivot table hierarchy updates');
+        updatePivotHierarchy(pivot, args);
+        await context.sync();
+        return { pivot_table: args.pivot_table, action, axis: args.axis || null, hierarchy: args.hierarchy || null, updated: true };
+      }
+      if (action === 'layout') {
+        requireRequirementSet('ExcelApi', '1.8', 'pivot table layout');
+        applyPivotLayoutOptions(pivot, args);
+        await context.sync();
+        return { pivot_table: args.pivot_table, action, updated: true };
+      }
+      if (action === 'filter') {
+        requireRequirementSet('ExcelApi', '1.12', 'pivot table filters');
+        pivotField(pivot, args).applyFilter(pivotFiltersFrom(args));
+        await context.sync();
+        return { pivot_table: args.pivot_table, action, field: args.field, filtered: true };
+      }
+      if (action === 'clear_filters') {
+        requireRequirementSet('ExcelApi', '1.12', 'pivot table filters');
+        pivotField(pivot, args).clearAllFilters();
+        await context.sync();
+        return { pivot_table: args.pivot_table, action, field: args.field, cleared: true };
+      }
+      if (action === 'delete') {
+        requireRequirementSet('ExcelApi', '1.8', 'pivot table deletion');
+        pivot.delete();
+        await context.sync();
+        return { pivot_table: args.pivot_table, action, deleted: true };
+      }
+      throw Object.assign(new Error(`Unsupported PivotTable action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    });
+  }
+
   function targetWorksheet(context, args) {
     return args.sheet
       ? context.workbook.worksheets.getItem(String(args.sheet))
@@ -1012,6 +1079,149 @@
       throw Object.assign(new Error('Expected a finite number.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
     return number;
+  }
+
+  function targetPivotTable(context, args) {
+    const name = requiredString(args, 'pivot_table', 'PivotTable name is required.');
+    return context.workbook.pivotTables.getItem(name);
+  }
+
+  function pivotSource(context, args) {
+    if (args.table) return context.workbook.tables.getItem(String(args.table));
+    return targetRange(context, args);
+  }
+
+  async function readPivotTableMetadata(context, pivot) {
+    pivot.load('id,name');
+    pivot.layout.load('layoutType,showColumnGrandTotals,showRowGrandTotals');
+    pivot.rowHierarchies.load('items/name,items/position');
+    pivot.columnHierarchies.load('items/name,items/position');
+    pivot.filterHierarchies.load('items/name,items/position');
+    pivot.dataHierarchies.load('items/name,items/position,items/summarizeBy,items/numberFormat');
+    const range = pivot.layout.getRange();
+    range.load('address,rowCount,columnCount');
+    await context.sync();
+    return pivotTableMetadata(pivot, range);
+  }
+
+  function pivotTableMetadata(pivot, range) {
+    return {
+      pivot_table: pivot.name,
+      id: pivot.id || null,
+      range: rangeInfo(range),
+      layout_type: pivot.layout.layoutType || null,
+      show_column_grand_totals: Boolean(pivot.layout.showColumnGrandTotals),
+      show_row_grand_totals: Boolean(pivot.layout.showRowGrandTotals),
+      row_hierarchies: pivot.rowHierarchies.items.map(pivotHierarchyInfo),
+      column_hierarchies: pivot.columnHierarchies.items.map(pivotHierarchyInfo),
+      filter_hierarchies: pivot.filterHierarchies.items.map(pivotHierarchyInfo),
+      data_hierarchies: pivot.dataHierarchies.items.map((item) => ({
+        name: item.name,
+        position: item.position,
+        summarize_by: item.summarizeBy || null,
+        number_format: item.numberFormat || null
+      }))
+    };
+  }
+
+  function pivotHierarchyInfo(item) {
+    return { name: item.name, position: item.position };
+  }
+
+  function updatePivotHierarchy(pivot, args) {
+    const axis = String(args.axis || '').trim().toLowerCase();
+    const hierarchy = requiredString(args, 'hierarchy', 'excel.update_pivot_table hierarchy actions require hierarchy.');
+    const action = String(args.action || '').trim().toLowerCase();
+    if (action === 'remove_hierarchy') {
+      removePivotHierarchy(pivot, axis, hierarchy);
+      return;
+    }
+    if (axis === 'row') {
+      pivot.rowHierarchies.add(pivot.hierarchies.getItem(hierarchy));
+      return;
+    }
+    if (axis === 'column') {
+      pivot.columnHierarchies.add(pivot.hierarchies.getItem(hierarchy));
+      return;
+    }
+    if (axis === 'filter') {
+      pivot.filterHierarchies.add(pivot.hierarchies.getItem(hierarchy));
+      return;
+    }
+    if (axis === 'data') {
+      const dataHierarchy = pivot.dataHierarchies.add(pivot.hierarchies.getItem(hierarchy));
+      if (args.summarize_by !== undefined) dataHierarchy.summarizeBy = aggregationFunctionFrom(args.summarize_by);
+      if (args.number_format !== undefined) dataHierarchy.numberFormat = String(args.number_format);
+      return;
+    }
+    throw Object.assign(new Error(`Unsupported PivotTable axis ${args.axis}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  function removePivotHierarchy(pivot, axis, hierarchy) {
+    if (axis === 'row') {
+      pivot.rowHierarchies.remove(pivot.rowHierarchies.getItem(hierarchy));
+      return;
+    }
+    if (axis === 'column') {
+      pivot.columnHierarchies.remove(pivot.columnHierarchies.getItem(hierarchy));
+      return;
+    }
+    if (axis === 'filter') {
+      pivot.filterHierarchies.remove(pivot.filterHierarchies.getItem(hierarchy));
+      return;
+    }
+    if (axis === 'data') {
+      pivot.dataHierarchies.remove(pivot.dataHierarchies.getItem(hierarchy));
+      return;
+    }
+    throw Object.assign(new Error(`Unsupported PivotTable axis ${axis}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  function applyPivotLayoutOptions(pivot, args) {
+    if (args.layout_type !== undefined) pivot.layout.layoutType = pivotLayoutTypeFrom(args.layout_type);
+    if (args.show_column_grand_totals !== undefined) pivot.layout.showColumnGrandTotals = Boolean(args.show_column_grand_totals);
+    if (args.show_row_grand_totals !== undefined) pivot.layout.showRowGrandTotals = Boolean(args.show_row_grand_totals);
+  }
+
+  function aggregationFunctionFrom(value) {
+    const values = {
+      automatic: Excel.AggregationFunction.automatic,
+      sum: Excel.AggregationFunction.sum,
+      count: Excel.AggregationFunction.count,
+      average: Excel.AggregationFunction.average,
+      max: Excel.AggregationFunction.max,
+      min: Excel.AggregationFunction.min,
+      product: Excel.AggregationFunction.product,
+      countNumbers: Excel.AggregationFunction.countNumbers,
+      standardDeviation: Excel.AggregationFunction.standardDeviation,
+      standardDeviationP: Excel.AggregationFunction.standardDeviationP,
+      variance: Excel.AggregationFunction.variance,
+      varianceP: Excel.AggregationFunction.varianceP
+    };
+    return enumValueFrom(values, value, 'PivotTable aggregation function');
+  }
+
+  function pivotLayoutTypeFrom(value) {
+    const values = {
+      compact: Excel.PivotLayoutType.compact,
+      tabular: Excel.PivotLayoutType.tabular,
+      outline: Excel.PivotLayoutType.outline
+    };
+    return enumValueFrom(values, value, 'PivotTable layout type');
+  }
+
+  function pivotFiltersFrom(args) {
+    const selectedItems = args.selected_items || args.values;
+    if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
+      throw Object.assign(new Error('excel.update_pivot_table filter requires selected_items.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return { manualFilter: { selectedItems: selectedItems.map(String) } };
+  }
+
+  function pivotField(pivot, args) {
+    const hierarchy = requiredString(args, 'hierarchy', 'excel.update_pivot_table filter requires hierarchy.');
+    const field = requiredString(args, 'field', 'excel.update_pivot_table filter requires field.');
+    return pivot.hierarchies.getItem(hierarchy).fields.getItem(field);
   }
 
   function sheetInfo(sheet, active) {
@@ -1366,7 +1576,9 @@
       excel_api_1_3: requirements.isSetSupported('ExcelApi', '1.3'),
       excel_api_1_4: requirements.isSetSupported('ExcelApi', '1.4'),
       excel_api_1_7: requirements.isSetSupported('ExcelApi', '1.7'),
+      excel_api_1_8: requirements.isSetSupported('ExcelApi', '1.8'),
       excel_api_1_9: requirements.isSetSupported('ExcelApi', '1.9'),
+      excel_api_1_12: requirements.isSetSupported('ExcelApi', '1.12'),
       excel_api_1_13: requirements.isSetSupported('ExcelApi', '1.13')
     };
   }

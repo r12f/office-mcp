@@ -44,6 +44,9 @@ const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
         name: "excel.create_chart",
     },
     ExcelToolDefinition {
+        name: "excel.create_pivot_table",
+    },
+    ExcelToolDefinition {
         name: "excel.create_table",
     },
     ExcelToolDefinition {
@@ -75,6 +78,9 @@ const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
     },
     ExcelToolDefinition {
         name: "excel.update_chart",
+    },
+    ExcelToolDefinition {
+        name: "excel.update_pivot_table",
     },
     ExcelToolDefinition {
         name: "excel.update_table",

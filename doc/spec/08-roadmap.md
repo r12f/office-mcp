@@ -1175,25 +1175,30 @@ Microsoft workbook -> worksheet -> range -> table/chart/pivot object workflow.
 
 Research basis: Microsoft Excel add-in docs identify the most common workflow as
 `Workbook` -> `Worksheet` -> `Range`, then higher-level `Table` and `Chart`
-objects created from existing range data. The core concepts page also calls out
-range `values`, `formulas`, and `format` as the immediately useful cell-data
-operations, and states that Excel JavaScript API has no separate `Cell` object:
-cells are one-cell `Range` objects. PivotTables are not part of that page's
-first-level walkthrough, but they are included in v1 because they are a
-high-value Excel analysis workflow and are present in the stable Excel.js object
-model. The refined catalog is fixed at 20 core tools by grouping common object
-lifecycle/configuration operations under `update_*` commands instead of
-exposing every Excel.js method. Each tool must own one distinct user intent;
-overlapping behavior must be removed or assigned to one owner before
-implementation.
+objects created from existing range data. The starting source is Microsoft
+Learn's core Excel object model concepts page:
+https://learn.microsoft.com/en-us/office/dev/add-ins/excel/excel-add-ins-core-concepts.
+That page also calls out range `values`, `formulas`, and `format` as the
+immediately useful cell-data operations, and states that Excel JavaScript API has
+no separate `Cell` object: cells are one-cell `Range` objects. PivotTables are
+not part of that page's first-level walkthrough, but they are included in v1
+because they are a high-value Excel analysis workflow and are present in the
+stable Excel.js object model. The refined catalog is fixed at 20 core tools by
+grouping common object lifecycle/configuration operations under `update_*`
+commands instead of exposing every Excel.js method. Each tool must own one
+distinct user intent; overlapping behavior must be removed or assigned to one
+owner before implementation.
 
 Selection criteria: prioritize the operations users actually ask Excel to do in
 an agent workflow: workbook orientation, sheet inventory/lifecycle, range/cell
 value CRUD, formula authoring, formatting, sorting/filtering, table management,
-chart creation/customization, and PivotTable analysis. Do not add tools for
-every Office.js object, property, event, shape, comment, slicer, external
-connection, or preview feature unless a later user workflow proves that the
-20-tool surface cannot express it safely.
+chart creation/customization, and PivotTable analysis. The API budget is 15-20
+tools; v1 intentionally lands at 20 because that is the smallest catalog that
+covers workbook, sheet, range/cell, formula, format, data, table, chart, and
+PivotTable workflows without method-level sprawl. Do not add tools for every
+Office.js object, property, event, shape, comment, slicer, external connection,
+or preview feature unless a later user workflow proves that the 20-tool surface
+cannot express it safely and the spec either retires or merges another tool.
 
 Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
@@ -1228,11 +1233,21 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       keep PivotTables as the only analysis object beyond the core concepts
       page's table/chart walkthrough, and record rejected method-level tool
       families so implementation does not drift into an Office.js mirror.
+- [x] Record the refined Excel tool budget as an explicit 15-20 API decision:
+      start from the Microsoft Learn core object path, keep single-cell work as
+      range work, split values/formulas/formatting because they have different
+      user intent and permission profiles, merge object lifecycle/configuration
+      under `update_*` owners, and cap v1 at 20 tools.
 - [ ] Verify each remaining planned tool's minimum ExcelApi requirement set
       against `src/office-ctl/excel/node_modules/@types/office-js/index.d.ts`
       and Microsoft API docs before implementation. Record the verified minimum
       requirement set in [04-excel-capabilities.md](04-excel-capabilities.md)
       instead of leaving `verify during implementation` in the final contract.
+- [ ] During implementation, keep each Excel slice aligned with the final
+      20-tool catalog in [04-excel-capabilities.md](04-excel-capabilities.md):
+      daemon catalog, MCP `tools/list`, Excel task pane available-tools metadata,
+      permission grouping, and documentation must all expose the same tool names
+      and categories.
 - [ ] Keep the runtime Excel catalog capped at the refined 20-tool target unless
       a future spec update identifies a distinct object owner, permission
       profile, or user-visible workflow that cannot be represented by the
@@ -1287,10 +1302,17 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       `getImage` export, and delete actions. Image export is gated behind
       `ExcelApi 1.2`; axis selection and chart type/id metadata are gated behind
       `ExcelApi 1.7`.
-- [ ] Implement PivotTable slice: `excel.create_pivot_table` and
+- [x] Implement PivotTable slice: `excel.create_pivot_table` and
       `excel.update_pivot_table` for normal range/table sources, row/column/data
       fields, filters, aggregation/calculation, refresh, metadata read, and
       delete. OLAP, Power Pivot, slicers, and preview-only APIs remain deferred.
+      Current implementation adds daemon catalog/list-tools coverage, Excel
+      task pane metadata/permission grouping, dispatch coverage, PivotTable
+      creation from range/table sources, metadata, hierarchy add/remove for row,
+      column, filter, and data axes, data aggregation/number format, layout
+      options, refresh, manual filters, clear filters, and delete. Creation and
+      hierarchy/layout/delete actions are gated behind `ExcelApi 1.8`; manual
+      filters are gated behind `ExcelApi 1.12`.
 - [ ] Update the Excel task pane tools UI and per-tool permissions so all 20
       tools are grouped by Workbook, Worksheet, Range, Formula, Format, Data,
       Table, Chart, and PivotTable categories, with category toggles and per-tool

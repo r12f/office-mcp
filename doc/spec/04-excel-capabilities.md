@@ -20,11 +20,12 @@ tools for those workflows instead of mirroring every Excel.js class and method.
 
 Research basis:
 
-- Microsoft Learn's "Core Excel object model concepts" is the starting point
-  for the v1 surface. It describes the common add-in workflow as starting from
-  a `Workbook`, moving to a `Worksheet`, working with one or more `Range`
-  objects, and then creating higher-level `Table` or `Chart` objects from
-  existing range data.
+- Microsoft Learn's "Core Excel object model concepts"
+  (https://learn.microsoft.com/en-us/office/dev/add-ins/excel/excel-add-ins-core-concepts)
+  is the starting point for the v1 surface. It describes the common add-in
+  workflow as starting from a `Workbook`, moving to a `Worksheet`, working with
+  one or more `Range` objects, and then creating higher-level `Table` or
+  `Chart` objects from existing range data.
 - The same page frames Excel add-ins around reading, writing, and visualizing
   workbook data through workbooks, worksheets, ranges, tables, and charts. This
   is the primary selection filter for v1 tools.
@@ -53,11 +54,26 @@ Research basis:
 
 The refined v1 target is 20 tools. This is the maximum allowed core Excel
 surface for v1 and satisfies the 15-20 tool target by covering the high-value
-workflows without mirroring every Excel.js class or method. Do not expand the
-catalog by copying individual Excel.js methods into MCP tools. A future tool can
-only be added after the selection matrix proves that the existing 20 tools
-cannot express a distinct object owner, permission profile, or user-visible
-workflow safely.
+workflows without mirroring every Excel.js class or method. Keep the catalog at
+or below 20 tools unless a later spec revision explicitly retires or merges an
+existing tool first. Do not expand the catalog by copying individual Excel.js
+methods into MCP tools. A future tool can only be added after the selection
+matrix proves that the existing 20 tools cannot express a distinct object owner,
+permission profile, or user-visible workflow safely.
+
+Selection rules for the 15-20 tool budget:
+
+- Start from the Microsoft Learn core object path: `Workbook` -> `Worksheet` ->
+  `Range` -> `Table` / `Chart`.
+- Add a tool only when it represents a user-level task, not a single Office.js
+  property or method.
+- Merge object lifecycle/configuration operations into object-owner update tools
+  when they share the same owner and permission profile.
+- Keep cell operations as range operations because Excel.js has no separate
+  `Cell` object.
+- Include PivotTables as the only v1 analysis object beyond the core concepts
+  page because summarized analysis is a central Excel workflow; defer slicers,
+  OLAP, Power Pivot, and preview-only APIs.
 
 Out of scope for the core Excel surface: shapes and images, comments and notes,
 slicers as first-class tools, events/subscriptions, custom XML, external data
@@ -128,7 +144,11 @@ Implemented Excel v1 tools:
 | `excel.sort_range` | edit | `ExcelApi 1.2` | Sort a range or table body by one or more keys. |
 | `excel.apply_filter` | edit | Range filters require `ExcelApi 1.9`; table column filters require `ExcelApi 1.2` | Apply, clear, remove, or reapply range and table filters. |
 | `excel.create_table` | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
+| `excel.update_table` | read/edit/destructive | `ExcelApi 1.1`; visual options require `ExcelApi 1.3`; resize requires `ExcelApi 1.13` | Read or update table structure, options, and lifecycle. |
 | `excel.create_chart` | edit | `ExcelApi 1.1` | Create a chart from a range on the active or named worksheet. |
+| `excel.update_chart` | read/edit/destructive | `ExcelApi 1.1`; image export requires `ExcelApi 1.2`; axis selection and chart type metadata require `ExcelApi 1.7` | Read or update chart configuration, source, export, and lifecycle. |
+| `excel.create_pivot_table` | edit | `ExcelApi 1.8` | Create a PivotTable from a range or table source. |
+| `excel.update_pivot_table` | read/edit/destructive | `ExcelApi 1.3`; hierarchy/layout/delete require `ExcelApi 1.8`; filters require `ExcelApi 1.12` | Read or update PivotTable fields, layout, filters, refresh, and lifecycle. |
 
 The Excel task pane reports these tools in `session.added.available_tools` only
 after the runtime registers successfully with the daemon.
@@ -155,8 +175,8 @@ Target core Excel tool surface:
 | `excel.update_table` | implemented | Table | read/edit/destructive | `ExcelApi 1.1`; visual options require `ExcelApi 1.3`; resize requires `ExcelApi 1.13` | Read table metadata/structure; add rows/columns; resize, rename, change table style/options, or delete a table. Table cell contents belong to `excel.read_range`. |
 | `excel.create_chart` | implemented | Chart | edit | `ExcelApi 1.1` | Create a chart from a range or table. |
 | `excel.update_chart` | implemented | Chart | edit/read/destructive | `ExcelApi 1.1`; image export requires `ExcelApi 1.2`; axis selection and chart type metadata require `ExcelApi 1.7` | Read chart metadata; update chart title, axes, legend, source range, position, size, delete the chart, or export a chart image where supported. |
-| `excel.create_pivot_table` | planned | PivotTable | edit | verify during implementation | Create a PivotTable from a range or table at a target destination. |
-| `excel.update_pivot_table` | planned | PivotTable | edit/destructive | verify during implementation | Configure row, column, data, and filter hierarchies; set aggregation/calculation, refresh, apply PivotTable filters, or delete a PivotTable. |
+| `excel.create_pivot_table` | implemented | PivotTable | edit | `ExcelApi 1.8` | Create a PivotTable from a range or table at a target destination. |
+| `excel.update_pivot_table` | implemented | PivotTable | edit/destructive | `ExcelApi 1.3`; hierarchy/layout/delete require `ExcelApi 1.8`; filters require `ExcelApi 1.12` | Read PivotTable metadata; configure row, column, data, and filter hierarchies; set aggregation and layout options, refresh, apply manual PivotTable filters, clear filters, or delete a PivotTable. |
 
 The planned tools above are the Excel implementation backlog, not the current
 runtime catalog. Before implementation, each planned tool must verify its
