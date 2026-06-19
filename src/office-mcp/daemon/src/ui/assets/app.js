@@ -1,7 +1,8 @@
-const state = { snapshot: null, search: '', result: 'all', expandedDocuments: new Set(), previousStatus: null };
+const state = { snapshot: null, search: '', app: 'all', result: 'all', expandedDocuments: new Set(), previousStatus: null };
 const $ = (id) => document.getElementById(id);
 
 $('search').addEventListener('input', (event) => { state.search = event.target.value.toLowerCase(); render(); });
+$('appFilter').addEventListener('change', (event) => { state.app = event.target.value; render(); });
 $('resultFilter').addEventListener('change', (event) => { state.result = event.target.value; render(); });
 $('clearInspector').addEventListener('click', () => { $('inspector').textContent = 'Select a row.'; announce('Inspector cleared'); });
 
@@ -75,6 +76,7 @@ function renderDocuments(groups) {
   const rows = [];
   const documentCommandHistory = state.snapshot?.document_command_history || {};
   for (const [app, docs] of Object.entries(groups)) {
+    if (state.app !== 'all' && app !== state.app) continue;
     const visible = docs.filter((doc) => matches(JSON.stringify(doc)));
     if (!visible.length) continue;
     rows.push(`<h3>${esc(title(app))}</h3>`);
@@ -87,7 +89,8 @@ function renderDocuments(groups) {
       rows.push(renderDocumentHistory(doc.session_id, documentCommandHistory[doc.session_id] || [], expanded, detailId));
     }
   }
-  $('documents').innerHTML = rows.join('') || emptyState('No documents connected', 'Open Word, Excel, or PowerPoint, then open Office MCP Control.', state.snapshot?.daemon?.addin_endpoint, 'Copy add-in endpoint');
+  const filtered = state.search || state.app !== 'all';
+  $('documents').innerHTML = rows.join('') || (filtered ? emptyState('No matching documents', 'Adjust the app or search filter.') : emptyState('No documents connected', 'Open Word, Excel, or PowerPoint, then open Office MCP Control.', state.snapshot?.daemon?.addin_endpoint, 'Copy add-in endpoint'));
 }
 
 function renderDocumentHistory(sessionId, commands, expanded, detailId) {

@@ -45,7 +45,18 @@
         <aside class="panel navigation" aria-labelledby="documentsHeading">
           <div class="panel-head">
             <h2 id="documentsHeading">Documents</h2>
-            <label class="field-label" for="search">Filter sessions</label><input id="search" name="session-filter" type="search" placeholder="Word, Excel, PowerPoint, session&hellip;" autocomplete="off" />
+            <div class="filter-row" aria-label="Document filters">
+              <label class="field-label" for="appFilter">App</label>
+              <select id="appFilter" name="app-filter" aria-label="Filter documents by app">
+                <option value="all">All apps</option>
+                <option value="word">Word</option>
+                <option value="excel">Excel</option>
+                <option value="powerpoint">PowerPoint</option>
+                <option value="outlook">Outlook</option>
+                <option value="other">Other</option>
+              </select>
+              <label class="field-label" for="search">Search</label><input id="search" name="session-filter" type="search" placeholder="Title, app, session&hellip;" autocomplete="off" />
+            </div>
           </div>
           <div id="documents" class="stack"></div>
           <h3>Clients</h3>

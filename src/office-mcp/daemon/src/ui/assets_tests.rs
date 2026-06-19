@@ -73,8 +73,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("aria-label=\"Copy log path\""));
     assert!(html.contains("class=\"detail-copy\" data-copy=\"configPath\""));
     assert!(html.contains("class=\"detail-copy\" data-copy=\"logPath\""));
+    assert!(html.contains("id=\"appFilter\" name=\"app-filter\""));
+    assert!(html.contains("aria-label=\"Filter documents by app\""));
     assert!(html.contains("name=\"session-filter\""));
-    assert!(html.contains("Word, Excel, PowerPoint, session&hellip;"));
+    assert!(html.contains("Title, app, session&hellip;"));
     assert!(!html.contains("session..."));
     assert!(html.contains("aria-live=\"polite\""));
     assert!(css.contains("grid-template-columns: 32px auto minmax(0, 1fr)"));
@@ -86,6 +88,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".detail-copy:hover, .detail-copy:focus-visible, .id-copy:hover, .id-copy:focus-visible"));
     assert!(css.contains("--powerpoint: #b7472a;"));
     assert!(css.contains(".row.powerpoint { border-left-color: var(--powerpoint); }"));
+    assert!(css.contains(".filter-row { display: grid; grid-template-columns: auto minmax(82px, 104px) auto minmax(120px, 1fr);"));
+    assert!(css.contains("#search, #appFilter { min-width: 0;"));
     assert!(css.contains("minmax(0, 1fr)"));
     assert!(css.contains("content-visibility: auto"));
     assert!(css.contains(".empty strong"));
@@ -93,6 +97,9 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".empty-copy code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(!css.contains("transition: all"));
     assert!(js.contains("emptyState('No documents connected'"));
+    assert!(js.contains("state.app = event.target.value"));
+    assert!(js.contains("if (state.app !== 'all' && app !== state.app) continue;"));
+    assert!(js.contains("emptyState('No matching documents'"));
     assert!(js.contains("Open Word, Excel, or PowerPoint, then open Office MCP Control."));
     assert!(js.contains("'Copy add-in endpoint'"));
     assert!(js.contains("'Copy MCP endpoint'"));

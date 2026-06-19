@@ -54,6 +54,13 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#documents").textContent.includes("Excel") && document.querySelector("#documents .row.excel") !== null', 'excel document group renders');
     await assertEval(cdp, 'document.querySelector("#documents").textContent.includes("stale")', 'stale document renders in document list');
     await assertEval(cdp, 'document.querySelector("#documents").textContent.includes("reconnecting")', 'reconnecting document state renders in document list');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#appFilter").value = "excel"; document.querySelector("#appFilter").dispatchEvent(new Event("change"))' });
+    await waitFor(cdp, 'document.querySelector("#documents .row.excel") !== null && document.querySelector("#documents .row.word") === null');
+    await assertEval(cdp, 'document.querySelector("#documents").textContent.includes("Excel") && !document.querySelector("#documents").textContent.includes("Runtime Evidence.docx")', 'document app filter limits visible sessions');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#appFilter").value = "powerpoint"; document.querySelector("#appFilter").dispatchEvent(new Event("change"))' });
+    await waitFor(cdp, 'document.querySelector("#documents").textContent.includes("No matching documents")');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#appFilter").value = "all"; document.querySelector("#appFilter").dispatchEvent(new Event("change"))' });
+    await waitFor(cdp, 'document.querySelector("#documents .row.word") !== null && document.querySelector("#documents .row.excel") !== null');
     await assertEval(cdp, 'document.querySelector("#documents .row.word").getAttribute("aria-expanded") === "false"', 'document detail starts collapsed');
     await assertEval(cdp, 'document.querySelector("#documents .doc-history[hidden]") !== null', 'collapsed document detail is hidden');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#documents .row.word").focus()' });
