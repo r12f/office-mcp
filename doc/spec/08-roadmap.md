@@ -1226,11 +1226,15 @@ Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
       coverage for clear contents/formats/all plus read-only find and replace.
       Current implementation covers range clear/delete through `ExcelApi 1.1`
       and find/replace through `ExcelApi 1.9` host gating.
-- [ ] Extend formula/format slice: update `excel.set_formula` to accept formula
+- [x] Extend formula/format slice: update `excel.set_formula` to accept formula
       matrices, and update `excel.format_range` to cover borders, horizontal and
       vertical alignment, wrap text, autofit rows/columns, and number-format
       matrices. Tests first: shape validation, generated Office.js calls, and
-      no regression for existing scalar formula/basic format behavior.
+      no regression for existing scalar formula/basic format behavior. Current
+      implementation validates formula and number-format matrix shape in the
+      Excel task pane, maps alignment and border options through stable Office.js
+      enums, gates autofit behind `ExcelApi 1.2`, and passed `npm run check` in
+      `src/office-ctl/excel`.
 - [ ] Implement data operations slice: `excel.sort_range` and
       `excel.apply_filter`. These are the only owners for sorting/filtering both
       plain ranges and table bodies; `excel.update_table` must not duplicate

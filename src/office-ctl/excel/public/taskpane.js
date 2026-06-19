@@ -545,21 +545,25 @@
   }
 
   async function setFormula(args) {
-    const formula = requiredString(args, 'formula', 'excel.set_formula requires formula.');
     return Excel.run(async (context) => {
       const range = targetRange(context, args);
       range.load('rowCount,columnCount');
       await context.sync();
-      range.formulas = matrixFromScalar(formula, range.rowCount, range.columnCount);
+      range.formulas = formulaMatrixFrom(args, range.rowCount, range.columnCount);
       await context.sync();
-      return { address: args.address, formula, wrote_formula: true };
+      return {
+        address: args.address,
+        formula: args.formula !== undefined ? String(args.formula) : null,
+        formula_matrix: Array.isArray(args.formulas),
+        wrote_formula: true
+      };
     });
   }
 
   async function formatRange(args) {
     return Excel.run(async (context) => {
       const range = targetRange(context, args);
-      if (args.number_format) {
+      if (args.number_format !== undefined || args.number_formats !== undefined) {
         range.load('rowCount,columnCount');
         await context.sync();
       }
@@ -567,7 +571,15 @@
       if (args.italic !== undefined) range.format.font.italic = Boolean(args.italic);
       if (args.font_color) range.format.font.color = String(args.font_color);
       if (args.fill_color) range.format.fill.color = String(args.fill_color);
-      if (args.number_format) range.numberFormat = matrixFromScalar(String(args.number_format), range.rowCount, range.columnCount);
+      if (args.number_format !== undefined) range.numberFormat = matrixFromScalar(String(args.number_format), range.rowCount, range.columnCount);
+      if (args.number_formats !== undefined) range.numberFormat = numberFormatMatrixFrom(args, range.rowCount, range.columnCount);
+      if (args.horizontal_alignment !== undefined) range.format.horizontalAlignment = alignmentFrom(args.horizontal_alignment, 'horizontal');
+      if (args.vertical_alignment !== undefined) range.format.verticalAlignment = alignmentFrom(args.vertical_alignment, 'vertical');
+      if (args.wrap_text !== undefined) range.format.wrapText = Boolean(args.wrap_text);
+      if (args.borders !== undefined) applyBorders(range, args.borders);
+      if (args.autofit_columns === true || args.autofit_rows === true) requireRequirementSet('ExcelApi', '1.2', 'autofit formatting');
+      if (args.autofit_columns === true) range.format.autofitColumns();
+      if (args.autofit_rows === true) range.format.autofitRows();
       await context.sync();
       return { address: args.address, formatted: true };
     });
@@ -667,14 +679,138 @@
   function supportsRequirementSet(name, version) {
     return Office.context?.requirements?.isSetSupported?.(name, version) === true;
   }
+
+  function requireRequirementSet(name, version, feature) {
+    if (!supportsRequirementSet(name, version)) {
+      throw Object.assign(new Error(`${feature} requires ${name} ${version}.`), {
+        officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE',
+        partialEffect: 'none'
+      });
+    }
+  }
+
   function requiredString(args, key, message) {
     const value = String(args[key] || '').trim();
     if (!value) throw Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT' });
     return value;
   }
 
+  function formulaMatrixFrom(args, rows, columns) {
+    if (args.formulas !== undefined) {
+      validateMatrixShape(args.formulas, rows, columns, 'formulas');
+      return args.formulas.map((row) => row.map((value) => String(value ?? '')));
+    }
+    const formula = requiredString(args, 'formula', 'excel.set_formula requires formula or formulas.');
+    return matrixFromScalar(formula, rows, columns);
+  }
+
+  function numberFormatMatrixFrom(args, rows, columns) {
+    validateMatrixShape(args.number_formats, rows, columns, 'number_formats');
+    return args.number_formats.map((row) => row.map((value) => String(value ?? 'General')));
+  }
+
+  function validateMatrixShape(matrix, rows, columns, label) {
+    if (!Array.isArray(matrix) || matrix.length !== rows) {
+      throw Object.assign(new Error(`${label} must be a ${rows} by ${columns} matrix.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    for (const row of matrix) {
+      if (!Array.isArray(row) || row.length !== columns) {
+        throw Object.assign(new Error(`${label} must be a ${rows} by ${columns} matrix.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+    }
+  }
+
   function matrixFromScalar(value, rows, columns) {
     return Array.from({ length: rows }, () => Array.from({ length: columns }, () => value));
+  }
+
+  function alignmentFrom(value, axis) {
+    const horizontal = {
+      general: Excel.HorizontalAlignment.general,
+      left: Excel.HorizontalAlignment.left,
+      center: Excel.HorizontalAlignment.center,
+      right: Excel.HorizontalAlignment.right,
+      fill: Excel.HorizontalAlignment.fill,
+      justify: Excel.HorizontalAlignment.justify,
+      centeracrossselection: Excel.HorizontalAlignment.centerAcrossSelection,
+      distributed: Excel.HorizontalAlignment.distributed
+    };
+    const vertical = {
+      top: Excel.VerticalAlignment.top,
+      center: Excel.VerticalAlignment.center,
+      bottom: Excel.VerticalAlignment.bottom,
+      justify: Excel.VerticalAlignment.justify,
+      distributed: Excel.VerticalAlignment.distributed
+    };
+    const values = axis === 'horizontal' ? horizontal : vertical;
+    const key = String(value || '').replace(/[_\s-]/g, '').toLowerCase();
+    if (!values[key]) {
+      throw Object.assign(new Error(`Unsupported ${axis} alignment ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return values[key];
+  }
+
+  function applyBorders(range, borders) {
+    if (!Array.isArray(borders)) {
+      throw Object.assign(new Error('borders must be an array.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    for (const border of borders) {
+      const rangeBorder = range.format.borders.getItem(borderIndexFrom(border.side));
+      if (border.color !== undefined) rangeBorder.color = String(border.color);
+      if (border.style !== undefined) rangeBorder.style = borderLineStyleFrom(border.style);
+      if (border.weight !== undefined) rangeBorder.weight = borderWeightFrom(border.weight);
+    }
+  }
+
+  function borderIndexFrom(value) {
+    const indexes = {
+      top: Excel.BorderIndex.edgeTop,
+      edgeTop: Excel.BorderIndex.edgeTop,
+      bottom: Excel.BorderIndex.edgeBottom,
+      edgeBottom: Excel.BorderIndex.edgeBottom,
+      left: Excel.BorderIndex.edgeLeft,
+      edgeLeft: Excel.BorderIndex.edgeLeft,
+      right: Excel.BorderIndex.edgeRight,
+      edgeRight: Excel.BorderIndex.edgeRight,
+      insideVertical: Excel.BorderIndex.insideVertical,
+      insideHorizontal: Excel.BorderIndex.insideHorizontal,
+      diagonalDown: Excel.BorderIndex.diagonalDown,
+      diagonalUp: Excel.BorderIndex.diagonalUp
+    };
+    return enumValueFrom(indexes, value, 'border side');
+  }
+
+  function borderLineStyleFrom(value) {
+    const styles = {
+      none: Excel.BorderLineStyle.none,
+      continuous: Excel.BorderLineStyle.continuous,
+      dash: Excel.BorderLineStyle.dash,
+      dashDot: Excel.BorderLineStyle.dashDot,
+      dashDotDot: Excel.BorderLineStyle.dashDotDot,
+      dot: Excel.BorderLineStyle.dot,
+      double: Excel.BorderLineStyle.double,
+      slantDashDot: Excel.BorderLineStyle.slantDashDot
+    };
+    return enumValueFrom(styles, value, 'border style');
+  }
+
+  function borderWeightFrom(value) {
+    const weights = {
+      hairline: Excel.BorderWeight.hairline,
+      thin: Excel.BorderWeight.thin,
+      medium: Excel.BorderWeight.medium,
+      thick: Excel.BorderWeight.thick
+    };
+    return enumValueFrom(weights, value, 'border weight');
+  }
+
+  function enumValueFrom(values, value, label) {
+    const key = String(value || '').replace(/[_\s-]/g, '').toLowerCase();
+    const match = Object.entries(values).find(([name]) => name.toLowerCase() === key);
+    if (!match) {
+      throw Object.assign(new Error(`Unsupported ${label} ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return match[1];
   }
 
   function chartTypeFrom(value) {

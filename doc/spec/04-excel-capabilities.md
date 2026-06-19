@@ -83,8 +83,8 @@ Implemented Excel v1 tools:
 | `excel.write_range` | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
 | `excel.clear_range` | destructive | `ExcelApi 1.1` | Clear contents, formats, all range data, or delete cells with a shift direction. |
 | `excel.find_replace_cells` | read/edit | `ExcelApi 1.9` | Find the first matching cell in a range or replace matching cells. |
-| `excel.set_formula` | edit | `ExcelApi 1.1` | Fill a range with one formula. |
-| `excel.format_range` | edit | `ExcelApi 1.1` | Apply basic font, fill, and number-format styling. |
+| `excel.set_formula` | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
+| `excel.format_range` | edit | `ExcelApi 1.1`; autofit requires `ExcelApi 1.2` | Apply font, fill, number formats, borders, alignment, wrapping, and autofit. |
 | `excel.create_table` | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
 | `excel.create_chart` | edit | `ExcelApi 1.1` | Create a chart from a range on the active or named worksheet. |
 
@@ -105,8 +105,8 @@ Target core Excel tool surface:
 | `excel.write_range` | implemented | Range | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
 | `excel.clear_range` | implemented | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, or all range data; optional cell deletion with shift direction. Hyperlink-specific clear modes are deferred because they require `ExcelApi 1.7`. |
 | `excel.find_replace_cells` | implemented | Range | read/edit | `ExcelApi 1.9` | Search cell contents in a range and optionally replace matches. |
-| `excel.set_formula` | implemented; extension planned | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula; target extension adds formula matrices. |
-| `excel.format_range` | implemented; extension planned | Format | edit | `ExcelApi 1.1` | Apply basic font, fill, and number format; target extension adds number-format matrices, borders, alignment, wrapping, and autofit. |
+| `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
+| `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1`; autofit requires `ExcelApi 1.2` | Apply font, fill, scalar or matrix number formats, borders, alignment, wrapping, and autofit. |
 | `excel.sort_range` | planned | Data | edit | verify during implementation | Sort a range or table body by one or more column keys; table structure changes belong to `excel.update_table`. |
 | `excel.apply_filter` | planned | Data | edit | verify during implementation | Apply or clear worksheet range or table filter criteria; PivotTable filters belong to `excel.update_pivot_table`. |
 | `excel.create_table` | implemented | Table | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
@@ -274,8 +274,20 @@ Arguments:
 }
 ```
 
-The same formula is written to every cell in the target range. Formula syntax is
-the host Excel formula syntax.
+Pass `formula` to write the same formula to every cell in the target range, or
+pass `formulas` as a two-dimensional matrix that exactly matches the target
+range shape. Formula syntax is the host Excel formula syntax.
+
+Matrix example:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "sheet": "Sheet1",
+  "address": "C2:D3",
+  "formulas": [["=A2+B2", "=A2-B2"], ["=A3+B3", "=A3-B3"]]
+}
+```
 
 Returns `{ "address": "C2:C10", "formula": "=B2*2", "wrote_formula": true }`.
 
@@ -292,12 +304,24 @@ Arguments:
   "italic": false,
   "font_color": "#17202A",
   "fill_color": "#DDEEFF",
-  "number_format": "General"
+  "number_format": "General",
+  "horizontal_alignment": "center",
+  "vertical_alignment": "top",
+  "wrap_text": true,
+  "borders": [
+    { "side": "top", "style": "continuous", "weight": "thin", "color": "#17202A" }
+  ],
+  "autofit_columns": true
 }
 ```
 
 All formatting fields are optional. `number_format`, when supplied, is written
-as a matrix matching the target range dimensions.
+as a scalar matrix matching the target range dimensions. `number_formats` may be
+supplied instead as a two-dimensional matrix that exactly matches the target
+range shape. Supported alignment, border side, border style, and border weight
+values are restricted to stable Office.js enum values. `autofit_rows` and
+`autofit_columns` require `ExcelApi 1.2`; unsupported hosts return
+`HOST_CAPABILITY_UNAVAILABLE` with no partial effect.
 
 Returns `{ "address": "A1:C2", "formatted": true }`.
 
