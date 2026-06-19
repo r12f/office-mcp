@@ -96,7 +96,9 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("Open Word, Excel, or PowerPoint, then open Office MCP Control."));
     assert!(js.contains("'Copy add-in endpoint'"));
     assert!(js.contains("'Copy MCP endpoint'"));
+    assert!(js.contains("const label = copyLabel.replace(/^Copy\\s+/i, '')"));
     assert!(js.contains("class=\"empty-copy\" data-copy-value=\"${esc(codeText)}\""));
+    assert!(js.contains("<span>${esc(label)}</span>"));
     assert!(js.contains("middleTruncate(codeText, 46)"));
     assert!(!js.contains("load the Office MCP add-in"));
     assert!(js.contains("fallbackCopy"));

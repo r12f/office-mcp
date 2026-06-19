@@ -120,7 +120,8 @@ async function copyText(text, button) {
 }
 
 function emptyState(titleText, bodyText, codeText, copyLabel = 'Copy endpoint') {
-  const copy = codeText ? `<button type="button" class="empty-copy" data-copy-value="${esc(codeText)}" aria-label="${esc(copyLabel)}" title="${esc(codeText)}"><span>${esc(copyLabel)}</span><code>${esc(middleTruncate(codeText, 46))}</code></button>` : '';
+  const label = copyLabel.replace(/^Copy\s+/i, '');
+  const copy = codeText ? `<button type="button" class="empty-copy" data-copy-value="${esc(codeText)}" aria-label="${esc(copyLabel)}" title="${esc(codeText)}"><span>${esc(label)}</span><code>${esc(middleTruncate(codeText, 46))}</code></button>` : '';
   return `<p class="empty"><strong>${esc(titleText)}</strong>${esc(bodyText)}${copy}</p>`;
 }
 
