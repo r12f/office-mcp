@@ -109,10 +109,10 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 
 - [ ] Verify planned Word content-control and consolidated mutation APIs against
       `@types/office-js` and Microsoft API docs before implementation.
-- [ ] Extend `word.insert_paragraph` so heading insertion is represented by
+- [x] Extend `word.insert_paragraph` so heading insertion is represented by
       style or heading-level arguments, then retire `word.insert_heading` from
       the advertised catalog after compatibility evidence is captured.
-- [ ] Extend `word.apply_style` so heading-level changes are represented as
+- [x] Extend `word.apply_style` so heading-level changes are represented as
       semantic style changes, then retire `word.set_heading_level` from the
       advertised catalog.
 - [x] Implement `word.update_table` as the single table mutation owner for cell
@@ -121,9 +121,9 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       `tools/list`, Word task pane available-tools metadata, permission grouping,
       dispatch path, and spec contract. It reuses the existing tested cell,
       row, column, and format behavior and adds explicit whole-table deletion.
-      The compatibility tools remain advertised until the dedicated retirement
-      slice removes `word.update_cell`, `word.add_row`, `word.add_column`, and
-      `word.format_cell` without breaking existing clients.
+      The compatibility tools were removed from the advertised catalog in the
+      target-surface retirement slice; historical handlers remain only as local
+      implementation helpers where needed.
 - [x] Add content-control CRUD tools: `word.list_content_controls`,
       `word.insert_content_control`, `word.update_content_control`, and
       `word.delete_content_control`, keeping generic text edits owned by
@@ -138,12 +138,12 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       adds the target owner to the daemon catalog, MCP `tools/list`, Word task
       pane available-tools metadata, permission grouping, dispatch path, and
       spec contract while reusing the existing fingerprint/stale-index safety
-      check. The compatibility tools remain advertised until the dedicated
-      retirement slice removes them without breaking existing clients.
+      check. The compatibility tools were removed from the advertised catalog in
+      the target-surface retirement slice.
 - [ ] Update daemon MCP catalog entries, JSON schemas, permission categories,
       task pane tool grouping, runtime evidence scripts, and README text from
       the current 27-tool compatibility surface to the refined 25-tool surface.
-- [ ] Add compatibility/deprecation tests proving superseded tools are not
+- [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.
 

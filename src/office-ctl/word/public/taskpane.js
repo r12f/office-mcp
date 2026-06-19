@@ -48,7 +48,6 @@
     'word.find_text',
     'word.get_selection',
     'word.insert_paragraph',
-    'word.insert_heading',
     'word.insert_image',
     'word.insert_table',
     'word.insert_page_break',
@@ -59,30 +58,23 @@
     'word.apply_formatting',
     'word.read_table',
     'word.update_table',
-    'word.update_cell',
-    'word.add_row',
-    'word.add_column',
-    'word.format_cell',
     'word.list_content_controls',
     'word.insert_content_control',
     'word.update_content_control',
     'word.delete_content_control',
-    'word.set_heading_level',
     'word.apply_style',
     'word.add_comment',
     'word.resolve_comment',
     'word.update_tracked_change',
-    'word.accept_change',
-    'word.reject_change',
     'word.save'
   ];
   const TOOL_GROUPS = [
     { label: 'Read', tools: ['word.get_text', 'word.get_outline', 'word.get_paragraph', 'word.find_text', 'word.get_selection'] },
-    { label: 'Insert', tools: ['word.insert_paragraph', 'word.insert_heading', 'word.insert_image', 'word.insert_table', 'word.insert_page_break', 'word.insert_list'] },
-    { label: 'Edit', tools: ['word.replace_text', 'word.update_paragraph', 'word.delete_range', 'word.apply_formatting', 'word.set_heading_level', 'word.apply_style'] },
-    { label: 'Tables', tools: ['word.read_table', 'word.update_table', 'word.update_cell', 'word.add_row', 'word.add_column', 'word.format_cell'] },
+    { label: 'Insert', tools: ['word.insert_paragraph', 'word.insert_image', 'word.insert_table', 'word.insert_page_break', 'word.insert_list'] },
+    { label: 'Edit', tools: ['word.replace_text', 'word.update_paragraph', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
+    { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
     { label: 'Content Controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
-    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_tracked_change', 'word.accept_change', 'word.reject_change'] },
+    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_tracked_change'] },
     { label: 'Document', tools: ['word.save'] }
   ];
   const TOOL_METADATA = new Map([
@@ -92,7 +84,6 @@
     ['word.find_text', { category: 'Read', sideEffect: 'read', description: 'Find text matches in the document body.' }],
     ['word.get_selection', { category: 'Read', sideEffect: 'read', description: 'Read the current selection.' }],
     ['word.insert_paragraph', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
-    ['word.insert_heading', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a heading paragraph.' }],
     ['word.insert_image', { category: 'Insert', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
     ['word.insert_table', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a table with provided values.' }],
     ['word.insert_page_break', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a page break.' }],
@@ -103,21 +94,14 @@
     ['word.apply_formatting', { category: 'Edit', sideEffect: 'mutating', description: 'Apply formatting to an anchored range.' }],
     ['word.read_table', { category: 'Tables', sideEffect: 'read', description: 'Read table dimensions and cell values.' }],
     ['word.update_table', { category: 'Tables', sideEffect: 'destructive', description: 'Update table cells, rows, columns, formatting, or lifecycle.' }],
-    ['word.update_cell', { category: 'Tables', sideEffect: 'mutating', description: 'Update a table cell value.' }],
-    ['word.add_row', { category: 'Tables', sideEffect: 'mutating', description: 'Add a row to a table.' }],
-    ['word.add_column', { category: 'Tables', sideEffect: 'mutating', description: 'Add a column to a table.' }],
-    ['word.format_cell', { category: 'Tables', sideEffect: 'mutating', description: 'Format a table cell.' }],
     ['word.list_content_controls', { category: 'Content Controls', sideEffect: 'read', description: 'List content-control metadata.' }],
     ['word.insert_content_control', { category: 'Content Controls', sideEffect: 'mutating', description: 'Create a content control around an anchored range.' }],
     ['word.update_content_control', { category: 'Content Controls', sideEffect: 'mutating', description: 'Update content-control metadata, locks, or text.' }],
     ['word.delete_content_control', { category: 'Content Controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling.' }],
-    ['word.set_heading_level', { category: 'Edit', sideEffect: 'mutating', description: 'Change a paragraph heading level.' }],
     ['word.apply_style', { category: 'Edit', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
     ['word.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a comment to an anchored range.' }],
     ['word.resolve_comment', { category: 'Review', sideEffect: 'mutating', description: 'Resolve an existing comment.' }],
     ['word.update_tracked_change', { category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint.' }],
-    ['word.accept_change', { category: 'Review', sideEffect: 'mutating', description: 'Accept a tracked change by fingerprint.' }],
-    ['word.reject_change', { category: 'Review', sideEffect: 'mutating', description: 'Reject a tracked change by fingerprint.' }],
     ['word.save', { category: 'Document', sideEffect: 'mutating', description: 'Save the current document.' }]
   ]);
   let socket;
@@ -351,9 +335,6 @@
         case 'word.insert_paragraph':
           data = await insertParagraph(args);
           break;
-        case 'word.insert_heading':
-          data = await insertHeading(args);
-          break;
         case 'word.insert_table':
           data = await insertTable(args);
           break;
@@ -384,18 +365,6 @@
         case 'word.update_table':
           data = await updateTable(args);
           break;
-        case 'word.update_cell':
-          data = await updateCell(args);
-          break;
-        case 'word.add_row':
-          data = await addRow(args);
-          break;
-        case 'word.add_column':
-          data = await addColumn(args);
-          break;
-        case 'word.format_cell':
-          data = await formatCell(args);
-          break;
         case 'word.list_content_controls':
           data = await listContentControls(args);
           break;
@@ -408,9 +377,6 @@
         case 'word.delete_content_control':
           data = await deleteContentControl(args);
           break;
-        case 'word.set_heading_level':
-          data = await setHeadingLevel(args);
-          break;
         case 'word.apply_style':
           data = await applyStyle(args);
           break;
@@ -422,12 +388,6 @@
           break;
         case 'word.update_tracked_change':
           data = await updateTrackedChange(args);
-          break;
-        case 'word.accept_change':
-          data = await mutateTrackedChange(args, 'accept');
-          break;
-        case 'word.reject_change':
-          data = await mutateTrackedChange(args, 'reject');
           break;
         case 'word._get_comments':
           data = await getComments(args);
@@ -566,16 +526,17 @@
 
   async function insertParagraph(args) {
     return Word.run(async (context) => {
+      const style = paragraphStyleFromArgs(args);
       if (args.anchor.kind === 'start_of_document') {
         const inserted = context.document.body.insertParagraph(args.text, Word.InsertLocation.start);
-        if (args.style) inserted.style = args.style;
+        if (style) inserted.style = style;
         if (args.formatting) applyRunFormatting(inserted.font, args.formatting);
         await context.sync();
         return { inserted: true };
       }
       if (args.anchor.kind === 'end_of_document') {
         const inserted = context.document.body.insertParagraph(args.text, Word.InsertLocation.end);
-        if (args.style) inserted.style = args.style;
+        if (style) inserted.style = style;
         if (args.formatting) applyRunFormatting(inserted.font, args.formatting);
         await context.sync();
         return { inserted: true };
@@ -597,7 +558,7 @@
           inserted = target.insertParagraph(args.text, Word.InsertLocation.after);
           break;
       }
-      if (args.style) inserted.style = args.style;
+      if (style) inserted.style = style;
       if (args.formatting) applyRunFormatting(inserted.font, args.formatting);
       await context.sync();
       return { inserted: true };
@@ -1010,9 +971,9 @@
   async function applyStyle(args) {
     return Word.run(async (context) => {
       const target = await resolveAnchor(context, args.anchor);
-      target.style = args.style;
+      target.style = args.style || headingStyleFromLevel(args.heading_level);
       await context.sync();
-      return { styled: true, style: args.style };
+      return { styled: true, style: target.style };
     });
   }
 
@@ -1318,6 +1279,20 @@
     if (typeof formatting.font_size_pt === 'number') font.size = formatting.font_size_pt;
     if (formatting.color) font.color = formatting.color;
     if (formatting.highlight) font.highlightColor = formatting.highlight;
+  }
+
+  function paragraphStyleFromArgs(args) {
+    if (args.style) return args.style;
+    if (args.heading_level !== undefined) return headingStyleFromLevel(args.heading_level);
+    return null;
+  }
+
+  function headingStyleFromLevel(level) {
+    const number = Number(level);
+    if (!Number.isInteger(number) || number < 0 || number > 9) {
+      throw Object.assign(new Error(`Heading level ${level} is out of range.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return number === 0 ? 'Normal' : `Heading ${number}`;
   }
 
   function headingLevelFromStyle(style) {

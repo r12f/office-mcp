@@ -20,6 +20,14 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word.delete_content_control"));
     assert!(names.contains(&"word.update_table"));
     assert!(names.contains(&"word.update_tracked_change"));
+    assert!(!names.contains(&"word.insert_heading"));
+    assert!(!names.contains(&"word.set_heading_level"));
+    assert!(!names.contains(&"word.update_cell"));
+    assert!(!names.contains(&"word.add_row"));
+    assert!(!names.contains(&"word.add_column"));
+    assert!(!names.contains(&"word.format_cell"));
+    assert!(!names.contains(&"word.accept_change"));
+    assert!(!names.contains(&"word.reject_change"));
     assert!(names.contains(&"excel.read_range"));
     assert!(names.contains(&"excel.sort_range"));
     assert!(names.contains(&"excel.apply_filter"));
@@ -29,10 +37,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"excel.update_pivot_table"));
     assert!(names.contains(&"powerpoint.add_slide"));
     assert!(names.contains(&"powerpoint.replace_text"));
-    assert_eq!(WORD_V1_TOOLS.len(), 33);
+    assert_eq!(WORD_V1_TOOLS.len(), 25);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 5);
-    assert_eq!(tools.len(), 60);
+    assert_eq!(tools.len(), 52);
 }
 
 #[test]

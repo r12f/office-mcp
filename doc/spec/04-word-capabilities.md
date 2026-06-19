@@ -47,18 +47,18 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current implemented Word v1 tool surface has 33 tools, grouped by category.
+The current advertised Word v1 tool surface has 25 tools, grouped by category.
 The per-tool JSON Schemas follow in §2-§8.
 
 | Category | Tools |
 |---|---|
 | **Read** | `word.get_text`, `word.get_outline`, `word.get_paragraph`, `word.find_text`, `word.get_selection` |
-| **Insert** | `word.insert_paragraph`, `word.insert_heading`, `word.insert_table`, `word.insert_image`, `word.insert_page_break`, `word.insert_list` |
+| **Insert** | `word.insert_paragraph`, `word.insert_table`, `word.insert_image`, `word.insert_page_break`, `word.insert_list` |
 | **Edit** | `word.replace_text`, `word.update_paragraph`, `word.delete_range`, `word.apply_formatting` |
-| **Tables** | `word.read_table`, `word.update_table`, `word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell` |
+| **Tables** | `word.read_table`, `word.update_table` |
 | **Content Controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
-| **Structure** | `word.set_heading_level`, `word.apply_style` |
-| **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_tracked_change`, `word.accept_change`, `word.reject_change` |
+| **Structure** | `word.apply_style` |
+| **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_tracked_change` |
 | **Document** | `word.save` |
 
 ### 1.2 Target refined Word tool surface
@@ -70,9 +70,9 @@ as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
 The target surface has 25 tools. It deliberately consolidates specialized tools
-that perform the same user intent under a single owner. Current implemented
-compatibility tools remain documented below until the migration TODO in
-[08-roadmap.md](08-roadmap.md) retires them from the advertised catalog.
+that perform the same user intent under a single owner. Superseded
+compatibility tools remain documented below for migration history, but they are
+not advertised by the daemon catalog or task pane available-tools metadata.
 
 | Tool | Status | Category | Side effect | Minimum API | Summary |
 |---|---|---|---|---|---|
@@ -281,12 +281,19 @@ paragraphs; portable character offsets are intentionally not exposed.
     "text": { "type": "string" },
     "anchor": { "$ref": "#/$defs/anchor" },
     "style": { "type": "string", "default": "Normal" },
+    "heading_level": { "type": "integer", "minimum": 0, "maximum": 9 },
     "formatting": { "$ref": "#/$defs/run_formatting" }
   }
 }
 ```
 
+`heading_level` is the target replacement for `word.insert_heading`. Level `0`
+inserts body text; levels `1`-`9` apply the corresponding heading style.
+
 ### 3.2 `word.insert_heading`
+
+Superseded compatibility contract. This tool is no longer advertised; use
+`word.insert_paragraph` with `heading_level`.
 
 ```json
 {
@@ -546,6 +553,9 @@ migration retires them from advertisement.
 
 ### 5.3 `word.update_cell`
 
+Superseded compatibility contract. This tool is no longer advertised; use
+`word.update_table` with `action: "update_cell"`.
+
 ```json
 {
   "type": "object",
@@ -562,6 +572,9 @@ migration retires them from advertisement.
 ```
 
 ### 5.4 `word.add_row`
+
+Superseded compatibility contract. This tool is no longer advertised; use
+`word.update_table` with `action: "add_row"`.
 
 ```json
 {
@@ -583,6 +596,9 @@ length must equal the table's current column count.
 
 ### 5.5 `word.add_column`
 
+Superseded compatibility contract. This tool is no longer advertised; use
+`word.update_table` with `action: "add_column"`.
+
 ```json
 {
   "type": "object",
@@ -602,6 +618,9 @@ satisfy that API return `HOST_CAPABILITY_UNAVAILABLE`. If `values` is
 provided, its length must equal the table's current row count.
 
 ### 5.6 `word.format_cell`
+
+Superseded compatibility contract. This tool is no longer advertised; use
+`word.update_table` with `action: "format_cell"`.
 
 ```json
 {
@@ -628,6 +647,9 @@ cross-platform Office.js behavior is verified.
 
 ### 6.1 `word.set_heading_level`
 
+Superseded compatibility contract. This tool is no longer advertised; use
+`word.apply_style` with `heading_level`.
+
 ```json
 {
   "type": "object",
@@ -647,14 +669,18 @@ Level `0` converts the paragraph to body text.
 ```json
 {
   "type": "object",
-  "required": ["session_id", "anchor", "style"],
+  "required": ["session_id", "anchor"],
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
     "anchor": { "$ref": "#/$defs/anchor" },
-    "style": { "type": "string", "minLength": 1 }
+    "style": { "type": "string", "minLength": 1 },
+    "heading_level": { "type": "integer", "minimum": 0, "maximum": 9 }
   }
 }
 ```
+
+Callers must provide either `style` or `heading_level`. `heading_level` is the
+target replacement for `word.set_heading_level`.
 
 `word.create_style` is reserved for a future capability set after its
 cross-platform Office.js behavior is verified.
