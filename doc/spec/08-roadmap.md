@@ -84,6 +84,55 @@ review the result like a normal collaborator's edits.
 - [x] `word.insert_image` (base64 + URL)
 - [x] `word.insert_list` (numbered, bulleted)
 
+### M4.1 — Word Core Tool Surface Refinement
+
+Research basis: Microsoft Word add-in docs identify the core object model as
+`Document` -> sections/body -> `Range`, with paragraphs, lists, tables, content
+controls, comments, and tracked changes as the high-value user-facing objects.
+The refined catalog should be about 25 tools and must apply Occam's razor: do
+not keep a separate tool when it only repeats another tool's object owner and
+user intent.
+
+Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
+`word.find_text`, `word.get_selection`, `word.insert_paragraph`,
+`word.insert_table`, `word.insert_image`, `word.insert_page_break`,
+`word.insert_list`, `word.replace_text`, `word.update_paragraph`,
+`word.delete_range`, `word.apply_formatting`, `word.apply_style`,
+`word.read_table`, `word.update_table`, `word.list_content_controls`,
+`word.insert_content_control`, `word.update_content_control`,
+`word.delete_content_control`, `word.add_comment`, `word.resolve_comment`,
+`word.update_tracked_change`, and `word.save`.
+
+Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
+`word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell`,
+`word.accept_change`, and `word.reject_change`.
+
+- [ ] Verify planned Word content-control and consolidated mutation APIs against
+      `@types/office-js` and Microsoft API docs before implementation.
+- [ ] Extend `word.insert_paragraph` so heading insertion is represented by
+      style or heading-level arguments, then retire `word.insert_heading` from
+      the advertised catalog after compatibility evidence is captured.
+- [ ] Extend `word.apply_style` so heading-level changes are represented as
+      semantic style changes, then retire `word.set_heading_level` from the
+      advertised catalog.
+- [ ] Implement `word.update_table` as the single table mutation owner for cell
+      values, row/column insertion, table/cell formatting, and table deletion;
+      retire `word.update_cell`, `word.add_row`, `word.add_column`, and
+      `word.format_cell` from the advertised catalog.
+- [ ] Add content-control CRUD tools: `word.list_content_controls`,
+      `word.insert_content_control`, `word.update_content_control`, and
+      `word.delete_content_control`, keeping generic text edits owned by
+      paragraph/range tools unless the caller targets a content control.
+- [ ] Implement `word.update_tracked_change` with an explicit `action` argument
+      for accept/reject, then retire `word.accept_change` and
+      `word.reject_change` from the advertised catalog.
+- [ ] Update daemon MCP catalog entries, JSON schemas, permission categories,
+      task pane tool grouping, runtime evidence scripts, and README text from
+      the current 27-tool compatibility surface to the refined 25-tool surface.
+- [ ] Add compatibility/deprecation tests proving superseded tools are not
+      advertised after migration while their target-owner replacements cover the
+      same user workflows without duplicate writes.
+
 ### M5 — Document IO
 
 - [x] `word.save`

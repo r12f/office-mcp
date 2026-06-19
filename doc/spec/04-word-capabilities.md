@@ -47,8 +47,8 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The full Word v1 tool surface, grouped by category. The per-tool JSON Schemas
-follow in §2–§8.
+The current implemented Word v1 tool surface has 27 tools, grouped by category.
+The per-tool JSON Schemas follow in §2-§8.
 
 | Category | Tools |
 |---|---|
@@ -60,7 +60,79 @@ follow in §2–§8.
 | **Review** | `word.add_comment`, `word.resolve_comment`, `word.accept_change`, `word.reject_change` |
 | **Document** | `word.save` |
 
-### 1.2 Runtime capability tiers
+### 1.2 Target refined Word tool surface
+
+The target refined Word surface is based on the Microsoft Word add-in object
+model: `Document` contains sections and document-level state; a section has a
+`Body`; `Body` and `Range` own most text operations; higher-level objects such
+as paragraphs, lists, tables, content controls, comments, and tracked changes
+own object-specific lifecycle and review workflows.
+
+The target surface has 25 tools. It deliberately consolidates specialized tools
+that perform the same user intent under a single owner. Current implemented
+compatibility tools remain documented below until the migration TODO in
+[08-roadmap.md](08-roadmap.md) retires them from the advertised catalog.
+
+| Tool | Status | Category | Side effect | Minimum API | Summary |
+|---|---|---|---|---|---|
+| `word.get_text` | implemented | Read | read | `WordApi 1.3` | Read paginated document body text; paragraph metadata is optional. |
+| `word.get_outline` | implemented | Read | read | `WordApi 1.3` | Read headings and lightweight document structure without body text. |
+| `word.get_paragraph` | implemented | Read | read | `WordApi 1.3` | Read one paragraph by index. |
+| `word.find_text` | implemented | Read | read | `WordApi 1.3` | Search text with Word search options and return portable paragraph-relative matches. |
+| `word.get_selection` | implemented | Read | read | `WordApi 1.3` | Read current selection text and simple selection metadata. |
+| `word.insert_paragraph` | implemented | Insert | edit | `WordApi 1.3` | Insert a paragraph at an anchor; also owns heading insertion through style or heading-level arguments after migration. |
+| `word.insert_table` | implemented | Insert | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
+| `word.insert_image` | implemented | Insert | edit | `WordApi 1.3` | Insert a validated image from base64 or a daemon-fetched HTTPS URL. |
+| `word.insert_page_break` | implemented | Insert | edit | `WordApi 1.3` | Insert a page break at an anchor. |
+| `word.insert_list` | implemented | Insert | edit | `WordApi 1.3` | Insert a numbered or bulleted list. |
+| `word.replace_text` | implemented | Edit | edit | `WordApi 1.3` | Find and replace text, with dry-run support. |
+| `word.update_paragraph` | implemented | Edit | edit | `WordApi 1.3` | Replace one paragraph's text wholesale. |
+| `word.delete_range` | implemented | Edit | destructive | `WordApi 1.3` | Delete an anchored paragraph, sentence, or selection. |
+| `word.apply_formatting` | implemented | Format | edit | `WordApi 1.3` | Apply character/run formatting to an anchored range. |
+| `word.apply_style` | implemented | Structure | edit | `WordApi 1.3` | Apply an Office style to an anchored range; also owns heading-level changes after migration. |
+| `word.read_table` | implemented | Table | read | `WordApi 1.3` | Read table dimensions, header state, and cell text. |
+| `word.update_table` | planned | Table | edit/destructive | verify during implementation | Update table cells, rows, columns, table/cell formatting, and table deletion through one table-owner tool. |
+| `word.list_content_controls` | planned | ContentControl | read | verify during implementation | List content controls with id/tag/title/type/range metadata, without duplicating document text reads. |
+| `word.insert_content_control` | planned | ContentControl | edit | verify during implementation | Create a content control around an anchored range or inserted placeholder content. |
+| `word.update_content_control` | planned | ContentControl | edit | verify during implementation | Update content control metadata, locked state, or contained text through the content-control owner. |
+| `word.delete_content_control` | planned | ContentControl | destructive | verify during implementation | Delete a content control, preserving or deleting contents according to an explicit mode. |
+| `word.add_comment` | implemented | Review | comment | `WordApi 1.4` | Add a comment to an anchored range as the signed-in Office user. |
+| `word.resolve_comment` | implemented | Review | comment | `WordApi 1.4` | Resolve an existing comment. |
+| `word.update_tracked_change` | planned | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint. |
+| `word.save` | implemented | Document | edit | `WordApi 1.1` | Save the current document with the host save behavior. |
+
+Superseded target-surface tools:
+
+| Current tool | Target owner | Reason |
+|---|---|---|
+| `word.insert_heading` | `word.insert_paragraph` | Heading insertion is paragraph insertion with a heading style or level. |
+| `word.set_heading_level` | `word.apply_style` | Heading level changes are style changes. |
+| `word.update_cell` | `word.update_table` | Cell updates are table-owned mutations. |
+| `word.add_row` | `word.update_table` | Row insertion is a table-owned mutation. |
+| `word.add_column` | `word.update_table` | Column insertion is a table-owned mutation. |
+| `word.format_cell` | `word.update_table` | Cell formatting is table-owned formatting, distinct from generic run formatting. |
+| `word.accept_change` / `word.reject_change` | `word.update_tracked_change` | Accept/reject are one tracked-change action with an explicit `action` argument. |
+
+Tool ownership rules:
+
+- One common user intent has one tool owner. Add a new tool only when it has a
+  different object owner, permission profile, or user-visible result.
+- Read resources and read tools may expose the same underlying document data,
+  but mutation tools must not duplicate each other's writes.
+- `word.insert_paragraph` owns paragraph creation, including headings. Do not add
+  a separate heading insertion tool after migration.
+- `word.apply_style` owns semantic Office style changes, including heading level.
+  `word.apply_formatting` owns direct character/run formatting only.
+- `word.read_table` owns table content reads. `word.update_table` owns table
+  structure, cell value, table/cell formatting, and deletion mutations.
+- Content-control tools own content-control lifecycle and metadata. Generic text
+  edits inside a known range remain owned by range/paragraph tools unless the
+  caller is explicitly targeting a content control.
+- `word.update_tracked_change` owns tracked-change accept/reject actions. The
+  tracked-change resource remains the read owner for current indices and
+  fingerprints.
+
+### 1.3 Runtime capability tiers
 
 The base manifest requires `WordApi 1.3`. The add-in probes higher sets at
 runtime and advertises only tools whose complete implementation is supported:
@@ -75,7 +147,7 @@ runtime and advertises only tools whose complete implementation is supported:
 `word.save` uses the production `WordApi 1.1` API and is available whenever
 the core tier is available. Preview APIs are excluded from v1.
 
-### 1.3 Word resources
+### 1.4 Word resources
 
 Declarative read-only resources (mutations go through tools in §2–§8).
 URI scheme and cross-cutting semantics are defined in

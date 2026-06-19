@@ -47,7 +47,10 @@ The Windows desktop implementation is in place for Word, Excel, and PowerPoint:
 - MCP server catalog covers the full Word v1 tool surface from
   `doc/spec/04-word-capabilities.md`, the Excel v1 tool surface from
   `doc/spec/04-excel-capabilities.md`, and the PowerPoint v1 tools in the roadmap.
-- The current Word add-in runtime advertises and executes all 27 Word v1 tools: discovery, read, insert, edit, table, structure, review, tracked-change, and save operations.
+- The current Word add-in runtime advertises and executes the 27-tool Word v1 compatibility surface.
+  `doc/spec/04-word-capabilities.md` now defines the target refined 25-tool Word surface,
+  and `doc/spec/08-roadmap.md` tracks the migration that removes duplicate specialized tools
+  from the advertised catalog.
 - The current Excel add-in runtime advertises and executes the Excel v1 workbook tools: range read/write, sheet creation, formula setting, formatting, table creation, and chart creation.
 - The current PowerPoint add-in runtime advertises and executes the PowerPoint v1 presentation tools: add slide, replace text, insert image, apply layout, and PDF export where the host supports it.
 - The daemon also exposes the Word v1 resource surface, including document text, structure, paragraph, comments, tracked changes, and selection.
