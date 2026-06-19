@@ -408,6 +408,23 @@ Current reported issues to carry as TODO requirements:
   accepted product icon, product tooltip, OS-native right-click menu, native menu
   behavior, and native quit confirmation; custom/web-styled menus are blockers.
 
+Current screenshot feedback to preserve for the next implementation goal:
+
+- Redesign or materially refine the logo as a product-design deliverable. The
+  mark must not use Office logos or Office-owned visual language, but it must
+  still make office productivity and local user control obvious. The target
+  impression is mature, slightly futuristic desktop control software, not a
+  generic add-in, settings gear, debug badge, or experimental placeholder.
+- Correct the add-in first-contact identity in one pass: title, icon, provider,
+  description, ribbon command, task pane chrome, catalog-visible type/category,
+  and generated catalog metadata. The Office catalog and ribbon must look like a
+  finished product before the task pane opens.
+- Correct the tray as a native product surface. A visible product icon is
+  required in the Windows notification area, and right-click must open a real
+  OS-native menu anchored to that icon. A blank/default icon, missing icon,
+  webview/CSS/custom-drawn menu, or non-native-looking menu keeps the tray item
+  open.
+
 - [ ] Redesign or re-approve the logo from the current visible user surfaces.
       The review must answer the user's current complaint directly: the logo
       cannot use Office logos, but it must still visibly communicate office
@@ -416,21 +433,29 @@ Current reported issues to carry as TODO requirements:
       settings mark, debug badge, placeholder tile, AI decoration, or legally
       distinct but weak office-control metaphor at tray/ribbon/catalog sizes,
       redesign the source mark and regenerate the asset set before closing this
-      item.
+      item. This item can close only after the final mark is reviewed in the
+      real add-in catalog, ribbon, task pane chrome, tray, installer, and daemon
+      title-bar surfaces or in release-equivalent rendered evidence tied to the
+      current asset fingerprints.
 - [ ] Rework the add-in title, icon, and visible type/category as one mature
       installed-software surface for Word, Excel, and PowerPoint. The catalog
       card, ribbon command, task pane chrome, provider, description, and
       generated catalog metadata must all present `Office MCP Control` as a
       finished local productivity/control product. Generic `Add-in`/`Task Pane`
       type text, default/missing icons, raw MCP/protocol wording, host package
-      names, or experimental sideload presentation keep this item open.
+      names, or experimental sideload presentation keep this item open. The
+      install/catalog scripts must be fixed as part of this item if any host
+      catalog disappears, points to stale assets, or renders the wrong title,
+      icon, provider, description, or type/category after reinstall.
 - [ ] Rework the tray first impression until it looks native and product-grade
       in a normal Windows daemon launch. The tray must show the accepted product
       glyph, product tooltip, OS-native right-click menu anchored to the visible
       notification-area icon, native separators/disabled rows, keyboardable menu
       behavior, and native quit confirmation. A custom-drawn, webview, CSS,
       frameless, or toolkit-demo-looking menu fails this item even when actions
-      work.
+      work. This item cannot close from `tray --probe` alone; it requires live
+      interactive Windows evidence showing the icon and native menu opened from
+      that exact notification-area icon.
 - [x] Run a full product logo concept pass before accepting the final mark. The
       pass must produce multiple original concept directions that communicate
       office productivity plus local control without Office-owned marks, Office
