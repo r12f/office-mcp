@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#F7F8FA" />
     <title>Office MCP Control</title>
+    <link rel="stylesheet" href="/common/taskpane.css?v=0.1.1" />
     <link rel="stylesheet" href="/powerpoint/taskpane.css?v=0.1.1" />
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script defer src="/common/browser-ui.js?v=0.1.1"></script>
     <script defer src="/common/addin-channel.js?v=0.1.1"></script>
     <script defer src="/common/logger.js?v=0.1.1"></script>
     <script defer src="/common/task-history.js?v=0.1.1"></script>
+    <script defer src="/common/main-ui.js?v=0.1.1"></script>
     <script defer src="/powerpoint/taskpane.js?v=0.1.1"></script>
   </head>
   <body>
@@ -25,14 +27,6 @@
               <h1>Office MCP Control</h1>
             </div>
           </div>
-          <button id="settingsToggle" class="icon-button" type="button" aria-label="Open Settings" title="Open Settings" aria-expanded="false" aria-controls="settingsPanel">
-            <svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M4 7h6m4 0h6M4 12h11m4 0h1M4 17h3m4 0h9" />
-              <circle cx="12" cy="7" r="2" />
-              <circle cx="17" cy="12" r="2" />
-              <circle cx="9" cy="17" r="2" />
-            </svg>
-          </button>
         </header>
 
         <div class="section-heading document-heading">
@@ -44,7 +38,19 @@
           <dt>Session</dt>
           <dd><button type="button" class="metadata-copy" data-copy-target="session" aria-label="Copy session ID" title="Copy session ID"><code id="session">-</code></button></dd>
           <dt>Daemon</dt>
-          <dd><button type="button" class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint" title="Copy daemon endpoint"><code id="daemon">-</code></button></dd>
+          <dd>
+            <form id="settingsForm" class="daemon-endpoint-form" novalidate>
+              <input id="endpointInput" class="daemon-endpoint-input" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Daemon endpoint" placeholder="wss://localhost:8765/addin" />
+              <button id="saveEndpoint" class="icon-button reconnect-button" type="submit" aria-label="Reconnect daemon" title="Reconnect daemon">
+                <svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M20 12a8 8 0 1 1-2.35-5.65" />
+                  <path d="M20 4v6h-6" />
+                </svg>
+              </button>
+            </form>
+            <p id="endpointError" class="field-error" role="alert"></p>
+            <button type="button" class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint" title="Copy daemon endpoint"><code id="daemon">-</code></button>
+          </dd>
           <dt>Runtime</dt>
           <dd id="runtimeVersions"><span id="serverVersion">Server Unknown</span> / <span id="protocolVersion">Protocol 1.0</span></dd>
           <dt>Host</dt>
@@ -60,22 +66,10 @@
         <details class="tools-panel">
           <summary>
             <span>Tools</span>
-            <span id="toolCount" class="meta-pill">Enabled 0 of 5</span>
+            <span id="toolCount" class="meta-pill">Enabled 0 of 25</span>
           </summary>
           <div id="toolList" class="tool-list" aria-label="PowerPoint tool controls"></div>
         </details>
-
-        <section id="settingsPanel" class="settings-panel" aria-labelledby="settingsHeading" hidden>
-          <h2 id="settingsHeading">Settings</h2>
-          <form id="settingsForm" novalidate>
-            <label for="endpointInput">Daemon Endpoint</label>
-            <div class="input-row">
-              <input id="endpointInput" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="wss://localhost:8765/addin…" />
-              <button id="saveEndpoint" type="submit">Save Endpoint</button>
-            </div>
-            <p id="endpointError" class="field-error" role="alert"></p>
-          </form>
-        </section>
       </section>
 
       <section class="panel current-task-panel" aria-labelledby="currentTaskHeading">

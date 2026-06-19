@@ -2,6 +2,7 @@
   const ADDIN_VERSION = '0.1.1';
   const PROTOCOL_VERSION = '1.0';
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
+  const { bindDetailsControl, officeHostSummary, renderRuntimeVersions } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -28,23 +29,68 @@
   const { TaskHistoryStore } = window.OfficeCtlTaskHistory;
 
   const AVAILABLE_TOOLS = [
+    'powerpoint.get_presentation_info',
+    'powerpoint.get_active_view',
+    'powerpoint.export_file',
+    'powerpoint.update_tags',
+    'powerpoint.list_slides',
     'powerpoint.add_slide',
-    'powerpoint.replace_text',
-    'powerpoint.insert_image',
+    'powerpoint.update_slide',
+    'powerpoint.delete_slide',
+    'powerpoint.move_slide',
+    'powerpoint.export_slide',
+    'powerpoint.list_layouts',
     'powerpoint.apply_layout',
-    'powerpoint.export_pdf'
+    'powerpoint.get_selection',
+    'powerpoint.set_selection',
+    'powerpoint.list_shapes',
+    'powerpoint.add_text_box',
+    'powerpoint.add_shape',
+    'powerpoint.insert_image',
+    'powerpoint.update_shape',
+    'powerpoint.read_text',
+    'powerpoint.replace_text',
+    'powerpoint.format_text',
+    'powerpoint.add_table',
+    'powerpoint.read_table',
+    'powerpoint.update_table'
   ];
   const TOOL_GROUPS = [
-    { label: 'Slides', tools: ['powerpoint.add_slide', 'powerpoint.apply_layout'] },
-    { label: 'Content', tools: ['powerpoint.replace_text', 'powerpoint.insert_image'] },
-    { label: 'Export', tools: ['powerpoint.export_pdf'] }
+    { label: 'Presentation', tools: ['powerpoint.get_presentation_info', 'powerpoint.get_active_view', 'powerpoint.export_file'] },
+    { label: 'Metadata', tools: ['powerpoint.update_tags'] },
+    { label: 'Slides', tools: ['powerpoint.list_slides', 'powerpoint.add_slide', 'powerpoint.update_slide', 'powerpoint.delete_slide', 'powerpoint.move_slide', 'powerpoint.export_slide'] },
+    { label: 'Layout', tools: ['powerpoint.list_layouts', 'powerpoint.apply_layout'] },
+    { label: 'Selection', tools: ['powerpoint.get_selection', 'powerpoint.set_selection'] },
+    { label: 'Shapes', tools: ['powerpoint.list_shapes', 'powerpoint.add_text_box', 'powerpoint.add_shape', 'powerpoint.insert_image', 'powerpoint.update_shape'] },
+    { label: 'Text', tools: ['powerpoint.read_text', 'powerpoint.replace_text', 'powerpoint.format_text'] },
+    { label: 'Tables', tools: ['powerpoint.add_table', 'powerpoint.read_table', 'powerpoint.update_table'] }
   ];
   const TOOL_METADATA = new Map([
+    ['powerpoint.get_presentation_info', { category: 'Presentation', sideEffect: 'read', description: 'Return presentation metadata, counts, selection summary, and capability gates.' }],
+    ['powerpoint.get_active_view', { category: 'Presentation', sideEffect: 'read', description: 'Return the current PowerPoint view mode.' }],
+    ['powerpoint.export_file', { category: 'Presentation', sideEffect: 'read', description: 'Export the presentation as PDF or PPTX when supported by the host.' }],
+    ['powerpoint.update_tags', { category: 'Metadata', sideEffect: 'destructive', description: 'Read, set, or delete presentation tags.' }],
+    ['powerpoint.list_slides', { category: 'Slides', sideEffect: 'read', description: 'List slides with ids, indices, layout, tags, and shape counts.' }],
     ['powerpoint.add_slide', { category: 'Slides', sideEffect: 'mutating', description: 'Add a slide to the current presentation.' }],
-    ['powerpoint.replace_text', { category: 'Content', sideEffect: 'mutating', description: 'Replace matching text in slide content.' }],
-    ['powerpoint.insert_image', { category: 'Content', sideEffect: 'mutating', description: 'Insert an image on a slide.' }],
+    ['powerpoint.update_slide', { category: 'Slides', sideEffect: 'mutating', description: 'Update slide tags, hidden state, or background where supported.' }],
+    ['powerpoint.delete_slide', { category: 'Slides', sideEffect: 'destructive', description: 'Delete a slide without leaving the presentation empty.' }],
+    ['powerpoint.move_slide', { category: 'Slides', sideEffect: 'mutating', description: 'Move a slide to a target index.' }],
+    ['powerpoint.export_slide', { category: 'Slides', sideEffect: 'read', description: 'Export one slide image data when supported by the host.' }],
+    ['powerpoint.list_layouts', { category: 'Layout', sideEffect: 'read', description: 'List slide masters and layouts.' }],
     ['powerpoint.apply_layout', { category: 'Slides', sideEffect: 'mutating', description: 'Apply a layout to a slide.' }],
-    ['powerpoint.export_pdf', { category: 'Export', sideEffect: 'read', description: 'Export the presentation to PDF when host support is available.' }]
+    ['powerpoint.get_selection', { category: 'Selection', sideEffect: 'read', description: 'Return selected slides, shapes, or text metadata.' }],
+    ['powerpoint.set_selection', { category: 'Selection', sideEffect: 'mutating', description: 'Select slides or text where supported.' }],
+    ['powerpoint.list_shapes', { category: 'Shapes', sideEffect: 'read', description: 'List shapes on a slide with geometry and content metadata.' }],
+    ['powerpoint.add_text_box', { category: 'Shapes', sideEffect: 'mutating', description: 'Add a text box to a slide.' }],
+    ['powerpoint.add_shape', { category: 'Shapes', sideEffect: 'mutating', description: 'Add a geometric shape or line to a slide.' }],
+    ['powerpoint.insert_image', { category: 'Shapes', sideEffect: 'mutating', description: 'Insert an image on a slide or current selection.' }],
+    ['powerpoint.update_shape', { category: 'Shapes', sideEffect: 'destructive', description: 'Update shape geometry, visual settings, metadata, z-order, or deletion.' }],
+    ['powerpoint.read_text', { category: 'Text', sideEffect: 'read', description: 'Read text from selected text, a shape, one slide, or all slides.' }],
+    ['powerpoint.replace_text', { category: 'Text', sideEffect: 'mutating', description: 'Replace matching text in slide content.' }],
+    ['powerpoint.format_text', { category: 'Text', sideEffect: 'mutating', description: 'Apply font and paragraph formatting to text.' }],
+    ['powerpoint.add_table', { category: 'Tables', sideEffect: 'mutating', description: 'Add a table to a slide.' }],
+    ['powerpoint.read_table', { category: 'Tables', sideEffect: 'read', description: 'Read table dimensions, values, and cell metadata.' }],
+    ['powerpoint.update_table', { category: 'Tables', sideEffect: 'destructive', description: 'Update table values, layout, style, or delete the table shape.' }]
   ]);
 
   const { instanceId, sessionId } = runtimeIds();
@@ -55,7 +101,6 @@
   let reconnectTimer;
   let reconnectAttempt = 0;
   let endpointDirty = false;
-  let suppressNextSettingsClick = false;
   let serverInfo = { serverVersion: 'Unknown', protocolVersion: PROTOCOL_VERSION };
   let documentInfo = null;
   let toolPermissions = loadToolPermissions();
@@ -77,16 +122,12 @@
   const currentTaskStateEl = document.getElementById('currentTaskState');
   const historyListEl = document.getElementById('historyList');
   const historyCountEl = document.getElementById('historyCount');
-  const settingsToggleEl = document.getElementById('settingsToggle');
-  const settingsPanelEl = document.getElementById('settingsPanel');
   const settingsFormEl = document.getElementById('settingsForm');
   const endpointInputEl = document.getElementById('endpointInput');
   const endpointErrorEl = document.getElementById('endpointError');
   const saveEndpointEl = document.getElementById('saveEndpoint');
   const announcerEl = document.getElementById('announcer');
 
-  settingsToggleEl.addEventListener('click', handleSettingsClick);
-  settingsToggleEl.addEventListener('keydown', activateSettingsWithKeyboard);
   settingsFormEl.addEventListener('submit', saveEndpointOverride);
   document.addEventListener('click', handleMetadataCopy);
   endpointInputEl.addEventListener('input', () => {
@@ -231,8 +272,7 @@
       return;
     }
     serverInfo = registerResult(message, PROTOCOL_VERSION);
-    serverVersionEl.textContent = `Server ${serverInfo.serverVersion}`;
-    protocolVersionEl.textContent = `Protocol ${serverInfo.protocolVersion}`;
+    renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
     connectionDetailEl.textContent = 'None';
     enableAutoOpen().then(() => announceSession()).catch((error) => {
       logger.error('session.announce.failed', error);
@@ -269,20 +309,80 @@
       if (taskStore.isCancelled(requestId)) throw cancelledError(tool);
       let data;
       switch (tool) {
+        case 'powerpoint.get_presentation_info':
+          data = await getPresentationInfoTool(args);
+          break;
+        case 'powerpoint.get_active_view':
+          data = await getActiveView(args);
+          break;
+        case 'powerpoint.export_file':
+          data = await exportFile(args);
+          break;
+        case 'powerpoint.update_tags':
+          data = await updateTags(args);
+          break;
+        case 'powerpoint.list_slides':
+          data = await listSlides(args);
+          break;
         case 'powerpoint.add_slide':
           data = await addSlide(args);
           break;
-        case 'powerpoint.replace_text':
-          data = await replaceText(args);
+        case 'powerpoint.update_slide':
+          data = await updateSlide(args);
           break;
-        case 'powerpoint.insert_image':
-          data = await insertImage(args);
+        case 'powerpoint.delete_slide':
+          data = await deleteSlide(args);
+          break;
+        case 'powerpoint.move_slide':
+          data = await moveSlide(args);
+          break;
+        case 'powerpoint.export_slide':
+          data = await exportSlide(args);
+          break;
+        case 'powerpoint.list_layouts':
+          data = await listLayouts(args);
           break;
         case 'powerpoint.apply_layout':
           data = await applyLayout(args);
           break;
-        case 'powerpoint.export_pdf':
-          data = await exportPdf(args);
+        case 'powerpoint.get_selection':
+          data = await getSelection(args);
+          break;
+        case 'powerpoint.set_selection':
+          data = await setSelection(args);
+          break;
+        case 'powerpoint.list_shapes':
+          data = await listShapes(args);
+          break;
+        case 'powerpoint.add_text_box':
+          data = await addTextBox(args);
+          break;
+        case 'powerpoint.add_shape':
+          data = await addShape(args);
+          break;
+        case 'powerpoint.insert_image':
+          data = await insertImage(args);
+          break;
+        case 'powerpoint.update_shape':
+          data = await updateShape(args);
+          break;
+        case 'powerpoint.read_text':
+          data = await readText(args);
+          break;
+        case 'powerpoint.replace_text':
+          data = await replaceText(args);
+          break;
+        case 'powerpoint.format_text':
+          data = await formatText(args);
+          break;
+        case 'powerpoint.add_table':
+          data = await addTable(args);
+          break;
+        case 'powerpoint.read_table':
+          data = await readTable(args);
+          break;
+        case 'powerpoint.update_table':
+          data = await updateTable(args);
           break;
         default:
           throw Object.assign(new Error(`Unsupported tool ${tool}`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
@@ -335,6 +435,152 @@
     });
   }
 
+  async function getPresentationInfoTool(args) {
+    return PowerPoint.run(async (context) => {
+      const slides = context.presentation.slides;
+      slides.load('items/id,index');
+      await context.sync();
+      const info = await getPresentationInfo();
+      return {
+        ...info,
+        slide_count: slides.items?.length || 0,
+        requirement_sets: probeRequirementSets(),
+        capabilities: Object.fromEntries(AVAILABLE_TOOLS.map((tool) => [tool, isToolEnabled(tool)])),
+        include_selection: Boolean(args.include_selection)
+      };
+    });
+  }
+
+  async function getActiveView(_args) {
+    const view = await officeAsync((callback) => Office.context.document.getActiveViewAsync(callback));
+    return { active_view: String(view || 'unknown'), editable: String(view || '').toLowerCase() !== 'read' };
+  }
+
+  async function exportFile(args) {
+    const format = String(args.format || 'pdf').toLowerCase();
+    const fileType = officeFileTypeFrom(format);
+    const file = await officeAsync((callback) => Office.context.document.getFileAsync(fileType, { sliceSize: positiveInteger(args.slice_size, 4 * 1024 * 1024) }, callback));
+    try {
+      const chunks = [];
+      for (let index = 0; index < file.sliceCount; index += 1) {
+        const slice = await officeAsync((callback) => file.getSliceAsync(index, callback));
+        chunks.push(sliceDataToBytes(slice.data));
+      }
+      return { format, mime_type: mimeTypeForFormat(format), base64: bytesToBase64(concatBytes(chunks)), size: file.size, slice_count: file.sliceCount };
+    } finally {
+      await officeAsync((callback) => file.closeAsync(callback)).catch((error) => logger.warn('file.close.failed', error));
+    }
+  }
+
+  async function updateTags(args) {
+    requireRequirementSet('PowerPointApi', '1.3', 'presentation tags');
+    return PowerPoint.run(async (context) => {
+      const tags = context.presentation.tags;
+      tags.load('items/key,value');
+      await context.sync();
+      const action = String(args.action || 'list').toLowerCase();
+      if (action === 'set') {
+        tags.add(requiredString(args, 'key', 'powerpoint.update_tags set requires key.'), requiredString(args, 'value', 'powerpoint.update_tags set requires value.'));
+      } else if (action === 'delete') {
+        tags.delete(requiredString(args, 'key', 'powerpoint.update_tags delete requires key.'));
+      } else if (action !== 'list') {
+        throw invalidArgument(`Unsupported powerpoint.update_tags action ${action}.`);
+      }
+      await context.sync();
+      tags.load('items/key,value');
+      await context.sync();
+      return { action, tags: (tags.items || []).map((tag) => ({ key: tag.key, value: tag.value })) };
+    });
+  }
+
+  async function listSlides(args) {
+    return PowerPoint.run(async (context) => {
+      const slides = context.presentation.slides;
+      slides.load('items/id,index,tags/items/key,value,layout/id,layout/name,shapes/items/id');
+      await context.sync();
+      return { slides: (slides.items || []).map((slide) => slideMetadata(slide, Boolean(args.include_tags))) };
+    });
+  }
+
+  async function updateSlide(args) {
+    requireRequirementSet('PowerPointApi', '1.3', 'slide updates');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      const action = String(args.action || 'set_tags').toLowerCase();
+      if (action === 'set_tag') {
+        slide.tags.add(requiredString(args, 'key', 'powerpoint.update_slide set_tag requires key.'), requiredString(args, 'value', 'powerpoint.update_slide set_tag requires value.'));
+      } else if (action === 'delete_tag') {
+        slide.tags.delete(requiredString(args, 'key', 'powerpoint.update_slide delete_tag requires key.'));
+      } else if (action === 'set_background') {
+        requireRequirementSet('PowerPointApi', '1.10', 'slide background updates');
+        if (slide.background?.fill?.setSolidColor) slide.background.fill.setSolidColor(requiredString(args, 'color', 'powerpoint.update_slide set_background requires color.'));
+        else throw hostCapabilityUnavailable('Slide background updates are not available in this PowerPoint host.');
+      } else if (action !== 'set_tags') {
+        throw invalidArgument(`Unsupported powerpoint.update_slide action ${action}.`);
+      }
+      slide.load('id,index,tags/items/key,value');
+      await context.sync();
+      return { action, slide: slideMetadata(slide, true) };
+    });
+  }
+
+  async function deleteSlide(args) {
+    requireRequirementSet('PowerPointApi', '1.3', 'slide deletion');
+    return PowerPoint.run(async (context) => {
+      const slides = context.presentation.slides;
+      const count = slides.getCount();
+      await context.sync();
+      if (count.value <= 1) throw invalidArgument('powerpoint.delete_slide cannot delete the only slide.');
+      const slide = targetSlide(context, args);
+      slide.load('id,index');
+      await context.sync();
+      const deleted = { slide_id: slide.id, slide_index: slide.index };
+      slide.delete();
+      await context.sync();
+      return { ...deleted, deleted: true };
+    });
+  }
+
+  async function moveSlide(args) {
+    requireRequirementSet('PowerPointApi', '1.8', 'slide move');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      const targetIndex = requiredInteger(args, 'target_index', 'powerpoint.move_slide requires target_index.');
+      if (typeof slide.moveTo !== 'function') throw hostCapabilityUnavailable('Slide move is not available in this PowerPoint host.');
+      slide.moveTo(targetIndex);
+      slide.load('id,index');
+      await context.sync();
+      return { slide_id: slide.id, slide_index: slide.index, target_index: targetIndex };
+    });
+  }
+
+  async function exportSlide(args) {
+    requireRequirementSet('PowerPointApi', '1.8', 'slide export');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      if (typeof slide.getImageAsBase64 !== 'function') throw hostCapabilityUnavailable('Slide image export is not available in this PowerPoint host.');
+      const image = slide.getImageAsBase64();
+      slide.load('id,index');
+      await context.sync();
+      return { slide_id: slide.id, slide_index: slide.index, mime_type: 'image/png', base64: image.value || image };
+    });
+  }
+
+  async function listLayouts(_args) {
+    return PowerPoint.run(async (context) => {
+      const masters = context.presentation.slideMasters;
+      masters.load('items/id,name,layouts/items/id,name,type');
+      await context.sync();
+      return {
+        masters: (masters.items || []).map((master) => ({
+          id: master.id,
+          name: master.name || '',
+          layouts: (master.layouts.items || []).map((layout) => ({ id: layout.id, name: layout.name || '', type: layout.type || null }))
+        }))
+      };
+    });
+  }
+
   async function replaceText(args) {
     const search = requiredString(args, 'search', 'powerpoint.replace_text requires search text.');
     const replacement = requiredString(args, 'replacement', 'powerpoint.replace_text requires replacement text.');
@@ -372,6 +618,172 @@
     return { inserted_image: true, placement: 'selection', width: numberOrNull(args.width), height: numberOrNull(args.height) };
   }
 
+  async function getSelection(_args) {
+    requireRequirementSet('PowerPointApi', '1.5', 'selection reads');
+    return PowerPoint.run(async (context) => {
+      const selectedSlides = context.presentation.getSelectedSlides();
+      selectedSlides.load('items/id,index');
+      await context.sync();
+      return { slides: (selectedSlides.items || []).map((slide) => ({ slide_id: slide.id, slide_index: slide.index })) };
+    });
+  }
+
+  async function setSelection(args) {
+    requireRequirementSet('PowerPointApi', '1.5', 'selection updates');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      if (typeof slide.select !== 'function') throw hostCapabilityUnavailable('Slide selection is not available in this PowerPoint host.');
+      slide.select();
+      slide.load('id,index');
+      await context.sync();
+      return { selected: true, slide_id: slide.id, slide_index: slide.index };
+    });
+  }
+
+  async function listShapes(args) {
+    requireRequirementSet('PowerPointApi', '1.3', 'shape listing');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      slide.load('id,index,shapes/items/id,name,type,left,top,width,height,rotation,textFrame/hasText,textFrame/textRange/text');
+      await context.sync();
+      return { slide_id: slide.id, slide_index: slide.index, shapes: (slide.shapes.items || []).map(shapeMetadata) };
+    });
+  }
+
+  async function addTextBox(args) {
+    requireRequirementSet('PowerPointApi', '1.4', 'text box creation');
+    const text = requiredString(args, 'text', 'powerpoint.add_text_box requires text.');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      const shape = slide.shapes.addTextBox(text, shapeOptions(args, { left: 72, top: 72, width: 420, height: 80 }));
+      shape.load('id,name,type,left,top,width,height');
+      slide.load('id,index');
+      await context.sync();
+      return { slide_id: slide.id, slide_index: slide.index, shape: shapeMetadata(shape) };
+    });
+  }
+
+  async function addShape(args) {
+    requireRequirementSet('PowerPointApi', '1.4', 'shape creation');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      const type = shapeTypeFrom(args.type);
+      const shape = slide.shapes.addGeometricShape(type, shapeOptions(args, { left: 96, top: 96, width: 160, height: 96 }));
+      applyShapeProperties(shape, args);
+      shape.load('id,name,type,left,top,width,height,rotation');
+      slide.load('id,index');
+      await context.sync();
+      return { slide_id: slide.id, slide_index: slide.index, shape: shapeMetadata(shape) };
+    });
+  }
+
+  async function updateShape(args) {
+    requireRequirementSet('PowerPointApi', '1.4', 'shape updates');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      const shape = targetShape(slide, args);
+      const action = String(args.action || 'set_properties').toLowerCase();
+      if (action === 'delete') {
+        shape.load('id');
+        await context.sync();
+        const shapeId = shape.id;
+        shape.delete();
+        await context.sync();
+        return { action, shape_id: shapeId, deleted: true };
+      }
+      if (action === 'bring_to_front' && typeof shape.setZOrder === 'function') shape.setZOrder('bringToFront');
+      else if (action === 'send_to_back' && typeof shape.setZOrder === 'function') shape.setZOrder('sendToBack');
+      else if (!['set_properties', 'bring_to_front', 'send_to_back'].includes(action)) throw invalidArgument(`Unsupported powerpoint.update_shape action ${action}.`);
+      applyShapeProperties(shape, args);
+      shape.load('id,name,type,left,top,width,height,rotation');
+      slide.load('id,index');
+      await context.sync();
+      return { action, slide_id: slide.id, slide_index: slide.index, shape: shapeMetadata(shape) };
+    });
+  }
+
+  async function readText(args) {
+    requireRequirementSet('PowerPointApi', '1.4', 'text reads');
+    return PowerPoint.run(async (context) => {
+      const slides = targetSlides(context, args);
+      if (slides.load) slides.load('items/id,index');
+      for (const slide of slides.items || []) slide.load('id,index,shapes/items/id,textFrame/hasText,textFrame/textRange/text');
+      await context.sync();
+      const items = [];
+      for (const slide of slides.items || []) {
+        for (const shape of slide.shapes.items || []) {
+          if (!shape.textFrame?.hasText) continue;
+          items.push({ slide_id: slide.id, slide_index: slide.index, shape_id: shape.id, text: shape.textFrame.textRange?.text || '' });
+        }
+      }
+      return { items, count: items.length };
+    });
+  }
+
+  async function formatText(args) {
+    requireRequirementSet('PowerPointApi', '1.4', 'text formatting');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      const shape = targetShape(slide, args);
+      shape.load('id,textFrame/hasText,textFrame/textRange/font');
+      await context.sync();
+      if (!shape.textFrame?.hasText) throw invalidArgument('Target shape does not contain text.');
+      applyTextFormat(shape.textFrame.textRange, args);
+      await context.sync();
+      return { shape_id: shape.id, formatted: true };
+    });
+  }
+
+  async function addTable(args) {
+    requireRequirementSet('PowerPointApi', '1.8', 'table creation');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      const rows = positiveInteger(args.rows, Array.isArray(args.values) ? args.values.length : 2);
+      const columns = positiveInteger(args.columns, Array.isArray(args.values?.[0]) ? args.values[0].length : 2);
+      if (typeof slide.shapes.addTable !== 'function') throw hostCapabilityUnavailable('Table creation is not available in this PowerPoint host.');
+      const shape = slide.shapes.addTable(rows, columns, shapeOptions(args, { left: 72, top: 120, width: 480, height: 220 }));
+      shape.load('id,type,table/rowCount,table/columnCount');
+      await context.sync();
+      if (Array.isArray(args.values)) applyTableValues(shape.table, args.values);
+      await context.sync();
+      return { shape_id: shape.id, rows, columns, added: true };
+    });
+  }
+
+  async function readTable(args) {
+    requireRequirementSet('PowerPointApi', '1.8', 'table reads');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      const shape = targetShape(slide, args);
+      shape.load('id,table/rowCount,table/columnCount,table/values');
+      await context.sync();
+      if (!shape.table) throw invalidArgument('Target shape is not a table.');
+      return tableMetadata(shape);
+    });
+  }
+
+  async function updateTable(args) {
+    requireRequirementSet('PowerPointApi', '1.8', 'table updates');
+    return PowerPoint.run(async (context) => {
+      const slide = targetSlide(context, args);
+      const shape = targetShape(slide, args);
+      shape.load('id,table/rowCount,table/columnCount,table/values');
+      await context.sync();
+      if (!shape.table) throw invalidArgument('Target shape is not a table.');
+      const action = String(args.action || 'set_values').toLowerCase();
+      if (action === 'delete') {
+        const shapeId = shape.id;
+        shape.delete();
+        await context.sync();
+        return { action, shape_id: shapeId, deleted: true };
+      }
+      if (action === 'set_values') applyTableValues(shape.table, args.values || []);
+      else if (action !== 'style') throw invalidArgument(`Unsupported powerpoint.update_table action ${action}.`);
+      await context.sync();
+      return { action, table: tableMetadata(shape) };
+    });
+  }
+
   async function applyLayout(args) {
     return PowerPoint.run(async (context) => {
       const slide = targetSlide(context, args);
@@ -382,20 +794,6 @@
       await context.sync();
       return { slide_id: slide.id, slide_index: slide.index, layout_id: layout.id, layout_name: layout.name, layout_type: layout.type };
     });
-  }
-
-  async function exportPdf(args) {
-    const file = await officeAsync((callback) => Office.context.document.getFileAsync(Office.FileType.Pdf, { sliceSize: positiveInteger(args.slice_size, 4 * 1024 * 1024) }, callback));
-    try {
-      const chunks = [];
-      for (let index = 0; index < file.sliceCount; index += 1) {
-        const slice = await officeAsync((callback) => file.getSliceAsync(index, callback));
-        chunks.push(sliceDataToBytes(slice.data));
-      }
-      return { mime_type: 'application/pdf', base64: bytesToBase64(concatBytes(chunks)), size: file.size, slice_count: file.sliceCount };
-    } finally {
-      await officeAsync((callback) => file.closeAsync(callback)).catch((error) => logger.warn('pdf.close.failed', error));
-    }
   }
 
   function slideOptions(args) {
@@ -439,6 +837,12 @@
     return context.presentation.getSelectedSlides().getItemAt(0);
   }
 
+  function targetShape(slide, args) {
+    const shapeId = stringArg(args, 'shape_id') || stringArg(args, 'shapeId');
+    if (!shapeId) throw invalidArgument('PowerPoint shape tools require shape_id.');
+    return slide.shapes.getItem(shapeId);
+  }
+
   async function resolveLayout(context, args) {
     const layoutId = stringArg(args, 'layout_id') || stringArg(args, 'layoutId');
     const layoutName = stringArg(args, 'layout_name') || stringArg(args, 'layoutName');
@@ -480,6 +884,115 @@
     return options;
   }
 
+  function slideMetadata(slide, includeTags) {
+    return {
+      slide_id: slide.id,
+      slide_index: slide.index,
+      layout_id: slide.layout?.id || null,
+      layout_name: slide.layout?.name || null,
+      shape_count: slide.shapes?.items?.length ?? null,
+      tags: includeTags ? (slide.tags?.items || []).map((tag) => ({ key: tag.key, value: tag.value })) : undefined
+    };
+  }
+
+  function shapeMetadata(shape) {
+    return {
+      shape_id: shape.id,
+      name: shape.name || '',
+      type: shape.type || null,
+      left: numberOrNull(shape.left),
+      top: numberOrNull(shape.top),
+      width: numberOrNull(shape.width),
+      height: numberOrNull(shape.height),
+      rotation: numberOrNull(shape.rotation),
+      has_text: Boolean(shape.textFrame?.hasText),
+      text_preview: shape.textFrame?.hasText ? String(shape.textFrame.textRange?.text || '').slice(0, 200) : null,
+      has_table: Boolean(shape.table)
+    };
+  }
+
+  function tableMetadata(shape) {
+    return {
+      shape_id: shape.id,
+      rows: shape.table?.rowCount ?? null,
+      columns: shape.table?.columnCount ?? null,
+      values: shape.table?.values || []
+    };
+  }
+
+  function applyShapeProperties(shape, args) {
+    for (const key of ['left', 'top', 'width', 'height', 'rotation']) {
+      const value = numberOrNull(args[key]);
+      if (value !== null) shape[key] = value;
+    }
+    const name = stringArg(args, 'name');
+    if (name) shape.name = name;
+    const fillColor = stringArg(args, 'fill_color');
+    if (fillColor && shape.fill?.setSolidColor) shape.fill.setSolidColor(fillColor);
+    const lineColor = stringArg(args, 'line_color');
+    if (lineColor && shape.lineFormat?.color !== undefined) shape.lineFormat.color = lineColor;
+  }
+
+  function applyTextFormat(textRange, args) {
+    const font = textRange.font;
+    if (!font) return;
+    if (args.bold !== undefined) font.bold = Boolean(args.bold);
+    if (args.italic !== undefined) font.italic = Boolean(args.italic);
+    if (args.underline !== undefined) font.underline = Boolean(args.underline);
+    const color = stringArg(args, 'color');
+    if (color) font.color = color;
+    const name = stringArg(args, 'font_name');
+    if (name) font.name = name;
+    const size = numberOrNull(args.font_size);
+    if (size !== null) font.size = size;
+  }
+
+  function applyTableValues(table, values) {
+    if (!Array.isArray(values)) throw invalidArgument('Table values must be a two-dimensional array.');
+    for (let row = 0; row < values.length; row += 1) {
+      if (!Array.isArray(values[row])) throw invalidArgument('Table values must be a two-dimensional array.');
+      for (let column = 0; column < values[row].length; column += 1) {
+        const cell = table.getCell(row, column);
+        cell.value = values[row][column] == null ? '' : String(values[row][column]);
+      }
+    }
+  }
+
+  function shapeTypeFrom(value) {
+    const raw = String(value || 'rectangle');
+    const shapes = PowerPoint.ShapeType || {};
+    return shapes[raw] || shapes[titleCase(raw).replace(/\s+/g, '')] || raw;
+  }
+
+  function officeFileTypeFrom(format) {
+    const normalized = String(format || 'pdf').toLowerCase();
+    if (normalized === 'pdf') return Office.FileType.Pdf;
+    if (normalized === 'pptx' || normalized === 'compressed') return Office.FileType.Compressed;
+    throw invalidArgument('powerpoint.export_file format must be pdf or pptx.');
+  }
+
+  function mimeTypeForFormat(format) {
+    return format === 'pptx' || format === 'compressed'
+      ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      : 'application/pdf';
+  }
+
+  function supportsRequirementSet(name, version) {
+    return Office.context?.requirements?.isSetSupported?.(name, version) === true;
+  }
+
+  function requireRequirementSet(name, version, feature) {
+    if (!supportsRequirementSet(name, version)) throw hostCapabilityUnavailable(`${feature} requires ${name} ${version}.`);
+  }
+
+  function hostCapabilityUnavailable(message) {
+    return Object.assign(new Error(message), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+  }
+
+  function invalidArgument(message) {
+    return Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
   function officeAsync(start) {
     return new Promise((resolve, reject) => {
       start((result) => {
@@ -519,7 +1032,13 @@
 
   function requiredString(args, key, message) {
     const value = stringArg(args, key);
-    if (!value) throw Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    if (!value) throw invalidArgument(message);
+    return value;
+  }
+
+  function requiredInteger(args, key, message) {
+    const value = Number(args?.[key]);
+    if (!Number.isInteger(value)) throw invalidArgument(message);
     return value;
   }
 
@@ -585,8 +1104,8 @@
   function renderStaticState() {
     setCopyableMetadata(sessionEl, sessionId);
     setCopyableMetadata(daemonEl, configuredEndpoint());
-    serverVersionEl.textContent = `Server ${serverInfo.serverVersion}`;
-    protocolVersionEl.textContent = `Protocol ${serverInfo.protocolVersion}`;
+    renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
+    hostPlatformEl.textContent = officeHostSummary('PowerPoint');
     renderToolSummary();
     renderCurrentTask();
     renderHistory();
@@ -594,24 +1113,56 @@
 
   function renderToolSummary() {
     const effective = effectiveTools();
+    const openGroups = new Set([...toolListEl.querySelectorAll('[data-tool-group]')]
+      .filter((input) => input.closest('details')?.open)
+      .map((input) => input.dataset.toolGroup));
     toolCountEl.textContent = `Enabled ${effective.length} of ${AVAILABLE_TOOLS.length}`;
-    toolListEl.innerHTML = TOOL_GROUPS.map((group) => {
-      const enabledInGroup = group.tools.filter((tool) => isToolEnabled(tool));
-      const rows = group.tools.map((tool) => toolControlMarkup(tool)).join('');
-      return `<details class="tool-group"><summary class="tool-group-title"><span>${escapeHtml(group.label)}</span><span>Enabled ${enabledInGroup.length} of ${group.tools.length}</span></summary><div class="tool-permission-list">${rows}</div></details>`;
-    }).join('');
-    for (const checkbox of toolListEl.querySelectorAll('input[data-tool]')) {
-      checkbox.addEventListener('change', () => updateToolPermission(checkbox.dataset.tool, checkbox.checked));
+    toolListEl.textContent = '';
+    for (const group of TOOL_GROUPS) {
+      const tools = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool));
+      if (tools.length === 0) continue;
+      const enabledInGroup = tools.filter((tool) => effective.includes(tool));
+      const groupEl = document.createElement('details');
+      groupEl.className = 'tool-group';
+      groupEl.open = openGroups.has(group.label);
+      const rows = tools.map(toolControlMarkup).join('');
+      groupEl.innerHTML = [
+        '<summary class="tool-group-title">',
+        `<span>${escapeHtml(group.label)}</span>`,
+        `<span class="tool-group-count">Enabled ${enabledInGroup.length} of ${tools.length}</span>`,
+        `<input class="group-toggle" type="checkbox" role="switch" data-tool-group="${escapeHtml(group.label)}" aria-label="Toggle ${escapeHtml(group.label)} tools" ${enabledInGroup.length === tools.length ? 'checked' : ''} />`,
+        '</summary>',
+        `<div class="tool-permission-list">${rows}</div>`
+      ].join('');
+      toolListEl.appendChild(groupEl);
     }
+    toolListEl.querySelectorAll('[data-tool]').forEach((input) => bindDetailsControl(input, handleToolPermissionChange));
+    toolListEl.querySelectorAll('[data-tool-group]').forEach((input) => bindDetailsControl(input, handleToolGroupPermissionChange));
   }
 
   function toolControlMarkup(tool) {
     const meta = TOOL_METADATA.get(tool) || { sideEffect: 'unknown', description: 'No metadata.' };
     const enabled = isToolEnabled(tool);
-    const rowStateClass = `${enabled ? '' : ' is-disabled'}${meta.sideEffect === 'mutating' ? ' is-mutating' : ''}`;
+    const rowStateClass = `${enabled ? '' : ' is-disabled'}${meta.sideEffect === 'mutating' || meta.sideEffect === 'destructive' ? ' is-mutating' : ''}`;
     const sideEffectClass = meta.sideEffect === 'mutating' ? ' mutating' : '';
     const id = `toolPermission-${tool.replace(/[^a-z0-9_-]/gi, '-')}`;
-    return `<label class="tool-permission-row${rowStateClass}" for="${id}"><input id="${id}" class="tool-toggle" type="checkbox" data-tool="${escapeHtml(tool)}" ${enabled ? 'checked' : ''} /><span class="tool-permission-main"><span class="tool-permission-title"><span class="tool-permission-name">${escapeHtml(tool)}</span><span class="side-effect-pill${sideEffectClass}">${escapeHtml(titleCase(meta.sideEffect))}</span></span><span class="tool-permission-meta">${escapeHtml(meta.description)}</span></span></label>`;
+    return `<label class="tool-permission-row${rowStateClass}" for="${id}"><span class="tool-permission-main"><span class="tool-permission-title"><span class="tool-permission-name">${escapeHtml(tool)}</span><span class="side-effect-pill${sideEffectClass}">${escapeHtml(titleCase(meta.sideEffect))}</span></span><span class="tool-permission-meta">${escapeHtml(meta.description)}</span></span><input id="${id}" class="tool-toggle" type="checkbox" role="switch" data-tool="${escapeHtml(tool)}" aria-label="Toggle ${escapeHtml(tool)}" ${enabled ? 'checked' : ''} /></label>`;
+  }
+
+  function handleToolPermissionChange(event) {
+    updateToolPermission(event.currentTarget.dataset.tool, event.currentTarget.checked);
+  }
+
+  function handleToolGroupPermissionChange(event) {
+    const group = TOOL_GROUPS.find((candidate) => candidate.label === event.currentTarget.dataset.toolGroup);
+    if (!group) return;
+    const enabled = event.currentTarget.checked;
+    for (const tool of group.tools) {
+      if (AVAILABLE_TOOLS.includes(tool)) toolPermissions[tool] = enabled;
+    }
+    saveToolPermissions();
+    renderToolSummary();
+    sendSessionToolUpdate();
   }
 
   function effectiveTools() {
@@ -627,12 +1178,15 @@
     toolPermissions = { ...toolPermissions, [tool]: Boolean(enabled) };
     saveToolPermissions();
     renderToolSummary();
-    if (sessionAnnounced) {
-      send(sessionUpdatedNotification({
-        session_id: sessionId,
-        patch: { available_tools: effectiveTools() }
-      }));
-    }
+    sendSessionToolUpdate();
+  }
+
+  function sendSessionToolUpdate() {
+    if (!sessionAnnounced) return;
+    send(sessionUpdatedNotification({
+      session_id: sessionId,
+      patch: { available_tools: effectiveTools() }
+    }));
   }
 
   function loadToolPermissions() {
@@ -752,37 +1306,6 @@
     };
   }
 
-  function handleSettingsClick(event) {
-    if (suppressNextSettingsClick) {
-      suppressNextSettingsClick = false;
-      return;
-    }
-    toggleSettings(event);
-  }
-
-  function activateSettingsWithKeyboard(event) {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    suppressNextSettingsClick = true;
-    toggleSettings(event);
-  }
-
-  function toggleSettings(event) {
-    event.preventDefault();
-    const opening = settingsPanelEl.hidden;
-    if (!opening && endpointDirty && !confirm('Discard unsaved endpoint changes?')) return;
-    settingsPanelEl.hidden = !opening;
-    toolListEl.classList.toggle('is-editing-tools', opening);
-    settingsToggleEl.setAttribute('aria-expanded', String(opening));
-    settingsToggleEl.setAttribute('aria-label', opening ? 'Close Settings' : 'Open Settings');
-    settingsToggleEl.setAttribute('title', opening ? 'Close Settings' : 'Open Settings');
-    if (opening) endpointInputEl.focus();
-    if (!opening) {
-      endpointInputEl.value = configuredEndpoint();
-      endpointDirty = false;
-      endpointErrorEl.textContent = '';
-    }
-  }
-
   function saveEndpointOverride(event) {
     event.preventDefault();
     endpointErrorEl.textContent = '';
@@ -792,18 +1315,14 @@
       storeEndpointOverride(value);
       endpointDirty = false;
       saveEndpointEl.disabled = true;
-      saveEndpointEl.textContent = 'Saving\u2026';
-      settingsPanelEl.hidden = true;
-      settingsToggleEl.setAttribute('aria-expanded', 'false');
-      settingsToggleEl.setAttribute('aria-label', 'Open Settings');
-      settingsToggleEl.setAttribute('title', 'Open Settings');
+      saveEndpointEl.setAttribute('aria-busy', 'true');
       connect();
     } catch (error) {
       endpointErrorEl.textContent = error.message || 'Enter a valid wss:// endpoint.';
       endpointInputEl.focus();
     } finally {
       saveEndpointEl.disabled = false;
-      saveEndpointEl.textContent = 'Save Endpoint';
+      saveEndpointEl.removeAttribute('aria-busy');
     }
   }
 

@@ -5,6 +5,34 @@ import test from 'node:test';
 
 const ADDIN_ROOT = process.cwd();
 
+const POWERPOINT_V1_TOOLS = [
+  'powerpoint.get_presentation_info',
+  'powerpoint.get_active_view',
+  'powerpoint.export_file',
+  'powerpoint.update_tags',
+  'powerpoint.list_slides',
+  'powerpoint.add_slide',
+  'powerpoint.update_slide',
+  'powerpoint.delete_slide',
+  'powerpoint.move_slide',
+  'powerpoint.export_slide',
+  'powerpoint.list_layouts',
+  'powerpoint.apply_layout',
+  'powerpoint.get_selection',
+  'powerpoint.set_selection',
+  'powerpoint.list_shapes',
+  'powerpoint.add_text_box',
+  'powerpoint.add_shape',
+  'powerpoint.insert_image',
+  'powerpoint.update_shape',
+  'powerpoint.read_text',
+  'powerpoint.replace_text',
+  'powerpoint.format_text',
+  'powerpoint.add_table',
+  'powerpoint.read_table',
+  'powerpoint.update_table'
+];
+
 test('PowerPoint add-in manifest targets presentation host and product identity', () => {
   const manifest = readFileSync(join(ADDIN_ROOT, 'manifest.xml'), 'utf8');
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
@@ -39,10 +67,12 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
   assert.match(html, /powerpoint\/taskpane\.css\?v=0\.1\.1/);
+  assert.match(html, /common\/taskpane\.css\?v=0\.1\.1/);
   assert.match(html, /common\/browser-ui\.js\?v=0\.1\.1/);
   assert.match(html, /common\/addin-channel\.js\?v=0\.1\.1/);
   assert.match(html, /common\/logger\.js\?v=0\.1\.1/);
   assert.match(html, /common\/task-history\.js\?v=0\.1\.1/);
+  assert.match(html, /common\/main-ui\.js\?v=0\.1\.1/);
   assert.match(html, /powerpoint\/taskpane\.js\?v=0\.1\.1/);
   assert.match(html, /<script src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
   assert.doesNotMatch(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
@@ -58,45 +88,36 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(html, /class="tools-panel"/);
   assert.match(html, /<span>Tools<\/span>/);
   assert.match(html, /id="toolList"/);
-  assert.match(html, /Enabled 0 of 5/);
+  assert.match(html, /Enabled 0 of 25/);
   assert.doesNotMatch(html, /Tool Permissions/);
+  assert.doesNotMatch(html, /id="settingsToggle"/);
+  assert.doesNotMatch(html, /id="settingsPanel"/);
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
-  assert.match(html, /placeholder="wss:\/\/localhost:8765\/addin…"/);
-  assert.doesNotMatch(html, /placeholder="wss:\/\/localhost:8765\/addin"/);
-  assert.match(html, /aria-label="Open Settings" title="Open Settings"/);
+  assert.match(html, /placeholder="wss:\/\/localhost:8765\/addin"/);
+  assert.match(html, /id="saveEndpoint" class="icon-button reconnect-button" type="submit" aria-label="Reconnect daemon" title="Reconnect daemon"/);
   assert.match(html, /<svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">/);
-  assert.match(html, /<circle cx="17" cy="12" r="2" \/>/);
   assert.doesNotMatch(html, /⚙|&#9881;/);
-  assert.ok(html.indexOf('id="settingsPanel"') < html.indexOf('id="currentTaskHeading"'));
-  assert.ok(html.indexOf('id="toolList"') < html.indexOf('id="settingsPanel"'));
+  assert.ok(html.indexOf('class="daemon-endpoint-form"') < html.indexOf('id="runtimeVersions"'));
 
   assert.match(css, /--powerpoint: #b7472a/);
-  assert.match(css, /body \{[\s\S]*min-width: 320px;[\s\S]*overflow-x: hidden;/);
-  assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);
-  assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
-  assert.match(css, /\.control-glyph \{[\s\S]*width: 18px;[\s\S]*stroke: currentColor;/);
-  assert.match(css, /\.tool-permission-row\.is-mutating \{[\s\S]*border-left: 3px solid var\(--powerpoint\);/);
-  assert.match(css, /\.metadata-copy \{[\s\S]*display: inline-flex;[\s\S]*min-height: 32px;[\s\S]*text-align: left;/);
-  assert.match(css, /\.metadata-copy code \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
-  assert.match(css, /\.task-command-id \{[\s\S]*display: flex;[\s\S]*gap: 4px;/);
-  assert.match(css, /\.inline-copy \{[\s\S]*display: inline-flex;[\s\S]*min-height: 32px;[\s\S]*background: transparent;[\s\S]*cursor: pointer;/);
-  assert.match(css, /\.metadata-copy:hover,[\s\S]*\.inline-copy:focus-visible \{[\s\S]*background: var\(--surface-raised\);/);
+  const commonCss = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');
+  assert.match(commonCss, /\.tool-toggle,\r?\n\.group-toggle/);
+  assert.match(commonCss, /\.daemon-endpoint-form/);
+  assert.match(commonCss, /\.metadata-grid \{[\s\S]*align-items: center;/);
   assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
-  assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
+  assert.doesNotMatch(commonCss, /overflow-x:\s*(auto|scroll)/);
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
 
   assert.match(js, /ADDIN_VERSION = '0\.1\.1'/);
   assert.match(js, /Connecting\\u2026/);
   assert.match(js, /Reconnecting\\u2026/);
   assert.match(js, /Registering\\u2026/);
-  assert.match(js, /saveEndpointEl\.textContent = 'Saving\\u2026'/);
+  assert.match(js, /saveEndpointEl\.setAttribute\('aria-busy', 'true'\)/);
+  assert.match(js, /saveEndpointEl\.removeAttribute\('aria-busy'\)/);
   assert.doesNotMatch(js, /Connecting\.\.\./);
   assert.match(js, /const AVAILABLE_TOOLS = \[/);
-  assert.match(js, /powerpoint\.add_slide/);
-  assert.match(js, /powerpoint\.replace_text/);
-  assert.match(js, /powerpoint\.insert_image/);
-  assert.match(js, /powerpoint\.apply_layout/);
-  assert.match(js, /powerpoint\.export_pdf/);
+  for (const tool of POWERPOINT_V1_TOOLS) assert.match(js, new RegExp(escapeRegExp(tool)));
+  assert.doesNotMatch(js, /powerpoint\.export_pdf/);
   assert.match(js, /function isPowerPointHost\(info\)/);
   assert.match(js, /Office\.HostType\?\.PowerPoint/);
   assert.match(js, /Office\.context\?\.requirements\?\.isSetSupported\?\.\('PowerPointApi', '1\.1'\)/);
@@ -109,14 +130,17 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /TOOL_DISABLED_BY_USER/);
   assert.match(js, /function effectiveTools\(\)/);
   assert.match(js, /function updateToolPermission\(tool, enabled\)/);
-  assert.match(js, /<details class="tool-group"><summary class="tool-group-title">/);
+  assert.match(js, /document\.createElement\('details'\)/);
+  assert.match(js, /class="group-toggle" type="checkbox" role="switch"/);
+  assert.match(js, /bindDetailsControl\(input, handleToolPermissionChange\)/);
+  assert.match(js, /bindDetailsControl\(input, handleToolGroupPermissionChange\)/);
   assert.match(js, /<div class="tool-permission-list">\$\{rows\}<\/div>/);
   assert.doesNotMatch(js, /<details class="tool-group" open>/);
-  assert.match(js, /rowStateClass = `\$\{enabled \? '' : ' is-disabled'\}\$\{meta\.sideEffect === 'mutating' \? ' is-mutating' : ''\}`/);
+  assert.match(js, /function handleToolGroupPermissionChange\(event\)/);
   assert.match(js, /const id = `toolPermission-\$\{tool\.replace\(\/\[\^a-z0-9_-\]\/gi, '-'\)\}`/);
   assert.match(js, /for="\$\{id\}"/);
   assert.match(js, /<input id="\$\{id\}" class="tool-toggle"/);
-  assert.match(js, /toolListEl\.classList\.toggle\('is-editing-tools', opening\)/);
+  assert.doesNotMatch(js, /toolListEl\.classList\.toggle\('is-editing-tools'/);
   assert.match(js, /sessionAddedNotification\(\{/);
   assert.match(js, /new TaskHistoryStore\(\{ redactText \}\)/);
   assert.match(js, /const \{ history, historyLimit \} = taskStore\.snapshot\(\)/);
@@ -134,8 +158,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
   assert.match(js, /class="task-meta task-command-id"/);
   assert.match(js, /aria-label="Copy command ID" title="\$\{escapeHtml\(task\.requestId\)\}"/);
-  assert.match(js, /settingsToggleEl\.setAttribute\('title', opening \? 'Close Settings' : 'Open Settings'\)/);
-  assert.match(js, /settingsToggleEl\.setAttribute\('title', 'Open Settings'\)/);
+  assert.doesNotMatch(js, /settingsToggleEl/);
   assert.match(js, /middleTruncate\(task\.requestId\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
@@ -164,14 +187,13 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
 
 test('PowerPoint task pane keeps settings inline and compact at narrow widths', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
-  const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
+  const css = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');
 
   assert.match(css, /body \{[\s\S]*min-width: 320px;[\s\S]*overflow-x: hidden;/);
   assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);
   assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
   assert.match(css, /\.empty-state \{[\s\S]*padding: 10px;/);
   assert.match(css, /#documentTitle \{[\s\S]*display: -webkit-box;[\s\S]*-webkit-line-clamp: 2;/);
-  assert.match(css, /@media \(min-width: 380px\)/);
   assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
   assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
   assert.doesNotMatch(cssRule(css, '.current-task-panel'), /\bheight:/);
@@ -179,42 +201,64 @@ test('PowerPoint task pane keeps settings inline and compact at narrow widths', 
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
 
   const summaryStart = html.indexOf('class="panel summary-panel"');
-  const settingsIndex = html.indexOf('id="settingsPanel"');
-  const summaryEnd = html.indexOf('</section>', settingsIndex);
+  const daemonFormIndex = html.indexOf('class="daemon-endpoint-form"');
   const currentTaskIndex = html.indexOf('id="currentTaskHeading"');
-  assert.ok(summaryStart !== -1 && settingsIndex !== -1, 'summary and settings exist');
-  assert.ok(settingsIndex > summaryStart, 'settings panel is inside summary flow');
-  assert.ok(settingsIndex < currentTaskIndex, 'settings appears before current task');
-  assert.ok(summaryEnd < currentTaskIndex, 'summary closes before current task');
+  assert.ok(summaryStart !== -1 && daemonFormIndex !== -1, 'summary and daemon form exist');
+  assert.ok(daemonFormIndex > summaryStart, 'daemon settings are inline in document metadata');
+  assert.ok(daemonFormIndex < currentTaskIndex, 'daemon settings appear before current task');
+  assert.doesNotMatch(html, /<section id="settingsPanel"/);
 });
 test('PowerPoint task pane implements advertised tool handlers with host APIs', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
-  assert.match(js, /case 'powerpoint\.add_slide':/);
-  assert.match(js, /case 'powerpoint\.replace_text':/);
-  assert.match(js, /case 'powerpoint\.insert_image':/);
-  assert.match(js, /case 'powerpoint\.apply_layout':/);
-  assert.match(js, /case 'powerpoint\.export_pdf':/);
+  for (const tool of POWERPOINT_V1_TOOLS) {
+    assert.match(js, new RegExp(`case '${escapeRegExp(tool)}':`), `missing handler for ${tool}`);
+  }
+  assert.doesNotMatch(js, /case 'powerpoint\.export_pdf':/);
+  assert.match(js, /async function getPresentationInfoTool\(args\)/);
+  assert.match(js, /async function getActiveView\(_?args\)/);
+  assert.match(js, /async function exportFile\(args\)/);
+  assert.match(js, /async function updateTags\(args\)/);
+  assert.match(js, /async function listSlides\(args\)/);
   assert.match(js, /async function addSlide\(args\)/);
   assert.match(js, /slides\.add\(slideOptions\(args\)\)/);
   assert.match(js, /added\.shapes\.addTextBox\(title/);
+  assert.match(js, /async function updateSlide\(args\)/);
+  assert.match(js, /async function deleteSlide\(args\)/);
+  assert.match(js, /async function moveSlide\(args\)/);
+  assert.match(js, /async function exportSlide\(args\)/);
+  assert.match(js, /async function listLayouts\(_?args\)/);
+  assert.match(js, /async function getSelection\(_?args\)/);
+  assert.match(js, /async function setSelection\(args\)/);
+  assert.match(js, /async function listShapes\(args\)/);
+  assert.match(js, /async function addTextBox\(args\)/);
+  assert.match(js, /async function addShape\(args\)/);
+  assert.match(js, /async function updateShape\(args\)/);
+  assert.match(js, /async function readText\(args\)/);
   assert.match(js, /async function replaceText\(args\)/);
   assert.match(js, /shape\.textFrame\?\.textRange/);
   assert.match(js, /range\.text = nextText/);
+  assert.match(js, /async function formatText\(args\)/);
+  assert.match(js, /async function addTable\(args\)/);
+  assert.match(js, /async function readTable\(args\)/);
+  assert.match(js, /async function updateTable\(args\)/);
   assert.match(js, /async function insertImage\(args\)/);
   assert.match(js, /Office\.context\.document\.setSelectedDataAsync\(base64, imageInsertOptions\(args\), callback\)/);
   assert.match(js, /coercionType: Office\.CoercionType\.Image/);
   assert.match(js, /async function applyLayout\(args\)/);
   assert.match(js, /slide\.applyLayout\(layout\)/);
   assert.match(js, /context\.presentation\.slideMasters/);
-  assert.match(js, /async function exportPdf\(args\)/);
-  assert.match(js, /Office\.context\.document\.getFileAsync\(Office\.FileType\.Pdf/);
+  assert.doesNotMatch(js, /async function exportPdf\(args\)/);
+  assert.match(js, /const fileType = officeFileTypeFrom\(format\)/);
+  assert.match(js, /Office\.context\.document\.getFileAsync\(fileType/);
   assert.match(js, /file\.getSliceAsync\(index, callback\)/);
   assert.match(js, /file\.closeAsync\(callback\)/);
-  assert.match(js, /mime_type: 'application\/pdf'/);
+  assert.match(js, /function officeFileTypeFrom\(format\)/);
+  assert.match(js, /function requireRequirementSet\(name, version, feature\)/);
   assert.match(js, /function requiredString\(args, key, message\)/);
   assert.match(js, /INVALID_ARGUMENT/);
   assert.match(js, /NOT_FOUND/);
+  assert.match(js, /HOST_CAPABILITY_UNAVAILABLE/);
   assert.match(js, /PowerPoint\.run/);
   assert.doesNotMatch(js, /declared by the daemon contract but is not implemented/);
 });
@@ -247,4 +291,8 @@ function cssRule(source, selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = source.match(new RegExp(`${escaped}\\s*\\{([\\s\\S]*?)\\}`));
   return match?.[1] || '';
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

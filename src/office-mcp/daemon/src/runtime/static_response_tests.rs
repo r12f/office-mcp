@@ -22,7 +22,8 @@ fn serves_versioned_addin_static_assets_with_query_strings() {
     assert!(word_js.starts_with("HTTP/1.1 200 OK"));
     assert!(word_js.contains("__OFFICE_MCP_TASKPANE_READY__"));
 
-    let common_js = response_text(&service().serve_addin_asset("/common/addin-channel.js?v=0.1.12"));
+    let common_js =
+        response_text(&service().serve_addin_asset("/common/addin-channel.js?v=0.1.12"));
     assert!(common_js.starts_with("HTTP/1.1 200 OK"));
     assert!(common_js.contains("OfficeCtlAddinChannel"));
 
@@ -65,7 +66,9 @@ fn serves_powerpoint_taskpane_static_assets() {
     assert!(html.starts_with("HTTP/1.1 200 OK"));
     assert!(html.contains("Office MCP Control"));
     assert!(html.contains("/powerpoint/taskpane.js?v=0.1.1"));
+    assert!(html.contains("/common/taskpane.css?v=0.1.1"));
     assert!(html.contains("/common/addin-channel.js?v=0.1.1"));
+    assert!(html.contains("/common/main-ui.js?v=0.1.1"));
 
     let js = response_text(&service().serve_addin_asset("/powerpoint/taskpane.js"));
     assert!(js.starts_with("HTTP/1.1 200 OK"));
@@ -73,8 +76,11 @@ fn serves_powerpoint_taskpane_static_assets() {
     assert!(js.contains("Office.HostType?.PowerPoint"));
     assert!(js.contains("sessionAddedNotification"));
     assert!(js.contains("available_tools: effectiveTools()"));
+    assert!(js.contains("powerpoint.get_presentation_info"));
+    assert!(js.contains("powerpoint.update_table"));
     assert!(js.contains("async function addSlide"));
-    assert!(js.contains("async function exportPdf"));
+    assert!(js.contains("async function exportFile"));
+    assert!(!js.contains("powerpoint.export_pdf"));
 
     let css = response_text(&service().serve_addin_asset("/powerpoint/taskpane.css"));
     assert!(css.starts_with("HTTP/1.1 200 OK"));

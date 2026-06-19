@@ -93,19 +93,79 @@ const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
 
 const POWERPOINT_V1_TOOLS: &[PowerPointToolDefinition] = &[
     PowerPointToolDefinition {
+        name: "powerpoint.get_presentation_info",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.get_active_view",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.export_file",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.update_tags",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.list_slides",
+    },
+    PowerPointToolDefinition {
         name: "powerpoint.add_slide",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.update_slide",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.delete_slide",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.move_slide",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.export_slide",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.list_layouts",
     },
     PowerPointToolDefinition {
         name: "powerpoint.apply_layout",
     },
     PowerPointToolDefinition {
-        name: "powerpoint.export_pdf",
+        name: "powerpoint.get_selection",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.set_selection",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.list_shapes",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.add_text_box",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.add_shape",
     },
     PowerPointToolDefinition {
         name: "powerpoint.insert_image",
     },
     PowerPointToolDefinition {
+        name: "powerpoint.update_shape",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.read_text",
+    },
+    PowerPointToolDefinition {
         name: "powerpoint.replace_text",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.format_text",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.add_table",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.read_table",
+    },
+    PowerPointToolDefinition {
+        name: "powerpoint.update_table",
     },
 ];
 
