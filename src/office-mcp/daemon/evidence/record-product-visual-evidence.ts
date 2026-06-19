@@ -554,8 +554,11 @@ function powerPointRuntimeDetailsLookReady(session: Record<string, unknown> | un
   if (!session || !details) return false;
   const document = isRecord(session.document) ? session.document : undefined;
   const host = isRecord(session.host) ? session.host : undefined;
-  const pdfSupported = details.pdf_supported === true && details.pdf_mime_type === 'application/pdf' && typeof details.pdf_size === 'number';
-  const pdfHostRejection = details.pdf_host_rejection === true;
+  const exportSupported = details.export_supported === true && details.export_mime_type === 'application/pdf' && typeof details.export_size === 'number';
+  const exportHostRejection = details.export_host_rejection === true;
+  const tableSupported = details.table_supported === true && isRecord(details.add_table) && typeof details.add_table.shape_id === 'string' && isRecord(details.read_table);
+  const tableHostRejection = details.table_host_rejection === true;
+  const categoryProofs = isRecord(details.tool_category_proofs) ? details.tool_category_proofs : undefined;
   return session.app === 'powerpoint'
     && session.status === 'active'
     && typeof session.session_id === 'string'
@@ -565,15 +568,38 @@ function powerPointRuntimeDetailsLookReady(session: Record<string, unknown> | un
     && document.title.length > 0
     && host?.app === 'powerpoint'
     && typeof session.available_tool_count === 'number'
-    && session.available_tool_count >= 5
+    && session.available_tool_count >= 25
+    && Array.isArray(details.available_tools)
+    && details.available_tools.includes('powerpoint.export_file')
+    && !details.available_tools.includes('powerpoint.export_pdf')
     && details.mutation_proved === true
+    && categoryProofs?.presentation === true
+    && categoryProofs?.slides === true
+    && categoryProofs?.layout === true
+    && categoryProofs?.shapes === true
+    && categoryProofs?.text === true
+    && categoryProofs?.tables === true
+    && isRecord(details.presentation_info)
+    && isRecord(details.active_view)
+    && isRecord(details.list_slides)
     && isRecord(details.add_slide)
     && typeof details.add_slide.slide_id === 'string'
+    && isRecord(details.add_text_box)
+    && isRecord(details.add_text_box.shape)
+    && isRecord(details.list_shapes)
+    && Array.isArray(details.list_shapes.shapes)
+    && isRecord(details.read_text)
+    && Array.isArray(details.read_text.items)
     && isRecord(details.replace_text)
     && Number(details.replace_text.replacements ?? 0) >= 1
+    && isRecord(details.format_text)
+    && details.format_text.formatted === true
     && isRecord(details.layout)
     && typeof details.layout.slide_id === 'string'
-    && (pdfSupported || pdfHostRejection);
+    && isRecord(details.list_layouts)
+    && Array.isArray(details.list_layouts.masters)
+    && (tableSupported || tableHostRejection)
+    && (exportSupported || exportHostRejection);
 }
 
 function excelRuntimeDetailsLookReady(session: Record<string, unknown> | undefined, details: Record<string, unknown> | undefined): boolean {

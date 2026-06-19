@@ -1016,7 +1016,7 @@ function writePowerPointRuntimeEvidence(dir: string, ready = true): string {
   const sessionId = '22222222-3333-4444-5555-666666666666';
   const sessions = ready ? [{
     app: 'powerpoint',
-    available_tool_count: 5,
+    available_tool_count: 25,
     document: { title: 'PowerPoint Presentation' },
     host: { app: 'powerpoint', platform: 'pc', version: '16.0' },
     session_id: sessionId,
@@ -1024,13 +1024,60 @@ function writePowerPointRuntimeEvidence(dir: string, ready = true): string {
   }] : [];
   const smokeDetails = {
     session_id: sessionId,
-    available_tool_count: ready ? 5 : 0,
+    available_tool_count: ready ? 25 : 0,
+    available_tools: ready ? [
+      'powerpoint.get_presentation_info',
+      'powerpoint.get_active_view',
+      'powerpoint.export_file',
+      'powerpoint.update_tags',
+      'powerpoint.list_slides',
+      'powerpoint.add_slide',
+      'powerpoint.update_slide',
+      'powerpoint.delete_slide',
+      'powerpoint.move_slide',
+      'powerpoint.export_slide',
+      'powerpoint.list_layouts',
+      'powerpoint.apply_layout',
+      'powerpoint.get_selection',
+      'powerpoint.set_selection',
+      'powerpoint.list_shapes',
+      'powerpoint.add_text_box',
+      'powerpoint.add_shape',
+      'powerpoint.insert_image',
+      'powerpoint.update_shape',
+      'powerpoint.read_text',
+      'powerpoint.replace_text',
+      'powerpoint.format_text',
+      'powerpoint.add_table',
+      'powerpoint.read_table',
+      'powerpoint.update_table'
+    ] : [],
+    presentation_info: ready ? { slide_count: 1 } : {},
+    active_view: ready ? { active_view: 'edit' } : {},
+    list_slides: ready ? { slides: [{ slide_id: 'slide-1', slide_index: 0 }] } : {},
     add_slide: ready ? { slide_id: 'slide-1', slide_index: 0 } : {},
+    add_text_box: ready ? { shape: { shape_id: 'shape-1' } } : {},
+    list_shapes: ready ? { shapes: [{ shape_id: 'shape-1' }] } : {},
+    read_text: ready ? { items: [{ shape_id: 'shape-1', text: 'Office MCP' }] } : {},
     replace_text: { replacements: ready ? 1 : 0 },
+    format_text: ready ? { shape_id: 'shape-1', formatted: true } : {},
+    list_layouts: ready ? { masters: [{ id: 'master-1', layouts: [{ id: 'layout-1' }] }] } : {},
     layout: ready ? { slide_id: 'slide-1', slide_index: 0, layout_name: 'Title Only' } : {},
+    add_table: ready ? { shape_id: 'table-1' } : {},
+    read_table: ready ? { shape_id: 'table-1', values: [['Office']] } : {},
     mutation_proved: ready,
-    pdf_supported: false,
-    pdf_host_rejection: ready
+    tool_category_proofs: {
+      presentation: ready,
+      slides: ready,
+      layout: ready,
+      shapes: ready,
+      text: ready,
+      tables: ready
+    },
+    export_supported: false,
+    export_host_rejection: ready,
+    table_supported: ready,
+    table_host_rejection: false
   };
   writeFileSync(path, JSON.stringify({
     schema_version: 1,

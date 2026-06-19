@@ -10,6 +10,34 @@ import { tinyPng } from './image-evidence.js';
 const REPO_ROOT = resolve(process.cwd(), '../../../..');
 const ASSET_ROOT = resolve(REPO_ROOT, 'src/office-ctl/common/assets');
 
+const POWERPOINT_V1_TOOLS = [
+  'powerpoint.get_presentation_info',
+  'powerpoint.get_active_view',
+  'powerpoint.export_file',
+  'powerpoint.update_tags',
+  'powerpoint.list_slides',
+  'powerpoint.add_slide',
+  'powerpoint.update_slide',
+  'powerpoint.delete_slide',
+  'powerpoint.move_slide',
+  'powerpoint.export_slide',
+  'powerpoint.list_layouts',
+  'powerpoint.apply_layout',
+  'powerpoint.get_selection',
+  'powerpoint.set_selection',
+  'powerpoint.list_shapes',
+  'powerpoint.add_text_box',
+  'powerpoint.add_shape',
+  'powerpoint.insert_image',
+  'powerpoint.update_shape',
+  'powerpoint.read_text',
+  'powerpoint.replace_text',
+  'powerpoint.format_text',
+  'powerpoint.add_table',
+  'powerpoint.read_table',
+  'powerpoint.update_table'
+];
+
 test('runtime evidence validator accepts required runtime gates and optional IRM skip', () => {
   withEvidenceFile(report('skipped'), (path) => {
     const result = runValidator(path);
@@ -102,12 +130,12 @@ test('runtime evidence validator can require PowerPoint smoke evidence', () => {
     assert.equal(summary.require_powerpoint_smoke, true);
   });
 
-  full.gates[1].details.pdf_supported = false;
-  full.gates[1].details.pdf_host_rejection = false;
+  full.gates[1].details.export_supported = false;
+  full.gates[1].details.export_host_rejection = false;
   withEvidenceFile(full, (path) => {
     const result = runValidator(path, '--require-powerpoint-smoke');
     assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /PDF export success or explicit host-capability rejection/);
+    assert.match(outputText(result.stdout), /export_file success or explicit host-capability rejection/);
   });
 });
 test('runtime evidence validator can require COM tracked-change evidence', () => {
@@ -1197,19 +1225,40 @@ function powerPointRuntimeEvidence(passed: boolean) {
       app: 'powerpoint',
       status: 'active',
       session_id: sessionId,
-      available_tool_count: 5,
+      available_tool_count: 25,
       document: { title: 'PowerPoint Presentation' },
       host: { app: 'powerpoint', platform: 'pc', version: '16.0' }
     },
     smoke_details: {
       session_id: sessionId,
-      available_tool_count: 5,
+      available_tool_count: 25,
+      available_tools: POWERPOINT_V1_TOOLS,
+      presentation_info: { slide_count: 1 },
+      active_view: { active_view: 'edit' },
+      list_slides: { slides: [{ slide_id: 'slide-1', slide_index: 0 }] },
       add_slide: { slide_id: 'slide-1', slide_index: 0 },
+      add_text_box: { shape: { shape_id: 'shape-1' } },
+      list_shapes: { shapes: [{ shape_id: 'shape-1' }] },
+      read_text: { items: [{ shape_id: 'shape-1', text: 'Office MCP' }] },
       replace_text: { replacements: passed ? 1 : 0 },
+      format_text: { shape_id: 'shape-1', formatted: passed },
+      list_layouts: { masters: [{ id: 'master-1', layouts: [{ id: 'layout-1' }] }] },
       layout: { slide_id: 'slide-1', slide_index: 0, layout_name: 'Title Only' },
+      add_table: { shape_id: 'table-1' },
+      read_table: { shape_id: 'table-1', values: [['Office']] },
       mutation_proved: passed,
-      pdf_supported: false,
-      pdf_host_rejection: passed
+      tool_category_proofs: {
+        presentation: passed,
+        slides: passed,
+        layout: passed,
+        shapes: passed,
+        text: passed,
+        tables: passed
+      },
+      export_supported: false,
+      export_host_rejection: passed,
+      table_supported: passed,
+      table_host_rejection: false
     }
   };
 }
@@ -1394,13 +1443,34 @@ function powerpointOnlyReport() {
       gate('word.session_discovery', 'passed', { sessions: [{ app: 'powerpoint', session_id: 'ppt-session' }] }),
       gate('powerpoint.runtime_smoke', 'passed', {
         session_id: 'ppt-session',
-        available_tool_count: 5,
+        available_tool_count: 25,
+        available_tools: POWERPOINT_V1_TOOLS,
+        presentation_info: { slide_count: 1 },
+        active_view: { active_view: 'edit' },
+        list_slides: { slides: [{ slide_id: 'slide-1', slide_index: 0 }] },
         add_slide: { slide_id: 'slide-1', slide_index: 0, added: true },
+        add_text_box: { shape: { shape_id: 'shape-1' } },
+        list_shapes: { shapes: [{ shape_id: 'shape-1' }] },
+        read_text: { items: [{ shape_id: 'shape-1', text: 'Office MCP' }] },
         replace_text: { replacements: 1, touched_shapes: [{ slide_id: 'slide-1', shape_id: 'shape-1' }] },
+        format_text: { shape_id: 'shape-1', formatted: true },
+        list_layouts: { masters: [{ id: 'master-1', layouts: [{ id: 'layout-1' }] }] },
         layout: { slide_id: 'slide-1', slide_index: 0, layout_name: 'Title Only' },
+        add_table: { shape_id: 'table-1' },
+        read_table: { shape_id: 'table-1', values: [['Office']] },
         mutation_proved: true,
-        pdf_supported: false,
-        pdf_host_rejection: true
+        tool_category_proofs: {
+          presentation: true,
+          slides: true,
+          layout: true,
+          shapes: true,
+          text: true,
+          tables: true
+        },
+        export_supported: false,
+        export_host_rejection: true,
+        table_supported: true,
+        table_host_rejection: false
       })
     ]
   };

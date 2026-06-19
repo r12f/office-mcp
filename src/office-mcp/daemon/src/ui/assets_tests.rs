@@ -91,7 +91,9 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".detail-copy code { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains(".id-copy { display: inline-flex; max-width: 100%; min-height: 32px;"));
     assert!(css.contains(".id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
-    assert!(css.contains(".detail-copy:hover, .detail-copy:focus-visible, .id-copy:hover, .id-copy:focus-visible"));
+    assert!(css.contains(
+        ".detail-copy:hover, .detail-copy:focus-visible, .id-copy:hover, .id-copy:focus-visible"
+    ));
     assert!(css.contains(".details { grid-column: 1 / -1;"));
     assert!(css.contains("border-top: 1px solid var(--border); padding-top: 8px;"));
     assert!(css.contains(".details dl { display: grid; grid-template-columns: minmax(72px, .45fr) minmax(72px, .45fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(180px, 1fr);"));
@@ -104,7 +106,9 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains("minmax(0, 1fr)"));
     assert!(css.contains("content-visibility: auto"));
     assert!(css.contains(".empty strong"));
-    assert!(css.contains(".empty-copy { display: grid; grid-template-columns: auto minmax(0, 1fr);"));
+    assert!(
+        css.contains(".empty-copy { display: grid; grid-template-columns: auto minmax(0, 1fr);")
+    );
     assert!(css.contains(".empty-copy code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(!css.contains("transition: all"));
     assert!(js.contains("emptyState('No documents connected'"));
@@ -127,6 +131,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("class=\"id-copy\" data-copy-value=\"${esc(text)}\""));
     assert!(js.contains("function middleTruncate(value, maxLength = 30)"));
     assert!(js.contains("copyableId(doc.session_id, 'Copy session ID')"));
-    assert!(js.contains("copyableId(command.command_id || command.mcp_request_id, 'Copy command ID')"));
+    assert!(
+        js.contains("copyableId(command.command_id || command.mcp_request_id, 'Copy command ID')")
+    );
     assert!(js.contains("copyableId(command.session_id, 'Copy session ID')"));
 }

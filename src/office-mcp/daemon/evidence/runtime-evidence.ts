@@ -397,41 +397,104 @@ async function runPowerPointSmokeGate(sessionId: string): Promise<void> {
     const marker = `Office MCP PowerPoint smoke ${Date.now()}`;
     const replacement = `${marker} updated`;
     const info = await callToolData('office.get_session_info', { session_id: sessionId });
+    const availableTools = Array.isArray(info.available_tools) ? info.available_tools.map(String) : [];
+    const presentationInfo = await callToolData('powerpoint.get_presentation_info', { session_id: sessionId, include_selection: true });
+    const activeView = await callToolData('powerpoint.get_active_view', { session_id: sessionId });
+    const slidesBefore = await callToolData('powerpoint.list_slides', { session_id: sessionId, include_tags: true });
+    const layouts = await callToolData('powerpoint.list_layouts', { session_id: sessionId });
     const addSlide = await callToolData('powerpoint.add_slide', {
       session_id: sessionId,
       title: marker,
       content: 'PowerPoint runtime smoke content'
     });
+    const addTextBox = await callToolData('powerpoint.add_text_box', {
+      session_id: sessionId,
+      slide_id: String(addSlide.slide_id ?? ''),
+      text: `Shape ${marker}`,
+      left: 72,
+      top: 220,
+      width: 360,
+      height: 64
+    });
+    const shapeId = String((addTextBox.shape as Record<string, unknown> | undefined)?.shape_id ?? '');
+    const shapes = await callToolData('powerpoint.list_shapes', { session_id: sessionId, slide_id: String(addSlide.slide_id ?? '') });
+    const readText = await callToolData('powerpoint.read_text', { session_id: sessionId, slide_id: String(addSlide.slide_id ?? '') });
     const replaceText = await callToolData('powerpoint.replace_text', {
       session_id: sessionId,
       search: marker,
       replacement,
       match_case: true
     });
+    const formatText = shapeId ? await callToolData('powerpoint.format_text', {
+      session_id: sessionId,
+      slide_id: String(addSlide.slide_id ?? ''),
+      shape_id: shapeId,
+      bold: true,
+      font_size: 18
+    }) : { skipped: true, reason: 'No text box shape id returned.' };
     const layout = await callToolData('powerpoint.apply_layout', {
       session_id: sessionId,
       slide_id: String(addSlide.slide_id ?? ''),
       layout: 'TitleOnly'
     });
-    const pdf = await callToolResult('powerpoint.export_pdf', { session_id: sessionId, slice_size: 1048576 });
-    const pdfData = toolData(pdf);
-    const pdfSupported = !isToolError(pdf);
-    const pdfHostRejection = isToolError(pdf) && ['HOST_CAPABILITY_UNAVAILABLE', 'HOST_ERROR'].includes(String(pdfData.office_mcp_code ?? pdfData.code ?? ''));
-    if (!pdfSupported && !pdfHostRejection) throw new Error(`PowerPoint PDF export failed without explicit host-capability rejection: ${JSON.stringify(pdfData)}`);
+    const table = await callToolResult('powerpoint.add_table', {
+      session_id: sessionId,
+      slide_id: String(addSlide.slide_id ?? ''),
+      rows: 2,
+      columns: 2,
+      values: [['Office', 'MCP'], ['PowerPoint', 'Smoke']]
+    });
+    const tableData = toolData(table);
+    const tableSupported = !isToolError(table);
+    const tableHostRejection = isExplicitHostRejection(table, tableData);
+    if (!tableSupported && !tableHostRejection) throw new Error(`PowerPoint table creation failed without explicit host-capability rejection: ${JSON.stringify(tableData)}`);
+    const tableShapeId = String(tableData.shape_id ?? '');
+    const readTable = tableSupported && tableShapeId ? await callToolData('powerpoint.read_table', {
+      session_id: sessionId,
+      slide_id: String(addSlide.slide_id ?? ''),
+      shape_id: tableShapeId
+    }) : { host_rejection: tableHostRejection };
+    const file = await callToolResult('powerpoint.export_file', { session_id: sessionId, format: 'pdf', slice_size: 1048576 });
+    const fileData = toolData(file);
+    const exportSupported = !isToolError(file);
+    const exportHostRejection = isExplicitHostRejection(file, fileData);
+    if (!exportSupported && !exportHostRejection) throw new Error(`PowerPoint file export failed without explicit host-capability rejection: ${JSON.stringify(fileData)}`);
+    const categoryProofs = {
+      presentation: Boolean(presentationInfo && activeView && (exportSupported || exportHostRejection)),
+      slides: typeof addSlide.slide_id === 'string' && Array.isArray(slidesBefore.slides),
+      layout: typeof layout.slide_id === 'string' && Array.isArray(layouts.masters),
+      shapes: shapeId.length > 0 && Array.isArray(shapes.shapes),
+      text: Number(replaceText.replacements ?? 0) >= 1 && Array.isArray(readText.items),
+      tables: tableSupported ? isRecord(readTable) : tableHostRejection
+    };
     return {
       session_id: sessionId,
       document_title: (info.document as { title?: string } | undefined)?.title,
-      available_tool_count: Array.isArray(info.available_tools) ? info.available_tools.length : undefined,
+      available_tool_count: availableTools.length,
+      available_tools: availableTools,
+      presentation_info: presentationInfo,
+      active_view: activeView,
+      list_slides: slidesBefore,
+      list_layouts: layouts,
       add_slide: addSlide,
+      add_text_box: addTextBox,
+      list_shapes: shapes,
+      read_text: readText,
       replace_text: replaceText,
+      format_text: formatText,
       layout,
+      add_table: tableData,
+      read_table: readTable,
       marker,
       replacement,
       mutation_proved: typeof addSlide.slide_id === 'string' && Number(replaceText.replacements ?? 0) >= 1,
-      pdf_supported: pdfSupported,
-      pdf_host_rejection: pdfHostRejection,
-      pdf_mime_type: pdfSupported ? pdfData.mime_type : undefined,
-      pdf_size: pdfSupported ? pdfData.size : undefined
+      tool_category_proofs: categoryProofs,
+      export_supported: exportSupported,
+      export_host_rejection: exportHostRejection,
+      export_mime_type: exportSupported ? fileData.mime_type : undefined,
+      export_size: exportSupported ? fileData.size : undefined,
+      table_supported: tableSupported,
+      table_host_rejection: tableHostRejection
     };
   });
 }
@@ -637,6 +700,14 @@ function resourceData(result: unknown): Record<string, unknown> {
 
 function isToolError(result: unknown): boolean {
   return (result as { isError?: boolean }).isError === true;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isExplicitHostRejection(result: unknown, data: Record<string, unknown>): boolean {
+  return isToolError(result) && ['HOST_CAPABILITY_UNAVAILABLE', 'HOST_ERROR'].includes(String(data.office_mcp_code ?? data.code ?? ''));
 }
 
 function runSmokeMode(mode: string, sessionId: string, extraArg?: string): string {

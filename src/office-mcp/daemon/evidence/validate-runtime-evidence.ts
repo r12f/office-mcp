@@ -156,14 +156,36 @@ function validatePowerPointSmokeGate(gate: EvidenceGate | undefined): void {
     return;
   }
   if (typeof details.session_id !== 'string' || details.session_id.length === 0) failures.push('PowerPoint smoke gate missing session_id.');
-  if (typeof details.available_tool_count !== 'number' || details.available_tool_count < 5) failures.push('PowerPoint smoke gate missing available tool count.');
+  if (typeof details.available_tool_count !== 'number' || details.available_tool_count < 25) failures.push('PowerPoint smoke gate missing 25-tool available tool count.');
   if (details.mutation_proved !== true) failures.push('PowerPoint smoke gate did not prove a mutation path.');
+  validatePowerPointCategoryProofs(details.tool_category_proofs, 'PowerPoint smoke gate');
+  if (!Array.isArray(details.available_tools) || !details.available_tools.includes('powerpoint.export_file') || details.available_tools.includes('powerpoint.export_pdf')) {
+    failures.push('PowerPoint smoke gate available tools are not aligned with v1 catalog.');
+  }
+  if (!isRecord(details.presentation_info)) failures.push('PowerPoint smoke gate missing presentation info proof.');
+  if (!isRecord(details.active_view)) failures.push('PowerPoint smoke gate missing active view proof.');
+  if (!isRecord(details.list_slides)) failures.push('PowerPoint smoke gate missing list_slides proof.');
   if (!isRecord(details.add_slide) || typeof details.add_slide.slide_id !== 'string') failures.push('PowerPoint smoke gate missing add_slide proof.');
+  if (!isRecord(details.add_text_box) || !isRecord(details.add_text_box.shape)) failures.push('PowerPoint smoke gate missing add_text_box proof.');
+  if (!isRecord(details.list_shapes) || !Array.isArray(details.list_shapes.shapes)) failures.push('PowerPoint smoke gate missing list_shapes proof.');
+  if (!isRecord(details.read_text) || !Array.isArray(details.read_text.items)) failures.push('PowerPoint smoke gate missing read_text proof.');
   if (!isRecord(details.replace_text) || Number(details.replace_text.replacements ?? 0) < 1) failures.push('PowerPoint smoke gate missing replace_text proof.');
+  if (!isRecord(details.format_text) || details.format_text.formatted !== true) failures.push('PowerPoint smoke gate missing format_text proof.');
   if (!isRecord(details.layout) || typeof details.layout.slide_id !== 'string') failures.push('PowerPoint smoke gate missing apply_layout proof.');
-  const pdfSupported = details.pdf_supported === true && details.pdf_mime_type === 'application/pdf' && typeof details.pdf_size === 'number';
-  const pdfHostRejection = details.pdf_host_rejection === true;
-  if (!pdfSupported && !pdfHostRejection) failures.push('PowerPoint smoke gate missing PDF export success or explicit host-capability rejection.');
+  if (!isRecord(details.list_layouts) || !Array.isArray(details.list_layouts.masters)) failures.push('PowerPoint smoke gate missing list_layouts proof.');
+  const tableSupported = details.table_supported === true && isRecord(details.add_table) && typeof details.add_table.shape_id === 'string' && isRecord(details.read_table);
+  const tableHostRejection = details.table_host_rejection === true;
+  if (!tableSupported && !tableHostRejection) failures.push('PowerPoint smoke gate missing table success or explicit host-capability rejection.');
+  const exportSupported = details.export_supported === true && details.export_mime_type === 'application/pdf' && typeof details.export_size === 'number';
+  const exportHostRejection = details.export_host_rejection === true;
+  if (!exportSupported && !exportHostRejection) failures.push('PowerPoint smoke gate missing export_file success or explicit host-capability rejection.');
+}
+
+function validatePowerPointCategoryProofs(value: unknown, label: string): void {
+  const proofs = isRecord(value) ? value : undefined;
+  for (const category of ['presentation', 'slides', 'layout', 'shapes', 'text', 'tables']) {
+    if (proofs?.[category] !== true) failures.push(`${label} missing ${category} category proof.`);
+  }
 }
 function validateUiEvidence(): never {
   if (report.kind !== 'ui_runtime_evidence') failures.push(`Unsupported UI evidence kind: ${report.kind ?? 'missing'}`);
@@ -659,14 +681,27 @@ function validatePowerPointRuntimeEvidence(evidence: unknown, ready: unknown): v
   if (typeof session.session_id !== 'string' || details.session_id !== session.session_id) failures.push('Product visual PowerPoint runtime evidence session_id mismatch.');
   if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual PowerPoint runtime evidence missing presentation title.');
   if (host?.app !== 'powerpoint') failures.push('Product visual PowerPoint runtime evidence missing PowerPoint host metadata.');
-  if (typeof session.available_tool_count !== 'number' || session.available_tool_count < 5) failures.push('Product visual PowerPoint runtime evidence missing available tool count.');
+  if (typeof session.available_tool_count !== 'number' || session.available_tool_count < 25) failures.push('Product visual PowerPoint runtime evidence missing 25-tool available tool count.');
   if (details.mutation_proved !== true) failures.push('Product visual PowerPoint runtime evidence did not prove mutation path.');
+  validatePowerPointCategoryProofs(details.tool_category_proofs, 'Product visual PowerPoint runtime evidence');
+  if (!Array.isArray(details.available_tools) || !details.available_tools.includes('powerpoint.export_file') || details.available_tools.includes('powerpoint.export_pdf')) failures.push('Product visual PowerPoint runtime evidence available tools are not aligned with v1 catalog.');
+  if (!isRecord(details.presentation_info)) failures.push('Product visual PowerPoint runtime evidence missing presentation info proof.');
+  if (!isRecord(details.active_view)) failures.push('Product visual PowerPoint runtime evidence missing active view proof.');
+  if (!isRecord(details.list_slides)) failures.push('Product visual PowerPoint runtime evidence missing list_slides proof.');
   if (!isRecord(details.add_slide) || typeof details.add_slide.slide_id !== 'string') failures.push('Product visual PowerPoint runtime evidence missing add_slide proof.');
+  if (!isRecord(details.add_text_box) || !isRecord(details.add_text_box.shape)) failures.push('Product visual PowerPoint runtime evidence missing add_text_box proof.');
+  if (!isRecord(details.list_shapes) || !Array.isArray(details.list_shapes.shapes)) failures.push('Product visual PowerPoint runtime evidence missing list_shapes proof.');
+  if (!isRecord(details.read_text) || !Array.isArray(details.read_text.items)) failures.push('Product visual PowerPoint runtime evidence missing read_text proof.');
   if (!isRecord(details.replace_text) || Number(details.replace_text.replacements ?? 0) < 1) failures.push('Product visual PowerPoint runtime evidence missing replace_text proof.');
+  if (!isRecord(details.format_text) || details.format_text.formatted !== true) failures.push('Product visual PowerPoint runtime evidence missing format_text proof.');
   if (!isRecord(details.layout) || typeof details.layout.slide_id !== 'string') failures.push('Product visual PowerPoint runtime evidence missing apply_layout proof.');
-  const pdfSupported = details.pdf_supported === true && details.pdf_mime_type === 'application/pdf' && typeof details.pdf_size === 'number';
-  const pdfHostRejection = details.pdf_host_rejection === true;
-  if (!pdfSupported && !pdfHostRejection) failures.push('Product visual PowerPoint runtime evidence missing PDF export success or explicit host-capability rejection.');
+  if (!isRecord(details.list_layouts) || !Array.isArray(details.list_layouts.masters)) failures.push('Product visual PowerPoint runtime evidence missing list_layouts proof.');
+  const tableSupported = details.table_supported === true && isRecord(details.add_table) && typeof details.add_table.shape_id === 'string' && isRecord(details.read_table);
+  const tableHostRejection = details.table_host_rejection === true;
+  if (!tableSupported && !tableHostRejection) failures.push('Product visual PowerPoint runtime evidence missing table success or explicit host-capability rejection.');
+  const exportSupported = details.export_supported === true && details.export_mime_type === 'application/pdf' && typeof details.export_size === 'number';
+  const exportHostRejection = details.export_host_rejection === true;
+  if (!exportSupported && !exportHostRejection) failures.push('Product visual PowerPoint runtime evidence missing export_file success or explicit host-capability rejection.');
 }
 
 function validateWordTaskpaneVisualEvidence(taskpane: unknown): void {
