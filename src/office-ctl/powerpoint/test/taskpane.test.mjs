@@ -198,6 +198,30 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   assert.doesNotMatch(js, /declared by the daemon contract but is not implemented/);
 });
 
+test('PowerPoint task pane announces session only after successful register response', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const registerBody = functionBody(js, 'register');
+  const responseBody = functionBody(js, 'handleRegisterResponse');
+
+  assert.doesNotMatch(registerBody, /announceSession\(/);
+  assert.match(responseBody, /serverInfo = registerResult\(message, PROTOCOL_VERSION\)/);
+  assert.match(responseBody, /enableAutoOpen\(\)\.then\(\(\) => announceSession\(\)\)\.catch/);
+  assert.match(responseBody, /session\.announce\.failed/);
+});
+
+function functionBody(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `missing function ${name}`);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') depth -= 1;
+    if (depth === 0) return source.slice(open + 1, index);
+  }
+  assert.fail(`unterminated function ${name}`);
+}
+
 function cssRule(source, selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = source.match(new RegExp(`${escaped}\\s*\\{([\\s\\S]*?)\\}`));
