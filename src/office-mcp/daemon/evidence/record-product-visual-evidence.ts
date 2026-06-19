@@ -38,6 +38,7 @@ const requiredSurfaces = [
   'powerpoint_ribbon_command',
   'powerpoint_catalog_entry',
   'powerpoint_taskpane_title',
+  'daemon_main_window',
   'logo_tray_size',
   'logo_ribbon_size',
   'logo_catalog_thumbnail',
@@ -76,6 +77,9 @@ const trayProductPolishReviewed = booleanFlag('--tray-product-polish-reviewed');
 const trayNativeFirstImpressionReviewed = booleanFlag('--tray-native-first-impression-reviewed');
 const trayNormalWindowsLaunchReviewed = booleanFlag('--tray-normal-windows-launch-reviewed');
 const currentTrayScreenshotFeedbackReviewed = booleanFlag('--current-tray-screenshot-feedback-reviewed');
+const daemonMainWindowReviewed = booleanFlag('--daemon-main-window-reviewed');
+const daemonMainWindowCompactReviewed = booleanFlag('--daemon-main-window-compact-reviewed');
+const daemonMainWindowThreeColumnReviewed = booleanFlag('--daemon-main-window-three-column-reviewed');
 const renderedSizeLogoReviewed = booleanFlag('--rendered-size-logo-reviewed');
 const wordFirstRunIdentityReviewed = booleanFlag('--word-first-run-identity-reviewed');
 const excelFirstRunIdentityReviewed = booleanFlag('--excel-first-run-identity-reviewed');
@@ -135,8 +139,9 @@ const powerPointServerProtocolReady = typeof powerPointServerProtocolRow === 'st
 const powerPointDocumentStateReady = typeof powerPointDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(powerPointDocumentState) && !/unknown/i.test(powerPointDocumentState);
 const powerPointTaskpaneDensityReady = powerPointCompactTopBlock && powerPointToolsPermissionsMerged && powerPointInlineSettings && powerPointServerProtocolReady && powerPointDocumentStateReady && powerPointRuntimeEvidenceReady;
 const currentScreenshotFeedbackReady = currentLogoScreenshotFeedbackReviewed && currentAddinScreenshotFeedbackReviewed && currentTrayScreenshotFeedbackReviewed;
+const daemonMainWindowReady = daemonMainWindowReviewed && daemonMainWindowCompactReviewed && daemonMainWindowThreeColumnReviewed;
 const productIdentityReviewReady = logoQualityReviewed && logoFutureOfficeControlReviewed && finalLogoUserSurfaceReviewed && currentLogoScreenshotFeedbackReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinTitleIconTypeReviewed && addinInstallableSurfaceReviewed && currentAddinScreenshotFeedbackReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNativeFirstImpressionReviewed && trayNormalWindowsLaunchReviewed && currentTrayScreenshotFeedbackReviewed;
-const passed = productTextReady && allScreenshotsExist && allScreenshotsFresh && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
+const passed = productTextReady && allScreenshotsExist && allScreenshotsFresh && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && daemonMainWindowReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -191,6 +196,12 @@ const evidence = {
     powerpoint_first_run_identity_ready: powerPointFirstRunIdentityReady,
     powerpoint_runtime_evidence_ready: powerPointRuntimeEvidenceReady,
     ready: productIdentityReviewReady
+  },
+  daemon_main_window: {
+    reviewed: daemonMainWindowReviewed,
+    compact_status_details_reviewed: daemonMainWindowCompactReviewed,
+    three_column_layout_reviewed: daemonMainWindowThreeColumnReviewed,
+    ready: daemonMainWindowReady
   },
   first_run_identity: {
     word: {

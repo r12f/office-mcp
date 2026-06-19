@@ -852,7 +852,9 @@ Current screenshot feedback to preserve for the next implementation goal:
       pane title/icon, Excel equivalents, PowerPoint ribbon command,
       PowerPoint catalog entry including type/category and icon, PowerPoint task
       pane title/icon, visible notification-area tray icon, native right-click
-      menu opened from that icon, and tray tooltip/confirmation dialog. The
+      menu opened from that icon, tray tooltip/confirmation dialog, and daemon
+      main window with product title/icon, compact status/details rail, and the
+      three-column operations layout. The
       evidence must be recorded with
       `npm run evidence:record-product-visual -- --daemon-bin <path>`, tied to
       the same local daemon build under test, validated with
@@ -868,6 +870,11 @@ Current screenshot feedback to preserve for the next implementation goal:
       add-slide, replace-text, layout mutation, and PDF success or explicit host
       rejection, so PowerPoint visual polish cannot pass from static screenshots
       alone.
+      The product visual artifact must include a daemon main-window screenshot
+      and explicit review flags for product identity, compact status/details
+      grouping, and the three-column console layout so release evidence cannot
+      pass while the daemon UI has detached oversized blocks or unrelated
+      spacing.
       Screenshot artifacts must be real, complete image files; truncated image
       headers are rejected by both the recorder and validator.
 

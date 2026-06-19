@@ -345,6 +345,22 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.daemon_main_window.compact_status_details_reviewed = false;
+      broken.daemon_main_window.three_column_layout_reviewed = false;
+      broken.daemon_main_window.ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /daemon main window compact status\/details review/);
+      assert.match(outputText(result.stdout), /daemon main window three-column layout review/);
+      assert.match(outputText(result.stdout), /daemon main window ready flag/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.excel_taskpane.document_state = 'unknown';
       broken.excel_taskpane.document_state_ready = false;
       broken.excel_taskpane.density_ready = false;
@@ -1022,6 +1038,12 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     },
     rendered_logo_review: renderedLogoReview(passed, screenshots.logo_tray_size),
     rendered_logo_review_ready: passed,
+    daemon_main_window: {
+      reviewed: passed,
+      compact_status_details_reviewed: passed,
+      three_column_layout_reviewed: passed,
+      ready: passed
+    },
     powerpoint_runtime_evidence: powerPointRuntimeEvidence(passed),
     powerpoint_runtime_evidence_ready: passed,
     word_taskpane: {
@@ -1263,6 +1285,7 @@ function productVisualSurfaces(): string[] {
     'powerpoint_ribbon_command',
     'powerpoint_catalog_entry',
     'powerpoint_taskpane_title',
+    'daemon_main_window',
     'logo_tray_size',
     'logo_ribbon_size',
     'logo_catalog_thumbnail',

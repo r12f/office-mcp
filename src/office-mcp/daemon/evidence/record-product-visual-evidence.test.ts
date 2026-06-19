@@ -36,6 +36,7 @@ const SURFACES = [
   'powerpoint-ribbon-command',
   'powerpoint-catalog-entry',
   'powerpoint-taskpane-title',
+  'daemon-main-window',
   'logo-tray-size',
   'logo-ribbon-size',
   'logo-catalog-thumbnail',
@@ -71,6 +72,9 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
+    assert.equal((evidence.daemon_main_window as Record<string, unknown>).ready, true);
+    assert.equal((evidence.daemon_main_window as Record<string, unknown>).compact_status_details_reviewed, true);
+    assert.equal((evidence.screenshots_exist as Record<string, unknown>).daemon_main_window, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).logo_future_office_control_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).final_logo_user_surface_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).current_logo_screenshot_feedback_reviewed, true);
@@ -162,6 +166,11 @@ test('README product visual evidence command matches current product visual gate
     '--powerpoint-catalog-entry-screenshot',
     '--powerpoint-taskpane-title',
     '--powerpoint-taskpane-title-screenshot',
+    '--daemon-main-window',
+    '--daemon-main-window-screenshot',
+    '--daemon-main-window-reviewed',
+    '--daemon-main-window-compact-reviewed',
+    '--daemon-main-window-three-column-reviewed',
     '--logo-quality-reviewed',
     '--logo-future-office-control-reviewed',
     '--final-logo-user-surface-reviewed',
@@ -772,7 +781,10 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     '--powerpoint-tools-permissions-merged', 'true',
     '--powerpoint-inline-settings', 'true',
     '--powerpoint-server-protocol-row', 'Server 0.1.0 / Protocol 1.0',
-    ...(explicitPowerPointDocumentState ? [] : ['--powerpoint-document-state', 'Editable'])
+    ...(explicitPowerPointDocumentState ? [] : ['--powerpoint-document-state', 'Editable']),
+    '--daemon-main-window-reviewed', 'true',
+    '--daemon-main-window-compact-reviewed', 'true',
+    '--daemon-main-window-three-column-reviewed', 'true'
   ];
   if (!hasWordManifest) args.push('--word-manifest-path', writeManifest(outputDir, 'word'));
   if (!hasExcelManifest) args.push('--excel-manifest-path', writeManifest(outputDir, 'excel'));

@@ -265,6 +265,7 @@ function validateProductVisualEvidence(): void {
   validateCatalogIdentityReview(visual.catalog_identity_review, visual.catalog_identity_review_ready);
   validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
   validateFirstRunIdentity(visual.first_run_identity);
+  validateDaemonMainWindowVisualEvidence(visual.daemon_main_window);
   validatePowerPointRuntimeEvidence(visual.powerpoint_runtime_evidence, visual.powerpoint_runtime_evidence_ready);
   validateWordTaskpaneVisualEvidence(visual.word_taskpane);
   validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
@@ -543,6 +544,21 @@ function validateHostFirstRunIdentity(identity: unknown, host: string): void {
   if (identity.ready !== true) failures.push(`Product visual evidence missing ${host} first-run identity ready flag.`);
 }
 
+function validateDaemonMainWindowVisualEvidence(mainWindow: unknown): void {
+  if (!isRecord(mainWindow)) {
+    failures.push('Product visual evidence missing daemon main window review.');
+    return;
+  }
+  for (const [key, label] of [
+    ['reviewed', 'daemon main window product review'],
+    ['compact_status_details_reviewed', 'daemon main window compact status/details review'],
+    ['three_column_layout_reviewed', 'daemon main window three-column layout review'],
+    ['ready', 'daemon main window ready flag']
+  ] as const) {
+    if (mainWindow[key] !== true) failures.push(`Product visual evidence missing ${label}.`);
+  }
+}
+
 function productCatalogTypeLooksReady(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   return /local productivity automation control utility/i.test(value) && !/(add-in|task pane|developer tool|mcp server|protocol bridge|sample|debug|experimental|office-mcp-(word|excel|powerpoint))/i.test(value);
@@ -764,6 +780,7 @@ function productVisualSurfaces(): string[] {
     'powerpoint_ribbon_command',
     'powerpoint_catalog_entry',
     'powerpoint_taskpane_title',
+    'daemon_main_window',
     'logo_tray_size',
     'logo_ribbon_size',
     'logo_catalog_thumbnail',
@@ -787,6 +804,7 @@ function distinctProductVisualSurfaces(): string[] {
     'powerpoint_ribbon_command',
     'powerpoint_catalog_entry',
     'powerpoint_taskpane_title',
+    'daemon_main_window',
     'tray_icon',
     'tray_native_menu',
     'tray_tooltip',
