@@ -1174,21 +1174,26 @@ Microsoft workbook -> worksheet -> range -> table/chart/pivot object workflow.
 #### M7.1 — Excel Core Tool Surface Refinement
 
 Research basis: Microsoft Excel add-in docs identify the most common workflow as
-`Workbook` -> `Worksheet` -> `Range`, then higher-level `Table`, `Chart`, and
-`PivotTable` objects. Cells are represented as one-cell `Range` objects, so v1
-must not add separate cell CRUD tools. The refined catalog is fixed at 20 core
-tools by grouping common object lifecycle/configuration operations under
-`update_*` commands instead of exposing every Excel.js method. Each tool must
-own one distinct user intent; overlapping behavior must be removed or assigned
-to one owner before implementation.
+`Workbook` -> `Worksheet` -> `Range`, then higher-level `Table` and `Chart`
+objects created from existing range data. The core concepts page also calls out
+range `values`, `formulas`, and `format` as the immediately useful cell-data
+operations, and states that Excel JavaScript API has no separate `Cell` object:
+cells are one-cell `Range` objects. PivotTables are not part of that page's
+first-level walkthrough, but they are included in v1 because they are a
+high-value Excel analysis workflow and are present in the stable Excel.js object
+model. The refined catalog is fixed at 20 core tools by grouping common object
+lifecycle/configuration operations under `update_*` commands instead of
+exposing every Excel.js method. Each tool must own one distinct user intent;
+overlapping behavior must be removed or assigned to one owner before
+implementation.
 
 Selection criteria: prioritize the operations users actually ask Excel to do in
-an agent workflow: workbook and sheet inventory/lifecycle, range/cell value
-CRUD, formula authoring, formatting, sorting/filtering, table management, chart
-creation/customization, and PivotTable analysis. Do not add tools for every
-Office.js object, property, event, shape, comment, slicer, external connection,
-or preview feature unless a later user workflow proves that the 20-tool surface
-cannot express it safely.
+an agent workflow: workbook orientation, sheet inventory/lifecycle, range/cell
+value CRUD, formula authoring, formatting, sorting/filtering, table management,
+chart creation/customization, and PivotTable analysis. Do not add tools for
+every Office.js object, property, event, shape, comment, slicer, external
+connection, or preview feature unless a later user workflow proves that the
+20-tool surface cannot express it safely.
 
 Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
@@ -1198,6 +1203,14 @@ Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
 `excel.create_table`, `excel.update_table`, `excel.create_chart`,
 `excel.update_chart`, `excel.create_pivot_table`, and
 `excel.update_pivot_table`.
+
+The 20 tools are grouped as: Workbook 1, Worksheet 4, Range/cell data 5,
+Formula 1, Format 1, Data operations 2, Table 2, Chart 2, and PivotTable 2.
+This is the v1 upper bound. Rejected v1 expansions include separate cell CRUD,
+worksheet formatting, freeze panes, protection, comments, shapes, images,
+slicers, event subscriptions, bindings, named items, custom XML, external data,
+Power Query, workbook import/export, save-as/close, and method-level table,
+chart, or PivotTable tools that duplicate an existing owner tool.
 
 - [x] Implement workbook and worksheet discovery/lifecycle slice:
       `excel.get_workbook_info`, `excel.list_sheets`, `excel.update_sheet`,
@@ -1210,6 +1223,11 @@ Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
       PivotTable docs. The spec now explicitly maps workspace-level sheet CRUD,
       sheet/range/cell CRUD, formula, format, sort/filter, table, chart, and
       PivotTable workflows into 20 task-oriented APIs.
+- [x] Tighten the Excel v1 API surface to the final 20-tool maximum: document
+      the category counts, explain why cells are represented by range tools,
+      keep PivotTables as the only analysis object beyond the core concepts
+      page's table/chart walkthrough, and record rejected method-level tool
+      families so implementation does not drift into an Office.js mirror.
 - [ ] Verify each remaining planned tool's minimum ExcelApi requirement set
       against `src/office-ctl/excel/node_modules/@types/office-js/index.d.ts`
       and Microsoft API docs before implementation. Record the verified minimum
@@ -1220,6 +1238,11 @@ Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
       profile, or user-visible workflow that cannot be represented by the
       existing tools. Any proposed expansion must update the selection matrix
       before implementation.
+- [ ] Add or keep contract tests that fail if the daemon catalog, Excel task
+      pane available-tools metadata, or UI permission grouping advertises more
+      than the v1 20-tool target without a spec update. The tests should also
+      prove the required categories remain Workbook, Worksheet, Range, Formula,
+      Format, Data, Table, Chart, and PivotTable.
 - [x] Implement range cleanup/search slice: `excel.clear_range` and
       `excel.find_replace_cells`. Tests first: daemon catalog/preflight,
       task pane dispatch/handler tests, argument validation tests, and smoke

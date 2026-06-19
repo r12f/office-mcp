@@ -20,18 +20,23 @@ tools for those workflows instead of mirroring every Excel.js class and method.
 
 Research basis:
 
-- Microsoft Learn's "Core Excel object model concepts" describes the common
-  Excel add-in workflow as starting from a `Workbook`, moving to a `Worksheet`,
-  then working with `Range` values, formulas, and formats before creating
-  higher-level `Table` or `Chart` objects.
-- The core concepts page description frames the Excel JavaScript API around
-  reading, writing, and visualizing workbook data through workbooks,
-  worksheets, ranges, tables, and charts. That is the primary selection filter
-  for v1 tools.
-- The same documentation states that cells are represented as one-cell
-  `Range` objects, so v1 must not add separate cell CRUD tools. Single-cell
+- Microsoft Learn's "Core Excel object model concepts" is the starting point
+  for the v1 surface. It describes the common add-in workflow as starting from
+  a `Workbook`, moving to a `Worksheet`, working with one or more `Range`
+  objects, and then creating higher-level `Table` or `Chart` objects from
+  existing range data.
+- The same page frames Excel add-ins around reading, writing, and visualizing
+  workbook data through workbooks, worksheets, ranges, tables, and charts. This
+  is the primary selection filter for v1 tools.
+- The core concepts page states that a `Range` represents either one cell or a
+  contiguous block of cells, and that Excel JavaScript API has no separate
+  `Cell` object. Therefore v1 must not add separate cell CRUD tools. Single-cell
   reads, writes, formulas, formatting, clearing, search, sorting, and filtering
   are all range operations.
+- The page calls out `values`, `formulas`, and `format` as the immediately
+  useful range properties. v1 exposes those as separate value, formula, and
+  formatting intents because they have different permission and validation
+  profiles.
 - Microsoft Learn's table guide focuses on creating, resizing, reading,
   sorting, filtering, and formatting tables. v1 keeps table lifecycle and
   table-specific style/options in `excel.update_table`, while generic table
@@ -41,14 +46,18 @@ Research basis:
   creation and one chart-owner update tool instead of separate axis, legend,
   series, and export tools.
 - Microsoft Learn's PivotTable guide focuses on creating, configuring, and
-  filtering PivotTables. PivotTables are included because they are a high-value
-  analysis workflow, but v1 is limited to normal range/table sources and
-  non-preview APIs.
+  filtering PivotTables. PivotTables are not part of the core concepts page's
+  first-level walkthrough, but they are included because they are a high-value
+  Excel analysis workflow and are present in the stable Excel.js object model.
+  v1 limits PivotTables to normal range/table sources and non-preview APIs.
 
-The refined v1 target is 20 tools. That is the upper bound for the core Excel
-surface unless a future workflow proves that a distinct object owner or
-permission profile is missing. Do not expand the catalog by copying individual
-Excel.js methods into MCP tools.
+The refined v1 target is 20 tools. This is the maximum allowed core Excel
+surface for v1 and satisfies the 15-20 tool target by covering the high-value
+workflows without mirroring every Excel.js class or method. Do not expand the
+catalog by copying individual Excel.js methods into MCP tools. A future tool can
+only be added after the selection matrix proves that the existing 20 tools
+cannot express a distinct object owner, permission profile, or user-visible
+workflow safely.
 
 Out of scope for the core Excel surface: shapes and images, comments and notes,
 slicers as first-class tools, events/subscriptions, custom XML, external data
@@ -68,6 +77,37 @@ Core tool selection matrix:
 | Promote data into a structured table | `Table` | `excel.create_table`, `excel.update_table` | Creation is common enough to be direct; lifecycle, rows/columns, resize, rename, and table style/options share one object-owner update tool. |
 | Visualize data | `Chart` | `excel.create_chart`, `excel.update_chart` | Creation is direct; title, axes, legend, series, size, position, delete, and supported export share one chart-owner update tool. |
 | Analyze summarized data | `PivotTable` | `excel.create_pivot_table`, `excel.update_pivot_table` | Creation is direct; fields, filters, aggregation, refresh, metadata, and delete share one PivotTable-owner update tool. |
+
+Final v1 tool set by category:
+
+| Category | Tools | Count | User intent |
+|---|---|---:|---|
+| Workbook | `excel.get_workbook_info` | 1 | Inspect workbook-level state without reading cell contents. |
+| Worksheet | `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | 4 | Sheet inventory and lifecycle. |
+| Range / cell data | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.clear_range`, `excel.find_replace_cells` | 5 | Locate, read, write, clear, and search cells through ranges. |
+| Formula | `excel.set_formula` | 1 | Author formulas distinctly from literal value writes. |
+| Format | `excel.format_range` | 1 | Apply user-visible cell formatting. |
+| Data operations | `excel.sort_range`, `excel.apply_filter` | 2 | Sort and filter plain ranges or table bodies. |
+| Table | `excel.create_table`, `excel.update_table` | 2 | Promote data to structured tables and manage table-owned lifecycle/options. |
+| Chart | `excel.create_chart`, `excel.update_chart` | 2 | Visualize data and manage chart-owned configuration. |
+| PivotTable | `excel.create_pivot_table`, `excel.update_pivot_table` | 2 | Create and configure summarized analysis views. |
+
+Total: 20 tools.
+
+Rejected tool families for v1:
+
+- No `excel.read_cell`, `excel.write_cell`, or `excel.delete_cell`; cells are
+  one-cell ranges.
+- No separate worksheet format, freeze pane, protection, comments, shapes,
+  images, slicer, event, binding, named-item, custom XML, external connection,
+  Power Query, workbook import/export, save-as, or close tools.
+- No separate table row, table column, table style, table sort, or table filter
+  tools. Table structure/options belong to `excel.update_table`; table data,
+  sort, and filter behavior belongs to range/data tools.
+- No separate chart title, axis, legend, series, image-export, move, resize, or
+  delete tools. Those actions belong to `excel.update_chart`.
+- No separate PivotTable field, filter, refresh, or delete tools. Those actions
+  belong to `excel.update_pivot_table`.
 
 Implemented Excel v1 tools:
 
