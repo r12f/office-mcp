@@ -41,13 +41,28 @@ const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
         name: "excel.create_table",
     },
     ExcelToolDefinition {
+        name: "excel.delete_sheet",
+    },
+    ExcelToolDefinition {
         name: "excel.format_range",
+    },
+    ExcelToolDefinition {
+        name: "excel.get_used_range",
+    },
+    ExcelToolDefinition {
+        name: "excel.get_workbook_info",
+    },
+    ExcelToolDefinition {
+        name: "excel.list_sheets",
     },
     ExcelToolDefinition {
         name: "excel.read_range",
     },
     ExcelToolDefinition {
         name: "excel.set_formula",
+    },
+    ExcelToolDefinition {
+        name: "excel.update_sheet",
     },
     ExcelToolDefinition {
         name: "excel.write_range",

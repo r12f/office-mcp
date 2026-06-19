@@ -6,9 +6,14 @@ Excel v1 `excel.*` command implementations live here.
 The task pane registers one workbook session with the daemon and currently
 advertises the implemented v1 tool surface:
 
+- `excel.get_workbook_info`
+- `excel.list_sheets`
+- `excel.add_sheet`
+- `excel.update_sheet`
+- `excel.delete_sheet`
+- `excel.get_used_range`
 - `excel.read_range`
 - `excel.write_range`
-- `excel.add_sheet`
 - `excel.set_formula`
 - `excel.format_range`
 - `excel.create_table`

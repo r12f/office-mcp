@@ -35,29 +35,41 @@
   } = window.OfficeCtlMainUi;
 
   const AVAILABLE_TOOLS = [
+    'excel.get_workbook_info',
+    'excel.list_sheets',
+    'excel.add_sheet',
+    'excel.update_sheet',
+    'excel.delete_sheet',
+    'excel.get_used_range',
     'excel.read_range',
     'excel.write_range',
-    'excel.add_sheet',
     'excel.set_formula',
     'excel.format_range',
     'excel.create_table',
     'excel.create_chart'
   ];
   const TOOL_GROUPS = [
-    { label: 'Read', tools: ['excel.read_range'] },
-    { label: 'Edit', tools: ['excel.write_range', 'excel.set_formula', 'excel.format_range'] },
-    { label: 'Workbook', tools: ['excel.add_sheet'] },
-    { label: 'Tables', tools: ['excel.create_table'] },
-    { label: 'Charts', tools: ['excel.create_chart'] }
+    { label: 'Workbook', tools: ['excel.get_workbook_info'] },
+    { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
+    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range'] },
+    { label: 'Formula', tools: ['excel.set_formula'] },
+    { label: 'Format', tools: ['excel.format_range'] },
+    { label: 'Table', tools: ['excel.create_table'] },
+    { label: 'Chart', tools: ['excel.create_chart'] }
   ];
   const TOOL_METADATA = new Map([
-    ['excel.read_range', { category: 'Read', sideEffect: 'read', description: 'Read values, text, and number formats from a range.' }],
-    ['excel.write_range', { category: 'Edit', sideEffect: 'mutating', description: 'Write a value matrix into a range.' }],
-    ['excel.add_sheet', { category: 'Workbook', sideEffect: 'mutating', description: 'Add a worksheet to the workbook.' }],
-    ['excel.set_formula', { category: 'Edit', sideEffect: 'mutating', description: 'Set formulas in a range.' }],
-    ['excel.format_range', { category: 'Edit', sideEffect: 'mutating', description: 'Apply formatting to a range.' }],
-    ['excel.create_table', { category: 'Tables', sideEffect: 'mutating', description: 'Create a table from a range.' }],
-    ['excel.create_chart', { category: 'Charts', sideEffect: 'mutating', description: 'Create a chart from a range.' }]
+    ['excel.get_workbook_info', { category: 'Workbook', sideEffect: 'read', description: 'Read workbook state and aggregate object counts.' }],
+    ['excel.list_sheets', { category: 'Worksheet', sideEffect: 'read', description: 'List workbook worksheets.' }],
+    ['excel.add_sheet', { category: 'Worksheet', sideEffect: 'mutating', description: 'Add a worksheet to the workbook.' }],
+    ['excel.update_sheet', { category: 'Worksheet', sideEffect: 'mutating', description: 'Rename, activate, move, or restyle a worksheet tab.' }],
+    ['excel.delete_sheet', { category: 'Worksheet', sideEffect: 'destructive', description: 'Delete a worksheet.' }],
+    ['excel.get_used_range', { category: 'Range', sideEffect: 'read', description: 'Read the used range address and dimensions.' }],
+    ['excel.read_range', { category: 'Range', sideEffect: 'read', description: 'Read values, text, formulas, and number formats from a range.' }],
+    ['excel.write_range', { category: 'Range', sideEffect: 'mutating', description: 'Write a value matrix into a range.' }],
+    ['excel.set_formula', { category: 'Formula', sideEffect: 'mutating', description: 'Set formulas in a range.' }],
+    ['excel.format_range', { category: 'Format', sideEffect: 'mutating', description: 'Apply formatting to a range.' }],
+    ['excel.create_table', { category: 'Table', sideEffect: 'mutating', description: 'Create a table from a range.' }],
+    ['excel.create_chart', { category: 'Chart', sideEffect: 'mutating', description: 'Create a chart from a range.' }]
   ]);
   const { instanceId, sessionId } = runtimeIds();
   const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.excel.tool-permissions.${sessionId}`;
@@ -275,14 +287,29 @@
       if (taskStore.isCancelled(requestId)) throw cancelledError(tool);
       let data;
       switch (tool) {
+        case 'excel.get_workbook_info':
+          data = await getWorkbookInfoTool(args);
+          break;
+        case 'excel.list_sheets':
+          data = await listSheets(args);
+          break;
+        case 'excel.add_sheet':
+          data = await addSheet(args);
+          break;
+        case 'excel.update_sheet':
+          data = await updateSheet(args);
+          break;
+        case 'excel.delete_sheet':
+          data = await deleteSheet(args);
+          break;
+        case 'excel.get_used_range':
+          data = await getUsedRange(args);
+          break;
         case 'excel.read_range':
           data = await readRange(args);
           break;
         case 'excel.write_range':
           data = await writeRange(args);
-          break;
-        case 'excel.add_sheet':
-          data = await addSheet(args);
           break;
         case 'excel.set_formula':
           data = await setFormula(args);
@@ -325,6 +352,49 @@
     });
   }
 
+  async function getWorkbookInfoTool(args) {
+    return Excel.run(async (context) => {
+      const workbook = context.workbook;
+      const worksheets = workbook.worksheets;
+      const tables = workbook.tables;
+      worksheets.load('items/id,items/name,items/visibility');
+      tables.load('items/name');
+      await context.sync();
+      let activeSheet = null;
+      try {
+        const sheet = worksheets.getActiveWorksheet();
+        sheet.load('id,name,visibility');
+        await context.sync();
+        activeSheet = sheetInfo(sheet, true);
+      } catch (error) {
+        logger.warn('excel.active_sheet_probe.failed', error);
+      }
+      return {
+        title: documentInfo?.title || fileName(Office.context.document?.url || '') || 'Excel Workbook',
+        url: Office.context.document?.url || null,
+        filename: fileName(Office.context.document?.url || '') || null,
+        active_sheet: activeSheet,
+        sheet_count: worksheets.items.length,
+        table_count: tables.items.length,
+        is_dirty: documentInfo?.is_dirty ?? null,
+        is_read_only: documentInfo?.is_read_only ?? false,
+        is_protected: documentInfo?.is_protected ?? false
+      };
+    });
+  }
+
+  async function listSheets(args) {
+    return Excel.run(async (context) => {
+      const worksheets = context.workbook.worksheets;
+      const activeSheet = worksheets.getActiveWorksheet();
+      worksheets.load('items/id,items/name,items/position,items/visibility,items/tabColor');
+      activeSheet.load('id');
+      await context.sync();
+      return {
+        sheets: worksheets.items.map((sheet) => sheetInfo(sheet, sheet.id === activeSheet.id))
+      };
+    });
+  }
   async function readRange(args) {
     return Excel.run(async (context) => {
       const range = targetRange(context, args);
@@ -359,6 +429,56 @@
     });
   }
 
+  async function updateSheet(args) {
+    const sheet = requiredString(args, 'sheet', 'excel.update_sheet requires sheet.');
+    return Excel.run(async (context) => {
+      const worksheets = context.workbook.worksheets;
+      const worksheet = worksheets.getItem(sheet);
+      const renamedTo = optionalTrimmedString(args.name);
+      if (renamedTo) worksheet.name = renamedTo;
+      if (args.visibility) worksheet.visibility = String(args.visibility);
+      if (args.tab_color) worksheet.tabColor = String(args.tab_color);
+      if (Number.isInteger(args.position)) worksheet.position = args.position;
+      if (args.activate === true) worksheet.activate();
+      worksheet.load('id,name,position,visibility,tabColor');
+      await context.sync();
+      return { sheet: sheetInfo(worksheet, args.activate === true), updated: true };
+    });
+  }
+
+  async function deleteSheet(args) {
+    const sheet = requiredString(args, 'sheet', 'excel.delete_sheet requires sheet.');
+    return Excel.run(async (context) => {
+      const worksheets = context.workbook.worksheets;
+      worksheets.load('items/name');
+      await context.sync();
+      if (worksheets.items.length <= 1) {
+        throw Object.assign(new Error('excel.delete_sheet cannot delete the only worksheet.'), { officeMcpCode: 'INVALID_ARGUMENT' });
+      }
+      const worksheet = worksheets.getItem(sheet);
+      worksheet.delete();
+      await context.sync();
+      return { sheet, deleted: true };
+    });
+  }
+
+  async function getUsedRange(args) {
+    return Excel.run(async (context) => {
+      const worksheet = targetWorksheet(context, args);
+      const usedRange = worksheet.getUsedRangeOrNullObject(true);
+      usedRange.load('address,rowCount,columnCount,isNullObject');
+      await context.sync();
+      if (usedRange.isNullObject) {
+        return { sheet: args.sheet || null, address: null, row_count: 0, column_count: 0, is_empty: true };
+      }
+      return {
+        address: usedRange.address,
+        row_count: usedRange.rowCount,
+        column_count: usedRange.columnCount,
+        is_empty: false
+      };
+    });
+  }
   async function addSheet(args) {
     const name = String(args.name || '').trim();
     return Excel.run(async (context) => {
@@ -428,6 +548,27 @@
     });
   }
 
+  function targetWorksheet(context, args) {
+    return args.sheet
+      ? context.workbook.worksheets.getItem(String(args.sheet))
+      : context.workbook.worksheets.getActiveWorksheet();
+  }
+
+  function sheetInfo(sheet, active) {
+    return {
+      id: sheet.id || null,
+      name: sheet.name,
+      position: Number.isInteger(sheet.position) ? sheet.position : null,
+      visibility: sheet.visibility || null,
+      tab_color: sheet.tabColor || null,
+      active: Boolean(active)
+    };
+  }
+
+  function optionalTrimmedString(value) {
+    const text = String(value || '').trim();
+    return text || null;
+  }
   function requiredString(args, key, message) {
     const value = String(args[key] || '').trim();
     if (!value) throw Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT' });

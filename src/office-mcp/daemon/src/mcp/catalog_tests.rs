@@ -18,12 +18,18 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"powerpoint.add_slide"));
     assert!(names.contains(&"powerpoint.replace_text"));
     assert_eq!(WORD_V1_TOOLS.len(), 27);
+    assert_eq!(ExcelToolCatalog::tools().len(), 12);
     assert_eq!(PowerPointToolCatalog::tools().len(), 5);
-    assert_eq!(tools.len(), 41);
+    assert_eq!(tools.len(), 46);
 }
 
 #[test]
 fn excel_tool_catalog_checks_supported_names() {
+    assert!(ExcelToolCatalog::contains("excel.get_workbook_info"));
+    assert!(ExcelToolCatalog::contains("excel.list_sheets"));
+    assert!(ExcelToolCatalog::contains("excel.update_sheet"));
+    assert!(ExcelToolCatalog::contains("excel.delete_sheet"));
+    assert!(ExcelToolCatalog::contains("excel.get_used_range"));
     assert!(ExcelToolCatalog::contains("excel.write_range"));
     assert!(!ExcelToolCatalog::contains("excel.unsupported"));
 }

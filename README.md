@@ -51,7 +51,7 @@ The Windows desktop implementation is in place for Word, Excel, and PowerPoint:
   `doc/spec/04-word-capabilities.md` now defines the target refined 25-tool Word surface,
   and `doc/spec/08-roadmap.md` tracks the migration that removes duplicate specialized tools
   from the advertised catalog.
-- The current Excel add-in runtime advertises and executes the Excel v1 workbook tools: range read/write, sheet creation, formula setting, formatting, table creation, and chart creation.
+- The current Excel add-in runtime advertises and executes the implemented Excel v1 workbook tools: workbook info, sheet list/add/update/delete, used-range discovery, range read/write, formula setting, formatting, table creation, and chart creation.
 - The current PowerPoint add-in runtime advertises and executes the PowerPoint v1 presentation tools: add slide, replace text, insert image, apply layout, and PDF export where the host supports it.
 - The daemon also exposes the Word v1 resource surface, including document text, structure, paragraph, comments, tracked changes, and selection.
 

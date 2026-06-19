@@ -28,9 +28,14 @@ Implemented Excel v1 tools:
 
 | Tool | Side effect | Minimum API | Summary |
 |---|---|---|---|
+| `excel.get_workbook_info` | read | `ExcelApi 1.1` | Return workbook identity, active sheet, and aggregate object counts. |
+| `excel.list_sheets` | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state. |
+| `excel.add_sheet` | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
+| `excel.update_sheet` | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
+| `excel.delete_sheet` | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
+| `excel.get_used_range` | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet. |
 | `excel.read_range` | read | `ExcelApi 1.1` | Read values, display text, dimensions, and number format for a range. |
 | `excel.write_range` | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
-| `excel.add_sheet` | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
 | `excel.set_formula` | edit | `ExcelApi 1.1` | Fill a range with one formula. |
 | `excel.format_range` | edit | `ExcelApi 1.1` | Apply basic font, fill, and number-format styling. |
 | `excel.create_table` | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
@@ -43,12 +48,12 @@ Target core Excel tool surface:
 
 | Tool | Status | Category | Side effect | Minimum API | Summary |
 |---|---|---|---|---|---|
-| `excel.get_workbook_info` | planned | Workbook | read | verify during implementation | Return workbook identity, workbook-level state, active sheet name/id, and aggregate object counts; detailed sheet inventory belongs to `excel.list_sheets`. |
-| `excel.list_sheets` | planned | Worksheet | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state; workbook metadata belongs to `excel.get_workbook_info`. |
+| `excel.get_workbook_info` | implemented | Workbook | read | `ExcelApi 1.1` | Return workbook identity, workbook-level state, active sheet name/id, and aggregate object counts; detailed sheet inventory belongs to `excel.list_sheets`. |
+| `excel.list_sheets` | implemented | Worksheet | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state; workbook metadata belongs to `excel.get_workbook_info`. |
 | `excel.add_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
-| `excel.update_sheet` | planned | Worksheet | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
-| `excel.delete_sheet` | planned | Worksheet | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
-| `excel.get_used_range` | planned | Range | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet; cell values/text/formulas belong to `excel.read_range`. |
+| `excel.update_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
+| `excel.delete_sheet` | implemented | Worksheet | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
+| `excel.get_used_range` | implemented | Range | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet; cell values/text/formulas belong to `excel.read_range`. |
 | `excel.read_range` | implemented | Range | read | `ExcelApi 1.1` | Read values, display text, formulas, dimensions, and number format for an explicit range. |
 | `excel.write_range` | implemented | Range | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
 | `excel.clear_range` | planned | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, hyperlinks, or all range data; optional cell deletion with shift direction. |
