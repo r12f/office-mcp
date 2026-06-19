@@ -12,6 +12,18 @@ addresses the workbook by `session_id`; the add-in executes workbook operations
 with `Excel.run` against either the active worksheet or an explicitly named
 worksheet when the tool accepts `sheet`.
 
+The target Excel surface is based on the Microsoft Excel add-in object model:
+most useful workflows start at `Workbook`, move to `Worksheet`, operate on
+`Range` values/formulas/formats, and then promote data into higher-level
+`Table`, `Chart`, or `PivotTable` objects. `office-mcp` exposes task-oriented
+tools for those workflows instead of mirroring every Excel.js class and method.
+
+Out of scope for the core Excel surface: shapes and images, comments and notes,
+slicers as first-class tools, events/subscriptions, custom XML, external data
+connections, Power Query, Python/preview-only APIs, OLAP/Power Pivot, arbitrary
+file import/export, workbook close, and save-as flows. These can be added later
+only when there is a clear user workflow and host support evidence.
+
 Implemented Excel v1 tools:
 
 | Tool | Side effect | Minimum API | Summary |
@@ -26,6 +38,35 @@ Implemented Excel v1 tools:
 
 The Excel task pane reports these tools in `session.added.available_tools` only
 after the runtime registers successfully with the daemon.
+
+Target core Excel tool surface:
+
+| Tool | Status | Category | Side effect | Minimum API | Summary |
+|---|---|---|---|---|---|
+| `excel.get_workbook_info` | planned | Workbook | read | verify during implementation | Return workbook identity, active sheet, sheet/table/chart/pivot counts, read-only/protection/dirty state where supported. |
+| `excel.list_sheets` | planned | Worksheet | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state. |
+| `excel.add_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
+| `excel.update_sheet` | planned | Worksheet | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
+| `excel.delete_sheet` | planned | Worksheet | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
+| `excel.get_used_range` | planned | Range | read | `ExcelApi 1.1` | Return the used range address, dimensions, and optional values/text for a sheet. |
+| `excel.read_range` | implemented | Range | read | `ExcelApi 1.1` | Read values, display text, formulas, dimensions, and number format for a range. |
+| `excel.write_range` | implemented | Range | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
+| `excel.clear_range` | planned | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, hyperlinks, or all range data; optional cell deletion with shift direction. |
+| `excel.find_replace_cells` | planned | Range | read/edit | verify during implementation | Search text, values, or formulas in a worksheet/range and optionally replace matches. |
+| `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
+| `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1` | Apply font, fill, number format, borders, alignment, and autofit basics. |
+| `excel.sort_range` | planned | Data | edit | verify during implementation | Sort a range or table body by one or more column keys. |
+| `excel.apply_filter` | planned | Data | edit | verify during implementation | Apply or clear AutoFilter/table criteria. |
+| `excel.create_table` | implemented | Table | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
+| `excel.update_table` | planned | Table | read/edit/destructive | `ExcelApi 1.1` | Read table metadata/data; add rows/columns; resize, rename, sort/filter, clear filters, format, or delete a table. |
+| `excel.create_chart` | implemented | Chart | edit | `ExcelApi 1.1` | Create a chart from a range or table. |
+| `excel.update_chart` | planned | Chart | edit/read/destructive | verify during implementation | Update chart title, axes, legend, series, position, size, delete the chart, or export an image where supported. |
+| `excel.create_pivot_table` | planned | PivotTable | edit | verify during implementation | Create a PivotTable from a range or table at a target destination. |
+| `excel.update_pivot_table` | planned | PivotTable | edit/destructive | verify during implementation | Configure row, column, data, and filter hierarchies; set aggregation, refresh, filter, or delete a PivotTable. |
+
+The planned tools above are the Excel implementation backlog, not the current
+runtime catalog. Before implementation, each planned tool must verify its
+minimum requirement set against `@types/office-js` and the Microsoft API docs.
 
 ## 2. Shared Arguments
 
@@ -202,7 +243,27 @@ Supported `type` values in v1 are `area`, `barClustered`, `columnClustered`,
 
 Returns `{ "chart": "Chart 1", "chart_type": "columnClustered", "source": "A1:C10" }`.
 
-## 4. Limits And Validation
+## 4. Planned Tool Contract Notes
+
+Planned tools should keep contracts coarse and workflow-oriented:
+
+- Workbook and worksheet tools own navigation, sheet lifecycle, and workbook
+  metadata. They must not read workbook cell contents except where explicitly
+  requested.
+- Range tools own cell data, formulas, formats, search/replace, sorting,
+  filtering, and clearing. A single-cell operation is represented as a one-cell
+  range.
+- `excel.clear_range` is the only planned destructive cell primitive. It should
+  cover content/format clearing and explicit delete-with-shift modes instead of
+  adding a separate delete-cell tool.
+- `excel.update_table`, `excel.update_chart`, and `excel.update_pivot_table`
+  intentionally group common reads and mutations by object type so the MCP
+  catalog stays compact while still covering user-visible Excel workflows.
+- PivotTable support must focus on normal workbook/range/table sources. OLAP,
+  Power Pivot, slicer UI management, and preview-only PivotTable APIs remain
+  deferred.
+
+## 5. Limits And Validation
 
 - The daemon validates session existence, session capability, queue depth,
   request size, timeout, and response size before or around forwarding.
@@ -210,9 +271,10 @@ Returns `{ "chart": "Chart 1", "chart_type": "columnClustered", "source": "A1:C1
 - Excel remains the authority for range validity, formula syntax, table/chart
   constraints, protected workbook denial, and other workbook-specific errors.
 - The server does not expose an Excel resource URI surface in v1. Clients use
-  `excel.read_range` for workbook reads.
+  `excel.get_workbook_info`, `excel.list_sheets`, `excel.get_used_range`, and
+  `excel.read_range` for workbook reads once the planned surface is implemented.
 
-## 5. Evidence
+## 6. Evidence
 
 Automated evidence exists at two levels:
 

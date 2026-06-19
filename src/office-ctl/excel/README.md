@@ -3,8 +3,8 @@
 Excel add-in entry point, host initialization, capability probing, and the
 Excel v1 `excel.*` command implementations live here.
 
-The task pane registers one workbook session with the daemon and advertises the
-current v1 tool surface:
+The task pane registers one workbook session with the daemon and currently
+advertises the implemented v1 tool surface:
 
 - `excel.read_range`
 - `excel.write_range`
@@ -13,6 +13,11 @@ current v1 tool surface:
 - `excel.format_range`
 - `excel.create_table`
 - `excel.create_chart`
+
+The target core Excel backlog is the refined about-20-tool catalog documented in
+`doc/spec/04-excel-capabilities.md` and tracked in `doc/spec/08-roadmap.md` under
+M7.1. It is based on the workbook, worksheet, range, table, chart, and PivotTable
+workflow from the Microsoft Excel add-in API docs.
 
 Run local checks from this directory:
 
