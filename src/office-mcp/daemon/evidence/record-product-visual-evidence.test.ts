@@ -67,6 +67,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).density_ready, true);
+    assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).logo_future_office_control_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).final_logo_user_surface_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).addin_title_icon_type_reviewed, true);
@@ -539,11 +540,15 @@ test('product visual evidence recorder requires PowerPoint runtime evidence', ()
     let evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.powerpoint_runtime_evidence_ready, false);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).powerpoint_runtime_evidence_ready, false);
+    assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
+    assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).density_ready, false);
 
     const broken = runRecorder(join(dir, 'broken-powerpoint-runtime-evidence.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--powerpoint-runtime-evidence-path', writePowerPointRuntimeEvidence(dir, false));
     assert.notEqual(broken.status, 0);
     evidence = JSON.parse(outputText(broken.stdout)) as Record<string, unknown>;
     assert.equal(evidence.powerpoint_runtime_evidence_ready, false);
+    assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
+    assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).density_ready, false);
   });
 });
 
@@ -595,6 +600,7 @@ test('product visual evidence recorder reads evidence artifact paths from enviro
     assert.equal(evidence.catalog_identity_review_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).density_ready, true);
+    assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal(evidence.powerpoint_runtime_evidence_ready, true);
     assert.equal(evidence.manual_tray_evidence_ready, true);
     assert.equal(evidence.passed, true);

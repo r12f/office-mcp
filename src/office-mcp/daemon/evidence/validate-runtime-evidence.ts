@@ -628,6 +628,7 @@ function validateExcelTaskpaneVisualEvidence(taskpane: unknown): void {
 
 function validatePowerPointTaskpaneVisualEvidence(taskpane: unknown): void {
   validateTaskpaneDensityEvidence(taskpane, 'PowerPoint');
+  if (isRecord(taskpane)) validatePowerPointRuntimeEvidence(taskpane.runtime_evidence, taskpane.runtime_evidence_ready);
 }
 
 function validateTaskpaneDensityEvidence(taskpane: unknown, label: 'Word' | 'Excel' | 'PowerPoint'): void {

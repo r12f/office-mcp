@@ -385,6 +385,22 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.powerpoint_taskpane.runtime_evidence_ready = false;
+      broken.powerpoint_taskpane.runtime_evidence.smoke_details.mutation_proved = false;
+      broken.powerpoint_taskpane.density_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /PowerPoint runtime evidence ready flag/);
+      assert.match(outputText(result.stdout), /PowerPoint runtime evidence did not prove mutation path/);
+      assert.match(outputText(result.stdout), /PowerPoint task pane density pass flag/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.catalog_type = 'Local productivity automation control utility protocol bridge debug panel';
       broken.first_run_identity.word.type = 'Local productivity automation control utility sample debug add-in';
       broken.tray_menu_surface_kind = 'webview';
@@ -991,6 +1007,8 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       server_protocol_row_ready: passed,
       document_state: 'Editable',
       document_state_ready: passed,
+      runtime_evidence: powerPointRuntimeEvidence(passed),
+      runtime_evidence_ready: passed,
       density_ready: passed
     },
     daemon_context: manualTrayDaemonContext(),
