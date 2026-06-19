@@ -1128,7 +1128,9 @@ Research basis: Microsoft Excel add-in docs identify the most common workflow as
 `Workbook` -> `Worksheet` -> `Range`, then higher-level `Table`, `Chart`, and
 `PivotTable` objects. The refined catalog must stay under 25 tools and should
 prefer about 20 tools by grouping common object mutations under `update_*`
-commands instead of exposing every Excel.js method.
+commands instead of exposing every Excel.js method. Each tool must own one
+distinct user intent; overlapping behavior should be removed or assigned to one
+owner before implementation.
 
 Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
@@ -1148,13 +1150,16 @@ Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
       and `excel.delete_sheet`.
 - [ ] Implement range and data tools: `excel.get_used_range`,
       `excel.clear_range`, `excel.find_replace_cells`, `excel.sort_range`, and
-      `excel.apply_filter`.
+      `excel.apply_filter`, with `excel.sort_range` and `excel.apply_filter` as
+      the single owners for sorting/filtering both ranges and table bodies.
 - [ ] Extend existing formula and format contracts where needed so
       `excel.set_formula` accepts formula matrices and `excel.format_range`
       covers borders, alignment, and autofit basics.
 - [ ] Implement table update behavior in `excel.update_table`, including table
-      metadata/data reads, rows/columns, resize, rename, sort/filter, clear
-      filters, formatting, and deletion modes.
+      metadata/structure reads, rows/columns, resize, rename, table style/options,
+      and deletion modes; table cell contents stay owned by `excel.read_range`,
+      and this tool must not duplicate generic range sort/filter or cell-format
+      behavior.
 - [ ] Implement chart update behavior in `excel.update_chart`, including title,
       axes, legend, series, position, size, deletion, and image export where the
       host supports it.

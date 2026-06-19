@@ -43,30 +43,58 @@ Target core Excel tool surface:
 
 | Tool | Status | Category | Side effect | Minimum API | Summary |
 |---|---|---|---|---|---|
-| `excel.get_workbook_info` | planned | Workbook | read | verify during implementation | Return workbook identity, active sheet, sheet/table/chart/pivot counts, read-only/protection/dirty state where supported. |
-| `excel.list_sheets` | planned | Worksheet | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state. |
+| `excel.get_workbook_info` | planned | Workbook | read | verify during implementation | Return workbook identity, workbook-level state, active sheet name/id, and aggregate object counts; detailed sheet inventory belongs to `excel.list_sheets`. |
+| `excel.list_sheets` | planned | Worksheet | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state; workbook metadata belongs to `excel.get_workbook_info`. |
 | `excel.add_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
 | `excel.update_sheet` | planned | Worksheet | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
 | `excel.delete_sheet` | planned | Worksheet | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
-| `excel.get_used_range` | planned | Range | read | `ExcelApi 1.1` | Return the used range address, dimensions, and optional values/text for a sheet. |
-| `excel.read_range` | implemented | Range | read | `ExcelApi 1.1` | Read values, display text, formulas, dimensions, and number format for a range. |
+| `excel.get_used_range` | planned | Range | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet; cell values/text/formulas belong to `excel.read_range`. |
+| `excel.read_range` | implemented | Range | read | `ExcelApi 1.1` | Read values, display text, formulas, dimensions, and number format for an explicit range. |
 | `excel.write_range` | implemented | Range | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
 | `excel.clear_range` | planned | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, hyperlinks, or all range data; optional cell deletion with shift direction. |
 | `excel.find_replace_cells` | planned | Range | read/edit | verify during implementation | Search text, values, or formulas in a worksheet/range and optionally replace matches. |
 | `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
 | `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1` | Apply font, fill, number format, borders, alignment, and autofit basics. |
-| `excel.sort_range` | planned | Data | edit | verify during implementation | Sort a range or table body by one or more column keys. |
-| `excel.apply_filter` | planned | Data | edit | verify during implementation | Apply or clear AutoFilter/table criteria. |
+| `excel.sort_range` | planned | Data | edit | verify during implementation | Sort a range or table body by one or more column keys; table structure changes belong to `excel.update_table`. |
+| `excel.apply_filter` | planned | Data | edit | verify during implementation | Apply or clear worksheet range or table filter criteria; PivotTable filters belong to `excel.update_pivot_table`. |
 | `excel.create_table` | implemented | Table | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
-| `excel.update_table` | planned | Table | read/edit/destructive | `ExcelApi 1.1` | Read table metadata/data; add rows/columns; resize, rename, sort/filter, clear filters, format, or delete a table. |
+| `excel.update_table` | planned | Table | read/edit/destructive | `ExcelApi 1.1` | Read table metadata/structure; add rows/columns; resize, rename, change table style/options, or delete a table. Table cell contents belong to `excel.read_range`. |
 | `excel.create_chart` | implemented | Chart | edit | `ExcelApi 1.1` | Create a chart from a range or table. |
-| `excel.update_chart` | planned | Chart | edit/read/destructive | verify during implementation | Update chart title, axes, legend, series, position, size, delete the chart, or export an image where supported. |
+| `excel.update_chart` | planned | Chart | edit/read/destructive | verify during implementation | Update chart title, axes, legend, series, position, size, delete the chart, or export a chart image where supported. |
 | `excel.create_pivot_table` | planned | PivotTable | edit | verify during implementation | Create a PivotTable from a range or table at a target destination. |
-| `excel.update_pivot_table` | planned | PivotTable | edit/destructive | verify during implementation | Configure row, column, data, and filter hierarchies; set aggregation, refresh, filter, or delete a PivotTable. |
+| `excel.update_pivot_table` | planned | PivotTable | edit/destructive | verify during implementation | Configure row, column, data, and filter hierarchies; set aggregation/calculation, refresh, apply PivotTable filters, or delete a PivotTable. |
 
 The planned tools above are the Excel implementation backlog, not the current
 runtime catalog. Before implementation, each planned tool must verify its
 minimum requirement set against `@types/office-js` and the Microsoft API docs.
+
+Tool ownership rules:
+
+- One tool owns each common user intent. Do not add a second tool unless it has a
+  different object owner, permission profile, or user-visible result.
+- `excel.get_workbook_info` is workbook state only. It may include the active
+  sheet id/name for orientation, but the worksheet list belongs to
+  `excel.list_sheets`.
+- `excel.get_used_range` locates the occupied sheet area. It does not return
+  cell contents; callers use `excel.read_range` for values, text, formulas, and
+  number formats.
+- `excel.write_range` writes literal values. `excel.set_formula` writes formulas
+  and formula matrices. Formula strings passed to `excel.write_range` remain
+  literal input unless explicitly documented otherwise during implementation.
+- `excel.format_range` owns cell-level visual formatting. Table style/options
+  remain in `excel.update_table`; chart visual settings remain in
+  `excel.update_chart`; PivotTable layout/format settings remain in
+  `excel.update_pivot_table`.
+- `excel.sort_range` and `excel.apply_filter` own sorting and filtering for both
+  plain ranges and table bodies. `excel.update_table` must not duplicate table
+  sort/filter behavior.
+- `excel.update_table` may return table metadata and ranges, but it must not
+  return table cell contents. Callers use `excel.read_range` against the table
+  range for values, text, formulas, and number formats.
+- `excel.update_table`, `excel.update_chart`, and
+  `excel.update_pivot_table` are object-owner tools. They group lifecycle and
+  configuration operations for their object type, but must not absorb generic
+  range, formula, or cell-format operations.
 
 ## 2. Shared Arguments
 
@@ -248,16 +276,15 @@ Returns `{ "chart": "Chart 1", "chart_type": "columnClustered", "source": "A1:C1
 Planned tools should keep contracts coarse and workflow-oriented:
 
 - Workbook and worksheet tools own navigation, sheet lifecycle, and workbook
-  metadata. They must not read workbook cell contents except where explicitly
-  requested.
-- Range tools own cell data, formulas, formats, search/replace, sorting,
-  filtering, and clearing. A single-cell operation is represented as a one-cell
-  range.
+  metadata. They must not read workbook cell contents.
+- Range tools own cell data, formulas, cell-level formatting, search/replace,
+  sorting, filtering, and clearing. A single-cell operation is represented as a
+  one-cell range.
 - `excel.clear_range` is the only planned destructive cell primitive. It should
   cover content/format clearing and explicit delete-with-shift modes instead of
   adding a separate delete-cell tool.
 - `excel.update_table`, `excel.update_chart`, and `excel.update_pivot_table`
-  intentionally group common reads and mutations by object type so the MCP
+  intentionally group object lifecycle and configuration by owner so the MCP
   catalog stays compact while still covering user-visible Excel workflows.
 - PivotTable support must focus on normal workbook/range/table sources. OLAP,
   Power Pivot, slicer UI management, and preview-only PivotTable APIs remain
