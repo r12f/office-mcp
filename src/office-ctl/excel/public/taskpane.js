@@ -43,6 +43,8 @@
     'excel.get_used_range',
     'excel.read_range',
     'excel.write_range',
+    'excel.clear_range',
+    'excel.find_replace_cells',
     'excel.set_formula',
     'excel.format_range',
     'excel.create_table',
@@ -51,7 +53,7 @@
   const TOOL_GROUPS = [
     { label: 'Workbook', tools: ['excel.get_workbook_info'] },
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
-    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range'] },
+    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.clear_range', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
     { label: 'Format', tools: ['excel.format_range'] },
     { label: 'Table', tools: ['excel.create_table'] },
@@ -66,6 +68,8 @@
     ['excel.get_used_range', { category: 'Range', sideEffect: 'read', description: 'Read the used range address and dimensions.' }],
     ['excel.read_range', { category: 'Range', sideEffect: 'read', description: 'Read values, text, formulas, and number formats from a range.' }],
     ['excel.write_range', { category: 'Range', sideEffect: 'mutating', description: 'Write a value matrix into a range.' }],
+    ['excel.clear_range', { category: 'Range', sideEffect: 'destructive', description: 'Clear contents, formats, or delete cells in a range.' }],
+    ['excel.find_replace_cells', { category: 'Range', sideEffect: 'mutating', description: 'Find cells in a range and optionally replace matches.' }],
     ['excel.set_formula', { category: 'Formula', sideEffect: 'mutating', description: 'Set formulas in a range.' }],
     ['excel.format_range', { category: 'Format', sideEffect: 'mutating', description: 'Apply formatting to a range.' }],
     ['excel.create_table', { category: 'Table', sideEffect: 'mutating', description: 'Create a table from a range.' }],
@@ -311,6 +315,12 @@
         case 'excel.write_range':
           data = await writeRange(args);
           break;
+        case 'excel.clear_range':
+          data = await clearRange(args);
+          break;
+        case 'excel.find_replace_cells':
+          data = await findReplaceCells(args);
+          break;
         case 'excel.set_formula':
           data = await setFormula(args);
           break;
@@ -425,6 +435,50 @@
         row_count: args.values.length,
         column_count: args.values[0].length,
         wrote_values: true
+      };
+    });
+  }
+
+  async function clearRange(args) {
+    return Excel.run(async (context) => {
+      const range = targetRange(context, args);
+      const deleteShift = optionalTrimmedString(args.delete_shift);
+      if (deleteShift) {
+        range.delete(deleteShiftDirectionFrom(deleteShift));
+        await context.sync();
+        return { address: args.address, deleted: true, delete_shift: deleteShift };
+      }
+      const applyTo = clearApplyToFrom(args.apply_to || 'contents');
+      range.clear(applyTo);
+      await context.sync();
+      return { address: args.address, cleared: true, apply_to: applyTo };
+    });
+  }
+
+  async function findReplaceCells(args) {
+    if (!supportsRequirementSet('ExcelApi', '1.9')) {
+      throw Object.assign(new Error('excel.find_replace_cells requires ExcelApi 1.9.'), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+    }
+    const query = requiredString(args, 'query', 'excel.find_replace_cells requires query.');
+    const hasReplacement = args.replacement !== undefined;
+    const replacement = hasReplacement ? String(args.replacement) : null;
+    return Excel.run(async (context) => {
+      const range = targetRange(context, args);
+      const criteria = searchCriteriaFrom(args);
+      if (hasReplacement) {
+        const result = range.replaceAll(query, replacement, replaceCriteriaFrom(args));
+        await context.sync();
+        return { query, replaced_count: result.value, replaced: true };
+      }
+      const match = range.findOrNullObject(query, criteria);
+      match.load('address,text,rowCount,columnCount,isNullObject');
+      await context.sync();
+      if (match.isNullObject) return { query, matches: [], match_count: 0, untrusted_source: true };
+      return {
+        query,
+        matches: [{ address: match.address, text: match.text, row_count: match.rowCount, column_count: match.columnCount }],
+        match_count: 1,
+        untrusted_source: true
       };
     });
   }
@@ -568,6 +622,50 @@
   function optionalTrimmedString(value) {
     const text = String(value || '').trim();
     return text || null;
+  }
+
+  function clearApplyToFrom(value) {
+    const modes = {
+      all: Excel.ClearApplyTo.all,
+      formats: Excel.ClearApplyTo.formats,
+      contents: Excel.ClearApplyTo.contents
+    };
+    const key = String(value || 'contents').trim().toLowerCase();
+    if (!modes[key]) {
+      throw Object.assign(new Error(`Unsupported clear mode ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return modes[key];
+  }
+
+  function deleteShiftDirectionFrom(value) {
+    const shifts = {
+      up: Excel.DeleteShiftDirection.up,
+      left: Excel.DeleteShiftDirection.left
+    };
+    const key = String(value || '').trim().toLowerCase();
+    if (!shifts[key]) {
+      throw Object.assign(new Error(`Unsupported delete shift ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return shifts[key];
+  }
+
+  function searchCriteriaFrom(args) {
+    return {
+      completeMatch: Boolean(args.complete_match),
+      matchCase: Boolean(args.match_case),
+      searchDirection: String(args.search_direction || 'Forward')
+    };
+  }
+
+  function replaceCriteriaFrom(args) {
+    return {
+      completeMatch: Boolean(args.complete_match),
+      matchCase: Boolean(args.match_case)
+    };
+  }
+
+  function supportsRequirementSet(name, version) {
+    return Office.context?.requirements?.isSetSupported?.(name, version) === true;
   }
   function requiredString(args, key, message) {
     const value = String(args[key] || '').trim();
@@ -730,7 +828,12 @@
   }
 
   function effectiveTools() {
-    return AVAILABLE_TOOLS.filter(isToolEnabled);
+    return AVAILABLE_TOOLS.filter((tool) => isToolSupported(tool) && isToolEnabled(tool));
+  }
+
+  function isToolSupported(tool) {
+    if (tool === 'excel.find_replace_cells') return supportsRequirementSet('ExcelApi', '1.9');
+    return true;
   }
 
   function isToolEnabled(tool) {

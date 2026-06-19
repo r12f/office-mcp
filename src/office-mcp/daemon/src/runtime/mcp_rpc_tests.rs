@@ -27,9 +27,11 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
         names,
         vec![
             "excel.add_sheet",
+            "excel.clear_range",
             "excel.create_chart",
             "excel.create_table",
             "excel.delete_sheet",
+            "excel.find_replace_cells",
             "excel.format_range",
             "excel.get_used_range",
             "excel.get_workbook_info",

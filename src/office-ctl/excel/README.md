@@ -14,6 +14,8 @@ advertises the implemented v1 tool surface:
 - `excel.get_used_range`
 - `excel.read_range`
 - `excel.write_range`
+- `excel.clear_range`
+- `excel.find_replace_cells`
 - `excel.set_formula`
 - `excel.format_range`
 - `excel.create_table`

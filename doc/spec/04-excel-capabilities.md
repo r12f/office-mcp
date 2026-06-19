@@ -56,6 +56,8 @@ Implemented Excel v1 tools:
 | `excel.get_used_range` | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet. |
 | `excel.read_range` | read | `ExcelApi 1.1` | Read values, display text, dimensions, and number format for a range. |
 | `excel.write_range` | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
+| `excel.clear_range` | destructive | `ExcelApi 1.1` | Clear contents, formats, all range data, or delete cells with a shift direction. |
+| `excel.find_replace_cells` | read/edit | `ExcelApi 1.9` | Find the first matching cell in a range or replace matching cells. |
 | `excel.set_formula` | edit | `ExcelApi 1.1` | Fill a range with one formula. |
 | `excel.format_range` | edit | `ExcelApi 1.1` | Apply basic font, fill, and number-format styling. |
 | `excel.create_table` | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
@@ -76,8 +78,8 @@ Target core Excel tool surface:
 | `excel.get_used_range` | implemented | Range | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet; cell values/text/formulas belong to `excel.read_range`. |
 | `excel.read_range` | implemented | Range | read | `ExcelApi 1.1` | Read values, display text, formulas, dimensions, and number format for an explicit range. |
 | `excel.write_range` | implemented | Range | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
-| `excel.clear_range` | planned | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, hyperlinks, or all range data; optional cell deletion with shift direction. |
-| `excel.find_replace_cells` | planned | Range | read/edit | verify during implementation | Search text, values, or formulas in a worksheet/range and optionally replace matches. |
+| `excel.clear_range` | implemented | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, or all range data; optional cell deletion with shift direction. Hyperlink-specific clear modes are deferred because they require `ExcelApi 1.7`. |
+| `excel.find_replace_cells` | implemented | Range | read/edit | `ExcelApi 1.9` | Search cell contents in a range and optionally replace matches. |
 | `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
 | `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1` | Apply font, fill, number format, borders, alignment, and autofit basics. |
 | `excel.sort_range` | planned | Data | edit | verify during implementation | Sort a range or table body by one or more column keys; table structure changes belong to `excel.update_table`. |
@@ -322,8 +324,8 @@ Planned tools should keep contracts coarse and workflow-oriented:
 - Range tools own cell data, formulas, cell-level formatting, search/replace,
   sorting, filtering, and clearing. A single-cell operation is represented as a
   one-cell range.
-- `excel.clear_range` is the only planned destructive cell primitive. It should
-  cover content/format clearing and explicit delete-with-shift modes instead of
+- `excel.clear_range` is the only destructive cell primitive. It covers
+  content/format/all clearing and explicit delete-with-shift modes instead of
   adding a separate delete-cell tool.
 - `excel.update_table`, `excel.update_chart`, and `excel.update_pivot_table`
   intentionally group object lifecycle and configuration by owner so the MCP

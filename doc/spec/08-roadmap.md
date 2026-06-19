@@ -1201,10 +1201,12 @@ Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
       and Microsoft API docs before implementation. Record the verified minimum
       requirement set in [04-excel-capabilities.md](04-excel-capabilities.md)
       instead of leaving `verify during implementation` in the final contract.
-- [ ] Implement range cleanup/search slice: `excel.clear_range` and
+- [x] Implement range cleanup/search slice: `excel.clear_range` and
       `excel.find_replace_cells`. Tests first: daemon catalog/preflight,
       task pane dispatch/handler tests, argument validation tests, and smoke
       coverage for clear contents/formats/all plus read-only find and replace.
+      Current implementation covers range clear/delete through `ExcelApi 1.1`
+      and find/replace through `ExcelApi 1.9` host gating.
 - [ ] Extend formula/format slice: update `excel.set_formula` to accept formula
       matrices, and update `excel.format_range` to cover borders, horizontal and
       vertical alignment, wrap text, autofit rows/columns, and number-format

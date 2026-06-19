@@ -35,6 +35,9 @@ const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
         name: "excel.add_sheet",
     },
     ExcelToolDefinition {
+        name: "excel.clear_range",
+    },
+    ExcelToolDefinition {
         name: "excel.create_chart",
     },
     ExcelToolDefinition {
@@ -42,6 +45,9 @@ const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
     },
     ExcelToolDefinition {
         name: "excel.delete_sheet",
+    },
+    ExcelToolDefinition {
+        name: "excel.find_replace_cells",
     },
     ExcelToolDefinition {
         name: "excel.format_range",
