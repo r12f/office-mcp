@@ -337,8 +337,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(html, /<dd id="protection">Not protected<\/dd>/);
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
   assert.match(html, /id="connectionDetail"/);
-  assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID"/);
-  assert.match(html, /class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint"/);
+  assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID" title="Copy session ID"/);
+  assert.match(html, /class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint" title="Copy daemon endpoint"/);
   assert.match(html, /id="currentTask"/);
   assert.match(html, /id="historyList"/);
   assert.match(html, /class="panel summary-panel"/);
@@ -396,7 +396,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /historyCountEl\.textContent = `\$\{history\.length\} \/ \$\{historyLimit\}`/);
   assert.match(js, /function taskMarkup\(task\)/);
   assert.match(js, /requestId: currentTask\.requestId/);
-  assert.match(js, /const commandId = task\.requestId \? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="\$\{escapeHtml\(task\.requestId\)\}" aria-label="Copy command ID"><code>\$\{escapeHtml\(middleTruncate\(task\.requestId\)\)\}<\/code><\/button><\/div>` : ''/);
+  assert.match(js, /const commandId = task\.requestId \? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="\$\{escapeHtml\(task\.requestId\)\}" aria-label="Copy command ID" title="\$\{escapeHtml\(task\.requestId\)\}"><code>\$\{escapeHtml\(middleTruncate\(task\.requestId\)\)\}<\/code><\/button><\/div>` : ''/);
   assert.match(js, /userIntent/);
   assert.match(js, /const requestId = message\.params\?\.request_id \|\| String\(message\.id\)/);
   assert.match(js, /startTask\(requestId, tool, message\.params \|\| \{\}, message\.params\.timeout_ms\)/);
@@ -420,6 +420,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /function setCopyableMetadata\(element, value\)/);
   assert.match(js, /element\.textContent = middleTruncate\(text\)/);
   assert.match(js, /button\.dataset\.copyValue = text/);
+  assert.match(js, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
   assert.match(js, /function middleTruncate\(value, maxLength = 30\)/);
   assert.match(js, /return `\$\{text\.slice\(0, head\)\}\$\{marker\}\$\{text\.slice\(text\.length - tail\)\}`/);
   assert.match(js, /function fallbackCopy\(value\)/);

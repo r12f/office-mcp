@@ -49,8 +49,8 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(html, /Connecting\.\.\./);
   assert.match(html, /<dd id="protection">Not protected<\/dd>/);
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
-  assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID"/);
-  assert.match(html, /class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint"/);
+  assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID" title="Copy session ID"/);
+  assert.match(html, /class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint" title="Copy daemon endpoint"/);
   assert.match(html, /class="panel summary-panel"/);
   assert.match(html, /class="tools-panel"/);
   assert.match(html, /<span>Tools<\/span>/);
@@ -130,13 +130,14 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /taskStore\.isCancelled\(requestId\)/);
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
   assert.match(js, /class="task-meta task-command-id"/);
-  assert.match(js, /aria-label="Copy command ID"/);
+  assert.match(js, /aria-label="Copy command ID" title="\$\{escapeHtml\(task\.requestId\)\}"/);
   assert.match(js, /settingsToggleEl\.setAttribute\('title', opening \? 'Close Settings' : 'Open Settings'\)/);
   assert.match(js, /settingsToggleEl\.setAttribute\('title', 'Open Settings'\)/);
   assert.match(js, /middleTruncate\(task\.requestId\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
   assert.match(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
+  assert.match(js, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
   assert.match(js, /const target = button\.dataset\.copyTarget \? document\.getElementById\(button\.dataset\.copyTarget\) : null/);
   assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
   assert.match(js, /navigator\.clipboard\?\.writeText/);

@@ -658,7 +658,7 @@
     const intent = task.userIntent ? `<div class="task-meta">${escapeHtml(redactText(task.userIntent))}</div>` : '';
     const deadline = task.deadlineAt ? `<div class="task-meta">Deadline ${escapeHtml(formatTime(task.deadlineAt))}</div>` : '';
     const cancel = task.cancelRequested ? '<div class="task-meta">Cancel requested</div>' : '';
-    const commandId = task.requestId ? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="${escapeHtml(task.requestId)}" aria-label="Copy command ID"><code>${escapeHtml(middleTruncate(task.requestId))}</code></button></div>` : '';
+    const commandId = task.requestId ? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="${escapeHtml(task.requestId)}" aria-label="Copy command ID" title="${escapeHtml(task.requestId)}"><code>${escapeHtml(middleTruncate(task.requestId))}</code></button></div>` : '';
     return [
       '<div class="task-title">',
       `<span>${escapeHtml(task.tool)}</span>`,
@@ -782,7 +782,10 @@
     element.textContent = middleTruncate(text);
     element.title = text;
     const button = element.closest('[data-copy-target]');
-    if (button) button.dataset.copyValue = text;
+    if (button) {
+      button.dataset.copyValue = text;
+      button.title = text === '-' ? button.getAttribute('aria-label') || '' : text;
+    }
   }
 
   function middleTruncate(value, maxLength = 30) {
