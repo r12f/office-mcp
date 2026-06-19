@@ -51,10 +51,11 @@ dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .endpoints { display: grid; gap: 6px; min-width: 0; }
 .copy { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: center; width: 100%; border: 1px solid var(--border); background: var(--raised); color: var(--text); border-radius: 7px; padding: 6px 8px; text-align: left; cursor: pointer; }
 .copy code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.detail-copy { display: block; width: 100%; min-height: 24px; padding: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.detail-copy { display: inline-flex; width: 100%; min-height: 32px; align-items: center; padding: 2px 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
 .detail-copy code { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.id-copy { display: inline-grid; max-width: 100%; min-height: 20px; padding: 0; border: 0; background: transparent; color: inherit; vertical-align: baseline; cursor: pointer; }
+.id-copy { display: inline-flex; max-width: 100%; min-height: 32px; align-items: center; padding: 2px 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: inherit; vertical-align: middle; cursor: pointer; }
 .id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; }
+.detail-copy:hover, .detail-copy:focus-visible, .id-copy:hover, .id-copy:focus-visible { border-color: var(--border); background: var(--raised); }
 .details { padding: 8px 12px; }
 .details dl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .workspace { min-height: 0; display: grid; grid-template-columns: minmax(240px, 300px) minmax(420px, 1fr) minmax(280px, 360px); gap: 10px; }
