@@ -29,17 +29,16 @@
           <button type="button" class="copy" data-copy="mcpEndpoint" aria-label="Copy MCP endpoint"><span>MCP</span><code id="mcpEndpoint">-</code></button>
           <button type="button" class="copy" data-copy="addinEndpoint" aria-label="Copy add-in endpoint"><span>Add-in</span><code id="addinEndpoint">-</code></button>
         </div>
+        <div class="details" aria-label="Daemon details">
+          <dl>
+            <div><dt>Version</dt><dd id="daemonVersion">-</dd></div>
+            <div><dt>Uptime</dt><dd id="daemonUptime">-</dd></div>
+            <div><dt>Config</dt><dd><button type="button" class="detail-copy" data-copy="configPath" aria-label="Copy config path"><code id="configPath">Not configured</code></button></dd></div>
+            <div><dt>Log</dt><dd><button type="button" class="detail-copy" data-copy="logPath" aria-label="Copy log path"><code id="logPath">Not configured</code></button></dd></div>
+            <div><dt>Last error</dt><dd id="lastError">None</dd></div>
+          </dl>
+        </div>
       </header>
-
-      <section class="details" aria-label="Daemon details">
-        <dl>
-          <div><dt>Version</dt><dd id="daemonVersion">-</dd></div>
-          <div><dt>Uptime</dt><dd id="daemonUptime">-</dd></div>
-          <div><dt>Config</dt><dd><button type="button" class="detail-copy" data-copy="configPath" aria-label="Copy config path"><code id="configPath">Not configured</code></button></dd></div>
-          <div><dt>Log</dt><dd><button type="button" class="detail-copy" data-copy="logPath" aria-label="Copy log path"><code id="logPath">Not configured</code></button></dd></div>
-          <div><dt>Last error</dt><dd id="lastError">None</dd></div>
-        </dl>
-      </section>
 
       <section class="workspace">
         <aside class="panel navigation" aria-labelledby="documentsHeading">

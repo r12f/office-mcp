@@ -71,6 +71,9 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("aria-label=\"Copy add-in endpoint\""));
     assert!(html.contains("aria-label=\"Copy config path\""));
     assert!(html.contains("aria-label=\"Copy log path\""));
+    assert!(html.contains("<div class=\"details\" aria-label=\"Daemon details\">"));
+    assert!(html.contains("</div>\n      </header>\n\n      <section class=\"workspace\">"));
+    assert!(!html.contains("<section class=\"details\" aria-label=\"Daemon details\">"));
     assert!(html.contains("class=\"detail-copy\" data-copy=\"configPath\""));
     assert!(html.contains("class=\"detail-copy\" data-copy=\"logPath\""));
     assert!(html.contains("id=\"appFilter\" name=\"app-filter\""));
@@ -79,6 +82,9 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("Title, app, session&hellip;"));
     assert!(!html.contains("session..."));
     assert!(html.contains("aria-live=\"polite\""));
+    assert!(css.contains("grid-template-rows: auto minmax(0, 1fr) auto"));
+    assert!(css.contains(".status-strip, .panel"));
+    assert!(!css.contains(".status-strip, .details, .panel { background"));
     assert!(css.contains("grid-template-columns: 32px auto minmax(0, 1fr)"));
     assert!(css.contains(".product-mark { width: 32px; height: 32px;"));
     assert!(css.contains(".detail-copy { display: inline-flex; width: 100%; min-height: 32px;"));
@@ -86,6 +92,11 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".id-copy { display: inline-flex; max-width: 100%; min-height: 32px;"));
     assert!(css.contains(".id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains(".detail-copy:hover, .detail-copy:focus-visible, .id-copy:hover, .id-copy:focus-visible"));
+    assert!(css.contains(".details { grid-column: 1 / -1;"));
+    assert!(css.contains("border-top: 1px solid var(--border); padding-top: 8px;"));
+    assert!(css.contains(".details dl { display: grid; grid-template-columns: minmax(72px, .45fr) minmax(72px, .45fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(180px, 1fr);"));
+    assert!(css.contains(".details dd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
+    assert!(css.contains(".details .detail-copy { min-height: 24px; padding: 0 4px;"));
     assert!(css.contains("--powerpoint: #b7472a;"));
     assert!(css.contains(".row.powerpoint { border-left-color: var(--powerpoint); }"));
     assert!(css.contains(".filter-row { display: grid; grid-template-columns: auto minmax(82px, 104px) auto minmax(120px, 1fr);"));

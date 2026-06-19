@@ -74,6 +74,8 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#history tr[data-inspect]").getAttribute("tabindex") === "0" && document.querySelector("#history tr[data-inspect]").getAttribute("role") === "button"', 'history table rows are keyboard focusable buttons');
     await assertEval(cdp, 'document.querySelector("#daemonVersion").textContent.trim().length > 0 && document.querySelector("#daemonUptime").textContent.trim().length > 0', 'daemon details show version and uptime');
     await assertEval(cdp, 'document.querySelector("#lastError").textContent.trim().length > 0', 'daemon details show last error state');
+    await assertEval(cdp, 'document.querySelector(".status-strip > .details") !== null && document.querySelector(".status-strip").nextElementSibling.classList.contains("workspace")', 'daemon details are grouped inside the compact status strip');
+    await assertEval(cdp, '(() => { const header = document.querySelector(".status-strip").getBoundingClientRect(); const details = document.querySelector(".details").getBoundingClientRect(); const workspace = document.querySelector(".workspace").getBoundingClientRect(); return details.height <= 56 && workspace.top - header.bottom <= 12; })()', 'daemon header avoids detached oversized detail block');
     await assertEval(cdp, 'getComputedStyle(document.querySelector(".workspace")).gridTemplateColumns.split(" ").length >= 3', 'desktop layout uses three columns');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#documents .row.word").click()' });
     await waitFor(cdp, 'document.querySelector("#documents .row.word").getAttribute("aria-expanded") === "true"');
@@ -106,6 +108,7 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.documentElement.scrollWidth <= 320', '320px viewport has no horizontal overflow');
     await assertEval(cdp, 'getComputedStyle(document.querySelector(".workspace")).gridTemplateColumns.split(" ").length === 1', 'narrow layout stacks columns');
     await assertEval(cdp, 'getComputedStyle(document.querySelector(".details dl")).gridTemplateColumns.split(" ").length === 1', 'daemon details stack on narrow layout');
+    await assertEval(cdp, 'document.querySelector(".status-strip > .details") !== null && document.querySelector(".details").getBoundingClientRect().top >= document.querySelector(".identity").getBoundingClientRect().bottom', 'narrow daemon details remain attached below identity metrics');
     console.error('theme assertions');
     await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
     await assertEval(cdp, 'getComputedStyle(document.documentElement).colorScheme.includes("dark")', 'dark mode color scheme applies');
