@@ -17,8 +17,10 @@ What the `office-mcp` server exposes to MCP clients (the AI side).
   [07-deployment.md](07-deployment.md) §0). Resources under each app are
   defined by that app's spec — Word resources are listed in §3 below. Excel v1
   intentionally uses tools rather than MCP resources; see
-  [04-excel-capabilities.md](04-excel-capabilities.md). Outlook resources will
-  be added with the future Outlook capability doc.
+  [04-excel-capabilities.md](04-excel-capabilities.md). PowerPoint v1 also uses
+  tools rather than MCP resources; see
+  [04-powerpoint-capabilities.md](04-powerpoint-capabilities.md). Outlook
+  resources will be added with the future Outlook capability doc.
 
 ## 2. Sessions as the unit of addressing
 
@@ -42,7 +44,10 @@ are read-only; mutations happen via tools.
 
 The table below is the **Word v1** resource surface. Excel v1 does not expose
 MCP resources; clients read workbook state through `excel.read_range` in
-[04-excel-capabilities.md](04-excel-capabilities.md). Outlook will ship its own
+[04-excel-capabilities.md](04-excel-capabilities.md). PowerPoint v1 similarly
+uses `powerpoint.get_presentation_info`, `powerpoint.list_slides`,
+`powerpoint.list_shapes`, `powerpoint.read_text`, and
+`powerpoint.read_table` instead of MCP resources. Outlook will ship its own
 resource table with a future capability doc; app resource types do not share a
 generic "document" abstraction.
 
@@ -109,6 +114,7 @@ doc:
 
 - Word: [04-word-capabilities.md](04-word-capabilities.md)
 - Excel: [04-excel-capabilities.md](04-excel-capabilities.md)
+- PowerPoint: [04-powerpoint-capabilities.md](04-powerpoint-capabilities.md)
 - Outlook: future Outlook capability doc
 
 Tool names are not re-listed here on purpose — the per-app doc is the single

@@ -1377,7 +1377,7 @@ chart, or PivotTable tools that duplicate an existing owner tool.
 ### M8 — PowerPoint
 
 Similar pattern: `powerpoint.*` namespace, second add-in.
-Catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
+Initial catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
 `export_pdf`.
 
 - [x] Add the daemon-side PowerPoint forwarding contract and catalog entries
@@ -1430,6 +1430,99 @@ Catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
       `npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-powerpoint.json --require-powerpoint-smoke`;
       this item remains open until that command passes against a connected live
       PowerPoint presentation.
+
+#### M8.1 — PowerPoint Core Tool Surface Refinement
+
+Research basis: Microsoft Learn's PowerPoint add-in core concepts page
+identifies the primary object model as `Presentation` -> `Slide` -> content
+objects such as `Shape`, `TextRange`, and `Table`, with `Layout` controlling how
+slide content is organized. It also calls out the Common API owners for runtime
+context, requirement-set probing, active view, and document file download. The
+refined PowerPoint catalog is fixed at 25 tools in
+[04-powerpoint-capabilities.md](04-powerpoint-capabilities.md). It applies
+Occam's razor: each tool must own one distinct user workflow; method-level or
+overlapping tools must be merged into the relevant object-owner update tool.
+
+Target catalog: `powerpoint.get_presentation_info`,
+`powerpoint.get_active_view`, `powerpoint.export_file`,
+`powerpoint.update_tags`, `powerpoint.list_slides`, `powerpoint.add_slide`,
+`powerpoint.update_slide`, `powerpoint.delete_slide`,
+`powerpoint.move_slide`, `powerpoint.export_slide`,
+`powerpoint.list_layouts`, `powerpoint.apply_layout`,
+`powerpoint.get_selection`, `powerpoint.set_selection`,
+`powerpoint.list_shapes`, `powerpoint.add_text_box`,
+`powerpoint.add_shape`, `powerpoint.insert_image`,
+`powerpoint.update_shape`, `powerpoint.read_text`,
+`powerpoint.replace_text`, `powerpoint.format_text`,
+`powerpoint.add_table`, `powerpoint.read_table`, and
+`powerpoint.update_table`.
+
+The 25 tools are grouped as: Presentation 3, Metadata 1, Slides 6, Layout 2,
+Selection 2, Shapes 5, Text 3, and Tables 3. Rejected v1 expansions include a
+PowerPoint deck save tool, separate `powerpoint.export_pdf`, slide duplication
+without a proven stable host API, custom XML mutation, document-property writes,
+separate shape move/resize/delete/fill tools, separate table row/column/cell
+tools, separate title/body/placeholder text tools, charts, SmartArt, media,
+animations, transitions, comments, speaker notes, slide show control,
+PowerPoint Designer, and macros.
+
+- [x] Research the PowerPoint v1 tool surface from Microsoft Learn's
+      PowerPoint core concepts page and `@types/office-js`, then record the
+      refined 25-tool target in
+      [04-powerpoint-capabilities.md](04-powerpoint-capabilities.md). Current
+      spec keeps export under `powerpoint.export_file`, rejects a PowerPoint
+      deck save tool because stable typings do not expose one, keeps slide
+      move/export at `PowerPointApi 1.8`, applies layout at `PowerPointApi 1.8`,
+      and reserves table operations for `PowerPointApi 1.8/1.9`.
+- [ ] Verify every planned PowerPoint tool's minimum `PowerPointApi` or Common
+      API requirement set against the local `@types/office-js` baseline and the
+      relevant Microsoft API docs before implementation. Replace any remaining
+      host-gated or verify-during-implementation notes with exact gates or mark
+      the tool unadvertised.
+- [ ] Update daemon catalog and MCP `tools/list` from the current 5-tool
+      PowerPoint runtime surface to the refined 25-tool surface. Remove
+      `powerpoint.export_pdf` from the advertised catalog after
+      `powerpoint.export_file` is implemented and covered.
+- [ ] Update the PowerPoint task pane `AVAILABLE_TOOLS`, permission grouping,
+      metadata descriptions, category toggles, per-tool toggles, and
+      `session.updated.available_tools` behavior so the UI exposes the same
+      Presentation, Metadata, Slides, Layout, Selection, Shapes, Text, and
+      Tables categories as the spec.
+- [ ] Implement Presentation and Metadata slice:
+      `powerpoint.get_presentation_info`, `powerpoint.get_active_view`,
+      `powerpoint.export_file`, and `powerpoint.update_tags`. Do not implement
+      a deck save tool unless stable PowerPoint save support is proven first.
+- [ ] Implement Slide and Layout slice: `powerpoint.list_slides`, extend
+      `powerpoint.add_slide` as needed, add `powerpoint.update_slide`,
+      `powerpoint.delete_slide`, `powerpoint.move_slide`,
+      `powerpoint.export_slide`, `powerpoint.list_layouts`, and keep
+      `powerpoint.apply_layout` aligned with its verified `PowerPointApi 1.8`
+      requirement.
+- [ ] Implement Selection and Shape slice: `powerpoint.get_selection`,
+      `powerpoint.set_selection`, `powerpoint.list_shapes`,
+      `powerpoint.add_text_box`, `powerpoint.add_shape`, improve
+      `powerpoint.insert_image` to a shape-owned implementation where host APIs
+      support it, and add `powerpoint.update_shape` as the single owner for
+      shape position, size, rotation, fill, line, z-order, grouping, alt text,
+      and deletion.
+- [ ] Implement Text slice: `powerpoint.read_text`, refine
+      `powerpoint.replace_text`, and add `powerpoint.format_text`. Do not add
+      separate title, subtitle, body, placeholder, or selected-text mutation
+      tools; text inside shapes belongs to the Text tools.
+- [ ] Implement Table slice: `powerpoint.add_table`, `powerpoint.read_table`,
+      and `powerpoint.update_table` for cell values, row/column dimensions,
+      add/delete rows and columns, merge cells, clear values/formatting, style
+      settings, and table-shape deletion. Do not add separate row, column, or
+      cell tools.
+- [ ] Add PowerPoint refinement contract tests: daemon catalog count and names,
+      MCP `tools/list`, task pane available-tools metadata, grouped permission
+      categories, no duplicate owner tools, no `powerpoint.save`, and no
+      `powerpoint.export_pdf` after `powerpoint.export_file` lands.
+- [ ] Add final PowerPoint v1 evidence: `npm run check` in
+      `src/office-ctl/powerpoint`, targeted daemon cargo tests, `git diff
+      --check`, and a live PowerPoint smoke covering Presentation, Slides,
+      Layout, Shapes, Text, Tables, and export success or explicit
+      host-capability rejection.
 
 ### M9 — Outlook (cautious)
 

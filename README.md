@@ -46,13 +46,19 @@ The Windows desktop implementation is in place for Word, Excel, and PowerPoint:
 - Word, Excel, and PowerPoint task pane add-ins that reverse-register one live document/workbook/presentation session.
 - MCP server catalog covers the full Word v1 tool surface from
   `doc/spec/04-word-capabilities.md`, the Excel v1 tool surface from
-  `doc/spec/04-excel-capabilities.md`, and the PowerPoint v1 tools in the roadmap.
+  `doc/spec/04-excel-capabilities.md`, and the current PowerPoint runtime tools
+  plus the target refined PowerPoint surface in
+  `doc/spec/04-powerpoint-capabilities.md`.
 - The current Word add-in runtime advertises and executes the 27-tool Word v1 compatibility surface.
   `doc/spec/04-word-capabilities.md` now defines the target refined 25-tool Word surface,
   and `doc/spec/08-roadmap.md` tracks the migration that removes duplicate specialized tools
   from the advertised catalog.
 - The current Excel add-in runtime advertises and executes the implemented Excel v1 workbook tools: workbook info, sheet list/add/update/delete, used-range discovery, range read/write/clear/find-replace, formula setting, formatting, table creation, and chart creation.
-- The current PowerPoint add-in runtime advertises and executes the PowerPoint v1 presentation tools: add slide, replace text, insert image, apply layout, and PDF export where the host supports it.
+- The current PowerPoint add-in runtime advertises and executes the initial
+  PowerPoint presentation tools: add slide, replace text, insert image, apply
+  layout, and PDF export where the host supports it. The target refined
+  PowerPoint surface is a 25-tool workflow API documented in
+  `doc/spec/04-powerpoint-capabilities.md`.
 - The daemon also exposes the Word v1 resource surface, including document text, structure, paragraph, comments, tracked changes, and selection.
 
 The design docs remain the source of truth for the broader v1 surface.
@@ -111,6 +117,7 @@ under `artifacts/`, not as parallel source packages at the root.
 | [03-mcp-tool-surface.md](doc/spec/03-mcp-tool-surface.md) | MCP tools, resources, prompts exposed to clients |
 | [04-word-capabilities.md](doc/spec/04-word-capabilities.md) | Word-specific tool catalog (v1) |
 | [04-excel-capabilities.md](doc/spec/04-excel-capabilities.md) | Excel-specific tool catalog (v1) |
+| [04-powerpoint-capabilities.md](doc/spec/04-powerpoint-capabilities.md) | PowerPoint-specific tool catalog (v1) |
 | [05-security.md](doc/spec/05-security.md) | Security model, sandbox, IRM, trust boundaries |
 | [06-error-model.md](doc/spec/06-error-model.md) | Error codes, retry, partial-failure semantics |
 | [07-deployment.md](doc/spec/07-deployment.md) | Installation, sideloading, distribution |
