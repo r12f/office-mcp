@@ -80,6 +80,7 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
             "word.set_heading_level",
             "word.update_cell",
             "word.update_paragraph",
+            "word.update_table",
         ]
     );
 

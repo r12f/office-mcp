@@ -91,7 +91,7 @@ compatibility tools remain documented below until the migration TODO in
 | `word.apply_formatting` | implemented | Format | edit | `WordApi 1.3` | Apply character/run formatting to an anchored range. |
 | `word.apply_style` | implemented | Structure | edit | `WordApi 1.3` | Apply an Office style to an anchored range; also owns heading-level changes after migration. |
 | `word.read_table` | implemented | Table | read | `WordApi 1.3` | Read table dimensions, header state, and cell text. |
-| `word.update_table` | planned | Table | edit/destructive | verify during implementation | Update table cells, rows, columns, table/cell formatting, and table deletion through one table-owner tool. |
+| `word.update_table` | implemented | Table | edit/destructive | `WordApi 1.3` | Update table cells, rows, columns, table/cell formatting, and table deletion through one table-owner tool. |
 | `word.list_content_controls` | planned | ContentControl | read | verify during implementation | List content controls with id/tag/title/type/range metadata, without duplicating document text reads. |
 | `word.insert_content_control` | planned | ContentControl | edit | verify during implementation | Create a content control around an anchored range or inserted placeholder content. |
 | `word.update_content_control` | planned | ContentControl | edit | verify during implementation | Update content control metadata, locked state, or contained text through the content-control owner. |
@@ -503,7 +503,47 @@ to preserve mixed character-run formatting inside the old text.
 
 Returns `{ rows, cols, data: string[][], header_row: boolean }`.
 
-### 5.2 `word.update_cell`
+### 5.2 `word.update_table`
+
+`word.update_table` is the target table mutation owner. The action field selects
+one table-owned mutation while preserving the existing v1 table behavior.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "table_index", "action"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "table_index": { "type": "integer", "minimum": 0 },
+    "action": { "enum": ["update_cell", "add_row", "add_column", "format_cell", "delete"] },
+    "row": { "type": "integer", "minimum": 0 },
+    "col": { "type": "integer", "minimum": 0 },
+    "text": { "type": "string" },
+    "index": { "type": "integer", "minimum": 0 },
+    "values": { "type": "array", "items": { "type": "string" } },
+    "background_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "horizontal_alignment": { "enum": ["left", "center", "right"] },
+    "vertical_alignment": { "enum": ["top", "center", "bottom"] },
+    "padding_pt": { "type": "number", "minimum": 0 },
+    "formatting": { "$ref": "#/$defs/run_formatting" }
+  },
+  "additionalProperties": false
+}
+```
+
+Action semantics:
+
+- `update_cell` requires `row`, `col`, and `text`; `formatting` is optional.
+- `add_row` accepts optional `index` and `values`; omitting `index` appends.
+- `add_column` accepts optional `index` and `values`; omitting `index` appends.
+- `format_cell` requires `row` and `col`; cell background, alignment, padding,
+  and run formatting are optional.
+- `delete` deletes the whole table and must be requested explicitly.
+
+The compatibility tools in §5.3-§5.6 remain documented until the catalog
+migration retires them from advertisement.
+
+### 5.3 `word.update_cell`
 
 ```json
 {
@@ -520,7 +560,7 @@ Returns `{ rows, cols, data: string[][], header_row: boolean }`.
 }
 ```
 
-### 5.3 `word.add_row`
+### 5.4 `word.add_row`
 
 ```json
 {
@@ -540,7 +580,7 @@ Omitting `index` appends the row. An interior insertion uses
 that API return `HOST_CAPABILITY_UNAVAILABLE`. If `values` is provided, its
 length must equal the table's current column count.
 
-### 5.4 `word.add_column`
+### 5.5 `word.add_column`
 
 ```json
 {
@@ -560,7 +600,7 @@ Omitting `index` appends the column. An interior insertion uses
 satisfy that API return `HOST_CAPABILITY_UNAVAILABLE`. If `values` is
 provided, its length must equal the table's current row count.
 
-### 5.5 `word.format_cell`
+### 5.6 `word.format_cell`
 
 ```json
 {

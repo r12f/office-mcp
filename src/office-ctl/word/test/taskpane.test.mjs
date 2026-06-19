@@ -376,6 +376,17 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(css, /forced-colors: active/);
   assert.match(js, /const TOOL_GROUPS = \[/);
   assert.match(js, /const TOOL_METADATA = new Map\(\[/);
+  assert.match(js, /'word\.update_table'/);
+  assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table', 'word\.update_cell', 'word\.add_row', 'word\.add_column', 'word\.format_cell'\] \}/);
+  assert.match(js, /\['word\.update_table', \{ category: 'Tables', sideEffect: 'destructive', description: 'Update table cells, rows, columns, formatting, or lifecycle\.' \}\]/);
+  assert.match(js, /case 'word\.update_table':\s*data = await updateTable\(args\);/);
+  assert.match(js, /async function updateTable\(args\)/);
+  assert.match(js, /case 'update_cell':/);
+  assert.match(js, /case 'add_row':/);
+  assert.match(js, /case 'add_column':/);
+  assert.match(js, /case 'format_cell':/);
+  assert.match(js, /case 'delete':/);
+  assert.match(js, /async function deleteTable\(args\)/);
   assert.match(js, /TOOL_PERMISSION_STORAGE_KEY/);
   assert.match(js, /const toolListEl = document\.getElementById\('toolList'\)/);
   assert.match(js, /function renderToolSummary\(\)/);

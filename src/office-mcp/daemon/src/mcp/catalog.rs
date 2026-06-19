@@ -28,6 +28,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.set_heading_level",
     "word.update_cell",
     "word.update_paragraph",
+    "word.update_table",
 ];
 
 const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[

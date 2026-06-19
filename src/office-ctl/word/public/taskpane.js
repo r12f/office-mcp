@@ -58,6 +58,7 @@
     'word.delete_range',
     'word.apply_formatting',
     'word.read_table',
+    'word.update_table',
     'word.update_cell',
     'word.add_row',
     'word.add_column',
@@ -74,7 +75,7 @@
     { label: 'Read', tools: ['word.get_text', 'word.get_outline', 'word.get_paragraph', 'word.find_text', 'word.get_selection'] },
     { label: 'Insert', tools: ['word.insert_paragraph', 'word.insert_heading', 'word.insert_image', 'word.insert_table', 'word.insert_page_break', 'word.insert_list'] },
     { label: 'Edit', tools: ['word.replace_text', 'word.update_paragraph', 'word.delete_range', 'word.apply_formatting', 'word.set_heading_level', 'word.apply_style'] },
-    { label: 'Tables', tools: ['word.read_table', 'word.update_cell', 'word.add_row', 'word.add_column', 'word.format_cell'] },
+    { label: 'Tables', tools: ['word.read_table', 'word.update_table', 'word.update_cell', 'word.add_row', 'word.add_column', 'word.format_cell'] },
     { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.accept_change', 'word.reject_change'] },
     { label: 'Document', tools: ['word.save'] }
   ];
@@ -95,6 +96,7 @@
     ['word.delete_range', { category: 'Edit', sideEffect: 'mutating', description: 'Delete text resolved from an anchor.' }],
     ['word.apply_formatting', { category: 'Edit', sideEffect: 'mutating', description: 'Apply formatting to an anchored range.' }],
     ['word.read_table', { category: 'Tables', sideEffect: 'read', description: 'Read table dimensions and cell values.' }],
+    ['word.update_table', { category: 'Tables', sideEffect: 'destructive', description: 'Update table cells, rows, columns, formatting, or lifecycle.' }],
     ['word.update_cell', { category: 'Tables', sideEffect: 'mutating', description: 'Update a table cell value.' }],
     ['word.add_row', { category: 'Tables', sideEffect: 'mutating', description: 'Add a row to a table.' }],
     ['word.add_column', { category: 'Tables', sideEffect: 'mutating', description: 'Add a column to a table.' }],
@@ -367,6 +369,9 @@
           break;
         case 'word.read_table':
           data = await readTable(args);
+          break;
+        case 'word.update_table':
+          data = await updateTable(args);
           break;
         case 'word.update_cell':
           data = await updateCell(args);
@@ -818,6 +823,25 @@
     });
   }
 
+  async function updateTable(args) {
+    const action = String(args.action || '').trim().toLowerCase();
+    switch (action) {
+      case 'update_cell':
+      case 'cell':
+        return updateCell(args);
+      case 'add_row':
+        return addRow(args);
+      case 'add_column':
+        return addColumn(args);
+      case 'format_cell':
+        return formatCell(args);
+      case 'delete':
+        return deleteTable(args);
+      default:
+        throw Object.assign(new Error(`Unsupported table action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
   async function updateCell(args) {
     return Word.run(async (context) => {
       const cell = await getTableCell(context, args.table_index, args.row, args.col);
@@ -884,6 +908,15 @@
       if (args.formatting) applyRunFormatting(cell.body.getRange().font, args.formatting);
       await context.sync();
       return { formatted: true, table_index: args.table_index, row: args.row, col: args.col };
+    });
+  }
+
+  async function deleteTable(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      table.delete();
+      await context.sync();
+      return { deleted: true, table_index: args.table_index };
     });
   }
 

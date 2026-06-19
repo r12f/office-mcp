@@ -115,10 +115,15 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 - [ ] Extend `word.apply_style` so heading-level changes are represented as
       semantic style changes, then retire `word.set_heading_level` from the
       advertised catalog.
-- [ ] Implement `word.update_table` as the single table mutation owner for cell
+- [x] Implement `word.update_table` as the single table mutation owner for cell
       values, row/column insertion, table/cell formatting, and table deletion;
-      retire `word.update_cell`, `word.add_row`, `word.add_column`, and
-      `word.format_cell` from the advertised catalog.
+      current implementation adds the target owner to the daemon catalog, MCP
+      `tools/list`, Word task pane available-tools metadata, permission grouping,
+      dispatch path, and spec contract. It reuses the existing tested cell,
+      row, column, and format behavior and adds explicit whole-table deletion.
+      The compatibility tools remain advertised until the dedicated retirement
+      slice removes `word.update_cell`, `word.add_row`, `word.add_column`, and
+      `word.format_cell` without breaking existing clients.
 - [ ] Add content-control CRUD tools: `word.list_content_controls`,
       `word.insert_content_control`, `word.update_content_control`, and
       `word.delete_content_control`, keeping generic text edits owned by
