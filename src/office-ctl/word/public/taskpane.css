@@ -261,9 +261,9 @@ button:hover {
 }
 
 .tool-group-title {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   min-width: 0;
   padding: 7px 8px;
@@ -285,8 +285,8 @@ button:hover {
   white-space: nowrap;
 }
 
-.tool-group-title span:last-child {
-  flex: 0 0 auto;
+.tool-group-count {
+  justify-self: end;
   font-variant-numeric: tabular-nums;
   text-transform: none;
 }
@@ -341,12 +341,37 @@ code,
   border-color: var(--border);
   background: var(--surface-raised);
 }
+.daemon-endpoint-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 6px;
+}
+
+.daemon-endpoint-form .metadata-copy,
+.daemon-endpoint-input {
+  min-height: 32px;
+}
+
+.daemon-endpoint-input[hidden],
+.is-editing-settings .daemon-endpoint-display {
+  display: none;
+}
+
+.is-editing-settings .daemon-endpoint-input {
+  display: block;
+}
+
+.reconnect-button {
+  border-color: var(--word);
+  color: var(--word);
+}
+
 
 .metadata-copy code {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .empty-state {
@@ -448,9 +473,9 @@ code,
 
 .tool-permission-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  align-items: start;
+  align-items: center;
   padding: 7px;
   border-top: 1px solid var(--border);
   background: transparent;
@@ -460,14 +485,47 @@ code,
   border-left: 3px solid var(--word);
 }
 
-.tool-toggle {
-  width: 16px;
-  height: 16px;
-  margin: 2px 0 0;
-  accent-color: var(--word);
+.tool-toggle,
+.group-toggle {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  appearance: none;
+  background: var(--surface-raised);
+  cursor: pointer;
 }
 
-.tool-list:not(.is-editing-tools) .tool-toggle {
+.tool-toggle::before,
+.group-toggle::before {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  content: "";
+  transition: transform 120ms ease-out, background 120ms ease-out;
+}
+
+.tool-toggle:checked,
+.group-toggle:checked {
+  border-color: var(--word);
+  background: var(--word);
+}
+
+.tool-toggle:checked::before,
+.group-toggle:checked::before {
+  transform: translateX(16px);
+  background: #ffffff;
+}
+
+.tool-list:not(.is-editing-tools) .tool-toggle,
+.tool-list:not(.is-editing-tools) .group-toggle {
   pointer-events: none;
 }
 
@@ -536,11 +594,6 @@ input {
 }
 
 button[type="submit"] {
-  min-height: 32px;
-  border: 1px solid var(--word);
-  border-radius: 7px;
-  color: #ffffff;
-  background: var(--word);
   cursor: pointer;
 }
 

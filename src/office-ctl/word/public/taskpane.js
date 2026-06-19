@@ -1,5 +1,5 @@
 (() => {
-  const ADDIN_VERSION = '0.1.9';
+  const ADDIN_VERSION = '0.1.10';
   const PROTOCOL_VERSION = '1.0';
   const {
     boolLabel,
@@ -1320,7 +1320,8 @@
       groupEl.innerHTML = [
         '<summary class="tool-group-title">',
         `<span>${escapeHtml(group.label)}</span>`,
-        `<span>Enabled ${enabledInGroup.length} of ${tools.length}</span>`,
+        `<span class="tool-group-count">Enabled ${enabledInGroup.length} of ${tools.length}</span>`,
+        `<input class="group-toggle" type="checkbox" role="switch" data-tool-group="${escapeHtml(group.label)}" aria-label="Toggle ${escapeHtml(group.label)} tools" ${enabledInGroup.length === tools.length ? 'checked' : ''} />`,
         '</summary>',
         `<div class="tool-permission-list">${tools.map(toolControlMarkup).join('')}</div>`
       ].join('');
@@ -1328,6 +1329,10 @@
     }
     toolListEl.querySelectorAll('[data-tool]').forEach((input) => {
       input.addEventListener('change', handleToolPermissionChange);
+    });
+    toolListEl.querySelectorAll('[data-tool-group]').forEach((input) => {
+      input.addEventListener('click', (event) => event.stopPropagation());
+      input.addEventListener('change', handleToolGroupPermissionChange);
     });
   }
 
@@ -1337,7 +1342,6 @@
     const checked = isToolEnabled(tool);
     return [
       `<label class="tool-permission-row${metadata.sideEffect === 'mutating' ? ' is-mutating' : ''}" for="${id}">`,
-      `<input id="${id}" class="tool-toggle" type="checkbox" data-tool="${escapeHtml(tool)}" ${checked ? 'checked' : ''} />`,
       '<span class="tool-permission-main">',
       '<span class="tool-permission-title">',
       `<span class="tool-permission-name">${escapeHtml(tool)}</span>`,
@@ -1345,6 +1349,7 @@
       '</span>',
       `<span class="tool-permission-meta">${escapeHtml(metadata.description)}</span>`,
       '</span>',
+      `<input id="${id}" class="tool-toggle" type="checkbox" role="switch" data-tool="${escapeHtml(tool)}" aria-label="Toggle ${escapeHtml(tool)}" ${checked ? 'checked' : ''} />`,
       '</label>'
     ].join('');
   }
@@ -1353,6 +1358,18 @@
     const tool = event.currentTarget.dataset.tool;
     if (!tool) return;
     toolPermissions[tool] = event.currentTarget.checked;
+    saveToolPermissions();
+    renderToolSummary();
+    sendSessionToolUpdate();
+  }
+
+  function handleToolGroupPermissionChange(event) {
+    const group = TOOL_GROUPS.find((candidate) => candidate.label === event.currentTarget.dataset.toolGroup);
+    if (!group) return;
+    const enabled = event.currentTarget.checked;
+    for (const tool of group.tools) {
+      if (AVAILABLE_TOOLS.includes(tool)) toolPermissions[tool] = enabled;
+    }
     saveToolPermissions();
     renderToolSummary();
     sendSessionToolUpdate();
@@ -1490,6 +1507,8 @@
       return;
     }
     settingsPanelEl.hidden = !opening;
+    document.body.classList.toggle('is-editing-settings', opening);
+    endpointInputEl.hidden = !opening;
     settingsToggleEl.setAttribute('aria-expanded', String(opening));
     settingsToggleEl.setAttribute('aria-label', opening ? 'Close Settings' : 'Open Settings');
     settingsToggleEl.setAttribute('title', opening ? 'Close Settings' : 'Open Settings');
@@ -1517,10 +1536,10 @@
       storeEndpointOverride(value);
       endpointDirty = false;
       saveEndpointEl.disabled = true;
-      saveEndpointEl.textContent = 'Saving…';
+      saveEndpointEl.setAttribute('aria-busy', 'true');
       setTimeout(() => {
         saveEndpointEl.disabled = false;
-        saveEndpointEl.textContent = 'Save Endpoint';
+        saveEndpointEl.removeAttribute('aria-busy');
         if (socket) socket.close(1000, 'Endpoint changed');
         connect();
       }, 0);
@@ -1561,7 +1580,7 @@
 
   function setCopyableMetadata(element, value) {
     const text = value || '-';
-    element.textContent = middleTruncate(text);
+    element.textContent = element.id === 'session' ? text : middleTruncate(text);
     element.title = text;
     const button = element.closest('[data-copy-target]');
     if (button) {

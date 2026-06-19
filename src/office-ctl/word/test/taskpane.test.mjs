@@ -22,17 +22,17 @@ test('Word add-in manifest and task pane asset versions stay aligned', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
-  assert.match(manifest, /<Version>1\.0\.0\.9<\/Version>/);
-  assert.match(manifest, /word\/taskpane\.html\?v=0\.1\.9/);
-  assert.match(html, /word\/taskpane\.css\?v=0\.1\.9/);
-  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.9/);
-  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.9/);
-  assert.match(html, /common\/logger\.js\?v=0\.1\.9/);
-  assert.match(html, /common\/task-history\.js\?v=0\.1\.9/);
-  assert.match(html, /word\/taskpane\.js\?v=0\.1\.9/);
+  assert.match(manifest, /<Version>1\.0\.0\.10<\/Version>/);
+  assert.match(manifest, /word\/taskpane\.html\?v=0\.1\.10/);
+  assert.match(html, /word\/taskpane\.css\?v=0\.1\.10/);
+  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.10/);
+  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.10/);
+  assert.match(html, /common\/logger\.js\?v=0\.1\.10/);
+  assert.match(html, /common\/task-history\.js\?v=0\.1\.10/);
+  assert.match(html, /word\/taskpane\.js\?v=0\.1\.10/);
   assert.match(html, /<script src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
   assert.doesNotMatch(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
-  assert.match(js, /ADDIN_VERSION = '0\.1\.9'/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.10'/);
 });
 
 test('Word add-in uses product identity metadata and generated icons', () => {
@@ -125,7 +125,7 @@ test('Office catalog registration script stages Office host manifests without re
     assert.match(wordManifest, /<SupportUrl DefaultValue="https:\/\/github\.com\/office-mcp\/office-mcp" \/>/);
     assert.match(wordManifest, /DefaultValue="Open Control Panel"/);
     assert.match(wordManifest, /Open the control panel to connect this Word document/);
-    assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.9/);
+    assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.10/);
     assert.match(wordManifest, /<IconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-32\.png" \/>/);
     assert.match(wordManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
     assert.match(wordManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
@@ -275,7 +275,7 @@ test('Office catalog registration can sync its origin from running daemon status
     const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
     const powerpointManifest = readFileSync(join(catalogPath, 'office-mcp-powerpoint.xml'), 'utf8');
-    assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.9/);
+    assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.10/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.8/);
@@ -339,7 +339,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
   assert.match(html, /id="connectionDetail"/);
   assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID" title="Copy session ID"/);
-  assert.match(html, /class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint" title="Copy daemon endpoint"/);
+  assert.match(html, /class="metadata-copy daemon-endpoint-display" data-copy-target="daemon" aria-label="Copy daemon endpoint" title="Copy daemon endpoint"/);
   assert.match(html, /id="currentTask"/);
   assert.match(html, /id="historyList"/);
   assert.match(html, /class="panel summary-panel"/);
@@ -351,7 +351,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.doesNotMatch(html, /id="toolPermissionList"/);
   assert.doesNotMatch(html, /id="enabledToolCount"/);
   assert.match(html, /aria-live="polite"/);
-  assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
+  assert.match(html, /class="daemon-endpoint-input" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Daemon endpoint"/);
   assert.match(html, /aria-label="Open Settings" title="Open Settings"/);
   assert.match(html, /<svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">/);
   assert.match(html, /<circle cx="17" cy="12" r="2" \/>/);
@@ -370,7 +370,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(css, /\.tool-toggle/);
   assert.match(css, /\.tool-list:not\(\.is-editing-tools\) \.tool-toggle/);
   assert.match(css, /\.metadata-copy \{[\s\S]*display: inline-flex;[\s\S]*min-height: 32px;[\s\S]*text-align: left;/);
-  assert.match(css, /\.metadata-copy code \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
+  assert.match(css, /\.metadata-copy code \{[\s\S]*overflow-wrap: anywhere;[\s\S]*white-space: normal;/);
   assert.match(css, /\.task-command-id \{[\s\S]*display: flex;[\s\S]*gap: 4px;/);
   assert.match(css, /\.inline-copy \{[\s\S]*display: inline-flex;[\s\S]*min-height: 32px;[\s\S]*background: transparent;[\s\S]*cursor: pointer;/);
   assert.match(css, /\.metadata-copy:hover,[\s\S]*\.inline-copy:focus-visible \{[\s\S]*background: var\(--surface-raised\);/);
@@ -383,6 +383,9 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /function renderToolSummary\(\)/);
   assert.match(js, /toolCountEl\.textContent = `Enabled \$\{effective\.length\} of \$\{AVAILABLE_TOOLS\.length\}`/);
   assert.match(js, /Enabled \$\{enabledInGroup\.length\} of \$\{tools\.length\}/);
+  assert.match(js, /data-tool-group/);
+  assert.match(js, /function handleToolGroupPermissionChange\(event\)/);
+  assert.match(js, /role="switch"/);
   assert.match(js, /renderToolSummary\(\)/);
   assert.match(js, /function toolControlMarkup\(tool\)/);
   assert.doesNotMatch(js, /function renderToolPermissions\(\)/);
@@ -419,12 +422,14 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
   assert.match(js, /navigator\.clipboard\?\.writeText/);
   assert.match(js, /function setCopyableMetadata\(element, value\)/);
-  assert.match(js, /element\.textContent = middleTruncate\(text\)/);
+  assert.match(js, /element\.textContent = element\.id === 'session' \? text : middleTruncate\(text\)/);
   assert.match(js, /button\.dataset\.copyValue = text/);
   assert.match(js, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
   assert.match(js, /function middleTruncate\(value, maxLength = 30\)/);
   assert.match(js, /return `\$\{text\.slice\(0, head\)\}\$\{marker\}\$\{text\.slice\(text\.length - tail\)\}`/);
   assert.match(js, /function fallbackCopy\(value\)/);
+  assert.match(js, /document\.body\.classList\.toggle\('is-editing-settings', opening\)/);
+  assert.match(js, /endpointInputEl\.hidden = !opening/);
   assert.match(js, /toolListEl\.classList\.toggle\('is-editing-tools', opening\)/);
   assert.match(js, /settingsToggleEl\.addEventListener\('keydown', activateSettingsWithKeyboard\)/);
   assert.match(js, /suppressNextSettingsClick/);
@@ -488,12 +493,13 @@ test('Word task pane keeps settings inline and compact at narrow widths', () => 
 
   const summaryStart = html.indexOf('class="panel summary-panel"');
   const settingsIndex = html.indexOf('id="settingsPanel"');
-  const summaryEnd = html.indexOf('</section>', settingsIndex);
+  const daemonFormIndex = html.indexOf('class="daemon-endpoint-form"');
   const currentTaskIndex = html.indexOf('id="currentTaskHeading"');
   assert.ok(summaryStart !== -1 && settingsIndex !== -1, 'summary and settings exist');
-  assert.ok(settingsIndex > summaryStart, 'settings panel is inside summary flow');
-  assert.ok(settingsIndex < currentTaskIndex, 'settings appears before current task');
-  assert.ok(summaryEnd < currentTaskIndex, 'summary closes before current task');
+  assert.ok(daemonFormIndex > summaryStart, 'daemon settings are inline in document metadata');
+  assert.ok(settingsIndex < currentTaskIndex, 'settings state marker appears before current task');
+  assert.ok(daemonFormIndex < settingsIndex, 'visual settings live in the daemon row');
+  assert.doesNotMatch(html, /<section id="settingsPanel"/);
 });
 test('Word task pane announces session only after successful register response', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');

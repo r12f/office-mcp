@@ -16,11 +16,11 @@ fn serves_word_taskpane_static_asset() {
 
 #[test]
 fn serves_versioned_addin_static_assets_with_query_strings() {
-    let word_js = response_text(&service().serve_addin_asset("/word/taskpane.js?v=0.1.9"));
+    let word_js = response_text(&service().serve_addin_asset("/word/taskpane.js?v=0.1.10"));
     assert!(word_js.starts_with("HTTP/1.1 200 OK"));
     assert!(word_js.contains("__OFFICE_MCP_TASKPANE_READY__"));
 
-    let common_js = response_text(&service().serve_addin_asset("/common/addin-channel.js?v=0.1.9"));
+    let common_js = response_text(&service().serve_addin_asset("/common/addin-channel.js?v=0.1.10"));
     assert!(common_js.starts_with("HTTP/1.1 200 OK"));
     assert!(common_js.contains("OfficeCtlAddinChannel"));
 
