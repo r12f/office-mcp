@@ -87,7 +87,7 @@ function renderDocuments(groups) {
       rows.push(renderDocumentHistory(doc.session_id, documentCommandHistory[doc.session_id] || [], expanded, detailId));
     }
   }
-  $('documents').innerHTML = rows.join('') || emptyState('No documents connected', 'Open Word, Excel, or PowerPoint, then open Office MCP Control.', state.snapshot?.daemon?.addin_endpoint);
+  $('documents').innerHTML = rows.join('') || emptyState('No documents connected', 'Open Word, Excel, or PowerPoint, then open Office MCP Control.', state.snapshot?.daemon?.addin_endpoint, 'Copy add-in endpoint');
 }
 
 function renderDocumentHistory(sessionId, commands, expanded, detailId) {
@@ -98,7 +98,7 @@ function renderDocumentHistory(sessionId, commands, expanded, detailId) {
 }
 
 function renderClients(clients) {
-  $('clients').innerHTML = clients.map((client) => `<button class="row" type="button" data-inspect='${attr(client)}'><strong>${esc(client.name || client.client_id)}</strong><span>${esc(client.transport)} | in flight ${esc(client.in_flight_request_count || 0)}</span></button>`).join('') || emptyState('No MCP clients connected', 'Connect an MCP client using this endpoint.', state.snapshot?.daemon?.mcp_endpoint);
+  $('clients').innerHTML = clients.map((client) => `<button class="row" type="button" data-inspect='${attr(client)}'><strong>${esc(client.name || client.client_id)}</strong><span>${esc(client.transport)} | in flight ${esc(client.in_flight_request_count || 0)}</span></button>`).join('') || emptyState('No MCP clients connected', 'Connect an MCP client using this endpoint.', state.snapshot?.daemon?.mcp_endpoint, 'Copy MCP endpoint');
 }
 
 function renderCommands(target, commands, running) {
@@ -119,9 +119,9 @@ async function copyText(text, button) {
   announce('Copied ' + (button.querySelector('span')?.textContent || 'value'));
 }
 
-function emptyState(titleText, bodyText, codeText) {
-  const code = codeText ? `<code>${esc(codeText)}</code>` : '';
-  return `<p class="empty"><strong>${esc(titleText)}</strong>${esc(bodyText)}${code}</p>`;
+function emptyState(titleText, bodyText, codeText, copyLabel = 'Copy endpoint') {
+  const copy = codeText ? `<button type="button" class="empty-copy" data-copy-value="${esc(codeText)}" aria-label="${esc(copyLabel)}" title="${esc(codeText)}"><span>${esc(copyLabel)}</span><code>${esc(middleTruncate(codeText, 46))}</code></button>` : '';
+  return `<p class="empty"><strong>${esc(titleText)}</strong>${esc(bodyText)}${copy}</p>`;
 }
 
 function copyableId(value, label) {

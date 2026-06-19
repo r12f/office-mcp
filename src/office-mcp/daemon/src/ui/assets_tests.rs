@@ -88,9 +88,15 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains("minmax(0, 1fr)"));
     assert!(css.contains("content-visibility: auto"));
     assert!(css.contains(".empty strong"));
+    assert!(css.contains(".empty-copy { display: grid; grid-template-columns: auto minmax(0, 1fr);"));
+    assert!(css.contains(".empty-copy code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(!css.contains("transition: all"));
     assert!(js.contains("emptyState('No documents connected'"));
     assert!(js.contains("Open Word, Excel, or PowerPoint, then open Office MCP Control."));
+    assert!(js.contains("'Copy add-in endpoint'"));
+    assert!(js.contains("'Copy MCP endpoint'"));
+    assert!(js.contains("class=\"empty-copy\" data-copy-value=\"${esc(codeText)}\""));
+    assert!(js.contains("middleTruncate(codeText, 46)"));
     assert!(!js.contains("load the Office MCP add-in"));
     assert!(js.contains("fallbackCopy"));
     assert!(js.contains("announceStatus"));
