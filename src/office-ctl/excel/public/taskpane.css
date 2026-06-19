@@ -378,6 +378,26 @@ code,
   font-variant-numeric: tabular-nums;
 }
 
+.task-command-id {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.inline-copy {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.inline-copy code {
+  font-size: 11px;
+}
+
 .history-list {
   display: grid;
   gap: 8px;

@@ -370,6 +370,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(css, /\.tool-list:not\(\.is-editing-tools\) \.tool-toggle/);
   assert.match(css, /\.metadata-copy \{[\s\S]*min-height: 24px;[\s\S]*text-align: left;/);
   assert.match(css, /\.metadata-copy code \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
+  assert.match(css, /\.task-command-id \{[\s\S]*display: flex;[\s\S]*gap: 4px;/);
+  assert.match(css, /\.inline-copy \{[\s\S]*background: transparent;[\s\S]*cursor: pointer;/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /forced-colors: active/);
   assert.match(js, /const TOOL_GROUPS = \[/);
@@ -392,6 +394,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /const \{ history, historyLimit \} = taskStore\.snapshot\(\)/);
   assert.match(js, /historyCountEl\.textContent = `\$\{history\.length\} \/ \$\{historyLimit\}`/);
   assert.match(js, /function taskMarkup\(task\)/);
+  assert.match(js, /requestId: currentTask\.requestId/);
+  assert.match(js, /const commandId = task\.requestId \? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="\$\{escapeHtml\(task\.requestId\)\}" aria-label="Copy command ID"><code>\$\{escapeHtml\(middleTruncate\(task\.requestId\)\)\}<\/code><\/button><\/div>` : ''/);
   assert.match(js, /userIntent/);
   assert.match(js, /const requestId = message\.params\?\.request_id \|\| String\(message\.id\)/);
   assert.match(js, /startTask\(requestId, tool, message\.params \|\| \{\}, message\.params\.timeout_ms\)/);
@@ -407,6 +411,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /settingsToggleEl\.addEventListener\('click', handleSettingsClick\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
+  assert.match(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
+  assert.match(js, /const target = button\.dataset\.copyTarget \? document\.getElementById\(button\.dataset\.copyTarget\) : null/);
   assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
   assert.match(js, /navigator\.clipboard\?\.writeText/);
   assert.match(js, /function setCopyableMetadata\(element, value\)/);

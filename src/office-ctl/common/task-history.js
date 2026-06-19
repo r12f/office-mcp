@@ -29,6 +29,7 @@
     finish(requestId, status, elapsedMs, error = null) {
       if (!this.currentTask || this.currentTask.requestId !== requestId) return null;
       const task = {
+        requestId,
         tool: this.currentTask.tool,
         userIntent: this.currentTask.userIntent,
         status,

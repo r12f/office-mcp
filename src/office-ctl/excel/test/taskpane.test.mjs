@@ -87,6 +87,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(css, /\.tool-list:not\(\.is-editing-tools\) \.tool-toggle/);
   assert.match(css, /\.metadata-copy \{[\s\S]*min-height: 24px;[\s\S]*text-align: left;/);
   assert.match(css, /\.metadata-copy code \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
+  assert.match(css, /\.task-command-id \{[\s\S]*display: flex;[\s\S]*gap: 4px;/);
+  assert.match(css, /\.inline-copy \{[\s\S]*background: transparent;[\s\S]*cursor: pointer;/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /forced-colors: active/);
   assert.match(js, /const TOOL_GROUPS = \[/);
@@ -118,6 +120,10 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /const \{ history, historyLimit \} = taskStore\.snapshot\(\)/);
   assert.match(js, /historyCountEl\.textContent = `\$\{history\.length\} \/ \$\{historyLimit\}`/);
   assert.match(js, /function taskMarkup\(task\)/);
+  assert.match(js, /requestId: currentTask\.requestId/);
+  assert.match(js, /class="task-meta task-command-id"/);
+  assert.match(js, /aria-label="Copy command ID"/);
+  assert.match(js, /middleTruncate\(task\.requestId\)/);
   assert.match(js, /const requestId = message\.params\?\.request_id \|\| String\(message\.id\)/);
   assert.match(js, /taskStore\.start\(requestId, tool, message\.params \|\| \{\}, message\.params\?\.timeout_ms\)/);
   assert.match(js, /taskStore\.isCancelled\(requestId\)/);
@@ -140,6 +146,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /settingsToggleEl\.setAttribute\('aria-label', opening \? 'Close Settings' : 'Open Settings'\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
+  assert.match(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
+  assert.match(js, /const target = button\.dataset\.copyTarget \? document\.getElementById\(button\.dataset\.copyTarget\) : null/);
   assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
   assert.match(js, /navigator\.clipboard\?\.writeText/);
   assert.match(js, /function setCopyableMetadata\(element, value\)/);

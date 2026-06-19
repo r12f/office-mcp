@@ -75,6 +75,8 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(css, /\.tool-permission-row\.is-mutating \{[\s\S]*border-left: 3px solid var\(--powerpoint\);/);
   assert.match(css, /\.metadata-copy \{[\s\S]*min-height: 24px;[\s\S]*text-align: left;/);
   assert.match(css, /\.metadata-copy code \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
+  assert.match(css, /\.task-command-id \{[\s\S]*display: flex;[\s\S]*gap: 4px;/);
+  assert.match(css, /\.inline-copy \{[\s\S]*background: transparent;[\s\S]*cursor: pointer;/);
   assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
   assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
@@ -115,8 +117,13 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /new TaskHistoryStore\(\{ redactText \}\)/);
   assert.match(js, /taskStore\.isCancelled\(requestId\)/);
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
+  assert.match(js, /class="task-meta task-command-id"/);
+  assert.match(js, /aria-label="Copy command ID"/);
+  assert.match(js, /middleTruncate\(task\.requestId\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
+  assert.match(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
+  assert.match(js, /const target = button\.dataset\.copyTarget \? document\.getElementById\(button\.dataset\.copyTarget\) : null/);
   assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
   assert.match(js, /navigator\.clipboard\?\.writeText/);
   assert.match(js, /function setCopyableMetadata\(element, value\)/);

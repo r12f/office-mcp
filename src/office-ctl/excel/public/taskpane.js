@@ -631,6 +631,7 @@
     currentTaskEl.className = 'task-card';
     currentTaskEl.innerHTML = taskMarkup({
       tool: currentTask.tool,
+      requestId: currentTask.requestId,
       status: 'running',
       elapsedMs: Math.max(0, Date.now() - currentTask.startedAt),
       userIntent: currentTask.userIntent,
@@ -657,11 +658,13 @@
     const intent = task.userIntent ? `<div class="task-meta">${escapeHtml(redactText(task.userIntent))}</div>` : '';
     const deadline = task.deadlineAt ? `<div class="task-meta">Deadline ${escapeHtml(formatTime(task.deadlineAt))}</div>` : '';
     const cancel = task.cancelRequested ? '<div class="task-meta">Cancel requested</div>' : '';
+    const commandId = task.requestId ? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="${escapeHtml(task.requestId)}" aria-label="Copy command ID"><code>${escapeHtml(middleTruncate(task.requestId))}</code></button></div>` : '';
     return [
       '<div class="task-title">',
       `<span>${escapeHtml(task.tool)}</span>`,
       `<span class="status-badge ${tone}">${escapeHtml(titleCase(task.status))}</span>`,
       '</div>',
+      commandId,
       `<div class="task-meta">${escapeHtml(formatDuration(task.elapsedMs || 0))}</div>`,
       deadline,
       cancel,
@@ -758,9 +761,9 @@
   }
 
   async function handleMetadataCopy(event) {
-    const button = event.target.closest('[data-copy-target]');
+    const button = event.target.closest('[data-copy-target], [data-copy-value]');
     if (!button) return;
-    const target = document.getElementById(button.dataset.copyTarget);
+    const target = button.dataset.copyTarget ? document.getElementById(button.dataset.copyTarget) : null;
     const value = button.dataset.copyValue || target?.textContent?.trim();
     if (!value || value === '-') return;
     try {

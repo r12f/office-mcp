@@ -696,7 +696,9 @@
     const status = task.status ? titleCase(task.status) : 'Running';
     const elapsed = typeof task.elapsedMs === 'number' ? formatDuration(task.elapsedMs) : 'in progress';
     const error = task.error ? `<div class="task-error">${escapeHtml(task.error.message || 'Command failed.')}</div>` : '';
-    return `<article class="task-card"><div class="task-title"><span>${escapeHtml(task.tool)}</span><span>${escapeHtml(status)}</span></div><div class="task-meta">${escapeHtml(formatTime(task.startedAt))} / ${escapeHtml(elapsed)}</div>${error}</article>`;
+    const commandId = task.requestId ? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="${escapeHtml(task.requestId)}" aria-label="Copy command ID"><code>${escapeHtml(middleTruncate(task.requestId))}</code></button></div>` : '';
+    const startedAt = task.startedAt ? `${escapeHtml(formatTime(task.startedAt))} / ` : '';
+    return `<article class="task-card"><div class="task-title"><span>${escapeHtml(task.tool)}</span><span>${escapeHtml(status)}</span></div>${commandId}<div class="task-meta">${startedAt}${escapeHtml(elapsed)}</div>${error}</article>`;
   }
 
   function scheduleReconnect() {
@@ -795,9 +797,9 @@
   }
 
   async function handleMetadataCopy(event) {
-    const button = event.target.closest('[data-copy-target]');
+    const button = event.target.closest('[data-copy-target], [data-copy-value]');
     if (!button) return;
-    const target = document.getElementById(button.dataset.copyTarget);
+    const target = button.dataset.copyTarget ? document.getElementById(button.dataset.copyTarget) : null;
     const value = button.dataset.copyValue || target?.textContent?.trim();
     if (!value || value === '-') return;
     try {
