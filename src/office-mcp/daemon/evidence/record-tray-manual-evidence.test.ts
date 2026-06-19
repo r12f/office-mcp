@@ -138,6 +138,18 @@ test('manual tray evidence recorder rejects truncated screenshots', () => {
   });
 });
 
+test('manual tray evidence recorder requires structured native tray menu snapshot', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const daemonBin = writeFakeDaemon(dir, true, undefined, false);
+    const output = join(dir, 'missing-structured-menu.json');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.daemon_context_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('manual tray evidence recorder rejects reused tray surface screenshots', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -284,18 +296,39 @@ function withTrayScreenshot(callback: (dir: string, screenshotPath: string) => v
   }
 }
 
-function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control']): string {
+function writeFakeDaemon(
+  dir: string,
+  stateFetchOk = true,
+  menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control'],
+  includeStructuredMenu = true
+): string {
   const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
-  writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk, menuItems));
+  writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk, menuItems, includeStructuredMenu));
   chmodSync(daemonBin, 0o755);
   return daemonBin;
 }
 
-function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[]): string {
+function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[], includeStructuredMenu: boolean): string {
   const status = JSON.stringify({ running: true, uiUrl: 'https://localhost:8765/ui/' });
-  const trayProbe = JSON.stringify({ native_host: true, state_fetch_ok: stateFetchOk, snapshot: { tooltip: 'Office MCP Control - Up - 0 clients - 0 documents', menu_items: menuItems } });
+  const snapshot: Record<string, unknown> = {
+    tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
+    menu_items: menuItems
+  };
+  if (includeStructuredMenu) snapshot.menu = structuredMenu();
+  const trayProbe = JSON.stringify({ native_host: true, state_fetch_ok: stateFetchOk, snapshot });
   if (process.platform === 'win32') {
     return `@echo off\r\nif "%1"=="daemon" echo ${status}\r\nif "%1"=="tray" echo ${trayProbe}\r\n`;
   }
   return `#!/bin/sh\nif [ "$1" = "daemon" ]; then printf '%s\\n' '${status}'; fi\nif [ "$1" = "tray" ]; then printf '%s\\n' '${trayProbe}'; fi\n`;
+}
+
+function structuredMenu(): Array<Record<string, unknown>> {
+  return [
+    { kind: 'read_only', label: 'Status: Up', enabled: false },
+    { kind: 'read_only', label: 'Clients: 0', enabled: false },
+    { kind: 'read_only', label: 'Documents: 0', enabled: false },
+    { kind: 'separator', label: '---', enabled: false },
+    { kind: 'action', label: 'Show Office MCP Control', action: 'show_ui', enabled: true },
+    { kind: 'action', label: 'Quit Office MCP Control', action: 'quit', enabled: true }
+  ];
 }

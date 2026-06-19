@@ -507,6 +507,18 @@ test('product visual evidence recorder can bind evidence to daemon context', () 
   });
 });
 
+test('product visual evidence recorder requires structured tray menu snapshot', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir, true, undefined, false);
+    const output = join(dir, 'missing-structured-tray-menu.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.daemon_context_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 
 test('product visual evidence recorder requires PowerPoint task pane density review', () => {
   withScreenshots((dir, screenshots) => {
@@ -770,9 +782,14 @@ function outputText(value: string | Buffer): string {
   return typeof value === 'string' ? value : value.toString('utf8');
 }
 
-function writeFakeDaemon(dir: string, stateFetchOk = true, menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control']): string {
+function writeFakeDaemon(
+  dir: string,
+  stateFetchOk = true,
+  menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control'],
+  includeStructuredMenu = true
+): string {
   const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
-  writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk, menuItems));
+  writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk, menuItems, includeStructuredMenu));
   chmodSync(daemonBin, 0o755);
   return daemonBin;
 }
@@ -1024,32 +1041,38 @@ function manualTrayDaemonContext(ready = true) {
       state_fetch_ok: ready,
       snapshot: {
         tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
-        menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control']
+        menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control'],
+        menu: structuredTrayMenu()
       }
     }
   };
 }
 
-function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[]): string {
+function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[], includeStructuredMenu: boolean): string {
   const status = JSON.stringify({ running: true, uiUrl: 'https://localhost:8765/ui/' });
+  const snapshot: Record<string, unknown> = {
+    tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
+    menu_items: menuItems
+  };
+  if (includeStructuredMenu) snapshot.menu = structuredTrayMenu();
   const trayProbe = JSON.stringify({
     native_host: true,
     state_fetch_ok: stateFetchOk,
-    snapshot: {
-      tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
-      menu_items: menuItems,
-      menu: [
-        { kind: 'read_only', enabled: false, label: 'Status: Up' },
-        { kind: 'read_only', enabled: false, label: 'Clients: 0' },
-        { kind: 'read_only', enabled: false, label: 'Documents: 0' },
-        { kind: 'separator', enabled: false, label: '---' },
-        { kind: 'action', enabled: true, label: 'Show Office MCP Control', action: 'show_ui' },
-        { kind: 'action', enabled: true, label: 'Quit Office MCP Control', action: 'quit' }
-      ]
-    }
+    snapshot
   });
   if (process.platform === 'win32') {
     return `@echo off\r\nif "%1"=="daemon" echo ${status}\r\nif "%1"=="tray" echo ${trayProbe}\r\n`;
   }
   return `#!/bin/sh\nif [ "$1" = "daemon" ]; then printf '%s\\n' '${status}'; fi\nif [ "$1" = "tray" ]; then printf '%s\\n' '${trayProbe}'; fi\n`;
+}
+
+function structuredTrayMenu(): Array<Record<string, unknown>> {
+  return [
+    { kind: 'read_only', enabled: false, label: 'Status: Up' },
+    { kind: 'read_only', enabled: false, label: 'Clients: 0' },
+    { kind: 'read_only', enabled: false, label: 'Documents: 0' },
+    { kind: 'separator', enabled: false, label: '---' },
+    { kind: 'action', enabled: true, label: 'Show Office MCP Control', action: 'show_ui' },
+    { kind: 'action', enabled: true, label: 'Quit Office MCP Control', action: 'quit' }
+  ];
 }

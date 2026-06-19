@@ -666,5 +666,25 @@ function traySnapshotLooksReady(snapshot: unknown): boolean {
   const menuItems = Array.isArray(snapshot.menu_items) ? snapshot.menu_items.filter((item): item is string => typeof item === 'string') : [];
   const menuReady = ['Status:', 'Clients:', 'Documents:', 'Show Office MCP Control', 'Quit Office MCP Control']
     .every((expected) => menuItems.some((item) => item.includes(expected)));
-  return tooltipReady && menuReady;
+  return tooltipReady && menuReady && structuredTrayMenuLooksReady(snapshot.menu);
+}
+
+function structuredTrayMenuLooksReady(menu: unknown): boolean {
+  if (!Array.isArray(menu)) return false;
+  const expected = [
+    { kind: 'read_only', enabled: false, label: /^Status: (Up|Degraded|Down)$/ },
+    { kind: 'read_only', enabled: false, label: /^Clients: \d+$/ },
+    { kind: 'read_only', enabled: false, label: /^Documents: \d+$/ },
+    { kind: 'separator', enabled: false, label: /^---$/ },
+    { kind: 'action', enabled: true, label: /^Show Office MCP Control$/, action: 'show_ui' },
+    { kind: 'action', enabled: true, label: /^Quit Office MCP Control$/, action: 'quit' }
+  ];
+  if (menu.length !== expected.length) return false;
+  return expected.every((rule, index) => {
+    const item = menu[index];
+    if (!isRecord(item)) return false;
+    if (item.kind !== rule.kind || item.enabled !== rule.enabled) return false;
+    if (typeof item.label !== 'string' || !rule.label.test(item.label)) return false;
+    return !('action' in rule) || item.action === rule.action;
+  });
 }
