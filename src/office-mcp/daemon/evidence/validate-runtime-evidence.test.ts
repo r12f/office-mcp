@@ -501,6 +501,22 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.product_identity_review.logo_future_office_control_reviewed = false;
+      broken.product_identity_review.addin_title_icon_type_reviewed = false;
+      broken.product_identity_review.tray_native_first_impression_reviewed = false;
+      broken.product_identity_review.ready = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /future office-control logo review/);
+      assert.match(outputText(result.stdout), /add-in title, icon, and type\/category review/);
+      assert.match(outputText(result.stdout), /tray native first-impression review/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.product_identity_review.rendered_size_logo_reviewed = false;
       broken.product_identity_review.rendered_logo_review_ready = false;
       broken.rendered_logo_review_ready = false;
@@ -873,15 +889,18 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     manual_tray_evidence_ready: passed,
     product_identity_review: {
       logo_quality_reviewed: passed,
+      logo_future_office_control_reviewed: passed,
       final_logo_user_surface_reviewed: passed,
       rendered_size_logo_reviewed: passed,
       rendered_logo_review_ready: passed,
       addin_identity_reviewed: passed,
+      addin_title_icon_type_reviewed: passed,
       addin_installable_surface_reviewed: passed,
       word_first_run_identity_reviewed: passed,
       excel_first_run_identity_reviewed: passed,
       powerpoint_first_run_identity_reviewed: passed,
       tray_product_polish_reviewed: passed,
+      tray_native_first_impression_reviewed: passed,
       tray_normal_windows_launch_reviewed: passed,
       word_first_run_identity_ready: passed,
       excel_first_run_identity_ready: passed,

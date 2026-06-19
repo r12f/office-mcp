@@ -373,15 +373,18 @@ function validateProductIdentityReview(review: unknown): void {
   }
   for (const [key, label] of [
     ['logo_quality_reviewed', 'logo quality review'],
+    ['logo_future_office_control_reviewed', 'future office-control logo review'],
     ['final_logo_user_surface_reviewed', 'final logo user-surface review'],
     ['rendered_size_logo_reviewed', 'rendered-size logo review'],
     ['rendered_logo_review_ready', 'rendered logo review artifact ready flag'],
     ['addin_identity_reviewed', 'add-in first-run identity review'],
+    ['addin_title_icon_type_reviewed', 'add-in title, icon, and type/category review'],
     ['addin_installable_surface_reviewed', 'add-in installable-software surface review'],
     ['word_first_run_identity_reviewed', 'Word first-run identity review'],
     ['excel_first_run_identity_reviewed', 'Excel first-run identity review'],
     ['powerpoint_first_run_identity_reviewed', 'PowerPoint first-run identity review'],
     ['tray_product_polish_reviewed', 'tray product polish review'],
+    ['tray_native_first_impression_reviewed', 'tray native first-impression review'],
     ['tray_normal_windows_launch_reviewed', 'tray normal Windows launch review'],
     ['word_first_run_identity_ready', 'Word first-run identity ready flag'],
     ['excel_first_run_identity_ready', 'Excel first-run identity ready flag'],
