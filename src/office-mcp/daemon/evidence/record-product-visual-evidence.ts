@@ -79,6 +79,11 @@ const excelCatalogType = readOption('--excel-catalog-type') ?? (catalogIdentityR
 const powerPointCatalogProvider = readOption('--powerpoint-catalog-provider') ?? catalogIdentityHostValue('powerpoint', 'provider');
 const powerPointCatalogDescription = readOption('--powerpoint-catalog-description') ?? catalogIdentityHostValue('powerpoint', 'description');
 const powerPointCatalogType = readOption('--powerpoint-catalog-type') ?? (catalogIdentityReviewReady ? catalogType : undefined);
+const wordCompactTopBlock = booleanFlag('--word-compact-top-block');
+const wordToolsPermissionsMerged = booleanFlag('--word-tools-permissions-merged');
+const wordInlineSettings = booleanFlag('--word-inline-settings');
+const wordServerProtocolRow = readOption('--word-server-protocol-row');
+const wordDocumentState = readOption('--word-document-state');
 const excelCompactTopBlock = booleanFlag('--excel-compact-top-block');
 const excelToolsPermissionsMerged = booleanFlag('--excel-tools-permissions-merged');
 const excelInlineSettings = booleanFlag('--excel-inline-settings');
@@ -109,6 +114,9 @@ const powerPointFirstRunIdentity = firstRunIdentity(powerPointManifestIdentity, 
 const wordFirstRunIdentityReady = wordFirstRunIdentityReviewed && catalogIdentityLooksReady(wordFirstRunIdentity);
 const excelFirstRunIdentityReady = excelFirstRunIdentityReviewed && catalogIdentityLooksReady(excelFirstRunIdentity);
 const powerPointFirstRunIdentityReady = powerPointFirstRunIdentityReviewed && catalogIdentityLooksReady(powerPointFirstRunIdentity);
+const wordServerProtocolReady = typeof wordServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(wordServerProtocolRow);
+const wordDocumentStateReady = typeof wordDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(wordDocumentState) && !/unknown/i.test(wordDocumentState);
+const wordTaskpaneDensityReady = wordCompactTopBlock && wordToolsPermissionsMerged && wordInlineSettings && wordServerProtocolReady && wordDocumentStateReady;
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady && excelRuntimeEvidenceReady;
@@ -116,7 +124,7 @@ const powerPointServerProtocolReady = typeof powerPointServerProtocolRow === 'st
 const powerPointDocumentStateReady = typeof powerPointDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(powerPointDocumentState) && !/unknown/i.test(powerPointDocumentState);
 const powerPointTaskpaneDensityReady = powerPointCompactTopBlock && powerPointToolsPermissionsMerged && powerPointInlineSettings && powerPointServerProtocolReady && powerPointDocumentStateReady;
 const productIdentityReviewReady = logoQualityReviewed && finalLogoUserSurfaceReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinInstallableSurfaceReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNormalWindowsLaunchReviewed;
-const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
+const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -183,6 +191,16 @@ const evidence = {
   rendered_logo_review_ready: renderedLogoReviewReady,
   powerpoint_runtime_evidence: powerPointRuntimeEvidence,
   powerpoint_runtime_evidence_ready: powerPointRuntimeEvidenceReady,
+  word_taskpane: {
+    compact_top_block: wordCompactTopBlock,
+    tools_permissions_merged: wordToolsPermissionsMerged,
+    inline_settings: wordInlineSettings,
+    server_protocol_row: wordServerProtocolRow,
+    server_protocol_row_ready: wordServerProtocolReady,
+    document_state: wordDocumentState,
+    document_state_ready: wordDocumentStateReady,
+    density_ready: wordTaskpaneDensityReady
+  },
   excel_taskpane: {
     compact_top_block: excelCompactTopBlock,
     tools_permissions_merged: excelToolsPermissionsMerged,

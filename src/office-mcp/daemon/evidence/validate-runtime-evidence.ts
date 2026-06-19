@@ -263,6 +263,7 @@ function validateProductVisualEvidence(): void {
   validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
   validateFirstRunIdentity(visual.first_run_identity);
   validatePowerPointRuntimeEvidence(visual.powerpoint_runtime_evidence, visual.powerpoint_runtime_evidence_ready);
+  validateWordTaskpaneVisualEvidence(visual.word_taskpane);
   validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
   validatePowerPointTaskpaneVisualEvidence(visual.powerpoint_taskpane);
   if (visual.daemon_context_ready !== true) {
@@ -577,6 +578,10 @@ function validatePowerPointRuntimeEvidence(evidence: unknown, ready: unknown): v
   if (!pdfSupported && !pdfHostRejection) failures.push('Product visual PowerPoint runtime evidence missing PDF export success or explicit host-capability rejection.');
 }
 
+function validateWordTaskpaneVisualEvidence(taskpane: unknown): void {
+  validateTaskpaneDensityEvidence(taskpane, 'Word');
+}
+
 function validateExcelTaskpaneVisualEvidence(taskpane: unknown): void {
   validateTaskpaneDensityEvidence(taskpane, 'Excel');
   if (isRecord(taskpane)) validateExcelRuntimeEvidence(taskpane.runtime_evidence, taskpane.runtime_evidence_ready);
@@ -586,7 +591,7 @@ function validatePowerPointTaskpaneVisualEvidence(taskpane: unknown): void {
   validateTaskpaneDensityEvidence(taskpane, 'PowerPoint');
 }
 
-function validateTaskpaneDensityEvidence(taskpane: unknown, label: 'Excel' | 'PowerPoint'): void {
+function validateTaskpaneDensityEvidence(taskpane: unknown, label: 'Word' | 'Excel' | 'PowerPoint'): void {
   if (!isRecord(taskpane)) {
     failures.push(`Product visual evidence missing ${label} task pane details.`);
     return;

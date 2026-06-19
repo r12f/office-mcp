@@ -304,6 +304,21 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.word_taskpane.document_state = 'unknown';
+      broken.word_taskpane.document_state_ready = false;
+      broken.word_taskpane.density_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /concrete Word editable\/read-only\/protected state/);
+      assert.match(outputText(result.stdout), /Word task pane density pass flag/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.excel_taskpane.document_state = 'unknown';
       broken.excel_taskpane.document_state_ready = false;
       broken.excel_taskpane.density_ready = false;
@@ -910,6 +925,16 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     rendered_logo_review_ready: passed,
     powerpoint_runtime_evidence: powerPointRuntimeEvidence(passed),
     powerpoint_runtime_evidence_ready: passed,
+    word_taskpane: {
+      compact_top_block: passed,
+      tools_permissions_merged: passed,
+      inline_settings: passed,
+      server_protocol_row: 'Server 0.1.0 / Protocol 1.0',
+      server_protocol_row_ready: passed,
+      document_state: 'Editable',
+      document_state_ready: passed,
+      density_ready: passed
+    },
     excel_taskpane: {
       compact_top_block: passed,
       tools_permissions_merged: passed,

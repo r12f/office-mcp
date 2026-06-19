@@ -60,6 +60,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal(evidence.tray_tooltip_ready, true);
     assert.equal(evidence.tray_menu_surface_kind, 'native');
     assert.equal(evidence.tray_menu_surface_native, true);
+    assert.equal((evidence.word_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).density_ready, true);
@@ -510,6 +511,28 @@ test('product visual evidence recorder requires PowerPoint runtime evidence', ()
   });
 });
 
+test('product visual evidence recorder requires Word task pane density review', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const output = join(dir, 'missing-word-taskpane-density.json');
+    const result = runRecorder(
+      output,
+      screenshots,
+      '--daemon-bin', daemonBin,
+      '--rendered-logo-review-path', renderedLogoReviewPath,
+      '--word-document-state', 'unknown'
+    );
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    const taskpane = evidence.word_taskpane as Record<string, unknown>;
+    assert.equal(taskpane.document_state, 'unknown');
+    assert.equal(taskpane.document_state_ready, false);
+    assert.equal(taskpane.density_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('product visual evidence recorder reads evidence artifact paths from environment', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -575,6 +598,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const explicitWordCatalogType = extra.includes('--word-catalog-type');
   const explicitExcelCatalogType = extra.includes('--excel-catalog-type');
   const explicitPowerPointCatalogType = extra.includes('--powerpoint-catalog-type');
+  const explicitWordDocumentState = extra.includes('--word-document-state');
   const explicitPowerPointDocumentState = extra.includes('--powerpoint-document-state');
   const filteredExtra = extra.filter((item, index) => {
     const previous = extra[index - 1];
@@ -619,6 +643,11 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     '--powerpoint-catalog-provider', 'Office MCP Control',
     '--powerpoint-catalog-description', 'Local office productivity automation and control utility',
     ...(explicitPowerPointCatalogType ? [] : ['--powerpoint-catalog-type', 'Local productivity automation control utility']),
+    '--word-compact-top-block', 'true',
+    '--word-tools-permissions-merged', 'true',
+    '--word-inline-settings', 'true',
+    '--word-server-protocol-row', 'Server 0.1.0 / Protocol 1.0',
+    ...(explicitWordDocumentState ? [] : ['--word-document-state', 'Editable']),
     '--excel-compact-top-block', 'true',
     '--excel-tools-permissions-merged', 'true',
     '--excel-inline-settings', 'true',
