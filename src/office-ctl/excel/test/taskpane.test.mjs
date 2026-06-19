@@ -85,10 +85,11 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(css, /\.tool-permission-row/);
   assert.match(css, /\.tool-toggle/);
   assert.match(css, /\.tool-list:not\(\.is-editing-tools\) \.tool-toggle/);
-  assert.match(css, /\.metadata-copy \{[\s\S]*min-height: 24px;[\s\S]*text-align: left;/);
+  assert.match(css, /\.metadata-copy \{[\s\S]*display: inline-flex;[\s\S]*min-height: 32px;[\s\S]*text-align: left;/);
   assert.match(css, /\.metadata-copy code \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
   assert.match(css, /\.task-command-id \{[\s\S]*display: flex;[\s\S]*gap: 4px;/);
-  assert.match(css, /\.inline-copy \{[\s\S]*background: transparent;[\s\S]*cursor: pointer;/);
+  assert.match(css, /\.inline-copy \{[\s\S]*display: inline-flex;[\s\S]*min-height: 32px;[\s\S]*background: transparent;[\s\S]*cursor: pointer;/);
+  assert.match(css, /\.metadata-copy:hover,[\s\S]*\.inline-copy:focus-visible \{[\s\S]*background: var\(--surface-raised\);/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /forced-colors: active/);
   assert.match(js, /const TOOL_GROUPS = \[/);

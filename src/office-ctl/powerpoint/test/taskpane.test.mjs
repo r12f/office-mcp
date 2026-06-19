@@ -73,10 +73,11 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
   assert.match(css, /\.control-glyph \{[\s\S]*width: 18px;[\s\S]*stroke: currentColor;/);
   assert.match(css, /\.tool-permission-row\.is-mutating \{[\s\S]*border-left: 3px solid var\(--powerpoint\);/);
-  assert.match(css, /\.metadata-copy \{[\s\S]*min-height: 24px;[\s\S]*text-align: left;/);
+  assert.match(css, /\.metadata-copy \{[\s\S]*display: inline-flex;[\s\S]*min-height: 32px;[\s\S]*text-align: left;/);
   assert.match(css, /\.metadata-copy code \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
   assert.match(css, /\.task-command-id \{[\s\S]*display: flex;[\s\S]*gap: 4px;/);
-  assert.match(css, /\.inline-copy \{[\s\S]*background: transparent;[\s\S]*cursor: pointer;/);
+  assert.match(css, /\.inline-copy \{[\s\S]*display: inline-flex;[\s\S]*min-height: 32px;[\s\S]*background: transparent;[\s\S]*cursor: pointer;/);
+  assert.match(css, /\.metadata-copy:hover,[\s\S]*\.inline-copy:focus-visible \{[\s\S]*background: var\(--surface-raised\);/);
   assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
   assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
