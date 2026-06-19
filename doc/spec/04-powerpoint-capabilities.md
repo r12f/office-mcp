@@ -141,31 +141,31 @@ Rejected v1 expansions:
 
 | Tool | Status | Category | Side effect | Minimum API | Summary |
 |---|---|---|---|---|---|
-| `powerpoint.get_presentation_info` | planned | Presentation | read | `PowerPointApi 1.0`; richer properties require `PowerPointApi 1.5+` / `1.7` | Return presentation title/id, host metadata, slide count, selection summary, active view when available, and capability gates. |
-| `powerpoint.get_active_view` | planned | Presentation | read | Common `Office.Document.getActiveViewAsync` | Return whether the presentation is in editable or read-only presentation view. |
-| `powerpoint.export_file` | planned | Presentation | read | Common `Office.Document.getFileAsync`; PDF/PPTX format support is host-gated | Export the current presentation as PDF or PPTX base64 slices through one export owner. |
-| `powerpoint.update_tags` | planned | Metadata | read/edit/destructive | `PowerPointApi 1.3` | Read, set, or delete presentation tags. |
-| `powerpoint.list_slides` | planned | Slides | read | `PowerPointApi 1.2` | List slides with id, index, layout/master ids, shape count, tags, and optional thumbnail metadata. |
+| `powerpoint.get_presentation_info` | implemented | Presentation | read | `PowerPointApi 1.0`; richer properties require `PowerPointApi 1.5+` / `1.7` | Return presentation title/id, host metadata, slide count, selection summary, active view when available, and capability gates. |
+| `powerpoint.get_active_view` | implemented | Presentation | read | Common `Office.Document.getActiveViewAsync` | Return whether the presentation is in editable or read-only presentation view. |
+| `powerpoint.export_file` | implemented | Presentation | read | Common `Office.Document.getFileAsync`; PDF/PPTX format support is host-gated | Export the current presentation as PDF or PPTX base64 slices through one export owner, or return explicit host-capability rejection where the host blocks export. |
+| `powerpoint.update_tags` | implemented | Metadata | read/edit/destructive | `PowerPointApi 1.3` | Read, set, or delete presentation tags. |
+| `powerpoint.list_slides` | implemented | Slides | read | `PowerPointApi 1.2` | List slides with id, index, layout/master ids, shape count, tags, and optional thumbnail metadata. |
 | `powerpoint.add_slide` | implemented | Slides | edit | `PowerPointApi 1.3` | Add a slide, optionally using a layout and initial title/body text boxes. |
-| `powerpoint.update_slide` | planned | Slides | edit | `PowerPointApi 1.3`; background requires `PowerPointApi 1.10` | Update slide tags and background where supported; slide content belongs to shape/text/table tools. |
-| `powerpoint.delete_slide` | planned | Slides | destructive | `PowerPointApi 1.3` | Delete a slide, rejecting attempts that would leave the deck empty. |
-| `powerpoint.move_slide` | planned | Slides | edit | `PowerPointApi 1.8` | Move a slide to a target index. |
-| `powerpoint.export_slide` | planned | Slides | read | `PowerPointApi 1.8` | Export one slide as PNG image data or a one-slide presentation, depending on arguments and host support. |
-| `powerpoint.list_layouts` | planned | Layout | read | `PowerPointApi 1.3` | List slide masters and layouts with id, name, and type. |
+| `powerpoint.update_slide` | implemented | Slides | edit | `PowerPointApi 1.3`; background requires `PowerPointApi 1.10` | Update slide tags and background where supported; slide content belongs to shape/text/table tools. |
+| `powerpoint.delete_slide` | implemented | Slides | destructive | `PowerPointApi 1.3` | Delete a slide, rejecting attempts that would leave the deck empty. |
+| `powerpoint.move_slide` | implemented | Slides | edit | `PowerPointApi 1.8` | Move a slide to a target index. |
+| `powerpoint.export_slide` | implemented | Slides | read | `PowerPointApi 1.8` | Export one slide as PNG image data or a one-slide presentation, depending on arguments and host support. |
+| `powerpoint.list_layouts` | implemented | Layout | read | `PowerPointApi 1.3` | List slide masters and layouts with id, name, and type. |
 | `powerpoint.apply_layout` | implemented | Layout | edit | `PowerPointApi 1.8` | Apply a layout to a target slide by id, name, or type. |
-| `powerpoint.get_selection` | planned | Selection | read | `PowerPointApi 1.5` | Return selected slides, shapes, and text range metadata. |
-| `powerpoint.set_selection` | planned | Selection | edit | `PowerPointApi 1.5` | Select slides or a text range; shape selection support is host-gated and must be verified before advertisement. |
-| `powerpoint.list_shapes` | planned | Shapes | read | `PowerPointApi 1.3`; richer shape metadata requires `PowerPointApi 1.4+` | List shapes on a slide with id, type, position, size, text/table presence, and accessibility metadata. |
-| `powerpoint.add_text_box` | planned | Shapes | edit | `PowerPointApi 1.4` | Add a text box to a slide. This supersedes title/body-specific text insertion tools. |
-| `powerpoint.add_shape` | planned | Shapes | edit | `PowerPointApi 1.4` | Add a geometric shape or line to a slide with explicit type and geometry. |
+| `powerpoint.get_selection` | implemented | Selection | read | `PowerPointApi 1.5` | Return selected slides, shapes, and text range metadata. |
+| `powerpoint.set_selection` | implemented | Selection | edit | `PowerPointApi 1.5` | Select slides or a text range; shape selection support is host-gated and must be verified before advertisement. |
+| `powerpoint.list_shapes` | implemented | Shapes | read | `PowerPointApi 1.3`; richer shape metadata requires `PowerPointApi 1.4+` | List shapes on a slide with id, type, position, size, text/table presence, and accessibility metadata. |
+| `powerpoint.add_text_box` | implemented | Shapes | edit | `PowerPointApi 1.4` | Add a text box to a slide. This supersedes title/body-specific text insertion tools. |
+| `powerpoint.add_shape` | implemented | Shapes | edit | `PowerPointApi 1.4` | Add a geometric shape or line to a slide with explicit type and geometry. |
 | `powerpoint.insert_image` | implemented | Shapes | edit | Current implementation uses Common API image insertion; shape-owned implementation requires PowerPoint image API verification | Insert an image on a slide or current selection from validated base64 or daemon-fetched HTTPS URL. |
-| `powerpoint.update_shape` | planned | Shapes | edit/destructive | `PowerPointApi 1.4`; grouping and advanced fields require higher sets | Read/update shape position, size, rotation, name, alt text, fill, line, z-order, grouping, and delete through one shape owner. |
-| `powerpoint.read_text` | planned | Text | read | `PowerPointApi 1.4` | Read text from selected text, a shape, one slide, or all slides with pagination. |
+| `powerpoint.update_shape` | implemented | Shapes | edit/destructive | `PowerPointApi 1.4`; grouping and advanced fields require higher sets | Read/update shape position, size, rotation, name, alt text, fill, line, z-order, grouping, and delete through one shape owner. |
+| `powerpoint.read_text` | implemented | Text | read | `PowerPointApi 1.4` | Read text from selected text, a shape, one slide, or all slides with pagination. |
 | `powerpoint.replace_text` | implemented | Text | edit | `PowerPointApi 1.4` | Replace matching text in slide shape text ranges, with optional scope and dry-run support. |
-| `powerpoint.format_text` | planned | Text | edit | `PowerPointApi 1.4`; advanced font features require `PowerPointApi 1.8+` | Apply font and paragraph formatting to selected text or a target shape text range. |
-| `powerpoint.add_table` | planned | Tables | edit | `PowerPointApi 1.8` | Add a table to a slide with initial dimensions and optional values. |
-| `powerpoint.read_table` | planned | Tables | read | `PowerPointApi 1.8` | Read table dimensions, values, merged areas, and basic cell metadata. |
-| `powerpoint.update_table` | planned | Tables | edit/destructive | `PowerPointApi 1.8`; rows/columns/clear require `PowerPointApi 1.9` | Update table cell values, row/column dimensions, add/delete rows/columns, merge cells, clear values/formatting, apply style settings, or delete the table shape. |
+| `powerpoint.format_text` | implemented | Text | edit | `PowerPointApi 1.4`; advanced font features require `PowerPointApi 1.8+` | Apply font and paragraph formatting to selected text or a target shape text range. |
+| `powerpoint.add_table` | implemented | Tables | edit | `PowerPointApi 1.8` | Add a table to a slide with initial dimensions and optional values, or return explicit host-capability rejection where table objects are unavailable. |
+| `powerpoint.read_table` | implemented | Tables | read | `PowerPointApi 1.8` | Read table dimensions, values, merged areas, and basic cell metadata. |
+| `powerpoint.update_table` | implemented | Tables | edit/destructive | `PowerPointApi 1.8`; rows/columns/clear require `PowerPointApi 1.9` | Update table cell values, row/column dimensions, add/delete rows/columns, merge cells, clear values/formatting, apply style settings, or delete the table shape. |
 
 The tools above are the target PowerPoint v1 contract. Implementation work must
 keep the daemon catalog, MCP `tools/list`, PowerPoint task pane

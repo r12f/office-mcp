@@ -1519,11 +1519,18 @@ PowerPoint Designer, and macros.
       MCP `tools/list`, task pane available-tools metadata, grouped permission
       categories, no duplicate owner tools, no `powerpoint.save`, and no
       `powerpoint.export_pdf` after `powerpoint.export_file` lands.
-- [ ] Add final PowerPoint v1 evidence: `npm run check` in
+- [x] Add final PowerPoint v1 evidence: `npm run check` in
       `src/office-ctl/powerpoint`, targeted daemon cargo tests, `git diff
       --check`, and a live PowerPoint smoke covering Presentation, Slides,
       Layout, Shapes, Text, Tables, and export success or explicit
-      host-capability rejection.
+      host-capability rejection. Current evidence includes `npm run check` in
+      `src/office-ctl/powerpoint`, `npm run evidence:powerpoint` and
+      `npm run check` in `src/office-mcp/daemon/evidence`,
+      `cargo test -p office-mcp-daemon`, `cargo fmt --check`, and
+      `git diff --check`; the generated PowerPoint runtime evidence records a
+      passed `powerpoint.runtime_smoke` gate with all 25 tools advertised and
+      category proofs for Presentation, Slides, Layout, Shapes, Text, and
+      Tables.
 
 ### M9 — Outlook (cautious)
 

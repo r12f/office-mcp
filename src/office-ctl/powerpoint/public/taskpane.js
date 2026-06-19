@@ -769,6 +769,7 @@
       const shape = slide.shapes.addTable(rows, columns, shapeOptions(args, { left: 72, top: 120, width: 480, height: 220 }));
       shape.load('id,type,table/rowCount,table/columnCount');
       await context.sync();
+      if (!shape.table) throw hostCapabilityUnavailable('Table creation is not available in this PowerPoint host.');
       if (Array.isArray(args.values)) applyTableValues(shape.table, args.values);
       await context.sync();
       return { shape_id: shape.id, rows, columns, added: true };

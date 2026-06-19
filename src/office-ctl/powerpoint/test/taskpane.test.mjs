@@ -266,6 +266,8 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   assert.match(loadSlidesWithShapesBody, /return slides\.items \|\| \[\]/);
   assert.match(js, /async function formatText\(args\)/);
   assert.match(js, /async function addTable\(args\)/);
+  const addTableBody = functionBody(js, 'addTable');
+  assert.match(addTableBody, /if \(!shape\.table\) throw hostCapabilityUnavailable/);
   assert.match(js, /async function readTable\(args\)/);
   assert.match(js, /async function updateTable\(args\)/);
   assert.match(js, /async function insertImage\(args\)/);
