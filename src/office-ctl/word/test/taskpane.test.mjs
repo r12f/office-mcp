@@ -22,16 +22,17 @@ test('Word add-in manifest and task pane asset versions stay aligned', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
-  assert.match(manifest, /<Version>1\.0\.0\.8<\/Version>/);
-  assert.match(manifest, /word\/taskpane\.html\?v=0\.1\.8/);
-  assert.match(html, /word\/taskpane\.css\?v=0\.1\.8/);
-  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.8/);
-  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.8/);
-  assert.match(html, /common\/logger\.js\?v=0\.1\.8/);
-  assert.match(html, /common\/task-history\.js\?v=0\.1\.8/);
-  assert.match(html, /word\/taskpane\.js\?v=0\.1\.8/);
-  assert.match(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
-  assert.match(js, /ADDIN_VERSION = '0\.1\.8'/);
+  assert.match(manifest, /<Version>1\.0\.0\.9<\/Version>/);
+  assert.match(manifest, /word\/taskpane\.html\?v=0\.1\.9/);
+  assert.match(html, /word\/taskpane\.css\?v=0\.1\.9/);
+  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.9/);
+  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.9/);
+  assert.match(html, /common\/logger\.js\?v=0\.1\.9/);
+  assert.match(html, /common\/task-history\.js\?v=0\.1\.9/);
+  assert.match(html, /word\/taskpane\.js\?v=0\.1\.9/);
+  assert.match(html, /<script src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
+  assert.doesNotMatch(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.9'/);
 });
 
 test('Word add-in uses product identity metadata and generated icons', () => {
@@ -124,7 +125,7 @@ test('Office catalog registration script stages Office host manifests without re
     assert.match(wordManifest, /<SupportUrl DefaultValue="https:\/\/github\.com\/office-mcp\/office-mcp" \/>/);
     assert.match(wordManifest, /DefaultValue="Open Control Panel"/);
     assert.match(wordManifest, /Open the control panel to connect this Word document/);
-    assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.8/);
+    assert.match(wordManifest, /https:\/\/localhost:8766\/word\/taskpane\.html\?v=0\.1\.9/);
     assert.match(wordManifest, /<IconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-32\.png" \/>/);
     assert.match(wordManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
     assert.match(wordManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
@@ -137,7 +138,7 @@ test('Office catalog registration script stages Office host manifests without re
     assert.match(excelManifest, /<SupportUrl DefaultValue="https:\/\/github\.com\/office-mcp\/office-mcp" \/>/);
     assert.match(excelManifest, /DefaultValue="Open Control Panel"/);
     assert.match(excelManifest, /Open the control panel to connect this Excel workbook/);
-    assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.7/);
+    assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.8/);
     assert.match(excelManifest, /<IconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-32\.png" \/>/);
     assert.match(excelManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
@@ -150,7 +151,7 @@ test('Office catalog registration script stages Office host manifests without re
     assert.match(powerpointManifest, /<SupportUrl DefaultValue="https:\/\/github\.com\/office-mcp\/office-mcp" \/>/);
     assert.match(powerpointManifest, /DefaultValue="Open Control Panel"/);
     assert.match(powerpointManifest, /Open the control panel to connect this PowerPoint presentation/);
-    assert.match(powerpointManifest, /https:\/\/localhost:8766\/powerpoint\/taskpane\.html\?v=0\.1\.0/);
+    assert.match(powerpointManifest, /https:\/\/localhost:8766\/powerpoint\/taskpane\.html\?v=0\.1\.1/);
     assert.match(powerpointManifest, /<IconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-32\.png" \/>/);
     assert.match(powerpointManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
     assert.match(powerpointManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
@@ -274,13 +275,13 @@ test('Office catalog registration can sync its origin from running daemon status
     const wordManifest = readFileSync(join(catalogPath, 'office-mcp-word.xml'), 'utf8');
     const excelManifest = readFileSync(join(catalogPath, 'office-mcp-excel.xml'), 'utf8');
     const powerpointManifest = readFileSync(join(catalogPath, 'office-mcp-powerpoint.xml'), 'utf8');
-    assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.8/);
+    assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.9/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
-    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.7/);
+    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.8/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
-    assert.match(powerpointManifest, /https:\/\/localhost:8777\/powerpoint\/taskpane\.html\?v=0\.1\.0/);
+    assert.match(powerpointManifest, /https:\/\/localhost:8777\/powerpoint\/taskpane\.html\?v=0\.1\.1/);
     assert.match(powerpointManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(powerpointManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
     assert.doesNotMatch(wordManifest, /https:\/\/localhost:8765/);

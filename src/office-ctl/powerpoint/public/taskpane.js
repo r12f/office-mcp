@@ -1,5 +1,5 @@
 (() => {
-  const ADDIN_VERSION = '0.1.0';
+  const ADDIN_VERSION = '0.1.1';
   const PROTOCOL_VERSION = '1.0';
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
   const {

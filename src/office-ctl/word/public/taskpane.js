@@ -1,5 +1,5 @@
 (() => {
-  const ADDIN_VERSION = '0.1.8';
+  const ADDIN_VERSION = '0.1.9';
   const PROTOCOL_VERSION = '1.0';
   const {
     boolLabel,
