@@ -784,22 +784,21 @@
 
   function saveEndpointOverride(event) {
     event.preventDefault();
+    endpointErrorEl.textContent = '';
     const value = endpointInputEl.value.trim();
-    const validation = validateEndpoint(value);
-    if (!validation.ok) {
-      endpointErrorEl.textContent = validation.message;
-      return;
-    }
-    saveEndpointEl.disabled = true;
-    saveEndpointEl.textContent = 'Saving\u2026';
     try {
+      validateEndpoint(value);
       storeEndpointOverride(value);
       endpointDirty = false;
-      endpointErrorEl.textContent = '';
+      saveEndpointEl.disabled = true;
+      saveEndpointEl.textContent = 'Saving\u2026';
       settingsPanelEl.hidden = true;
       settingsToggleEl.setAttribute('aria-expanded', 'false');
       settingsToggleEl.setAttribute('aria-label', 'Open Settings');
       connect();
+    } catch (error) {
+      endpointErrorEl.textContent = error.message || 'Enter a valid wss:// endpoint.';
+      endpointInputEl.focus();
     } finally {
       saveEndpointEl.disabled = false;
       saveEndpointEl.textContent = 'Save Endpoint';

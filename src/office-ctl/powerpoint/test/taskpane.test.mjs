@@ -146,6 +146,9 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /function fallbackCopy\(value\)/);
   assert.match(js, /clearEndpointOverride/);
   assert.match(js, /currentOriginEndpoint/);
+  assert.match(js, /try \{[\s\S]*validateEndpoint\(value\);[\s\S]*storeEndpointOverride\(value\);[\s\S]*\} catch \(error\) \{[\s\S]*endpointErrorEl\.textContent = error\.message \|\| 'Enter a valid wss:\/\/ endpoint\.';[\s\S]*endpointInputEl\.focus\(\);/);
+  assert.doesNotMatch(js, /const validation = validateEndpoint\(value\)/);
+  assert.doesNotMatch(js, /validation\.ok/);
   assert.match(js, /Office\.AutoShowTaskpaneWithDocument/);
   assert.match(js, /window\.__OFFICE_MCP_TASKPANE_READY__ = true/);
   assert.doesNotMatch(js, /console\.(log|warn|error)/);

@@ -117,8 +117,9 @@ async function main(): Promise<void> {
     const screenshot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
     if (screenshot.data.length < 1000) throw new Error('UI smoke failed: daemon screenshot is unexpectedly small');
     console.error('taskpane assertions');
-    await assertTaskpane(cdp, pageDiagnostics, `${runtime.origin}/word/taskpane.html`, 'Word');
-    await assertTaskpane(cdp, pageDiagnostics, `${runtime.origin}/excel/taskpane.html`, 'Excel');
+    await assertTaskpane(cdp, pageDiagnostics, `${runtime.origin}/word/taskpane.html`, 'Word', 3);
+    await assertTaskpane(cdp, pageDiagnostics, `${runtime.origin}/excel/taskpane.html`, 'Excel', 3);
+    await assertTaskpane(cdp, pageDiagnostics, `${runtime.origin}/powerpoint/taskpane.html`, 'PowerPoint', 3);
     console.error('empty-state assertions');
     const emptyRuntimePath = join(mkdtempSync(join(tmpdir(), 'office-mcp-ui-empty-runtime-')), 'ui-runtime.json');
     const emptyDaemon = startRustUiFixture(emptyRuntimePath, cargoTargetDir, 'empty');
@@ -269,7 +270,7 @@ async function pressKey(cdp: CdpClient, key: string, code: number): Promise<void
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code });
 }
 
-async function assertTaskpane(cdp: CdpClient, pageDiagnostics: PageDiagnostics, url: string, hostName: string): Promise<void> {
+async function assertTaskpane(cdp: CdpClient, pageDiagnostics: PageDiagnostics, url: string, hostName: string, minimumToolGroups: number): Promise<void> {
   await setViewport(cdp, 320, 720, true);
   await cdp.send('Page.navigate', { url });
   await waitFor(cdp, 'document.querySelector(".taskpane-shell") !== null');
@@ -285,7 +286,7 @@ async function assertTaskpane(cdp: CdpClient, pageDiagnostics: PageDiagnostics, 
   await assertEval(cdp, 'document.querySelector("#hostPlatform") !== null && document.querySelector("#documentState") !== null && document.querySelector("#connectionDetail") !== null', `${hostName} taskpane exposes host document and connection detail fields`);
   await assertEval(cdp, '!/Dirty:\\s*unknown|Read-only:\\s*unknown/i.test(document.querySelector("#documentState").textContent)', `${hostName} taskpane avoids unknown dirty/read-only state`);
   await assertEval(cdp, 'document.querySelector(".tools-panel summary").textContent.includes("Tools") && !document.body.textContent.includes("Available Tools") && !document.body.textContent.includes("Tool Permissions")', `${hostName} taskpane merges available tools and permissions into one surface`);
-  await assertEval(cdp, 'document.querySelectorAll("#toolList").length === 1 && document.querySelectorAll("#toolPermissionList").length === 0 && document.querySelectorAll(".tool-group").length >= 3', `${hostName} taskpane renders one grouped tools surface`);
+  await assertEval(cdp, `document.querySelectorAll("#toolList").length === 1 && document.querySelectorAll("#toolPermissionList").length === 0 && document.querySelectorAll(".tool-group").length >= ${minimumToolGroups}`, `${hostName} taskpane renders one grouped tools surface`);
   await assertEval(cdp, '[...document.querySelectorAll(".tool-group")].every((group) => group.tagName === "DETAILS" && group.querySelector("summary")?.textContent.includes("Enabled"))', `${hostName} taskpane tool categories are collapsible with enabled counts`);
   await assertEval(cdp, 'document.querySelector("#settingsPanel") !== null && document.querySelector("#endpointInput").type === "url" && document.querySelector("#endpointInput").name === "daemonEndpoint"', `${hostName} taskpane settings form exposes endpoint URL field`);
   await assertEval(cdp, 'document.querySelector("#settingsPanel .tool-permissions") === null && document.querySelector("#settingsPanel").getBoundingClientRect().height < 120', `${hostName} taskpane settings stay compact and inline`);

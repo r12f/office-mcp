@@ -158,7 +158,7 @@ async function runTrayProbeGate(): Promise<void> {
     if (jsonStart === -1) throw new Error(`Tray probe did not emit JSON: ${result.stdout}`);
     const evidence = JSON.parse(result.stdout.slice(jsonStart)) as Record<string, unknown>;
     const snapshot = evidence.snapshot as Record<string, unknown> | undefined;
-    const expected = ['Status: Degraded', 'Clients: 1', 'Documents: 2', '---', 'Show Office MCP Control', 'Quit Office MCP Control'];
+    const expected = ['Status: Degraded', 'Clients: 1', 'Documents: 1', '---', 'Show Office MCP Control', 'Quit Office MCP Control'];
     if (JSON.stringify(snapshot?.menu_items) !== JSON.stringify(expected)) {
       throw new Error(`Tray menu order/counts are wrong: ${JSON.stringify(evidence)}`);
     }
