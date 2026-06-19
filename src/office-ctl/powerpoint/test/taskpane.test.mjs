@@ -44,8 +44,8 @@ test('PowerPoint add-in manifest targets presentation host and product identity'
 
   assert.match(manifest, /<Host Name="Presentation" \/>/);
   assert.match(manifest, /<Set Name="PowerPointApi" MinVersion="1\.1" \/>/);
-  assert.match(manifest, /<Version>1\.0\.0\.2<\/Version>/);
-  assert.match(manifest, /powerpoint\/taskpane\.html\?v=0\.1\.1/);
+  assert.match(manifest, /<Version>1\.0\.0\.4<\/Version>/);
+  assert.match(manifest, /powerpoint\/taskpane\.html\?v=0\.1\.3/);
   assert.match(manifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
   assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
   assert.match(manifest, /Control live PowerPoint presentations through a local productivity automation control utility\./);
@@ -66,14 +66,14 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
-  assert.match(html, /powerpoint\/taskpane\.css\?v=0\.1\.1/);
-  assert.match(html, /common\/taskpane\.css\?v=0\.1\.1/);
-  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.1/);
-  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.1/);
-  assert.match(html, /common\/logger\.js\?v=0\.1\.1/);
-  assert.match(html, /common\/task-history\.js\?v=0\.1\.1/);
-  assert.match(html, /common\/main-ui\.js\?v=0\.1\.1/);
-  assert.match(html, /powerpoint\/taskpane\.js\?v=0\.1\.1/);
+  assert.match(html, /powerpoint\/taskpane\.css\?v=0\.1\.3/);
+  assert.match(html, /common\/taskpane\.css\?v=0\.1\.3/);
+  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.3/);
+  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.3/);
+  assert.match(html, /common\/logger\.js\?v=0\.1\.3/);
+  assert.match(html, /common\/task-history\.js\?v=0\.1\.3/);
+  assert.match(html, /common\/main-ui\.js\?v=0\.1\.3/);
+  assert.match(html, /powerpoint\/taskpane\.js\?v=0\.1\.3/);
   assert.match(html, /<script src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
   assert.doesNotMatch(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
   assert.match(html, /id="runtimeVersions"/);
@@ -108,7 +108,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(commonCss, /overflow-x:\s*(auto|scroll)/);
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
 
-  assert.match(js, /ADDIN_VERSION = '0\.1\.1'/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.3'/);
   assert.match(js, /Connecting\\u2026/);
   assert.match(js, /Reconnecting\\u2026/);
   assert.match(js, /Registering\\u2026/);
@@ -154,6 +154,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /const cancel = task\.cancelRequested \? '<div class="task-meta">Cancel requested<\/div>' : ''/);
   assert.match(js, /function valueLabel\(value\)/);
   assert.match(js, /if \(value === true\) return 'yes'/);
+  assert.match(js, /function reply\(id, result\) \{\s*return replyJsonRpc\(socket, id, result\);\s*\}/);
   assert.match(js, /taskStore\.isCancelled\(requestId\)/);
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
   assert.match(js, /class="task-meta task-command-id"/);
@@ -180,7 +181,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(js, /validation\.ok/);
   assert.match(js, /Office\.AutoShowTaskpaneWithDocument/);
   assert.match(js, /window\.__OFFICE_MCP_TASKPANE_READY__ = true/);
-  assert.match(js, /ADDIN_VERSION = '0\.1\.1'/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.3'/);
   assert.doesNotMatch(js, /console\.(log|warn|error)/);
 });
 
@@ -228,16 +229,41 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   assert.match(js, /async function moveSlide\(args\)/);
   assert.match(js, /async function exportSlide\(args\)/);
   assert.match(js, /async function listLayouts\(_?args\)/);
+  const listLayoutsBody = functionBody(js, 'listLayouts');
+  assert.match(listLayoutsBody, /master\.layouts\.load\('items\/id,name,type'\)/);
   assert.match(js, /async function getSelection\(_?args\)/);
   assert.match(js, /async function setSelection\(args\)/);
   assert.match(js, /async function listShapes\(args\)/);
+  const listShapesBody = functionBody(js, 'listShapes');
+  assert.match(listShapesBody, /slide\.shapes\.load\('items'\)/);
+  assert.match(listShapesBody, /shape\.load\('id,name,type,left,top,width,height,rotation,textFrame\/hasText,textFrame\/textRange\/text'\)/);
   assert.match(js, /async function addTextBox\(args\)/);
+  const addTextBoxBody = functionBody(js, 'addTextBox');
+  assert.match(addTextBoxBody, /shape\.load\('id,name,type,left,top,width,height,rotation,textFrame\/hasText,textFrame\/textRange\/text'\)/);
   assert.match(js, /async function addShape\(args\)/);
+  const addShapeBody = functionBody(js, 'addShape');
+  assert.match(addShapeBody, /shape\.load\('id,name,type,left,top,width,height,rotation,textFrame\/hasText,textFrame\/textRange\/text'\)/);
+  const shapeMetadataBody = functionBody(js, 'shapeMetadata');
+  assert.match(shapeMetadataBody, /safeLoaded\(shape, 'altTextTitle'/);
+  assert.match(shapeMetadataBody, /safeLoaded\(shape, 'zOrderPosition'/);
   assert.match(js, /async function updateShape\(args\)/);
   assert.match(js, /async function readText\(args\)/);
+  const readTextBody = functionBody(js, 'readText');
+  assert.match(readTextBody, /loadSlidesWithShapes\(context, args\)/);
+  assert.match(readTextBody, /shape\.load\('id,textFrame\/hasText,textFrame\/textRange\/text'\)/);
   assert.match(js, /async function replaceText\(args\)/);
+  const replaceTextBody = functionBody(js, 'replaceText');
+  assert.match(replaceTextBody, /loadSlidesWithShapes\(context, args\)/);
+  assert.match(replaceTextBody, /shape\.load\('id,textFrame\/hasText,textFrame\/textRange\/text'\)/);
+  assert.doesNotMatch(replaceTextBody, /slides\.items/, 'replace_text must not read collection items before sync');
   assert.match(js, /shape\.textFrame\?\.textRange/);
   assert.match(js, /range\.text = nextText/);
+  const loadSlidesWithShapesBody = functionBody(js, 'loadSlidesWithShapes');
+  assert.match(loadSlidesWithShapesBody, /slides\.load\('items'\)/);
+  assert.match(loadSlidesWithShapesBody, /await context\.sync\(\)/);
+  assert.match(loadSlidesWithShapesBody, /slide\.load\('id,index'\)/);
+  assert.match(loadSlidesWithShapesBody, /slide\.shapes\.load\('items'\)/);
+  assert.match(loadSlidesWithShapesBody, /return slides\.items \|\| \[\]/);
   assert.match(js, /async function formatText\(args\)/);
   assert.match(js, /async function addTable\(args\)/);
   assert.match(js, /async function readTable\(args\)/);
@@ -248,12 +274,26 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   assert.match(js, /async function applyLayout\(args\)/);
   assert.match(js, /slide\.applyLayout\(layout\)/);
   assert.match(js, /context\.presentation\.slideMasters/);
+  const resolveLayoutBody = functionBody(js, 'resolveLayout');
+  assert.match(resolveLayoutBody, /masters\.load\('items\/id,name'\)/);
+  assert.match(resolveLayoutBody, /master\.layouts\.load\('items\/id,name,type'\)/);
+  assert.doesNotMatch(resolveLayoutBody, /layouts\/items\/id,name,type/);
   assert.doesNotMatch(js, /async function exportPdf\(args\)/);
   assert.match(js, /const fileType = officeFileTypeFrom\(format\)/);
-  assert.match(js, /Office\.context\.document\.getFileAsync\(fileType/);
-  assert.match(js, /file\.getSliceAsync\(index, callback\)/);
+  const exportFileBody = functionBody(js, 'exportFile');
+  assert.match(exportFileBody, /isDesktopPowerPointHost\(\)/);
+  assert.match(exportFileBody, /PowerPoint desktop file export is not available through Office\.context\.document\.getFileAsync/);
+  assert.match(exportFileBody, /POWERPOINT_FILE_EXPORT_TIMEOUT_MS/);
+  assert.match(exportFileBody, /Office\.context\.document\.getFileAsync\(fileType/);
+  assert.match(exportFileBody, /file\.getSliceAsync\(index, callback\)/);
   assert.match(js, /file\.closeAsync\(callback\)/);
   assert.match(js, /function officeFileTypeFrom\(format\)/);
+  assert.match(js, /function isDesktopPowerPointHost\(\)/);
+  const isDesktopPowerPointHostBody = functionBody(js, 'isDesktopPowerPointHost');
+  assert.match(isDesktopPowerPointHostBody, /Office\.context\?\.platform/);
+  assert.match(js, /function officeAsync\(start, options = \{\}\)/);
+  assert.match(js, /const timeoutMs = numberOrNull\(options\.timeout_ms\)/);
+  assert.match(js, /officeMcpCode: options\.timeout_code \|\| 'HOST_ERROR'/);
   assert.match(js, /function requireRequirementSet\(name, version, feature\)/);
   assert.match(js, /function requiredString\(args, key, message\)/);
   assert.match(js, /INVALID_ARGUMENT/);
@@ -261,6 +301,17 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   assert.match(js, /HOST_CAPABILITY_UNAVAILABLE/);
   assert.match(js, /PowerPoint\.run/);
   assert.doesNotMatch(js, /declared by the daemon contract but is not implemented/);
+});
+
+test('PowerPoint presentation info is a non-blocking metadata probe', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const source = functionBody(js, 'getPresentationInfoTool');
+
+  assert.doesNotMatch(source, /PowerPoint\.run/, 'presentation info must not block the task pane on PowerPoint.run');
+  assert.doesNotMatch(source, /context\.sync\(/, 'presentation info must not depend on host sync');
+  assert.match(source, /getPresentationInfo\(\)/);
+  assert.match(source, /slide_count:\s*null/);
+  assert.match(source, /include_selection:\s*Boolean\(args\.include_selection\)/);
 });
 
 test('PowerPoint owner update tools cover the spec action surface', () => {

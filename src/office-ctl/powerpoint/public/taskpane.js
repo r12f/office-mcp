@@ -1,6 +1,7 @@
 (() => {
-  const ADDIN_VERSION = '0.1.1';
+  const ADDIN_VERSION = '0.1.3';
   const PROTOCOL_VERSION = '1.0';
+  const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
   const { bindDetailsControl, officeHostSummary, renderRuntimeVersions } = window.OfficeCtlMainUi;
   const {
@@ -436,19 +437,14 @@
   }
 
   async function getPresentationInfoTool(args) {
-    return PowerPoint.run(async (context) => {
-      const slides = context.presentation.slides;
-      slides.load('items/id,index');
-      await context.sync();
-      const info = await getPresentationInfo();
-      return {
-        ...info,
-        slide_count: slides.items?.length || 0,
-        requirement_sets: probeRequirementSets(),
-        capabilities: Object.fromEntries(AVAILABLE_TOOLS.map((tool) => [tool, isToolEnabled(tool)])),
-        include_selection: Boolean(args.include_selection)
-      };
-    });
+    const info = await getPresentationInfo();
+    return {
+      ...info,
+      slide_count: null,
+      requirement_sets: probeRequirementSets(),
+      capabilities: Object.fromEntries(AVAILABLE_TOOLS.map((tool) => [tool, isToolEnabled(tool)])),
+      include_selection: Boolean(args.include_selection)
+    };
   }
 
   async function getActiveView(_args) {
@@ -458,12 +454,16 @@
 
   async function exportFile(args) {
     const format = String(args.format || 'pdf').toLowerCase();
+    if (isDesktopPowerPointHost()) {
+      throw hostCapabilityUnavailable('PowerPoint desktop file export is not available through Office.context.document.getFileAsync in this host.');
+    }
     const fileType = officeFileTypeFrom(format);
-    const file = await officeAsync((callback) => Office.context.document.getFileAsync(fileType, { sliceSize: positiveInteger(args.slice_size, 4 * 1024 * 1024) }, callback));
+    const asyncOptions = { timeout_ms: POWERPOINT_FILE_EXPORT_TIMEOUT_MS, timeout_code: 'HOST_ERROR', timeout_partial_effect: 'none' };
+    const file = await officeAsync((callback) => Office.context.document.getFileAsync(fileType, { sliceSize: positiveInteger(args.slice_size, 4 * 1024 * 1024) }, callback), asyncOptions);
     try {
       const chunks = [];
       for (let index = 0; index < file.sliceCount; index += 1) {
-        const slice = await officeAsync((callback) => file.getSliceAsync(index, callback));
+        const slice = await officeAsync((callback) => file.getSliceAsync(index, callback), asyncOptions);
         chunks.push(sliceDataToBytes(slice.data));
       }
       return { format, mime_type: mimeTypeForFormat(format), base64: bytesToBase64(concatBytes(chunks)), size: file.size, slice_count: file.sliceCount };
@@ -569,7 +569,9 @@
   async function listLayouts(_args) {
     return PowerPoint.run(async (context) => {
       const masters = context.presentation.slideMasters;
-      masters.load('items/id,name,layouts/items/id,name,type');
+      masters.load('items/id,name');
+      await context.sync();
+      for (const master of masters.items || []) master.layouts.load('items/id,name,type');
       await context.sync();
       return {
         masters: (masters.items || []).map((master) => ({
@@ -586,17 +588,14 @@
     const replacement = requiredString(args, 'replacement', 'powerpoint.replace_text requires replacement text.');
     const matchCase = Boolean(args.match_case);
     return PowerPoint.run(async (context) => {
-      const slides = targetSlides(context, args);
-      if (slides.load) slides.load('items/id,index');
-      for (const slide of slides.items || []) slide.load('id,index');
-      await context.sync();
-      for (const slide of slides.items) {
-        slide.shapes.load('items/id,textFrame/hasText,textFrame/textRange/text');
+      const slides = await loadSlidesWithShapes(context, args);
+      for (const slide of slides) {
+        for (const shape of slide.shapes.items || []) shape.load('id,textFrame/hasText,textFrame/textRange/text');
       }
       await context.sync();
       const touchedShapes = [];
       let replacements = 0;
-      for (const slide of slides.items) {
+      for (const slide of slides) {
         for (const shape of slide.shapes.items || []) {
           const range = shape.textFrame?.textRange;
           if (!shape.textFrame?.hasText || !range || typeof range.text !== 'string') continue;
@@ -644,7 +643,10 @@
     requireRequirementSet('PowerPointApi', '1.3', 'shape listing');
     return PowerPoint.run(async (context) => {
       const slide = targetSlide(context, args);
-      slide.load('id,index,shapes/items/id,name,type,left,top,width,height,rotation,textFrame/hasText,textFrame/textRange/text');
+      slide.load('id,index');
+      slide.shapes.load('items');
+      await context.sync();
+      for (const shape of slide.shapes.items || []) shape.load('id,name,type,left,top,width,height,rotation,textFrame/hasText,textFrame/textRange/text');
       await context.sync();
       return { slide_id: slide.id, slide_index: slide.index, shapes: (slide.shapes.items || []).map(shapeMetadata) };
     });
@@ -656,7 +658,7 @@
     return PowerPoint.run(async (context) => {
       const slide = targetSlide(context, args);
       const shape = slide.shapes.addTextBox(text, shapeOptions(args, { left: 72, top: 72, width: 420, height: 80 }));
-      shape.load('id,name,type,left,top,width,height');
+      shape.load('id,name,type,left,top,width,height,rotation,textFrame/hasText,textFrame/textRange/text');
       slide.load('id,index');
       await context.sync();
       return { slide_id: slide.id, slide_index: slide.index, shape: shapeMetadata(shape) };
@@ -670,7 +672,7 @@
       const type = shapeTypeFrom(args.type);
       const shape = slide.shapes.addGeometricShape(type, shapeOptions(args, { left: 96, top: 96, width: 160, height: 96 }));
       applyShapeProperties(shape, args);
-      shape.load('id,name,type,left,top,width,height,rotation');
+      shape.load('id,name,type,left,top,width,height,rotation,textFrame/hasText,textFrame/textRange/text');
       slide.load('id,index');
       await context.sync();
       return { slide_id: slide.id, slide_index: slide.index, shape: shapeMetadata(shape) };
@@ -727,12 +729,13 @@
   async function readText(args) {
     requireRequirementSet('PowerPointApi', '1.4', 'text reads');
     return PowerPoint.run(async (context) => {
-      const slides = targetSlides(context, args);
-      if (slides.load) slides.load('items/id,index');
-      for (const slide of slides.items || []) slide.load('id,index,shapes/items/id,textFrame/hasText,textFrame/textRange/text');
+      const slides = await loadSlidesWithShapes(context, args);
+      for (const slide of slides) {
+        for (const shape of slide.shapes.items || []) shape.load('id,textFrame/hasText,textFrame/textRange/text');
+      }
       await context.sync();
       const items = [];
-      for (const slide of slides.items || []) {
+      for (const slide of slides) {
         for (const shape of slide.shapes.items || []) {
           if (!shape.textFrame?.hasText) continue;
           items.push({ slide_id: slide.id, slide_index: slide.index, shape_id: shape.id, text: shape.textFrame.textRange?.text || '' });
@@ -886,6 +889,18 @@
     return context.presentation.slides;
   }
 
+  async function loadSlidesWithShapes(context, args) {
+    const slides = targetSlides(context, args);
+    if (slides.load) slides.load('items');
+    await context.sync();
+    for (const slide of slides.items || []) {
+      slide.load('id,index');
+      slide.shapes.load('items');
+    }
+    await context.sync();
+    return slides.items || [];
+  }
+
   function targetSlide(context, args) {
     const slideId = stringArg(args, 'slide_id') || stringArg(args, 'slideId');
     if (slideId) return context.presentation.slides.getItem(slideId);
@@ -908,7 +923,9 @@
       throw Object.assign(new Error('powerpoint.apply_layout requires layout_id, layout_name, or layout_type.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
     const masters = context.presentation.slideMasters;
-    masters.load('items/id,name,layouts/items/id,name,type');
+    masters.load('items/id,name');
+    await context.sync();
+    for (const master of masters.items || []) master.layouts.load('items/id,name,type');
     await context.sync();
     const normalizedName = layoutName ? layoutName.toLowerCase() : '';
     const normalizedType = layoutType ? layoutType.toLowerCase() : '';
@@ -953,6 +970,11 @@
   }
 
   function shapeMetadata(shape) {
+    const altTextTitle = safeLoaded(shape, 'altTextTitle');
+    const altTextDescription = safeLoaded(shape, 'altTextDescription');
+    const isDecorative = safeLoaded(shape, 'isDecorative');
+    const visible = safeLoaded(shape, 'visible');
+    const zOrderPosition = safeLoaded(shape, 'zOrderPosition');
     return {
       shape_id: shape.id,
       name: shape.name || '',
@@ -962,15 +984,23 @@
       width: numberOrNull(shape.width),
       height: numberOrNull(shape.height),
       rotation: numberOrNull(shape.rotation),
-      alt_text_title: shape.altTextTitle || null,
-      alt_text_description: shape.altTextDescription || null,
-      is_decorative: typeof shape.isDecorative === 'boolean' ? shape.isDecorative : null,
-      visible: typeof shape.visible === 'boolean' ? shape.visible : null,
-      z_order_position: numberOrNull(shape.zOrderPosition),
+      alt_text_title: altTextTitle || null,
+      alt_text_description: altTextDescription || null,
+      is_decorative: typeof isDecorative === 'boolean' ? isDecorative : null,
+      visible: typeof visible === 'boolean' ? visible : null,
+      z_order_position: numberOrNull(zOrderPosition),
       has_text: Boolean(shape.textFrame?.hasText),
       text_preview: shape.textFrame?.hasText ? String(shape.textFrame.textRange?.text || '').slice(0, 200) : null,
       has_table: Boolean(shape.table)
     };
+  }
+
+  function safeLoaded(object, property) {
+    try {
+      return object?.[property];
+    } catch (_error) {
+      return null;
+    }
   }
 
   function tableMetadata(shape) {
@@ -1093,6 +1123,10 @@
     throw invalidArgument('powerpoint.export_file format must be pdf or pptx.');
   }
 
+  function isDesktopPowerPointHost() {
+    return String(Office.context?.platform || '').toLowerCase() === 'pc';
+  }
+
   function mimeTypeForFormat(format) {
     return format === 'pptx' || format === 'compressed'
       ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
@@ -1115,9 +1149,22 @@
     return Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
   }
 
-  function officeAsync(start) {
+  function officeAsync(start, options = {}) {
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const timeoutMs = numberOrNull(options.timeout_ms);
+      const timeout = timeoutMs === null ? null : setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(Object.assign(new Error(options.timeout_message || `Office async operation timed out after ${timeoutMs}ms.`), {
+          officeMcpCode: options.timeout_code || 'HOST_ERROR',
+          partialEffect: options.timeout_partial_effect || 'unknown'
+        }));
+      }, timeoutMs);
       start((result) => {
+        if (settled) return;
+        settled = true;
+        if (timeout) clearTimeout(timeout);
         if (result.status === Office.AsyncResultStatus.Succeeded) {
           resolve(result.value);
           return;
@@ -1415,7 +1462,7 @@
   }
 
   function reply(id, result) {
-    send(replyJsonRpc(id, result));
+    return replyJsonRpc(socket, id, result);
   }
 
   function send(message) {

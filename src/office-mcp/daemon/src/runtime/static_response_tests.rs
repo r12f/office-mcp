@@ -65,10 +65,10 @@ fn serves_powerpoint_taskpane_static_assets() {
     let html = response_text(&service().serve_addin_asset("/powerpoint/taskpane.html"));
     assert!(html.starts_with("HTTP/1.1 200 OK"));
     assert!(html.contains("Office MCP Control"));
-    assert!(html.contains("/powerpoint/taskpane.js?v=0.1.1"));
-    assert!(html.contains("/common/taskpane.css?v=0.1.1"));
-    assert!(html.contains("/common/addin-channel.js?v=0.1.1"));
-    assert!(html.contains("/common/main-ui.js?v=0.1.1"));
+    assert!(html.contains("/powerpoint/taskpane.js?v=0.1.3"));
+    assert!(html.contains("/common/taskpane.css?v=0.1.3"));
+    assert!(html.contains("/common/addin-channel.js?v=0.1.3"));
+    assert!(html.contains("/common/main-ui.js?v=0.1.3"));
 
     let js = response_text(&service().serve_addin_asset("/powerpoint/taskpane.js"));
     assert!(js.starts_with("HTTP/1.1 200 OK"));
