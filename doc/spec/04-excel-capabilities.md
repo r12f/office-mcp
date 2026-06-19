@@ -3,7 +3,9 @@
 This document is the Excel v1 capability contract for `office-mcp`. Excel tools
 run inside the document-scoped Excel Office.js add-in under `src/office-ctl/excel`
 and are routed by the Rust daemon through the same add-in JSON-RPC channel as
-Word tools.
+Word tools. The tool list in this file is the source of truth for the daemon
+catalog, add-in `available_tools`, task pane permission UI, and implementation
+TODO list.
 
 ## 1. Scope
 
@@ -60,6 +62,12 @@ existing tool first. Do not expand the catalog by copying individual Excel.js
 methods into MCP tools. A future tool can only be added after the selection
 matrix proves that the existing 20 tools cannot express a distinct object owner,
 permission profile, or user-visible workflow safely.
+
+The v1 priority order is: workbook orientation, worksheet lifecycle, range/cell
+data CRUD, formulas, formatting, sort/filter, tables, charts, and PivotTables.
+This follows the Excel core concepts path from workbook to worksheet to range,
+then to table and chart objects; PivotTables are included as the only extra v1
+analysis object because summarized workbook analysis is a core Excel user need.
 
 Selection rules for the 15-20 tool budget:
 
@@ -178,12 +186,14 @@ Target core Excel tool surface:
 | `excel.create_pivot_table` | implemented | PivotTable | edit | `ExcelApi 1.8` | Create a PivotTable from a range or table at a target destination. |
 | `excel.update_pivot_table` | implemented | PivotTable | edit/destructive | `ExcelApi 1.3`; hierarchy/layout/delete require `ExcelApi 1.8`; filters require `ExcelApi 1.12` | Read PivotTable metadata; configure row, column, data, and filter hierarchies; set aggregation and layout options, refresh, apply manual PivotTable filters, clear filters, or delete a PivotTable. |
 
-The planned tools above are the Excel implementation backlog, not the current
-runtime catalog. Before implementation, each planned tool must verify its
-minimum requirement set against `@types/office-js` and the Microsoft API docs,
-then land as a test-first implementation slice with daemon catalog coverage,
-task pane contract coverage, and live Excel smoke evidence where the host API
-cannot be fully proven statically.
+The tools above are the final Excel v1 contract. Implementation work must keep
+the daemon catalog, MCP `tools/list`, Excel task pane `available_tools`, task
+pane permission grouping, documentation, and tests aligned with this 20-tool
+surface. Before implementing or changing a tool, verify its minimum requirement
+set against `@types/office-js` and Microsoft API docs, then land the change as a
+test-first implementation slice with daemon catalog coverage, task pane
+contract coverage, and live Excel smoke evidence where the host API cannot be
+fully proven statically.
 
 Tool ownership rules:
 
@@ -495,7 +505,7 @@ Supported `type` values in v1 are `area`, `barClustered`, `columnClustered`,
 
 Returns `{ "chart": "Chart 1", "chart_type": "columnClustered", "source": "A1:C10" }`.
 
-## 4. Planned Tool Contract Notes
+## 4. Contract Ownership Notes
 
 Planned tools should keep contracts coarse and workflow-oriented:
 
@@ -523,7 +533,7 @@ Planned tools should keep contracts coarse and workflow-oriented:
   constraints, protected workbook denial, and other workbook-specific errors.
 - The server does not expose an Excel resource URI surface in v1. Clients use
   `excel.get_workbook_info`, `excel.list_sheets`, `excel.get_used_range`, and
-  `excel.read_range` for workbook reads once the planned surface is implemented.
+  `excel.read_range` for workbook reads.
 
 ## 6. Evidence
 

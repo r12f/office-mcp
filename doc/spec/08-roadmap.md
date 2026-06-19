@@ -1214,6 +1214,16 @@ Office.js object, property, event, shape, comment, slicer, external connection,
 or preview feature unless a later user workflow proves that the 20-tool surface
 cannot express it safely and the spec either retires or merges another tool.
 
+Research conclusion from the Microsoft Learn core concepts page: Excel v1 must
+be a small workflow API, not an Excel.js mirror. The core path is `Workbook` ->
+`Worksheet` -> `Range` -> `Table` / `Chart`; single cells are represented by
+one-cell ranges; range `values`, `formulas`, and `format` remain separate
+intents because they carry different validation and permission profiles.
+PivotTables are the only extra analysis object in v1 because they represent a
+high-value summarized-analysis workflow. Shapes, comments, slicers, bindings,
+events, named items, external data, Power Query, import/export, save-as/close,
+and method-level table/chart/PivotTable wrappers remain out of scope.
+
 Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
 `excel.get_used_range`, `excel.read_range`, `excel.write_range`,
@@ -1252,21 +1262,22 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       range work, split values/formulas/formatting because they have different
       user intent and permission profiles, merge object lifecycle/configuration
       under `update_*` owners, and cap v1 at 20 tools.
-- [ ] Verify each remaining planned tool's minimum ExcelApi requirement set
-      against `src/office-ctl/excel/node_modules/@types/office-js/index.d.ts`
-      and Microsoft API docs before implementation. Record the verified minimum
-      requirement set in [04-excel-capabilities.md](04-excel-capabilities.md)
-      instead of leaving `verify during implementation` in the final contract.
-- [ ] During implementation, keep each Excel slice aligned with the final
-      20-tool catalog in [04-excel-capabilities.md](04-excel-capabilities.md):
-      daemon catalog, MCP `tools/list`, Excel task pane available-tools metadata,
+- [ ] Verify each Excel tool's minimum ExcelApi requirement set against
+      `src/office-ctl/excel/node_modules/@types/office-js/index.d.ts` and the
+      relevant Microsoft API docs before changing implementation. Record the
+      verified minimum requirement set in
+      [04-excel-capabilities.md](04-excel-capabilities.md) and avoid unresolved
+      `verify during implementation` language in the final contract.
+- [ ] Keep every Excel implementation slice aligned with the final 20-tool
+      catalog in [04-excel-capabilities.md](04-excel-capabilities.md): daemon
+      catalog, MCP `tools/list`, Excel task pane available-tools metadata,
       permission grouping, and documentation must all expose the same tool names
       and categories.
 - [ ] Keep the runtime Excel catalog capped at the refined 20-tool target unless
       a future spec update identifies a distinct object owner, permission
       profile, or user-visible workflow that cannot be represented by the
       existing tools. Any proposed expansion must update the selection matrix
-      before implementation.
+      and retire or merge an existing tool before implementation.
 - [ ] Add or keep contract tests that fail if the daemon catalog, Excel task
       pane available-tools metadata, or UI permission grouping advertises more
       than the v1 20-tool target without a spec update. The tests should also
