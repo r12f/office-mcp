@@ -123,8 +123,14 @@ fn serves_office_ctl_common_logger_asset() {
 
 #[test]
 fn serves_generated_brand_icons_instead_of_placeholder_pngs() {
+    let icon_16 = response_bytes(&service().serve_addin_asset("/assets/icon-16.png"));
     let icon_32 = response_bytes(&service().serve_addin_asset("/assets/icon-32.png"));
     let icon_80 = response_bytes(&service().serve_addin_asset("/assets/icon-80.png"));
+
+    assert!(starts_with_http_ok(&icon_16));
+    assert!(String::from_utf8_lossy(&icon_16).contains("Content-Type: image/png"));
+    assert!(png_body(&icon_16).len() > 100);
+    assert_eq!(png_dimensions(png_body(&icon_16)), (16, 16));
 
     assert!(starts_with_http_ok(&icon_32));
     assert!(String::from_utf8_lossy(&icon_32).contains("Content-Type: image/png"));

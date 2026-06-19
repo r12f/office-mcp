@@ -72,7 +72,7 @@ fn handle_response_ignores_non_pong_messages() {
 }
 
 #[test]
-fn timeout_decision_closes_after_second_missed_ping() {
+fn timeout_decision_closes_after_third_missed_ping() {
     let shared_state = shared_state(Duration::from_secs(30), Duration::from_secs(10));
     register_connection(&shared_state, "connection-1");
 
@@ -84,6 +84,11 @@ fn timeout_decision_closes_after_second_missed_ping() {
     assert_eq!(
         WebSocketHeartbeatService::record_timeout(&shared_state, "connection-1")
             .expect("second timeout"),
+        HeartbeatLoopDecision::KeepOpen
+    );
+    assert_eq!(
+        WebSocketHeartbeatService::record_timeout(&shared_state, "connection-1")
+            .expect("third timeout"),
         HeartbeatLoopDecision::Close
     );
 }

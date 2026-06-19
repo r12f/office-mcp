@@ -4,6 +4,8 @@ pub(crate) struct AddinHeartbeatState {
     missed_pongs: u8,
 }
 
+const MAX_MISSED_PONGS_BEFORE_CLOSE: u8 = 3;
+
 impl AddinHeartbeatState {
     pub(crate) fn start_ping(&mut self, ping_id: String) {
         self.pending_ping_id = Some(ping_id);
@@ -21,7 +23,7 @@ impl AddinHeartbeatState {
     pub(crate) fn record_timeout(&mut self) -> AddinHeartbeatTimeout {
         self.pending_ping_id = None;
         self.missed_pongs = self.missed_pongs.saturating_add(1);
-        if self.missed_pongs < 2 {
+        if self.missed_pongs < MAX_MISSED_PONGS_BEFORE_CLOSE {
             AddinHeartbeatTimeout::KeepOpen {
                 missed_pongs: self.missed_pongs,
             }

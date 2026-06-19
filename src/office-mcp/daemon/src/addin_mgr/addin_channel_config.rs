@@ -15,7 +15,7 @@ impl Default for AddinChannelConfig {
             origin: "https://localhost:8765".to_string(),
             session_grace: Duration::from_mins(1),
             heartbeat_interval: Duration::from_secs(30),
-            heartbeat_timeout: Duration::from_secs(10),
+            heartbeat_timeout: Duration::from_secs(20),
             max_pending_per_session: 4,
         }
     }

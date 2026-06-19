@@ -31,7 +31,7 @@ fn first_timeout_keeps_connection_open() {
 }
 
 #[test]
-fn second_timeout_closes_connection() {
+fn third_timeout_closes_connection() {
     let mut heartbeat = AddinHeartbeatState::default();
 
     assert_eq!(
@@ -40,8 +40,12 @@ fn second_timeout_closes_connection() {
     );
     assert_eq!(
         heartbeat.record_timeout(),
+        AddinHeartbeatTimeout::KeepOpen { missed_pongs: 2 }
+    );
+    assert_eq!(
+        heartbeat.record_timeout(),
         AddinHeartbeatTimeout::Close {
-            missed_pongs: 2,
+            missed_pongs: 3,
             close_code: 4002
         }
     );

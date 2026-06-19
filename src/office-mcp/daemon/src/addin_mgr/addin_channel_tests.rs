@@ -166,7 +166,7 @@ fn session_added_rejects_wrong_instance() {
 }
 
 #[test]
-fn heartbeat_marks_session_stale_after_second_miss() {
+fn heartbeat_marks_session_stale_after_third_miss() {
     let now = SystemTime::UNIX_EPOCH + Duration::from_secs(10);
     let mut server = AddinChannelServer::new();
     let mut registry = SessionRegistry::new();
@@ -195,6 +195,10 @@ fn heartbeat_marks_session_stale_after_second_miss() {
 
     let ping = server.start_ping("connection-1", now).expect("ping");
     assert_eq!(ping.method.as_deref(), Some("ping"));
+    assert_eq!(
+        server.record_heartbeat_timeout(&mut registry, "connection-1", now),
+        Ok(HeartbeatDecision::KeepOpen)
+    );
     assert_eq!(
         server.record_heartbeat_timeout(&mut registry, "connection-1", now),
         Ok(HeartbeatDecision::KeepOpen)
