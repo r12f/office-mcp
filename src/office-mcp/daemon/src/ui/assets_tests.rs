@@ -69,12 +69,18 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(!html.contains("<h1>Office MCP</h1>"));
     assert!(html.contains("aria-label=\"Copy MCP endpoint\""));
     assert!(html.contains("aria-label=\"Copy add-in endpoint\""));
+    assert!(html.contains("aria-label=\"Copy config path\""));
+    assert!(html.contains("aria-label=\"Copy log path\""));
+    assert!(html.contains("class=\"detail-copy\" data-copy=\"configPath\""));
+    assert!(html.contains("class=\"detail-copy\" data-copy=\"logPath\""));
     assert!(html.contains("name=\"session-filter\""));
     assert!(html.contains("Word, Excel, PowerPoint, session&hellip;"));
     assert!(!html.contains("session..."));
     assert!(html.contains("aria-live=\"polite\""));
     assert!(css.contains("grid-template-columns: 32px auto minmax(0, 1fr)"));
     assert!(css.contains(".product-mark { width: 32px; height: 32px;"));
+    assert!(css.contains(".detail-copy { display: block; width: 100%; min-height: 24px;"));
+    assert!(css.contains(".detail-copy code { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains("--powerpoint: #b7472a;"));
     assert!(css.contains(".row.powerpoint { border-left-color: var(--powerpoint); }"));
     assert!(css.contains("minmax(0, 1fr)"));
