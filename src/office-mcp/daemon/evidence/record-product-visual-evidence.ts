@@ -65,12 +65,15 @@ const quitConfirmationVisible = booleanFlag('--quit-confirmation-visible');
 const logoQualityReviewed = booleanFlag('--logo-quality-reviewed');
 const logoFutureOfficeControlReviewed = booleanFlag('--logo-future-office-control-reviewed');
 const finalLogoUserSurfaceReviewed = booleanFlag('--final-logo-user-surface-reviewed');
+const currentLogoScreenshotFeedbackReviewed = booleanFlag('--current-logo-screenshot-feedback-reviewed');
 const addinIdentityReviewed = booleanFlag('--addin-identity-reviewed');
 const addinTitleIconTypeReviewed = booleanFlag('--addin-title-icon-type-reviewed');
 const addinInstallableSurfaceReviewed = booleanFlag('--addin-installable-surface-reviewed');
+const currentAddinScreenshotFeedbackReviewed = booleanFlag('--current-addin-screenshot-feedback-reviewed');
 const trayProductPolishReviewed = booleanFlag('--tray-product-polish-reviewed');
 const trayNativeFirstImpressionReviewed = booleanFlag('--tray-native-first-impression-reviewed');
 const trayNormalWindowsLaunchReviewed = booleanFlag('--tray-normal-windows-launch-reviewed');
+const currentTrayScreenshotFeedbackReviewed = booleanFlag('--current-tray-screenshot-feedback-reviewed');
 const renderedSizeLogoReviewed = booleanFlag('--rendered-size-logo-reviewed');
 const wordFirstRunIdentityReviewed = booleanFlag('--word-first-run-identity-reviewed');
 const excelFirstRunIdentityReviewed = booleanFlag('--excel-first-run-identity-reviewed');
@@ -128,7 +131,8 @@ const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsM
 const powerPointServerProtocolReady = typeof powerPointServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(powerPointServerProtocolRow);
 const powerPointDocumentStateReady = typeof powerPointDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(powerPointDocumentState) && !/unknown/i.test(powerPointDocumentState);
 const powerPointTaskpaneDensityReady = powerPointCompactTopBlock && powerPointToolsPermissionsMerged && powerPointInlineSettings && powerPointServerProtocolReady && powerPointDocumentStateReady && powerPointRuntimeEvidenceReady;
-const productIdentityReviewReady = logoQualityReviewed && logoFutureOfficeControlReviewed && finalLogoUserSurfaceReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinTitleIconTypeReviewed && addinInstallableSurfaceReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNativeFirstImpressionReviewed && trayNormalWindowsLaunchReviewed;
+const currentScreenshotFeedbackReady = currentLogoScreenshotFeedbackReviewed && currentAddinScreenshotFeedbackReviewed && currentTrayScreenshotFeedbackReviewed;
+const productIdentityReviewReady = logoQualityReviewed && logoFutureOfficeControlReviewed && finalLogoUserSurfaceReviewed && currentLogoScreenshotFeedbackReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinTitleIconTypeReviewed && addinInstallableSurfaceReviewed && currentAddinScreenshotFeedbackReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNativeFirstImpressionReviewed && trayNormalWindowsLaunchReviewed && currentTrayScreenshotFeedbackReviewed;
 const passed = productTextReady && allScreenshotsExist && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
 const evidence = {
@@ -161,17 +165,21 @@ const evidence = {
     logo_quality_reviewed: logoQualityReviewed,
     logo_future_office_control_reviewed: logoFutureOfficeControlReviewed,
     final_logo_user_surface_reviewed: finalLogoUserSurfaceReviewed,
+    current_logo_screenshot_feedback_reviewed: currentLogoScreenshotFeedbackReviewed,
     rendered_size_logo_reviewed: renderedSizeLogoReviewed,
     rendered_logo_review_ready: renderedLogoReviewReady,
     addin_identity_reviewed: addinIdentityReviewed,
     addin_title_icon_type_reviewed: addinTitleIconTypeReviewed,
     addin_installable_surface_reviewed: addinInstallableSurfaceReviewed,
+    current_addin_screenshot_feedback_reviewed: currentAddinScreenshotFeedbackReviewed,
     word_first_run_identity_reviewed: wordFirstRunIdentityReviewed,
     excel_first_run_identity_reviewed: excelFirstRunIdentityReviewed,
     powerpoint_first_run_identity_reviewed: powerPointFirstRunIdentityReviewed,
     tray_product_polish_reviewed: trayProductPolishReviewed,
     tray_native_first_impression_reviewed: trayNativeFirstImpressionReviewed,
     tray_normal_windows_launch_reviewed: trayNormalWindowsLaunchReviewed,
+    current_tray_screenshot_feedback_reviewed: currentTrayScreenshotFeedbackReviewed,
+    current_screenshot_feedback_ready: currentScreenshotFeedbackReady,
     word_first_run_identity_ready: wordFirstRunIdentityReady,
     excel_first_run_identity_ready: excelFirstRunIdentityReady,
     powerpoint_first_run_identity_ready: powerPointFirstRunIdentityReady,

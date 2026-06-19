@@ -70,10 +70,14 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).logo_future_office_control_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).final_logo_user_surface_reviewed, true);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).current_logo_screenshot_feedback_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).addin_title_icon_type_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).addin_installable_surface_reviewed, true);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).current_addin_screenshot_feedback_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).tray_native_first_impression_reviewed, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).tray_normal_windows_launch_reviewed, true);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).current_tray_screenshot_feedback_reviewed, true);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).current_screenshot_feedback_ready, true);
     assert.equal((evidence.product_identity_review as Record<string, unknown>).ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.ready, true);
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).excel.ready, true);
@@ -140,16 +144,19 @@ test('README product visual evidence command matches current product visual gate
     '--logo-quality-reviewed',
     '--logo-future-office-control-reviewed',
     '--final-logo-user-surface-reviewed',
+    '--current-logo-screenshot-feedback-reviewed',
     '--rendered-size-logo-reviewed',
     '--addin-identity-reviewed',
     '--addin-title-icon-type-reviewed',
     '--addin-installable-surface-reviewed',
+    '--current-addin-screenshot-feedback-reviewed',
     '--word-first-run-identity-reviewed',
     '--excel-first-run-identity-reviewed',
     '--powerpoint-first-run-identity-reviewed',
     '--tray-product-polish-reviewed',
     '--tray-native-first-impression-reviewed',
     '--tray-normal-windows-launch-reviewed',
+    '--current-tray-screenshot-feedback-reviewed',
     '--word-compact-top-block',
     '--word-tools-permissions-merged',
     '--word-inline-settings',
@@ -311,6 +318,39 @@ test('product visual evidence recorder requires final user-surface polish review
     assert.equal(review.tray_product_polish_reviewed, true);
     assert.equal(review.tray_native_first_impression_reviewed, false);
     assert.equal(review.tray_normal_windows_launch_reviewed, false);
+    assert.equal(review.ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
+test('product visual evidence recorder requires current screenshot feedback reviews', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const output = join(dir, 'missing-current-screenshot-feedback-reviews.json');
+    const result = runRecorder(
+      output,
+      screenshots,
+      '--daemon-bin', daemonBin,
+      '--rendered-logo-review-path', renderedLogoReviewPath,
+      '--skip-product-review-flags',
+      '--logo-quality-reviewed', 'true',
+      '--logo-future-office-control-reviewed', 'true',
+      '--final-logo-user-surface-reviewed', 'true',
+      '--addin-identity-reviewed', 'true',
+      '--addin-title-icon-type-reviewed', 'true',
+      '--addin-installable-surface-reviewed', 'true',
+      '--tray-product-polish-reviewed', 'true',
+      '--tray-native-first-impression-reviewed', 'true',
+      '--tray-normal-windows-launch-reviewed', 'true'
+    );
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    const review = evidence.product_identity_review as Record<string, unknown>;
+    assert.equal(review.current_logo_screenshot_feedback_reviewed, false);
+    assert.equal(review.current_addin_screenshot_feedback_reviewed, false);
+    assert.equal(review.current_tray_screenshot_feedback_reviewed, false);
+    assert.equal(review.current_screenshot_feedback_ready, false);
     assert.equal(review.ready, false);
     assert.equal(evidence.passed, false);
   });
@@ -725,14 +765,18 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
       '--logo-quality-reviewed', 'true',
       '--logo-future-office-control-reviewed', 'true',
       '--final-logo-user-surface-reviewed', 'true',
+      '--current-logo-screenshot-feedback-reviewed', 'true',
       '--addin-identity-reviewed', 'true',
       '--addin-title-icon-type-reviewed', 'true',
       '--addin-installable-surface-reviewed', 'true',
+      '--current-addin-screenshot-feedback-reviewed', 'true',
       '--tray-product-polish-reviewed', 'true',
       '--tray-native-first-impression-reviewed', 'true',
-      '--tray-normal-windows-launch-reviewed', 'true'
+      '--tray-normal-windows-launch-reviewed', 'true',
+      '--current-tray-screenshot-feedback-reviewed', 'true'
     );
-  }  if (!skipRenderedLogoAndFirstRunFlags) {
+  }
+  if (!skipRenderedLogoAndFirstRunFlags) {
     args.push(
       '--rendered-size-logo-reviewed', 'true',
       '--word-first-run-identity-reviewed', 'true',
