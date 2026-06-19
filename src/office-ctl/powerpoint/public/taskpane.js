@@ -8,6 +8,7 @@
     clearEndpointOverride,
     clearRegisterRequest,
     configuredEndpoint,
+    createRequestId,
     currentOriginEndpoint,
     isPing,
     isRegisterResponse,
@@ -207,7 +208,7 @@
   function register() {
     reconnectAttempt = 0;
     setConnectionState('connecting', 'Registering\u2026');
-    const requestId = crypto.randomUUID();
+    const requestId = createRequestId();
     send(registerRequest(requestId, {
       instance_id: instanceId,
       host: {

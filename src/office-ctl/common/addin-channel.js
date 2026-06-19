@@ -47,12 +47,21 @@
     return parsed;
   }
 
+  function createRequestId(options = {}) {
+    const randomUUID = options.randomUUID || global.crypto?.randomUUID?.bind(global.crypto);
+    if (typeof randomUUID === 'function') return randomUUID();
+    const random = options.random || Math.random;
+    const bytes = Array.from({ length: 16 }, () => Math.floor(random() * 256) & 0xff);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
   function runtimeIds(options = {}) {
     const storage = options.storage || global.sessionStorage;
-    const randomUUID = options.randomUUID || global.crypto?.randomUUID?.bind(global.crypto);
-    if (!randomUUID) throw new Error('crypto.randomUUID is required.');
-    const instanceId = storage?.getItem(INSTANCE_STORAGE_KEY) || randomUUID();
-    const sessionId = storage?.getItem(SESSION_STORAGE_KEY) || randomUUID();
+    const instanceId = storage?.getItem(INSTANCE_STORAGE_KEY) || createRequestId(options);
+    const sessionId = storage?.getItem(SESSION_STORAGE_KEY) || createRequestId(options);
     storage?.setItem(INSTANCE_STORAGE_KEY, instanceId);
     storage?.setItem(SESSION_STORAGE_KEY, sessionId);
     return { instanceId, sessionId };
@@ -154,6 +163,7 @@
     clearEndpointOverride,
     clearRegisterRequest,
     configuredEndpoint,
+    createRequestId,
     currentOriginEndpoint,
     defaultEndpoint,
     isPing,

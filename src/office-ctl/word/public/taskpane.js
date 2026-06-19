@@ -1,5 +1,5 @@
 (() => {
-  const ADDIN_VERSION = '0.1.12';
+  const ADDIN_VERSION = '0.1.13';
   const PROTOCOL_VERSION = '1.0';
   const {
     boolLabel,
@@ -14,6 +14,7 @@
     clearEndpointOverride,
     clearRegisterRequest,
     configuredEndpoint,
+    createRequestId,
     currentOriginEndpoint,
     isPing,
     isRegisterResponse,
@@ -221,7 +222,7 @@
   function register() {
     reconnectAttempt = 0;
     setConnectionState('connecting', 'Registering…');
-    const requestId = crypto.randomUUID();
+    const requestId = createRequestId();
     send(registerRequest(requestId, {
       instance_id: instanceId,
       host: {
@@ -1419,7 +1420,7 @@
   }
 
   function reply(id, result) {
-    replyJsonRpc(socket, id, result);
+    return replyJsonRpc(socket, id, result);
   }
 
   function send(message) {

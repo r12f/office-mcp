@@ -23,6 +23,9 @@ function storage(initial = {}) {
 
 function loadChannel(options = {}) {
   const source = readFileSync(join(REPO_ROOT, 'src', 'office-ctl', 'common', 'addin-channel.js'), 'utf8');
+  const cryptoValue = options.crypto === undefined
+    ? { randomUUID: options.randomUUID || (() => 'generated-id') }
+    : options.crypto;
   const context = vm.createContext({
     Error,
     JSON,
@@ -30,7 +33,7 @@ function loadChannel(options = {}) {
     Object,
     String,
     URL,
-    crypto: { randomUUID: options.randomUUID || (() => 'generated-id') },
+    crypto: cryptoValue,
     globalThis: {},
     localStorage: options.localStorage || storage(),
     location: options.location || { origin: 'https://localhost:8765' },
@@ -78,6 +81,20 @@ test('common add-in channel persists runtime IDs and register request IDs', () =
   assert.equal(channel.isRegisterResponse({ id: 'other' }), false);
   channel.clearRegisterRequest();
   assert.equal(channel.isRegisterResponse({ id: 'register-1' }), false);
+});
+
+test('common add-in channel falls back when Office WebView lacks crypto.randomUUID', () => {
+  const sessionStorage = storage();
+  const channel = loadChannel({
+    crypto: {},
+    sessionStorage,
+    random: () => 0.5
+  });
+
+  const ids = channel.runtimeIds();
+  assert.match(ids.instanceId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.match(ids.sessionId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.match(channel.createRequestId({ random: () => 0.25 }), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });
 
 test('common add-in channel parses and sends JSON-RPC messages', () => {
