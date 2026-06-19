@@ -1492,6 +1492,7 @@
     settingsPanelEl.hidden = !opening;
     settingsToggleEl.setAttribute('aria-expanded', String(opening));
     settingsToggleEl.setAttribute('aria-label', opening ? 'Close Settings' : 'Open Settings');
+    settingsToggleEl.setAttribute('title', opening ? 'Close Settings' : 'Open Settings');
     toolListEl.classList.toggle('is-editing-tools', opening);
     if (opening) endpointInputEl.focus();
     else {

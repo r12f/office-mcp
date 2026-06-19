@@ -774,6 +774,7 @@
     toolListEl.classList.toggle('is-editing-tools', opening);
     settingsToggleEl.setAttribute('aria-expanded', String(opening));
     settingsToggleEl.setAttribute('aria-label', opening ? 'Close Settings' : 'Open Settings');
+    settingsToggleEl.setAttribute('title', opening ? 'Close Settings' : 'Open Settings');
     if (opening) endpointInputEl.focus();
     if (!opening) {
       endpointInputEl.value = configuredEndpoint();
@@ -795,6 +796,7 @@
       settingsPanelEl.hidden = true;
       settingsToggleEl.setAttribute('aria-expanded', 'false');
       settingsToggleEl.setAttribute('aria-label', 'Open Settings');
+      settingsToggleEl.setAttribute('title', 'Open Settings');
       connect();
     } catch (error) {
       endpointErrorEl.textContent = error.message || 'Enter a valid wss:// endpoint.';

@@ -60,7 +60,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
   assert.match(html, /placeholder="wss:\/\/localhost:8765\/addin…"/);
   assert.doesNotMatch(html, /placeholder="wss:\/\/localhost:8765\/addin"/);
-  assert.match(html, /aria-label="Open Settings"/);
+  assert.match(html, /aria-label="Open Settings" title="Open Settings"/);
   assert.match(html, /<svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">/);
   assert.match(html, /<circle cx="17" cy="12" r="2" \/>/);
   assert.doesNotMatch(html, /⚙|&#9881;/);
@@ -131,6 +131,8 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
   assert.match(js, /class="task-meta task-command-id"/);
   assert.match(js, /aria-label="Copy command ID"/);
+  assert.match(js, /settingsToggleEl\.setAttribute\('title', opening \? 'Close Settings' : 'Open Settings'\)/);
+  assert.match(js, /settingsToggleEl\.setAttribute\('title', 'Open Settings'\)/);
   assert.match(js, /middleTruncate\(task\.requestId\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);

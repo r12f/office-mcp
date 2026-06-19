@@ -351,7 +351,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.doesNotMatch(html, /id="enabledToolCount"/);
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
-  assert.match(html, /aria-label="Open Settings"/);
+  assert.match(html, /aria-label="Open Settings" title="Open Settings"/);
   assert.match(html, /<svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">/);
   assert.match(html, /<circle cx="17" cy="12" r="2" \/>/);
   assert.doesNotMatch(html, /⚙|&#9881;/);
@@ -410,6 +410,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /Partial effect:/);
   assert.match(js, /storeEndpointOverride\(value\)/);
   assert.match(js, /settingsToggleEl\.addEventListener\('click', handleSettingsClick\)/);
+  assert.match(js, /settingsToggleEl\.setAttribute\('title', opening \? 'Close Settings' : 'Open Settings'\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
   assert.match(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);

@@ -64,7 +64,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.doesNotMatch(html, /id="toolPermissionList"/);
   assert.doesNotMatch(html, /id="enabledToolCount"/);
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
-  assert.match(html, /aria-label="Open Settings"/);
+  assert.match(html, /aria-label="Open Settings" title="Open Settings"/);
   assert.match(html, /<svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">/);
   assert.match(html, /<circle cx="17" cy="12" r="2" \/>/);
   assert.doesNotMatch(html, /⚙|&#9881;/);
@@ -145,6 +145,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.doesNotMatch(js, /Reconnecting\.\.\./);
   assert.doesNotMatch(js, /Registering\.\.\./);
   assert.match(js, /settingsToggleEl\.setAttribute\('aria-label', opening \? 'Close Settings' : 'Open Settings'\)/);
+  assert.match(js, /settingsToggleEl\.setAttribute\('title', opening \? 'Close Settings' : 'Open Settings'\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
   assert.match(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
