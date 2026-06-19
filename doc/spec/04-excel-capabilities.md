@@ -24,14 +24,26 @@ Research basis:
   Excel add-in workflow as starting from a `Workbook`, moving to a `Worksheet`,
   then working with `Range` values, formulas, and formats before creating
   higher-level `Table` or `Chart` objects.
+- The core concepts page description frames the Excel JavaScript API around
+  reading, writing, and visualizing workbook data through workbooks,
+  worksheets, ranges, tables, and charts. That is the primary selection filter
+  for v1 tools.
 - The same documentation states that cells are represented as one-cell
   `Range` objects, so v1 must not add separate cell CRUD tools. Single-cell
   reads, writes, formulas, formatting, clearing, search, sorting, and filtering
   are all range operations.
-- Tables and charts are the most common promotion step after range work.
-  PivotTables are included in the core target because they are a high-value
-  analysis workflow, but the v1 contract is intentionally limited to normal
-  range/table sources and non-preview APIs.
+- Microsoft Learn's table guide focuses on creating, resizing, reading,
+  sorting, filtering, and formatting tables. v1 keeps table lifecycle and
+  table-specific style/options in `excel.update_table`, while generic table
+  data, sort, and filter operations stay with range/data tools.
+- Microsoft Learn's chart guide focuses on creating charts, adding series,
+  formatting titles and axes, and exporting chart images. v1 exposes chart
+  creation and one chart-owner update tool instead of separate axis, legend,
+  series, and export tools.
+- Microsoft Learn's PivotTable guide focuses on creating, configuring, and
+  filtering PivotTables. PivotTables are included because they are a high-value
+  analysis workflow, but v1 is limited to normal range/table sources and
+  non-preview APIs.
 
 The refined v1 target is 20 tools. That is the upper bound for the core Excel
 surface unless a future workflow proves that a distinct object owner or
@@ -43,6 +55,19 @@ slicers as first-class tools, events/subscriptions, custom XML, external data
 connections, Power Query, Python/preview-only APIs, OLAP/Power Pivot, arbitrary
 file import/export, workbook close, and save-as flows. These can be added later
 only when there is a clear user workflow and host support evidence.
+
+Core tool selection matrix:
+
+| User workflow | Object owner | v1 tools | Why this is enough |
+|---|---|---|---|
+| Inspect workbook state and navigate sheets | `Workbook` / `Worksheet` | `excel.get_workbook_info`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD and workbook orientation without reading cell contents. |
+| Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.clear_range`, `excel.find_replace_cells` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools. |
+| Work with formulas | `Range` formulas | `excel.set_formula` | Formula writes are distinct from literal value writes and can support scalar or matrix input. |
+| Apply user-visible cell formatting | `RangeFormat` | `excel.format_range` | Keeps font, fill, number format, borders, alignment, wrapping, and autofit under one cell-format owner. |
+| Sort and filter data | `RangeSort` / table filter owners | `excel.sort_range`, `excel.apply_filter` | One data-operation owner covers both plain ranges and table bodies; table tools must not duplicate it. |
+| Promote data into a structured table | `Table` | `excel.create_table`, `excel.update_table` | Creation is common enough to be direct; lifecycle, rows/columns, resize, rename, and table style/options share one object-owner update tool. |
+| Visualize data | `Chart` | `excel.create_chart`, `excel.update_chart` | Creation is direct; title, axes, legend, series, size, position, delete, and supported export share one chart-owner update tool. |
+| Analyze summarized data | `PivotTable` | `excel.create_pivot_table`, `excel.update_pivot_table` | Creation is direct; fields, filters, aggregation, refresh, metadata, and delete share one PivotTable-owner update tool. |
 
 Implemented Excel v1 tools:
 
@@ -80,8 +105,8 @@ Target core Excel tool surface:
 | `excel.write_range` | implemented | Range | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
 | `excel.clear_range` | implemented | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, or all range data; optional cell deletion with shift direction. Hyperlink-specific clear modes are deferred because they require `ExcelApi 1.7`. |
 | `excel.find_replace_cells` | implemented | Range | read/edit | `ExcelApi 1.9` | Search cell contents in a range and optionally replace matches. |
-| `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
-| `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1` | Apply font, fill, number format, borders, alignment, and autofit basics. |
+| `excel.set_formula` | implemented; extension planned | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula; target extension adds formula matrices. |
+| `excel.format_range` | implemented; extension planned | Format | edit | `ExcelApi 1.1` | Apply basic font, fill, and number format; target extension adds number-format matrices, borders, alignment, wrapping, and autofit. |
 | `excel.sort_range` | planned | Data | edit | verify during implementation | Sort a range or table body by one or more column keys; table structure changes belong to `excel.update_table`. |
 | `excel.apply_filter` | planned | Data | edit | verify during implementation | Apply or clear worksheet range or table filter criteria; PivotTable filters belong to `excel.update_pivot_table`. |
 | `excel.create_table` | implemented | Table | edit | `ExcelApi 1.1` | Create a workbook table from a range. |

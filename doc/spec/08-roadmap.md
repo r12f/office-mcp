@@ -1182,6 +1182,14 @@ tools by grouping common object lifecycle/configuration operations under
 own one distinct user intent; overlapping behavior must be removed or assigned
 to one owner before implementation.
 
+Selection criteria: prioritize the operations users actually ask Excel to do in
+an agent workflow: workbook and sheet inventory/lifecycle, range/cell value
+CRUD, formula authoring, formatting, sorting/filtering, table management, chart
+creation/customization, and PivotTable analysis. Do not add tools for every
+Office.js object, property, event, shape, comment, slicer, external connection,
+or preview feature unless a later user workflow proves that the 20-tool surface
+cannot express it safely.
+
 Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
 `excel.get_used_range`, `excel.read_range`, `excel.write_range`,
@@ -1196,11 +1204,22 @@ Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
       `excel.delete_sheet`, and `excel.get_used_range`, including daemon catalog
       entries, task pane handlers, and Rust/JS tests. Committed as
       `excel: add workbook and worksheet tools`.
+- [x] Record Excel tool-selection research in
+      [04-excel-capabilities.md](04-excel-capabilities.md), starting from the
+      Microsoft Learn Excel core object model and related range/table/chart/
+      PivotTable docs. The spec now explicitly maps workspace-level sheet CRUD,
+      sheet/range/cell CRUD, formula, format, sort/filter, table, chart, and
+      PivotTable workflows into 20 task-oriented APIs.
 - [ ] Verify each remaining planned tool's minimum ExcelApi requirement set
       against `src/office-ctl/excel/node_modules/@types/office-js/index.d.ts`
       and Microsoft API docs before implementation. Record the verified minimum
       requirement set in [04-excel-capabilities.md](04-excel-capabilities.md)
       instead of leaving `verify during implementation` in the final contract.
+- [ ] Keep the runtime Excel catalog capped at the refined 20-tool target unless
+      a future spec update identifies a distinct object owner, permission
+      profile, or user-visible workflow that cannot be represented by the
+      existing tools. Any proposed expansion must update the selection matrix
+      before implementation.
 - [x] Implement range cleanup/search slice: `excel.clear_range` and
       `excel.find_replace_cells`. Tests first: daemon catalog/preflight,
       task pane dispatch/handler tests, argument validation tests, and smoke
@@ -1216,7 +1235,8 @@ Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
       `excel.apply_filter`. These are the only owners for sorting/filtering both
       plain ranges and table bodies; `excel.update_table` must not duplicate
       this behavior. Tests first: plain range target, table target, clear filter,
-      multi-key sort, and metadata/permission categories.
+      multi-key sort, visible/filtered rows behavior where Office.js exposes it,
+      and metadata/permission categories.
 - [ ] Implement table object-owner slice: `excel.update_table` with explicit
       actions for metadata read, add rows, add columns, resize, rename, table
       style/options, and delete. Table cell contents stay owned by
