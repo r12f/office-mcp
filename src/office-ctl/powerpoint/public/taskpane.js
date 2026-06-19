@@ -694,11 +694,21 @@
 
   function taskMarkup(task) {
     const status = task.status ? titleCase(task.status) : 'Running';
+    const tone = task.status === 'success' ? 'status-success' : task.status === 'running' ? 'status-warning' : task.status === 'cancelled' ? 'status-neutral' : 'status-danger';
     const elapsed = typeof task.elapsedMs === 'number' ? formatDuration(task.elapsedMs) : 'in progress';
-    const error = task.error ? `<div class="task-error">${escapeHtml(task.error.message || 'Command failed.')}</div>` : '';
+    const error = task.error ? `<div class="task-meta">${escapeHtml(task.error.office_mcp_code)}: ${escapeHtml(task.error.message)} · Retriable: ${valueLabel(task.error.retriable)} · Partial effect: ${escapeHtml(task.error.partial_effect || 'unknown')}</div>` : '';
+    const intent = task.userIntent ? `<div class="task-meta">${escapeHtml(redactText(task.userIntent))}</div>` : '';
+    const deadline = task.deadlineAt ? `<div class="task-meta">Deadline ${escapeHtml(formatTime(task.deadlineAt))}</div>` : '';
+    const cancel = task.cancelRequested ? '<div class="task-meta">Cancel requested</div>' : '';
     const commandId = task.requestId ? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="${escapeHtml(task.requestId)}" aria-label="Copy command ID"><code>${escapeHtml(middleTruncate(task.requestId))}</code></button></div>` : '';
     const startedAt = task.startedAt ? `${escapeHtml(formatTime(task.startedAt))} / ` : '';
-    return `<article class="task-card"><div class="task-title"><span>${escapeHtml(task.tool)}</span><span>${escapeHtml(status)}</span></div>${commandId}<div class="task-meta">${startedAt}${escapeHtml(elapsed)}</div>${error}</article>`;
+    return `<article class="task-card"><div class="task-title"><span>${escapeHtml(task.tool)}</span><span class="status-badge ${tone}">${escapeHtml(status)}</span></div>${commandId}<div class="task-meta">${startedAt}${escapeHtml(elapsed)}</div>${deadline}${cancel}${intent}${error}</article>`;
+  }
+
+  function valueLabel(value) {
+    if (value === true) return 'yes';
+    if (value === false) return 'no';
+    return 'unknown';
   }
 
   function scheduleReconnect() {
