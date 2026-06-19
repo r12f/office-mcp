@@ -17,12 +17,13 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"excel.read_range"));
     assert!(names.contains(&"excel.sort_range"));
     assert!(names.contains(&"excel.apply_filter"));
+    assert!(names.contains(&"excel.update_table"));
     assert!(names.contains(&"powerpoint.add_slide"));
     assert!(names.contains(&"powerpoint.replace_text"));
     assert_eq!(WORD_V1_TOOLS.len(), 27);
-    assert_eq!(ExcelToolCatalog::tools().len(), 16);
+    assert_eq!(ExcelToolCatalog::tools().len(), 17);
     assert_eq!(PowerPointToolCatalog::tools().len(), 5);
-    assert_eq!(tools.len(), 50);
+    assert_eq!(tools.len(), 51);
 }
 
 #[test]
@@ -36,6 +37,7 @@ fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.find_replace_cells"));
     assert!(ExcelToolCatalog::contains("excel.sort_range"));
     assert!(ExcelToolCatalog::contains("excel.apply_filter"));
+    assert!(ExcelToolCatalog::contains("excel.update_table"));
     assert!(ExcelToolCatalog::contains("excel.write_range"));
     assert!(!ExcelToolCatalog::contains("excel.unsupported"));
 }

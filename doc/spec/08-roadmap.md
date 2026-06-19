@@ -1268,11 +1268,15 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       capability-gates range/table sort behind `ExcelApi 1.2`, range AutoFilter
       behind `ExcelApi 1.9`, and passed Excel task pane plus targeted daemon
       catalog/list-tools tests.
-- [ ] Implement table object-owner slice: `excel.update_table` with explicit
+- [x] Implement table object-owner slice: `excel.update_table` with explicit
       actions for metadata read, add rows, add columns, resize, rename, table
       style/options, and delete. Table cell contents stay owned by
       `excel.read_range`; generic sort/filter stays owned by data tools; generic
-      cell formatting stays owned by `excel.format_range`.
+      cell formatting stays owned by `excel.format_range`. Current
+      implementation adds daemon catalog/list-tools coverage, Excel task pane
+      metadata/permission grouping, dispatch coverage, Office.js table rows,
+      columns, resize, rename, style/options, delete actions, and gates visual
+      table options behind `ExcelApi 1.3` and resize behind `ExcelApi 1.13`.
 - [ ] Implement chart object-owner slice: `excel.update_chart` with explicit
       actions for metadata read, title, axes, legend, series source, position,
       size, delete, and image export where the host supports it. Unsupported

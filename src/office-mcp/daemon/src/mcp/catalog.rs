@@ -74,6 +74,9 @@ const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
         name: "excel.sort_range",
     },
     ExcelToolDefinition {
+        name: "excel.update_table",
+    },
+    ExcelToolDefinition {
         name: "excel.update_sheet",
     },
     ExcelToolDefinition {

@@ -152,7 +152,7 @@ Target core Excel tool surface:
 | `excel.sort_range` | implemented | Data | edit | `ExcelApi 1.2` | Sort a range or table body by one or more column keys; table structure changes belong to `excel.update_table`. |
 | `excel.apply_filter` | implemented | Data | edit | Range filters require `ExcelApi 1.9`; table column filters require `ExcelApi 1.2` | Apply, clear, remove, or reapply worksheet range or table filter criteria; PivotTable filters belong to `excel.update_pivot_table`. |
 | `excel.create_table` | implemented | Table | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
-| `excel.update_table` | planned | Table | read/edit/destructive | `ExcelApi 1.1` | Read table metadata/structure; add rows/columns; resize, rename, change table style/options, or delete a table. Table cell contents belong to `excel.read_range`. |
+| `excel.update_table` | implemented | Table | read/edit/destructive | `ExcelApi 1.1`; visual options require `ExcelApi 1.3`; resize requires `ExcelApi 1.13` | Read table metadata/structure; add rows/columns; resize, rename, change table style/options, or delete a table. Table cell contents belong to `excel.read_range`. |
 | `excel.create_chart` | implemented | Chart | edit | `ExcelApi 1.1` | Create a chart from a range or table. |
 | `excel.update_chart` | planned | Chart | edit/read/destructive | verify during implementation | Update chart title, axes, legend, series, position, size, delete the chart, or export a chart image where supported. |
 | `excel.create_pivot_table` | planned | PivotTable | edit | verify during implementation | Create a PivotTable from a range or table at a target destination. |

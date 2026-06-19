@@ -96,9 +96,11 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(css, /forced-colors: active/);
   assert.match(js, /const TOOL_GROUPS = \[/);
   assert.match(js, /\{ label: 'Data', tools: \['excel\.sort_range', 'excel\.apply_filter'\] \}/);
+  assert.match(js, /\{ label: 'Table', tools: \['excel\.create_table', 'excel\.update_table'\] \}/);
   assert.match(js, /const TOOL_METADATA = new Map\(\[/);
   assert.match(js, /\['excel\.sort_range', \{ category: 'Data', sideEffect: 'mutating'/);
   assert.match(js, /\['excel\.apply_filter', \{ category: 'Data', sideEffect: 'mutating'/);
+  assert.match(js, /\['excel\.update_table', \{ category: 'Table', sideEffect: 'destructive'/);
   assert.match(js, /TOOL_PERMISSION_STORAGE_KEY/);
   assert.match(js, /const toolListEl = document\.getElementById\('toolList'\)/);
   assert.match(js, /function renderToolSummary\(\)/);
@@ -186,6 +188,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /excel\.find_replace_cells/);
   assert.match(js, /excel\.sort_range/);
   assert.match(js, /excel\.apply_filter/);
+  assert.match(js, /excel\.update_table/);
   assert.match(js, /case 'excel.get_workbook_info':/);
   assert.match(js, /case 'excel.list_sheets':/);
   assert.match(js, /case 'excel.update_sheet':/);
@@ -195,6 +198,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /case 'excel.find_replace_cells':/);
   assert.match(js, /case 'excel.sort_range':/);
   assert.match(js, /case 'excel.apply_filter':/);
+  assert.match(js, /case 'excel.update_table':/);
   assert.match(js, /async function getWorkbookInfoTool/);
   assert.match(js, /async function listSheets/);
   assert.match(js, /async function updateSheet/);
@@ -204,6 +208,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /async function findReplaceCells/);
   assert.match(js, /async function sortRange/);
   assert.match(js, /async function applyFilter/);
+  assert.match(js, /async function updateTable/);
   assert.match(js, /const applyTo = clearApplyToFrom/);
   assert.match(js, /range\.clear\(applyTo\)/);
   assert.match(js, /range\.delete\(deleteShiftDirectionFrom\(deleteShift\)\)/);
@@ -213,6 +218,21 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.2', 'range sorting'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.9', 'range filtering'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.2', 'table filtering'\)/);
+  assert.match(js, /requireRequirementSet\('ExcelApi', '1\.13', 'table resize'\)/);
+  assert.match(js, /requireRequirementSet\('ExcelApi', '1\.3', 'table visual options'\)/);
+  assert.match(js, /table\.rows\.add\(optionalIndex\(args\.index\), tableValuesFrom\(args\.values, 'rows'\), args\.always_insert !== false\)/);
+  assert.match(js, /table\.columns\.add\(optionalIndex\(args\.index\), tableValuesFrom\(args\.values, 'columns'\), optionalName\(args\.name\)\)/);
+  assert.match(js, /table\.resize\(requiredString\(args, 'address', 'excel\.update_table resize requires address\.'\)\)/);
+  assert.match(js, /table\.name = requiredString\(args, 'name', 'excel\.update_table rename requires name\.'\)/);
+  assert.match(js, /applyTableOptions\(table, args\)/);
+  assert.match(js, /table\.delete\(\)/);
+  assert.match(js, /function tableMetadata\(table, range, bodyRange, headerRange, totalRange\)/);
+  assert.match(js, /const headerRange = table\.showHeaders \? table\.getHeaderRowRange\(\) : null/);
+  assert.match(js, /const totalRange = table\.showTotals \? table\.getTotalRowRange\(\) : null/);
+  assert.match(js, /function applyTableOptions\(table, args\)/);
+  assert.match(js, /function tableValuesFrom\(values, label\)/);
+  assert.match(js, /function optionalIndex\(value\)/);
+  assert.match(js, /function optionalName\(value\)/);
   assert.match(js, /targetSortObject\(context, args\)/);
   assert.match(js, /sort\.apply\(sortFieldsFrom\(args\.fields\), Boolean\(args\.match_case\), args\.has_headers !== false/);
   assert.match(js, /table\.sort\.apply\(sortFieldsFrom\(args\.fields\), Boolean\(args\.match_case\), sortMethodFrom\(args\.method\)\)/);

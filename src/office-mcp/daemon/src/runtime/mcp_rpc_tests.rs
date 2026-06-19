@@ -41,6 +41,7 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
             "excel.set_formula",
             "excel.sort_range",
             "excel.update_sheet",
+            "excel.update_table",
             "excel.write_range",
             "office.get_session_info",
             "office.list_sessions",

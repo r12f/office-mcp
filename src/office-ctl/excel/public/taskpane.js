@@ -50,6 +50,7 @@
     'excel.sort_range',
     'excel.apply_filter',
     'excel.create_table',
+    'excel.update_table',
     'excel.create_chart'
   ];
   const TOOL_GROUPS = [
@@ -59,7 +60,7 @@
     { label: 'Formula', tools: ['excel.set_formula'] },
     { label: 'Format', tools: ['excel.format_range'] },
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
-    { label: 'Table', tools: ['excel.create_table'] },
+    { label: 'Table', tools: ['excel.create_table', 'excel.update_table'] },
     { label: 'Chart', tools: ['excel.create_chart'] }
   ];
   const TOOL_METADATA = new Map([
@@ -78,6 +79,7 @@
     ['excel.sort_range', { category: 'Data', sideEffect: 'mutating', description: 'Sort a range or table by one or more keys.' }],
     ['excel.apply_filter', { category: 'Data', sideEffect: 'mutating', description: 'Apply, clear, remove, or reapply range and table filters.' }],
     ['excel.create_table', { category: 'Table', sideEffect: 'mutating', description: 'Create a table from a range.' }],
+    ['excel.update_table', { category: 'Table', sideEffect: 'destructive', description: 'Read or update table structure, style, options, and lifecycle.' }],
     ['excel.create_chart', { category: 'Chart', sideEffect: 'mutating', description: 'Create a chart from a range.' }]
   ]);
   const { instanceId, sessionId } = runtimeIds();
@@ -340,6 +342,9 @@
           break;
         case 'excel.create_table':
           data = await createTable(args);
+          break;
+        case 'excel.update_table':
+          data = await updateTable(args);
           break;
         case 'excel.create_chart':
           data = await createChart(args);
@@ -688,6 +693,49 @@
     });
   }
 
+  async function updateTable(args) {
+    const action = String(args.action || 'metadata').trim().toLowerCase();
+    return Excel.run(async (context) => {
+      const table = targetTable(context, args);
+      if (action === 'metadata' || action === 'read') {
+        return readTableMetadata(context, table);
+      }
+      if (action === 'add_rows') {
+        table.rows.add(optionalIndex(args.index), tableValuesFrom(args.values, 'rows'), args.always_insert !== false);
+        await context.sync();
+        return { table: args.table, action, added_rows: Array.isArray(args.values) ? args.values.length : 1 };
+      }
+      if (action === 'add_columns') {
+        table.columns.add(optionalIndex(args.index), tableValuesFrom(args.values, 'columns'), optionalName(args.name));
+        await context.sync();
+        return { table: args.table, action, added_columns: 1 };
+      }
+      if (action === 'resize') {
+        requireRequirementSet('ExcelApi', '1.13', 'table resize');
+        table.resize(requiredString(args, 'address', 'excel.update_table resize requires address.'));
+        await context.sync();
+        return { table: args.table, action, resized: true, address: args.address };
+      }
+      if (action === 'rename') {
+        table.name = requiredString(args, 'name', 'excel.update_table rename requires name.');
+        table.load('id,name');
+        await context.sync();
+        return { table: table.name, action, renamed: true, id: table.id || null };
+      }
+      if (action === 'options' || action === 'style') {
+        applyTableOptions(table, args);
+        await context.sync();
+        return { table: args.table, action, updated: true };
+      }
+      if (action === 'delete') {
+        table.delete();
+        await context.sync();
+        return { table: args.table, action, deleted: true };
+      }
+      throw Object.assign(new Error(`Unsupported table action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    });
+  }
+
   async function createChart(args) {
     const typeName = String(args.type || 'columnClustered');
     const type = chartTypeFrom(typeName);
@@ -720,6 +768,89 @@
     if (targetType === 'table') return { table: targetTable(context, args) };
     if (targetType === 'range') return { range: targetRange(context, args) };
     throw Object.assign(new Error(`Unsupported sort target ${args.target_type}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  async function readTableMetadata(context, table) {
+    table.load('id,name,showHeaders,showTotals,style');
+    table.rows.load('count');
+    table.columns.load('count');
+    await context.sync();
+    const range = table.getRange();
+    const bodyRange = table.getDataBodyRange();
+    const headerRange = table.showHeaders ? table.getHeaderRowRange() : null;
+    const totalRange = table.showTotals ? table.getTotalRowRange() : null;
+    range.load('address,rowCount,columnCount');
+    bodyRange.load('address,rowCount,columnCount');
+    if (headerRange) headerRange.load('address,rowCount,columnCount');
+    if (totalRange) totalRange.load('address,rowCount,columnCount');
+    await context.sync();
+    return tableMetadata(table, range, bodyRange, headerRange, totalRange);
+  }
+
+  function tableMetadata(table, range, bodyRange, headerRange, totalRange) {
+    return {
+      table: table.name,
+      id: table.id || null,
+      show_headers: Boolean(table.showHeaders),
+      show_totals: Boolean(table.showTotals),
+      style: table.style || null,
+      row_count: table.rows.count,
+      column_count: table.columns.count,
+      range: rangeInfo(range),
+      data_body_range: rangeInfo(bodyRange),
+      header_row_range: rangeInfo(headerRange),
+      total_row_range: rangeInfo(totalRange)
+    };
+  }
+
+  function rangeInfo(range) {
+    return {
+      address: range.address || null,
+      row_count: Number.isInteger(range.rowCount) ? range.rowCount : null,
+      column_count: Number.isInteger(range.columnCount) ? range.columnCount : null
+    };
+  }
+
+  function applyTableOptions(table, args) {
+    if (args.style !== undefined) table.style = String(args.style);
+    if (args.show_headers !== undefined) table.showHeaders = Boolean(args.show_headers);
+    if (args.show_totals !== undefined) table.showTotals = Boolean(args.show_totals);
+    const visualOptionKeys = [
+      'highlight_first_column',
+      'highlight_last_column',
+      'show_banded_columns',
+      'show_banded_rows',
+      'show_filter_button'
+    ];
+    if (visualOptionKeys.some((key) => args[key] !== undefined)) {
+      requireRequirementSet('ExcelApi', '1.3', 'table visual options');
+    }
+    if (args.highlight_first_column !== undefined) table.highlightFirstColumn = Boolean(args.highlight_first_column);
+    if (args.highlight_last_column !== undefined) table.highlightLastColumn = Boolean(args.highlight_last_column);
+    if (args.show_banded_columns !== undefined) table.showBandedColumns = Boolean(args.show_banded_columns);
+    if (args.show_banded_rows !== undefined) table.showBandedRows = Boolean(args.show_banded_rows);
+    if (args.show_filter_button !== undefined) table.showFilterButton = Boolean(args.show_filter_button);
+  }
+
+  function tableValuesFrom(values, label) {
+    if (values === undefined || values === null) return undefined;
+    if (!Array.isArray(values) || !Array.isArray(values[0])) {
+      throw Object.assign(new Error(`Table ${label} values must be a two-dimensional array.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return values;
+  }
+
+  function optionalIndex(value) {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (!Number.isInteger(Number(value))) {
+      throw Object.assign(new Error('Table index must be an integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return Number(value);
+  }
+
+  function optionalName(value) {
+    const name = optionalTrimmedString(value);
+    return name || undefined;
   }
 
   function sheetInfo(sheet, active) {
@@ -1071,8 +1202,10 @@
     return {
       excel_api_1_1: requirements.isSetSupported('ExcelApi', '1.1'),
       excel_api_1_2: requirements.isSetSupported('ExcelApi', '1.2'),
+      excel_api_1_3: requirements.isSetSupported('ExcelApi', '1.3'),
       excel_api_1_4: requirements.isSetSupported('ExcelApi', '1.4'),
-      excel_api_1_9: requirements.isSetSupported('ExcelApi', '1.9')
+      excel_api_1_9: requirements.isSetSupported('ExcelApi', '1.9'),
+      excel_api_1_13: requirements.isSetSupported('ExcelApi', '1.13')
     };
   }
 
