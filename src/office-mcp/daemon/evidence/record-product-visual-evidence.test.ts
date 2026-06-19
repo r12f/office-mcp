@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -8,6 +9,8 @@ import { tinyPng } from './image-evidence.js';
 
 const TSX = './node_modules/tsx/dist/cli.mjs';
 const RECORDER = resolve(process.cwd(), 'record-product-visual-evidence.ts');
+const REPO_ROOT = resolve(process.cwd(), '../../../..');
+const ASSET_ROOT = resolve(REPO_ROOT, 'src/office-ctl/common/assets');
 const LOGO_SURFACES = [
   'logo-tray-size',
   'logo-ribbon-size',
@@ -377,6 +380,25 @@ test('product visual evidence recorder requires rendered logo concept pass', () 
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8'));
     assert.equal(evidence.rendered_logo_review_ready, false);
+  });
+});
+
+test('product visual evidence recorder requires rendered logo asset fingerprints to match current assets', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const review = JSON.parse(readFileSync(renderedLogoReviewPath, 'utf8')) as Record<string, unknown>;
+    review.source_asset_sha256 = '0'.repeat(64);
+    const surfaces = review.surfaces as Array<Record<string, unknown>>;
+    surfaces[0].asset_sha256 = '0'.repeat(64);
+    writeFileSync(renderedLogoReviewPath, JSON.stringify(review, null, 2));
+    const output = join(dir, 'stale-rendered-logo-review.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.rendered_logo_review_ready, false);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).rendered_logo_review_ready, false);
+    assert.equal(evidence.passed, false);
   });
 });
 
@@ -754,13 +776,15 @@ function writeRenderedLogoReview(dir: string, ready = true): string {
   writeFileSync(sheetPath, tinyPng());
   const path = join(dir, 'rendered-logo-review.json');
   const surfaces = [
-    ['logo_tray_size', 16],
-    ['logo_ribbon_size', 32],
-    ['logo_catalog_thumbnail', 80],
-    ['logo_daemon_titlebar', 20],
-    ['logo_installer_metadata', 256]
-  ].map(([key, size]) => ({
+    ['logo_tray_size', 16, 'icon-16.png'],
+    ['logo_ribbon_size', 32, 'icon-32.png'],
+    ['logo_catalog_thumbnail', 80, 'icon-80.png'],
+    ['logo_daemon_titlebar', 20, 'icon-20.png'],
+    ['logo_installer_metadata', 256, 'icon-256.png']
+  ].map(([key, size, asset]) => ({
     key,
+    asset_path: resolve(ASSET_ROOT, String(asset)),
+    asset_sha256: ready ? sha256File(resolve(ASSET_ROOT, String(asset))) : '0'.repeat(64),
     rendered_size_px: ready ? size : 1,
     width: ready ? size : 1,
     height: ready ? size : 1,
@@ -773,6 +797,8 @@ function writeRenderedLogoReview(dir: string, ready = true): string {
     schema_version: 1,
     kind: 'rendered_logo_review',
     product_name: 'Office MCP Control',
+    source_asset_path: resolve(ASSET_ROOT, 'brand-mark.svg'),
+    source_asset_sha256: ready ? sha256File(resolve(ASSET_ROOT, 'brand-mark.svg')) : '0'.repeat(64),
     sheet_path: sheetPath,
     design_review: renderedLogoDesignReview(ready),
     surfaces,
@@ -792,6 +818,10 @@ function renderedLogoDesignReview(ready: boolean) {
     rejects_generic_readings: ready ? ['settings', 'file', 'debug console', 'ai-only', 'microsoft office clone'] : [],
     ready
   };
+}
+
+function sha256File(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
 function renderedLogoConceptPass(ready: boolean) {

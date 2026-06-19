@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { inflateSync } from 'node:zlib';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -142,6 +143,8 @@ test('rendered-size logo review artifact covers first-contact product surfaces',
     assert.equal(report.kind, 'rendered_logo_review');
     assert.equal(report.product_name, PRODUCT_NAME);
     assert.equal(report.ready, true);
+    assert.equal(report.source_asset_path, join(ASSET_ROOT, 'brand-mark.svg'));
+    assert.equal(report.source_asset_sha256, sha256(readFileSync(join(ASSET_ROOT, 'brand-mark.svg'))));
     assert.equal(report.sheet_path, sheet);
     assert.equal(report.design_review.ready, true);
     assert.equal(report.design_review.concept_pass.ready, true);
@@ -189,6 +192,7 @@ test('rendered-size logo review artifact covers first-contact product surfaces',
       assert.equal(surface.non_empty, true);
       assert.equal(surface.palette_ready, true);
       assert.equal(surface.expected_size_ready, true);
+      assert.equal(surface.asset_sha256, sha256(readFileSync(surface.asset_path)));
       assert.ok(surface.opaque_color_count >= 4, `${key} keeps product palette at rendered size`);
       assert.equal(surface.screenshot_path, sheet);
     }
@@ -196,6 +200,10 @@ test('rendered-size logo review artifact covers first-contact product surfaces',
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+function sha256(buffer) {
+  return createHash('sha256').update(buffer).digest('hex');
+}
 
 function parsePngRgba(png) {
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);

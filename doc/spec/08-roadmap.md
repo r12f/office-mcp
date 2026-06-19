@@ -661,9 +661,13 @@ Current reported issues to carry as TODO requirements:
       review screenshots with the product visual evidence artifact. Automated
       support now exists: `record-rendered-logo-review.mjs` renders a repeatable
       contact-sheet screenshot and JSON report from the generated icon assets,
+      records SHA-256 fingerprints for the source SVG and each rendered icon,
       and product identity tests verify the required rendered sizes, non-empty
-      output, and multi-color product palette. This item remains open until that
-      rendered review is included in the final product visual evidence artifact.
+      output, multi-color product palette, and current-asset fingerprints. The
+      product visual evidence recorder and final validator reject rendered logo
+      reviews that do not match the current `brand-mark.svg` and generated icon
+      files. This item remains open until that rendered review is included in
+      the final product visual evidence artifact from the release run.
 - [x] Update Word and Excel add-in manifests/catalog rendering so release and
       sideloaded builds use mature product metadata: stable add-in title,
       provider, description, support URL, ribbon group label, action label, and

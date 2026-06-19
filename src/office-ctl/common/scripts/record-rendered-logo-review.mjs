@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
@@ -7,6 +8,7 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const COMMON_ROOT = dirname(SCRIPT_DIR);
 const REPO_ROOT = resolve(COMMON_ROOT, '..', '..', '..');
 const ASSET_ROOT = join(COMMON_ROOT, 'assets');
+const SOURCE_ASSET_PATH = join(ASSET_ROOT, 'brand-mark.svg');
 const outputPath = resolve(readOption('--output') ?? join(REPO_ROOT, 'artifacts/logo-rendered-size-review.json'));
 const sheetPath = resolve(readOption('--sheet') ?? join(REPO_ROOT, 'artifacts/logo-rendered-size-review.png'));
 
@@ -34,6 +36,7 @@ SURFACES.forEach((surface, index) => {
     key: surface.key,
     label: surface.label,
     asset_path: iconPath,
+    asset_sha256: sha256(readFileSync(iconPath)),
     rendered_size_px: surface.size,
     width: icon.width,
     height: icon.height,
@@ -87,6 +90,8 @@ const report = {
   kind: 'rendered_logo_review',
   recorded_at: new Date().toISOString(),
   product_name: 'Office MCP Control',
+  source_asset_path: SOURCE_ASSET_PATH,
+  source_asset_sha256: sha256(readFileSync(SOURCE_ASSET_PATH)),
   sheet_path: sheetPath,
   design_review: designReview,
   surfaces: surfaceReports,
@@ -261,4 +266,8 @@ function readOption(name) {
   const index = process.argv.indexOf(name);
   if (index === -1) return undefined;
   return process.argv[index + 1];
+}
+
+function sha256(buffer) {
+  return createHash('sha256').update(buffer).digest('hex');
 }

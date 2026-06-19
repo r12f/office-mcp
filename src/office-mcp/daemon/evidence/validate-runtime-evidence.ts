@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +23,7 @@ type EvidenceReport = {
 
 const evidenceRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(evidenceRoot, '../../../..');
+const brandAssetRoot = join(repoRoot, 'src/office-ctl/common/assets');
 const evidencePath = resolve(readOption('--input') ?? join(repoRoot, 'artifacts/runtime-evidence.json'));
 const validateUi = hasFlag('--ui');
 const requireManualTray = hasFlag('--require-manual-tray');
@@ -411,6 +413,7 @@ function validateRenderedLogoReview(review: unknown, ready: unknown): void {
   if (typeof review.sheet_path !== 'string' || !screenshotFileLooksLikeImage(resolve(review.sheet_path))) {
     failures.push('Rendered logo review contact sheet is missing or invalid.');
   }
+  validateRenderedLogoAssetFingerprints(review);
   const surfaces = Array.isArray(review.surfaces) ? review.surfaces.filter(isRecord) : [];
   for (const [key, size] of renderedLogoReviewSurfaces()) {
     const surface = surfaces.find((item) => item.key === key);
@@ -424,6 +427,39 @@ function validateRenderedLogoReview(review: unknown, ready: unknown): void {
     if (surface.non_empty !== true) failures.push(`Rendered logo review surface ${key} is empty.`);
     if (surface.palette_ready !== true) failures.push(`Rendered logo review surface ${key} is missing product palette.`);
     if (surface.expected_size_ready !== true) failures.push(`Rendered logo review surface ${key} is not expected-size ready.`);
+  }
+}
+
+function validateRenderedLogoAssetFingerprints(review: Record<string, unknown>): void {
+  if (typeof review.source_asset_sha256 !== 'string') {
+    failures.push('Rendered logo review missing source asset SHA-256 fingerprint.');
+  } else if (review.source_asset_sha256 !== sha256File(join(brandAssetRoot, 'brand-mark.svg'))) {
+    failures.push('Rendered logo review source asset fingerprint does not match current brand-mark.svg.');
+  }
+  const surfaces = Array.isArray(review.surfaces) ? review.surfaces.filter(isRecord) : [];
+  for (const [key] of renderedLogoReviewSurfaces()) {
+    const surface = surfaces.find((item) => item.key === key);
+    if (!surface) continue;
+    if (typeof surface.asset_sha256 !== 'string') {
+      failures.push(`Rendered logo review missing asset SHA-256 fingerprint: ${key}.`);
+      continue;
+    }
+    const assetName = typeof surface.asset_path === 'string' ? surface.asset_path.split(/[\\/]/).pop() : undefined;
+    if (!assetName || !/^icon-\d+\.png$/.test(assetName)) {
+      failures.push(`Rendered logo review missing generated icon asset path: ${key}.`);
+      continue;
+    }
+    if (surface.asset_sha256 !== sha256File(join(brandAssetRoot, assetName))) {
+      failures.push(`Rendered logo review asset fingerprint does not match current generated icon: ${key}.`);
+    }
+  }
+}
+
+function sha256File(path: string): string | undefined {
+  try {
+    return createHash('sha256').update(readFileSync(path)).digest('hex');
+  } catch (_error) {
+    return undefined;
   }
 }
 

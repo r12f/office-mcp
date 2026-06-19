@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +7,7 @@ import { screenshotFileLooksLikeImage } from './image-evidence.js';
 
 const evidenceRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(evidenceRoot, '../../../..');
+const brandAssetRoot = join(repoRoot, 'src/office-ctl/common/assets');
 const outputPath = resolve(readOption('--output') ?? join(repoRoot, 'artifacts/product-visual-evidence.json'));
 const tester = readOption('--tester') ?? process.env.USERNAME ?? process.env.USER ?? 'unknown';
 const notes = readOption('--notes');
@@ -355,9 +357,30 @@ function renderedLogoReviewLooksReady(review: Record<string, unknown> | undefine
   if (!review) return false;
   if (review.ok !== true || review.schema_version !== 1 || review.kind !== 'rendered_logo_review' || review.product_name !== productName || review.ready !== true) return false;
   if (!renderedLogoDesignReviewLooksReady(review.design_review)) return false;
+  if (!renderedLogoAssetFingerprintsLookCurrent(review)) return false;
   if (typeof review.sheet_path !== 'string' || !screenshotFileLooksLikeImage(resolve(review.sheet_path))) return false;
   const surfaces = Array.isArray(review.surfaces) ? review.surfaces.filter(isRecord) : [];
   return renderedLogoSurfaceSpecs().every(([key, size]) => surfaces.some((surface) => surface.key === key && surface.rendered_size_px === size && surface.width === size && surface.height === size && surface.non_empty === true && surface.palette_ready === true && surface.expected_size_ready === true));
+}
+
+function renderedLogoAssetFingerprintsLookCurrent(review: Record<string, unknown>): boolean {
+  if (typeof review.source_asset_sha256 !== 'string' || review.source_asset_sha256 !== sha256File(join(brandAssetRoot, 'brand-mark.svg'))) return false;
+  const surfaces = Array.isArray(review.surfaces) ? review.surfaces.filter(isRecord) : [];
+  return renderedLogoSurfaceSpecs().every(([key]) => {
+    const surface = surfaces.find((item) => item.key === key);
+    if (!surface || typeof surface.asset_sha256 !== 'string') return false;
+    const assetName = typeof surface.asset_path === 'string' ? surface.asset_path.split(/[\\/]/).pop() : undefined;
+    if (!assetName || !/^icon-\d+\.png$/.test(assetName)) return false;
+    return surface.asset_sha256 === sha256File(join(brandAssetRoot, assetName));
+  });
+}
+
+function sha256File(path: string): string | undefined {
+  try {
+    return createHash('sha256').update(readFileSync(path)).digest('hex');
+  } catch (_error) {
+    return undefined;
+  }
 }
 
 function renderedLogoDesignReviewLooksReady(review: unknown): boolean {
