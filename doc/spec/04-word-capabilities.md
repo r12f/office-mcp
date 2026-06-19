@@ -47,7 +47,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current implemented Word v1 tool surface has 27 tools, grouped by category.
+The current implemented Word v1 tool surface has 32 tools, grouped by category.
 The per-tool JSON Schemas follow in §2-§8.
 
 | Category | Tools |
@@ -55,7 +55,8 @@ The per-tool JSON Schemas follow in §2-§8.
 | **Read** | `word.get_text`, `word.get_outline`, `word.get_paragraph`, `word.find_text`, `word.get_selection` |
 | **Insert** | `word.insert_paragraph`, `word.insert_heading`, `word.insert_table`, `word.insert_image`, `word.insert_page_break`, `word.insert_list` |
 | **Edit** | `word.replace_text`, `word.update_paragraph`, `word.delete_range`, `word.apply_formatting` |
-| **Tables** | `word.read_table`, `word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell` |
+| **Tables** | `word.read_table`, `word.update_table`, `word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell` |
+| **Content Controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Structure** | `word.set_heading_level`, `word.apply_style` |
 | **Review** | `word.add_comment`, `word.resolve_comment`, `word.accept_change`, `word.reject_change` |
 | **Document** | `word.save` |
@@ -92,10 +93,10 @@ compatibility tools remain documented below until the migration TODO in
 | `word.apply_style` | implemented | Structure | edit | `WordApi 1.3` | Apply an Office style to an anchored range; also owns heading-level changes after migration. |
 | `word.read_table` | implemented | Table | read | `WordApi 1.3` | Read table dimensions, header state, and cell text. |
 | `word.update_table` | implemented | Table | edit/destructive | `WordApi 1.3` | Update table cells, rows, columns, table/cell formatting, and table deletion through one table-owner tool. |
-| `word.list_content_controls` | planned | ContentControl | read | verify during implementation | List content controls with id/tag/title/type/range metadata, without duplicating document text reads. |
-| `word.insert_content_control` | planned | ContentControl | edit | verify during implementation | Create a content control around an anchored range or inserted placeholder content. |
-| `word.update_content_control` | planned | ContentControl | edit | verify during implementation | Update content control metadata, locked state, or contained text through the content-control owner. |
-| `word.delete_content_control` | planned | ContentControl | destructive | verify during implementation | Delete a content control, preserving or deleting contents according to an explicit mode. |
+| `word.list_content_controls` | implemented | ContentControl | read | `WordApi 1.5` | List content controls with id/tag/title/type metadata, without duplicating document text reads. |
+| `word.insert_content_control` | implemented | ContentControl | edit | `WordApi 1.5` | Create a content control around an anchored range or inserted placeholder content. |
+| `word.update_content_control` | implemented | ContentControl | edit | `WordApi 1.5` | Update content control metadata, locked state, or contained text through the content-control owner. |
+| `word.delete_content_control` | implemented | ContentControl | destructive | `WordApi 1.5` | Delete a content control, preserving or deleting contents according to an explicit mode. |
 | `word.add_comment` | implemented | Review | comment | `WordApi 1.4` | Add a comment to an anchored range as the signed-in Office user. |
 | `word.resolve_comment` | implemented | Review | comment | `WordApi 1.4` | Resolve an existing comment. |
 | `word.update_tracked_change` | planned | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint. |
@@ -658,9 +659,102 @@ Level `0` converts the paragraph to body text.
 `word.create_style` is reserved for a future capability set after its
 cross-platform Office.js behavior is verified.
 
-## 7. Review
+## 7. Content Controls
 
-### 7.1 `word.add_comment`
+The content-control tools use generic `Word.ContentControl` APIs only. v1
+supports rich text and plain text controls; checkbox, dropdown, combo box,
+picture, date picker, repeating-section, group, and desktop-only specialized
+control behavior is deferred.
+
+### 7.1 `word.list_content_controls`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "type": { "enum": ["rich_text", "plain_text"] },
+    "tag": { "type": "string" },
+    "title": { "type": "string" }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns `{ content_controls, count }`. Each item includes
+`content_control_id`, `tag`, `title`, `type`, `subtype`, `cannot_delete`, and
+`cannot_edit`. It does not return the contained document text; callers use read
+tools for text.
+
+### 7.2 `word.insert_content_control`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "type": { "enum": ["rich_text", "plain_text"] },
+    "text": { "type": "string" },
+    "tag": { "type": "string" },
+    "title": { "type": "string" },
+    "cannot_delete": { "type": "boolean" },
+    "cannot_edit": { "type": "boolean" },
+    "appearance": { "enum": ["bounding_box", "tags", "hidden"] },
+    "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "placeholder_text": { "type": "string" }
+  },
+  "additionalProperties": false
+}
+```
+
+When `anchor` is omitted, the current selection is used. When `text` is
+provided, the anchored range is replaced with that text before wrapping it.
+
+### 7.3 `word.update_content_control`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "content_control_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "content_control_id": { "type": "integer", "minimum": 0 },
+    "text": { "type": "string" },
+    "tag": { "type": "string" },
+    "title": { "type": "string" },
+    "cannot_delete": { "type": "boolean" },
+    "cannot_edit": { "type": "boolean" },
+    "appearance": { "enum": ["bounding_box", "tags", "hidden"] },
+    "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "placeholder_text": { "type": "string" }
+  },
+  "additionalProperties": false
+}
+```
+
+### 7.4 `word.delete_content_control`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "content_control_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "content_control_id": { "type": "integer", "minimum": 0 },
+    "mode": { "enum": ["keep_content", "delete_content"], "default": "keep_content" }
+  },
+  "additionalProperties": false
+}
+```
+
+The default preserves contents while removing the content-control wrapper.
+
+## 8. Review
+
+### 8.1 `word.add_comment`
 
 ```json
 {
@@ -679,7 +773,7 @@ behalf of the user is the user, in the same way that a macro the user runs is
 the user. No "AI watermark" is added: the value of office-mcp comes from being
 indistinguishable from the user doing it themselves.
 
-### 7.2 `word.resolve_comment`
+### 8.2 `word.resolve_comment`
 
 ```json
 {
@@ -692,7 +786,7 @@ indistinguishable from the user doing it themselves.
 }
 ```
 
-### 7.3 `word.accept_change` and `word.reject_change`
+### 8.3 `word.accept_change` and `word.reject_change`
 
 Stable Office.js tracked-change objects do not expose an ID. The tracked
 changes resource therefore returns each item as
@@ -717,9 +811,9 @@ Each tool uses:
 The add-in reloads the collection immediately before mutation. An index or
 fingerprint mismatch returns `STALE_INDEX`; clients must re-read the resource.
 
-## 8. Document
+## 9. Document
 
-### 8.1 `word.save`
+### 9.1 `word.save`
 
 ```json
 { "type": "object", "required": ["session_id"], "properties": { "session_id": { "type": "string" } } }
@@ -733,9 +827,9 @@ prompt/save the current document and can name a new document, but it does not
 provide a portable arbitrary-path Save As or Word-to-PDF byte export. These
 names remain reserved for a future API-backed design.
 
-## 9. Behavior contracts
+## 10. Behavior contracts
 
-### 9.1 Mutation consistency
+### 10.1 Mutation consistency
 
 Office.js batches queued operations at `context.sync()`, but does not provide a
 general transaction or rollback guarantee. A mutating tool MUST:

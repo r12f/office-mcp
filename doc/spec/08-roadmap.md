@@ -124,10 +124,14 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       The compatibility tools remain advertised until the dedicated retirement
       slice removes `word.update_cell`, `word.add_row`, `word.add_column`, and
       `word.format_cell` without breaking existing clients.
-- [ ] Add content-control CRUD tools: `word.list_content_controls`,
+- [x] Add content-control CRUD tools: `word.list_content_controls`,
       `word.insert_content_control`, `word.update_content_control`, and
       `word.delete_content_control`, keeping generic text edits owned by
-      paragraph/range tools unless the caller targets a content control.
+      paragraph/range tools unless the caller targets a content control. Current
+      implementation uses generic `Word.ContentControl` APIs from `WordApi 1.5`,
+      supports rich text and plain text controls, lists metadata without
+      duplicating contained document text, updates tag/title/lock/text metadata,
+      and deletes controls with explicit keep/delete content handling.
 - [ ] Implement `word.update_tracked_change` with an explicit `action` argument
       for accept/reject, then retire `word.accept_change` and
       `word.reject_change` from the advertised catalog.

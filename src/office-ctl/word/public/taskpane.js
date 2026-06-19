@@ -63,6 +63,10 @@
     'word.add_row',
     'word.add_column',
     'word.format_cell',
+    'word.list_content_controls',
+    'word.insert_content_control',
+    'word.update_content_control',
+    'word.delete_content_control',
     'word.set_heading_level',
     'word.apply_style',
     'word.add_comment',
@@ -76,6 +80,7 @@
     { label: 'Insert', tools: ['word.insert_paragraph', 'word.insert_heading', 'word.insert_image', 'word.insert_table', 'word.insert_page_break', 'word.insert_list'] },
     { label: 'Edit', tools: ['word.replace_text', 'word.update_paragraph', 'word.delete_range', 'word.apply_formatting', 'word.set_heading_level', 'word.apply_style'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table', 'word.update_cell', 'word.add_row', 'word.add_column', 'word.format_cell'] },
+    { label: 'Content Controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
     { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.accept_change', 'word.reject_change'] },
     { label: 'Document', tools: ['word.save'] }
   ];
@@ -101,6 +106,10 @@
     ['word.add_row', { category: 'Tables', sideEffect: 'mutating', description: 'Add a row to a table.' }],
     ['word.add_column', { category: 'Tables', sideEffect: 'mutating', description: 'Add a column to a table.' }],
     ['word.format_cell', { category: 'Tables', sideEffect: 'mutating', description: 'Format a table cell.' }],
+    ['word.list_content_controls', { category: 'Content Controls', sideEffect: 'read', description: 'List content-control metadata.' }],
+    ['word.insert_content_control', { category: 'Content Controls', sideEffect: 'mutating', description: 'Create a content control around an anchored range.' }],
+    ['word.update_content_control', { category: 'Content Controls', sideEffect: 'mutating', description: 'Update content-control metadata, locks, or text.' }],
+    ['word.delete_content_control', { category: 'Content Controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling.' }],
     ['word.set_heading_level', { category: 'Edit', sideEffect: 'mutating', description: 'Change a paragraph heading level.' }],
     ['word.apply_style', { category: 'Edit', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
     ['word.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a comment to an anchored range.' }],
@@ -384,6 +393,18 @@
           break;
         case 'word.format_cell':
           data = await formatCell(args);
+          break;
+        case 'word.list_content_controls':
+          data = await listContentControls(args);
+          break;
+        case 'word.insert_content_control':
+          data = await insertContentControl(args);
+          break;
+        case 'word.update_content_control':
+          data = await updateContentControl(args);
+          break;
+        case 'word.delete_content_control':
+          data = await deleteContentControl(args);
           break;
         case 'word.set_heading_level':
           data = await setHeadingLevel(args);
@@ -920,6 +941,58 @@
     });
   }
 
+  async function listContentControls(args) {
+    return Word.run(async (context) => {
+      const controls = context.document.body.getContentControls(contentControlFilterOptions(args));
+      controls.load('items/id,items/tag,items/title,items/type,items/subtype,items/cannotDelete,items/cannotEdit');
+      await context.sync();
+      const filtered = controls.items.filter((control) => {
+        if (args.tag !== undefined && control.tag !== String(args.tag)) return false;
+        if (args.title !== undefined && control.title !== String(args.title)) return false;
+        return true;
+      });
+      return {
+        content_controls: filtered.map(contentControlMetadata),
+        count: filtered.length,
+        untrusted_source: true
+      };
+    });
+  }
+
+  async function insertContentControl(args) {
+    return Word.run(async (context) => {
+      const target = args.anchor ? await resolveAnchor(context, args.anchor) : context.document.getSelection();
+      const range = args.text !== undefined ? target.insertText(String(args.text), Word.InsertLocation.replace) : target;
+      const control = range.insertContentControl(contentControlTypeFrom(args.type));
+      applyContentControlProperties(control, args);
+      control.load('id,tag,title,type,subtype,cannotDelete,cannotEdit');
+      await context.sync();
+      return { content_control: contentControlMetadata(control, 0), created: true };
+    });
+  }
+
+  async function updateContentControl(args) {
+    return Word.run(async (context) => {
+      const control = await targetContentControl(context, args);
+      applyContentControlProperties(control, args);
+      if (args.text !== undefined) control.insertText(String(args.text), Word.InsertLocation.replace);
+      control.load('id,tag,title,type,subtype,cannotDelete,cannotEdit');
+      await context.sync();
+      return { content_control: contentControlMetadata(control, 0), updated: true };
+    });
+  }
+
+  async function deleteContentControl(args) {
+    return Word.run(async (context) => {
+      const control = await targetContentControl(context, args);
+      const id = control.id;
+      const keepContent = args.mode !== 'delete_content';
+      control.delete(keepContent);
+      await context.sync();
+      return { content_control_id: id, deleted: true, mode: keepContent ? 'keep_content' : 'delete_content' };
+    });
+  }
+
   async function setHeadingLevel(args) {
     return Word.run(async (context) => {
       const paragraph = await getParagraphByIndex(context, args.index);
@@ -1158,6 +1231,67 @@
     return table.getCell(row, col);
   }
 
+  async function targetContentControl(context, args) {
+    const id = Number(args.content_control_id ?? args.id);
+    if (!Number.isInteger(id)) {
+      throw Object.assign(new Error('Content control id is required.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return context.document.body.getContentControls().getById(id);
+  }
+
+  function contentControlFilterOptions(args) {
+    if (!args.type) return undefined;
+    return { types: [contentControlTypeFrom(args.type)] };
+  }
+
+  function contentControlMetadata(control, index) {
+    return {
+      index,
+      content_control_id: control.id,
+      tag: control.tag || null,
+      title: control.title || null,
+      type: control.type || null,
+      subtype: control.subtype || null,
+      cannot_delete: Boolean(control.cannotDelete),
+      cannot_edit: Boolean(control.cannotEdit),
+      untrusted_source: true
+    };
+  }
+
+  function applyContentControlProperties(control, args) {
+    if (args.tag !== undefined) control.tag = String(args.tag);
+    if (args.title !== undefined) control.title = String(args.title);
+    if (args.cannot_delete !== undefined) control.cannotDelete = Boolean(args.cannot_delete);
+    if (args.cannot_edit !== undefined) control.cannotEdit = Boolean(args.cannot_edit);
+    if (args.lock_content_control !== undefined) control.cannotDelete = Boolean(args.lock_content_control);
+    if (args.lock_contents !== undefined) control.cannotEdit = Boolean(args.lock_contents);
+    if (args.appearance !== undefined) control.appearance = contentControlAppearanceFrom(args.appearance);
+    if (args.color !== undefined) control.color = String(args.color);
+    if (args.placeholder_text !== undefined) control.placeholderText = String(args.placeholder_text);
+  }
+
+  function contentControlTypeFrom(value) {
+    const normalized = String(value || 'rich_text').trim().toLowerCase();
+    const values = {
+      rich_text: 'RichText',
+      richtext: 'RichText',
+      rich: 'RichText',
+      plain_text: 'PlainText',
+      plaintext: 'PlainText',
+      plain: 'PlainText'
+    };
+    if (values[normalized]) return values[normalized];
+    throw Object.assign(new Error(`Unsupported content control type ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  function contentControlAppearanceFrom(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'bounding_box' || normalized === 'boundingbox') return 'BoundingBox';
+    if (normalized === 'tags') return 'Tags';
+    if (normalized === 'hidden') return 'Hidden';
+    throw Object.assign(new Error(`Unsupported content control appearance ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
   function isBeforeAnchor(anchor) {
     return anchor.kind === 'before_paragraph_index' || anchor.kind === 'before_text' || anchor.kind === 'start_of_document';
   }
@@ -1270,6 +1404,7 @@
     return {
       WordApi: requirements.isSetSupported('WordApi', '1.3') ? '1.3' : null,
       WordApi_1_4: requirements.isSetSupported('WordApi', '1.4') ? '1.4' : null,
+      WordApi_1_5: requirements.isSetSupported('WordApi', '1.5') ? '1.5' : null,
       WordApi_1_6: requirements.isSetSupported('WordApi', '1.6') ? '1.6' : null
     };
   }
