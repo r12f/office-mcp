@@ -261,9 +261,9 @@ button:hover {
 }
 
 .tool-group-title {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   min-width: 0;
   padding: 7px 8px;
@@ -285,8 +285,8 @@ button:hover {
   white-space: nowrap;
 }
 
-.tool-group-title span:last-child {
-  flex: 0 0 auto;
+.tool-group-count {
+  justify-self: end;
   font-variant-numeric: tabular-nums;
   text-transform: none;
 }
@@ -341,12 +341,26 @@ code,
   border-color: var(--border);
   background: var(--surface-raised);
 }
+.daemon-endpoint-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 6px;
+}
+
+.daemon-endpoint-input {
+  min-height: 32px;
+}
+
+.reconnect-button {
+  border-color: var(--excel);
+  color: var(--excel);
+}
 
 .metadata-copy code {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .empty-state {
@@ -424,22 +438,6 @@ code,
   min-width: 0;
 }
 
-.settings-panel {
-  display: grid;
-  gap: 8px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.settings-panel[hidden] {
-  display: none;
-}
-
-.settings-panel h2 {
-  display: none;
-}
-
 .tool-permission-list {
   display: grid;
   gap: 6px;
@@ -448,9 +446,9 @@ code,
 
 .tool-permission-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  align-items: start;
+  align-items: center;
   padding: 7px;
   border-top: 1px solid var(--border);
   background: transparent;
@@ -460,15 +458,43 @@ code,
   border-left: 3px solid var(--excel);
 }
 
-.tool-toggle {
-  width: 16px;
-  height: 16px;
-  margin: 2px 0 0;
-  accent-color: var(--excel);
+.tool-toggle,
+.group-toggle {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  appearance: none;
+  background: var(--surface-raised);
+  cursor: pointer;
 }
 
-.tool-list:not(.is-editing-tools) .tool-toggle {
-  pointer-events: none;
+.tool-toggle::before,
+.group-toggle::before {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  content: "";
+  transition: transform 120ms ease-out, background 120ms ease-out;
+}
+
+.tool-toggle:checked,
+.group-toggle:checked {
+  border-color: var(--excel);
+  background: var(--excel);
+}
+
+.tool-toggle:checked::before,
+.group-toggle:checked::before {
+  transform: translateX(16px);
+  background: #ffffff;
 }
 
 .tool-permission-main {
@@ -514,17 +540,6 @@ code,
   color: var(--excel);
 }
 
-.input-row {
-  display: grid;
-  gap: 8px;
-}
-
-label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 600;
-}
-
 input {
   width: 100%;
   min-width: 0;
@@ -536,11 +551,6 @@ input {
 }
 
 button[type="submit"] {
-  min-height: 32px;
-  border: 1px solid var(--excel);
-  border-radius: 7px;
-  color: #ffffff;
-  background: var(--excel);
   cursor: pointer;
 }
 
@@ -557,12 +567,6 @@ button[type="submit"] {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
-}
-
-@media (min-width: 380px) {
-  .input-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

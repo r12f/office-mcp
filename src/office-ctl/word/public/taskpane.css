@@ -353,15 +353,6 @@ code,
   min-height: 32px;
 }
 
-.daemon-endpoint-input[hidden],
-.is-editing-settings .daemon-endpoint-display {
-  display: none;
-}
-
-.is-editing-settings .daemon-endpoint-input {
-  display: block;
-}
-
 .reconnect-button {
   border-color: var(--word);
   color: var(--word);
@@ -522,11 +513,6 @@ code,
 .group-toggle:checked::before {
   transform: translateX(16px);
   background: #ffffff;
-}
-
-.tool-list:not(.is-editing-tools) .tool-toggle,
-.tool-list:not(.is-editing-tools) .group-toggle {
-  pointer-events: none;
 }
 
 .tool-permission-main {

@@ -1,5 +1,5 @@
 (() => {
-  const ADDIN_VERSION = '0.1.10';
+  const ADDIN_VERSION = '0.1.11';
   const PROTOCOL_VERSION = '1.0';
   const {
     boolLabel,
@@ -108,7 +108,6 @@
   let reconnectTimer;
   let reconnectAttempt = 0;
   let endpointDirty = false;
-  let suppressNextSettingsClick = false;
   let toolPermissions = loadToolPermissions();
   let sessionAnnounced = false;
   const logger = new AddinLogger({ redactText });
@@ -130,16 +129,12 @@
   const currentTaskStateEl = document.getElementById('currentTaskState');
   const historyListEl = document.getElementById('historyList');
   const historyCountEl = document.getElementById('historyCount');
-  const settingsToggleEl = document.getElementById('settingsToggle');
-  const settingsPanelEl = document.getElementById('settingsPanel');
   const settingsFormEl = document.getElementById('settingsForm');
   const endpointInputEl = document.getElementById('endpointInput');
   const endpointErrorEl = document.getElementById('endpointError');
   const saveEndpointEl = document.getElementById('saveEndpoint');
   const announcerEl = document.getElementById('announcer');
 
-  settingsToggleEl.addEventListener('click', handleSettingsClick);
-  settingsToggleEl.addEventListener('keydown', activateSettingsWithKeyboard);
   settingsFormEl.addEventListener('submit', saveEndpointOverride);
   document.addEventListener('click', handleMetadataCopy);
   endpointInputEl.addEventListener('input', () => {
@@ -1492,40 +1487,6 @@
     ].join('');
   }
 
-  function handleSettingsClick() {
-    if (suppressNextSettingsClick) {
-      suppressNextSettingsClick = false;
-      return;
-    }
-    toggleSettings();
-  }
-
-  function toggleSettings() {
-    const opening = settingsPanelEl.hidden;
-    if (!opening && endpointDirty && !confirm('Discard unsaved endpoint changes?')) {
-      endpointInputEl.focus();
-      return;
-    }
-    settingsPanelEl.hidden = !opening;
-    document.body.classList.toggle('is-editing-settings', opening);
-    endpointInputEl.hidden = !opening;
-    settingsToggleEl.setAttribute('aria-expanded', String(opening));
-    settingsToggleEl.setAttribute('aria-label', opening ? 'Close Settings' : 'Open Settings');
-    settingsToggleEl.setAttribute('title', opening ? 'Close Settings' : 'Open Settings');
-    toolListEl.classList.toggle('is-editing-tools', opening);
-    if (opening) endpointInputEl.focus();
-    else {
-      endpointInputEl.value = configuredEndpoint();
-      endpointDirty = false;
-    }
-  }
-
-  function activateSettingsWithKeyboard(event) {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    suppressNextSettingsClick = true;
-    toggleSettings();
-  }
 
   function saveEndpointOverride(event) {
     event.preventDefault();

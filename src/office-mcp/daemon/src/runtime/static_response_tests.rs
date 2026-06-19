@@ -16,15 +16,15 @@ fn serves_word_taskpane_static_asset() {
 
 #[test]
 fn serves_versioned_addin_static_assets_with_query_strings() {
-    let word_js = response_text(&service().serve_addin_asset("/word/taskpane.js?v=0.1.10"));
+    let word_js = response_text(&service().serve_addin_asset("/word/taskpane.js?v=0.1.11"));
     assert!(word_js.starts_with("HTTP/1.1 200 OK"));
     assert!(word_js.contains("__OFFICE_MCP_TASKPANE_READY__"));
 
-    let common_js = response_text(&service().serve_addin_asset("/common/addin-channel.js?v=0.1.10"));
+    let common_js = response_text(&service().serve_addin_asset("/common/addin-channel.js?v=0.1.11"));
     assert!(common_js.starts_with("HTTP/1.1 200 OK"));
     assert!(common_js.contains("OfficeCtlAddinChannel"));
 
-    let excel_js = response_text(&service().serve_addin_asset("/excel/taskpane.js?v=0.1.8"));
+    let excel_js = response_text(&service().serve_addin_asset("/excel/taskpane.js?v=0.1.9"));
     assert!(excel_js.starts_with("HTTP/1.1 200 OK"));
     assert!(excel_js.contains("function isExcelHost"));
     assert!(excel_js.contains("Office.HostType?.Excel"));
@@ -35,8 +35,8 @@ fn serves_excel_taskpane_static_assets() {
     let html = response_text(&service().serve_addin_asset("/excel/taskpane.html"));
     assert!(html.starts_with("HTTP/1.1 200 OK"));
     assert!(html.contains("Office MCP Control"));
-    assert!(html.contains("/excel/taskpane.js?v=0.1.8"));
-    assert!(html.contains("/common/addin-channel.js?v=0.1.8"));
+    assert!(html.contains("/excel/taskpane.js?v=0.1.9"));
+    assert!(html.contains("/common/addin-channel.js?v=0.1.9"));
 
     let js = response_text(&service().serve_addin_asset("/excel/taskpane.js"));
     assert!(js.starts_with("HTTP/1.1 200 OK"));
