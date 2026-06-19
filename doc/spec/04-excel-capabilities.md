@@ -85,6 +85,8 @@ Implemented Excel v1 tools:
 | `excel.find_replace_cells` | read/edit | `ExcelApi 1.9` | Find the first matching cell in a range or replace matching cells. |
 | `excel.set_formula` | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
 | `excel.format_range` | edit | `ExcelApi 1.1`; autofit requires `ExcelApi 1.2` | Apply font, fill, number formats, borders, alignment, wrapping, and autofit. |
+| `excel.sort_range` | edit | `ExcelApi 1.2` | Sort a range or table body by one or more keys. |
+| `excel.apply_filter` | edit | Range filters require `ExcelApi 1.9`; table column filters require `ExcelApi 1.2` | Apply, clear, remove, or reapply range and table filters. |
 | `excel.create_table` | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
 | `excel.create_chart` | edit | `ExcelApi 1.1` | Create a chart from a range on the active or named worksheet. |
 
@@ -107,8 +109,8 @@ Target core Excel tool surface:
 | `excel.find_replace_cells` | implemented | Range | read/edit | `ExcelApi 1.9` | Search cell contents in a range and optionally replace matches. |
 | `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
 | `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1`; autofit requires `ExcelApi 1.2` | Apply font, fill, scalar or matrix number formats, borders, alignment, wrapping, and autofit. |
-| `excel.sort_range` | planned | Data | edit | verify during implementation | Sort a range or table body by one or more column keys; table structure changes belong to `excel.update_table`. |
-| `excel.apply_filter` | planned | Data | edit | verify during implementation | Apply or clear worksheet range or table filter criteria; PivotTable filters belong to `excel.update_pivot_table`. |
+| `excel.sort_range` | implemented | Data | edit | `ExcelApi 1.2` | Sort a range or table body by one or more column keys; table structure changes belong to `excel.update_table`. |
+| `excel.apply_filter` | implemented | Data | edit | Range filters require `ExcelApi 1.9`; table column filters require `ExcelApi 1.2` | Apply, clear, remove, or reapply worksheet range or table filter criteria; PivotTable filters belong to `excel.update_pivot_table`. |
 | `excel.create_table` | implemented | Table | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
 | `excel.update_table` | planned | Table | read/edit/destructive | `ExcelApi 1.1` | Read table metadata/structure; add rows/columns; resize, rename, change table style/options, or delete a table. Table cell contents belong to `excel.read_range`. |
 | `excel.create_chart` | implemented | Chart | edit | `ExcelApi 1.1` | Create a chart from a range or table. |
@@ -325,7 +327,76 @@ values are restricted to stable Office.js enum values. `autofit_rows` and
 
 Returns `{ "address": "A1:C2", "formatted": true }`.
 
-### 3.6 `excel.create_table`
+### 3.6 `excel.sort_range`
+
+Arguments for a plain range sort:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "sheet": "Sheet1",
+  "address": "A1:D20",
+  "target_type": "range",
+  "fields": [{ "key": 2, "ascending": false, "sort_on": "value" }],
+  "has_headers": true,
+  "orientation": "rows"
+}
+```
+
+Arguments for a table sort:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "target_type": "table",
+  "table": "SalesTable",
+  "fields": [{ "key": 1, "ascending": true }]
+}
+```
+
+`fields[*].key` is the zero-based column or row offset within the sorted range
+or table body. Supported actions are `apply`, `clear`, and `reapply`; `clear`
+and `reapply` are table-only because Office.js exposes them on `TableSort`.
+Range and table sorting require `ExcelApi 1.2`.
+
+Returns `{ "target_type": "range", "address": "A1:D20", "sorted": true }`.
+
+### 3.7 `excel.apply_filter`
+
+Arguments for a range filter:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "sheet": "Sheet1",
+  "address": "A1:D20",
+  "target_type": "range",
+  "column_index": 2,
+  "criteria": { "filter_on": "values", "values": ["West", "East"] }
+}
+```
+
+Arguments for a table filter:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "target_type": "table",
+  "table": "SalesTable",
+  "column": "Region",
+  "criteria": { "filter_on": "custom", "criterion1": "=*West" }
+}
+```
+
+Supported actions are `apply`, `clear`, `remove`, and `reapply`. Range filters
+use worksheet `AutoFilter` and require `ExcelApi 1.9`. Table column filters use
+the table column `Filter` object and require `ExcelApi 1.2`; clearing or
+reapplying a table filter uses the table `AutoFilter` object. PivotTable filters
+belong to `excel.update_pivot_table`.
+
+Returns `{ "target_type": "range", "address": "A1:D20", "filtered": true }`.
+
+### 3.8 `excel.create_table`
 
 Arguments:
 
@@ -344,7 +415,7 @@ Arguments:
 
 Returns `{ "table": "SalesTable", "address": "A1:C10", "has_headers": true }`.
 
-### 3.7 `excel.create_chart`
+### 3.9 `excel.create_chart`
 
 Arguments:
 

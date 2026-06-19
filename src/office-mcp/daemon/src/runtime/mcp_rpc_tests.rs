@@ -27,6 +27,7 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
         names,
         vec![
             "excel.add_sheet",
+            "excel.apply_filter",
             "excel.clear_range",
             "excel.create_chart",
             "excel.create_table",
@@ -38,6 +39,7 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
             "excel.list_sheets",
             "excel.read_range",
             "excel.set_formula",
+            "excel.sort_range",
             "excel.update_sheet",
             "excel.write_range",
             "office.get_session_info",

@@ -35,6 +35,9 @@ const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
         name: "excel.add_sheet",
     },
     ExcelToolDefinition {
+        name: "excel.apply_filter",
+    },
+    ExcelToolDefinition {
         name: "excel.clear_range",
     },
     ExcelToolDefinition {
@@ -66,6 +69,9 @@ const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
     },
     ExcelToolDefinition {
         name: "excel.set_formula",
+    },
+    ExcelToolDefinition {
+        name: "excel.sort_range",
     },
     ExcelToolDefinition {
         name: "excel.update_sheet",

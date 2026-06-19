@@ -47,6 +47,8 @@
     'excel.find_replace_cells',
     'excel.set_formula',
     'excel.format_range',
+    'excel.sort_range',
+    'excel.apply_filter',
     'excel.create_table',
     'excel.create_chart'
   ];
@@ -56,6 +58,7 @@
     { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.clear_range', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
     { label: 'Format', tools: ['excel.format_range'] },
+    { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
     { label: 'Table', tools: ['excel.create_table'] },
     { label: 'Chart', tools: ['excel.create_chart'] }
   ];
@@ -72,6 +75,8 @@
     ['excel.find_replace_cells', { category: 'Range', sideEffect: 'mutating', description: 'Find cells in a range and optionally replace matches.' }],
     ['excel.set_formula', { category: 'Formula', sideEffect: 'mutating', description: 'Set formulas in a range.' }],
     ['excel.format_range', { category: 'Format', sideEffect: 'mutating', description: 'Apply formatting to a range.' }],
+    ['excel.sort_range', { category: 'Data', sideEffect: 'mutating', description: 'Sort a range or table by one or more keys.' }],
+    ['excel.apply_filter', { category: 'Data', sideEffect: 'mutating', description: 'Apply, clear, remove, or reapply range and table filters.' }],
     ['excel.create_table', { category: 'Table', sideEffect: 'mutating', description: 'Create a table from a range.' }],
     ['excel.create_chart', { category: 'Chart', sideEffect: 'mutating', description: 'Create a chart from a range.' }]
   ]);
@@ -326,6 +331,12 @@
           break;
         case 'excel.format_range':
           data = await formatRange(args);
+          break;
+        case 'excel.sort_range':
+          data = await sortRange(args);
+          break;
+        case 'excel.apply_filter':
+          data = await applyFilter(args);
           break;
         case 'excel.create_table':
           data = await createTable(args);
@@ -585,6 +596,85 @@
     });
   }
 
+  async function sortRange(args) {
+    requireRequirementSet('ExcelApi', '1.2', 'range sorting');
+    return Excel.run(async (context) => {
+      const target = targetSortObject(context, args);
+      const action = String(args.action || 'apply').trim().toLowerCase();
+      if (action === 'clear') {
+        if (!target.table) throw Object.assign(new Error('excel.sort_range clear is only supported for table targets.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+        target.table.sort.clear();
+        await context.sync();
+        return { target_type: 'table', table: args.table, sorted: false, cleared: true };
+      }
+      if (action === 'reapply') {
+        if (!target.table) throw Object.assign(new Error('excel.sort_range reapply is only supported for table targets.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+        target.table.sort.reapply();
+        await context.sync();
+        return { target_type: 'table', table: args.table, reapplied: true };
+      }
+      if (target.table) {
+        const table = target.table;
+        table.sort.apply(sortFieldsFrom(args.fields), Boolean(args.match_case), sortMethodFrom(args.method));
+        await context.sync();
+        return { target_type: 'table', table: args.table, sorted: true };
+      }
+      const sort = target.range.sort;
+      sort.apply(sortFieldsFrom(args.fields), Boolean(args.match_case), args.has_headers !== false, sortOrientationFrom(args.orientation), sortMethodFrom(args.method));
+      await context.sync();
+      return { target_type: 'range', address: args.address, sorted: true };
+    });
+  }
+
+  async function applyFilter(args) {
+    const targetType = String(args.target_type || (args.table ? 'table' : 'range')).trim().toLowerCase();
+    const action = String(args.action || 'apply').trim().toLowerCase();
+    if (targetType === 'range') requireRequirementSet('ExcelApi', '1.9', 'range filtering');
+    else if (targetType === 'table') requireRequirementSet('ExcelApi', '1.2', 'table filtering');
+    else throw Object.assign(new Error(`Unsupported filter target ${args.target_type}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    return Excel.run(async (context) => {
+      if (targetType === 'table') {
+        const table = targetTable(context, args);
+        if (action === 'clear' || action === 'remove') {
+          table.autoFilter.clearCriteria();
+          await context.sync();
+          return { target_type: 'table', table: args.table, filtered: false, cleared: true };
+        }
+        if (action === 'reapply') {
+          table.autoFilter.reapply();
+          await context.sync();
+          return { target_type: 'table', table: args.table, reapplied: true };
+        }
+        table.columns.getItem(requiredString(args, 'column', 'excel.apply_filter requires column for table filters.')).filter.apply(filterCriteriaFrom(args.criteria));
+        await context.sync();
+        return { target_type: 'table', table: args.table, column: String(args.column), filtered: true };
+      }
+      const range = targetRange(context, args);
+      const autoFilter = targetWorksheet(context, args).autoFilter;
+      if (action === 'clear') {
+        autoFilter.clearCriteria();
+        await context.sync();
+        return { target_type: 'range', address: args.address, filtered: false, cleared: true };
+      }
+      if (action === 'remove') {
+        autoFilter.remove();
+        await context.sync();
+        return { target_type: 'range', address: args.address, filtered: false, removed: true };
+      }
+      if (action === 'reapply') {
+        autoFilter.reapply();
+        await context.sync();
+        return { target_type: 'range', address: args.address, reapplied: true };
+      }
+      if (!Number.isInteger(Number(args.column_index))) {
+        throw Object.assign(new Error('excel.apply_filter requires column_index for range filters.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      autoFilter.apply(range, Number(args.column_index), filterCriteriaFrom(args.criteria));
+      await context.sync();
+      return { target_type: 'range', address: args.address, column_index: Number(args.column_index), filtered: true };
+    });
+  }
+
   async function createTable(args) {
     const hasHeaders = args.has_headers !== false;
     const name = String(args.name || '').trim();
@@ -618,6 +708,18 @@
     return args.sheet
       ? context.workbook.worksheets.getItem(String(args.sheet))
       : context.workbook.worksheets.getActiveWorksheet();
+  }
+
+  function targetTable(context, args) {
+    const table = requiredString(args, 'table', 'Table name is required.');
+    return context.workbook.tables.getItem(table);
+  }
+
+  function targetSortObject(context, args) {
+    const targetType = String(args.target_type || (args.table ? 'table' : 'range')).trim().toLowerCase();
+    if (targetType === 'table') return { table: targetTable(context, args) };
+    if (targetType === 'range') return { range: targetRange(context, args) };
+    throw Object.assign(new Error(`Unsupported sort target ${args.target_type}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
   }
 
   function sheetInfo(sheet, active) {
@@ -674,6 +776,44 @@
       completeMatch: Boolean(args.complete_match),
       matchCase: Boolean(args.match_case)
     };
+  }
+
+  function sortFieldsFrom(fields) {
+    if (!Array.isArray(fields) || fields.length === 0) {
+      throw Object.assign(new Error('excel.sort_range requires at least one sort field.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return fields.map((field) => {
+      if (!field || typeof field !== 'object' || Array.isArray(field)) {
+        throw Object.assign(new Error('Sort field must be an object.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      if (!Number.isInteger(Number(field.key))) {
+        throw Object.assign(new Error('Sort field key must be an integer offset.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      const result = {
+        key: Number(field.key),
+        ascending: field.ascending !== false
+      };
+      if (field.sort_on !== undefined) result.sortOn = sortOnFrom(field.sort_on);
+      if (field.data_option !== undefined) result.dataOption = sortDataOptionFrom(field.data_option);
+      if (field.color !== undefined) result.color = String(field.color);
+      if (field.sub_field !== undefined) result.subField = String(field.sub_field);
+      return result;
+    });
+  }
+
+  function filterCriteriaFrom(criteria) {
+    if (!criteria || typeof criteria !== 'object' || Array.isArray(criteria)) {
+      throw Object.assign(new Error('excel.apply_filter requires criteria.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    const result = { filterOn: filterOnFrom(criteria.filter_on || criteria.filterOn || 'values') };
+    if (criteria.criterion1 !== undefined) result.criterion1 = String(criteria.criterion1);
+    if (criteria.criterion2 !== undefined) result.criterion2 = String(criteria.criterion2);
+    if (criteria.color !== undefined) result.color = String(criteria.color);
+    if (criteria.operator !== undefined) result.operator = filterOperatorFrom(criteria.operator);
+    if (criteria.dynamic_criteria !== undefined) result.dynamicCriteria = dynamicFilterCriteriaFrom(criteria.dynamic_criteria);
+    if (criteria.values !== undefined) result.values = criteria.values;
+    if (criteria.sub_field !== undefined) result.subField = String(criteria.sub_field);
+    return result;
   }
 
   function supportsRequirementSet(name, version) {
@@ -804,6 +944,74 @@
     return enumValueFrom(weights, value, 'border weight');
   }
 
+  function sortOnFrom(value) {
+    const values = {
+      value: Excel.SortOn.value,
+      cellColor: Excel.SortOn.cellColor,
+      fontColor: Excel.SortOn.fontColor,
+      icon: Excel.SortOn.icon
+    };
+    return enumValueFrom(values, value, 'sort type');
+  }
+
+  function sortDataOptionFrom(value) {
+    const values = {
+      normal: Excel.SortDataOption.normal,
+      textAsNumber: Excel.SortDataOption.textAsNumber
+    };
+    return enumValueFrom(values, value, 'sort data option');
+  }
+
+  function sortOrientationFrom(value) {
+    const values = {
+      rows: Excel.SortOrientation.rows,
+      columns: Excel.SortOrientation.columns
+    };
+    return enumValueFrom(values, value || 'rows', 'sort orientation');
+  }
+
+  function sortMethodFrom(value) {
+    if (value === undefined || value === null || value === '') return undefined;
+    const values = {
+      pinYin: Excel.SortMethod.pinYin,
+      strokeCount: Excel.SortMethod.strokeCount
+    };
+    return enumValueFrom(values, value, 'sort method');
+  }
+
+  function filterOnFrom(value) {
+    const values = {
+      bottomItems: Excel.FilterOn.bottomItems,
+      bottomPercent: Excel.FilterOn.bottomPercent,
+      cellColor: Excel.FilterOn.cellColor,
+      dynamic: Excel.FilterOn.dynamic,
+      fontColor: Excel.FilterOn.fontColor,
+      values: Excel.FilterOn.values,
+      topItems: Excel.FilterOn.topItems,
+      topPercent: Excel.FilterOn.topPercent,
+      icon: Excel.FilterOn.icon,
+      custom: Excel.FilterOn.custom
+    };
+    return enumValueFrom(values, value, 'filter type');
+  }
+
+  function filterOperatorFrom(value) {
+    const values = {
+      and: Excel.FilterOperator.and,
+      or: Excel.FilterOperator.or
+    };
+    return enumValueFrom(values, value, 'filter operator');
+  }
+
+  function dynamicFilterCriteriaFrom(value) {
+    const key = String(value || '').replace(/[_\s-]/g, '').toLowerCase();
+    const match = Object.entries(Excel.DynamicFilterCriteria || {}).find(([name]) => name.toLowerCase() === key);
+    if (!match) {
+      throw Object.assign(new Error(`Unsupported dynamic filter criteria ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return match[1];
+  }
+
   function enumValueFrom(values, value, label) {
     const key = String(value || '').replace(/[_\s-]/g, '').toLowerCase();
     const match = Object.entries(values).find(([name]) => name.toLowerCase() === key);
@@ -862,7 +1070,9 @@
     const requirements = Office.context.requirements;
     return {
       excel_api_1_1: requirements.isSetSupported('ExcelApi', '1.1'),
-      excel_api_1_4: requirements.isSetSupported('ExcelApi', '1.4')
+      excel_api_1_2: requirements.isSetSupported('ExcelApi', '1.2'),
+      excel_api_1_4: requirements.isSetSupported('ExcelApi', '1.4'),
+      excel_api_1_9: requirements.isSetSupported('ExcelApi', '1.9')
     };
   }
 
@@ -969,6 +1179,8 @@
 
   function isToolSupported(tool) {
     if (tool === 'excel.find_replace_cells') return supportsRequirementSet('ExcelApi', '1.9');
+    if (tool === 'excel.sort_range') return supportsRequirementSet('ExcelApi', '1.2');
+    if (tool === 'excel.apply_filter') return supportsRequirementSet('ExcelApi', '1.9');
     return true;
   }
 

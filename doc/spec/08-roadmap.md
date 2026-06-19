@@ -1235,12 +1235,16 @@ Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
       Excel task pane, maps alignment and border options through stable Office.js
       enums, gates autofit behind `ExcelApi 1.2`, and passed `npm run check` in
       `src/office-ctl/excel`.
-- [ ] Implement data operations slice: `excel.sort_range` and
+- [x] Implement data operations slice: `excel.sort_range` and
       `excel.apply_filter`. These are the only owners for sorting/filtering both
       plain ranges and table bodies; `excel.update_table` must not duplicate
       this behavior. Tests first: plain range target, table target, clear filter,
       multi-key sort, visible/filtered rows behavior where Office.js exposes it,
-      and metadata/permission categories.
+      and metadata/permission categories. Current implementation adds both tools
+      to the daemon catalog and Excel task pane, groups them under Data,
+      capability-gates range/table sort behind `ExcelApi 1.2`, range AutoFilter
+      behind `ExcelApi 1.9`, and passed Excel task pane plus targeted daemon
+      catalog/list-tools tests.
 - [ ] Implement table object-owner slice: `excel.update_table` with explicit
       actions for metadata read, add rows, add columns, resize, rename, table
       style/options, and delete. Table cell contents stay owned by
