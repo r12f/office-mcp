@@ -379,6 +379,23 @@ Latest design feedback from the current visible build:
   launch must show the product icon, and the right-click menu must be OS-native,
   not a custom or web-styled menu surface.
 
+Latest visible-build feedback to carry into the next implementation goal:
+
+- Design and review a product logo that avoids Microsoft Office marks while
+  still communicating office productivity plus deliberate local control. The
+  direction should feel futuristic through precise control geometry, layered
+  document/workspace surfaces, and restrained depth, not through generic neon,
+  AI, settings, debug, or placeholder icon language.
+- Rework add-in identity as a first-contact software surface, not a collection
+  of manifest fields. Title, icon, catalog-visible type/category, provider,
+  description, ribbon command, and task pane chrome must all read as one mature
+  product for Word, Excel, and PowerPoint after a clean install.
+- Rework tray first impression as native desktop software. A normal daemon
+  launch must show the accepted product glyph in the Windows notification area,
+  and right-click must open a native menu from that icon. A missing/default
+  icon, non-native menu, webview/CSS popup, toolkit-demo surface, or prototype
+  wording keeps the tray task open.
+
 - [x] Run a full product logo concept pass before accepting the final mark. The
       pass must produce multiple original concept directions that communicate
       office productivity plus local control without Office-owned marks, Office
@@ -458,6 +475,12 @@ Latest design feedback from the current visible build:
       developer/debug badge, or loud decorative graphic. This review must inspect
       the add-in catalog, ribbon, task pane chrome, tray, installer, and daemon
       title-bar renderings.
+- [ ] Re-open the logo acceptance review against the latest visible-build
+      feedback. The reviewer must judge whether the current mark actually feels
+      like futuristic office control in real product surfaces, not merely whether
+      it is legally distinct from Microsoft marks. If the icon reads as a
+      generic add-in, file, settings, debug, AI, or placeholder product mark at
+      tray/ribbon/catalog sizes, redesign it before closing this item.
 - [x] Redesign or materially refine the current logo if the live rendered
       surfaces still fail the future-office-control brief. The implemented
       refinement keeps the selected `Command Console Panes` direction but
@@ -496,6 +519,12 @@ Latest design feedback from the current visible build:
       Office container labels, missing/default icons, raw host package names,
       sideload/debug wording, or mismatched per-host metadata keep this item
       open even if all manifests validate.
+- [ ] Re-audit the add-in title, icon, and visible type/category from the user's
+      first installed view, not only from source manifests. Word, Excel, and
+      PowerPoint must present a finished software identity before the task pane
+      opens. The Office catalog and ribbon must not show generic `Add-in` or
+      `Task Pane` categories, raw MCP/protocol names, host scaffold names,
+      missing/default icons, or any copy that looks like an experiment.
 - [ ] Fix add-in product identity as one installable-software surface wherever
       Office exposes it. `DisplayName`, Office catalog title, icon, provider,
       short description, ribbon group, primary command, task pane title/chrome,
@@ -541,6 +570,11 @@ Latest design feedback from the current visible build:
       the actual tray icon and the quit confirmation dialog. Automated probe
       output is not enough; this stays open until live Windows evidence proves
       the menu is visually native.
+- [ ] Re-audit the normal Windows tray launch from the user's first impression.
+      The tray must show the accepted product icon, native tooltip, and
+      OS-native right-click menu anchored to the notification-area icon. Any
+      blank/default/framework icon, non-native-looking menu, webview/CSS popup,
+      toolkit-demo surface, or prototype wording must be fixed before release.
 - [x] Design an original office-control product logo and icon system. It must
       avoid Microsoft Office product marks while still communicating office
       productivity, local automation, and user control with a mature, slightly
