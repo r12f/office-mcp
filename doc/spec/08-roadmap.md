@@ -1296,7 +1296,7 @@ channel, and MCP `tools/call` dispatch.
 - [x] The E2E suite must be runnable separately from release evidence commands.
       Evidence recorders may consume its output later, but passing E2E is its
       own gate and must not be implemented as `npm run evidence:*`.
-- [ ] Fix live Office E2E window/process cleanup across Word, Excel, and
+- [x] Fix live Office E2E window/process cleanup across Word, Excel, and
       PowerPoint. The current Windows sideload activator can open both the
       original driver-created file and an Office-generated `* add-in ...` copy,
       and failures can leave driver-owned Office windows/processes behind. The
@@ -1306,7 +1306,13 @@ channel, and MCP `tools/call` dispatch.
       verification fails, quit the Office app when no user documents remain, and
       delete all generated temp files. This is a release blocker for Word as
       well as PowerPoint; the developer must never have to close E2E-created
-      Office windows by hand.
+      Office windows by hand. Current evidence: live `npm run e2e:tools` with
+      `OFFICE_MCP_RUN_E2E=1` passed for Word, Excel, and PowerPoint; the runtime
+      validator passed `--require-office-tool-e2e` against
+      `artifacts/office-tool-e2e-word.json`,
+      `artifacts/office-tool-e2e-excel.json`, and
+      `artifacts/office-tool-e2e-powerpoint.json`; final process and temp-file
+      checks found no E2E-created Word, Excel, or PowerPoint residue.
 
 Current implementation evidence: `src/office-ctl/common/test/tool-e2e-contract.mjs`
 owns the shared table-driven loop and exact coverage checks; Word, Excel, and
@@ -1334,7 +1340,7 @@ setup and a direct-result or readback verifier. The shared coverage gate also
 parses the daemon Rust runtime catalog and fails if a host E2E table covers the
 task pane `AVAILABLE_TOOLS` but misses a tool exposed by MCP `tools/list`.
 Fully automated Windows ribbon/task-pane activation and live Office execution
-evidence remain open. Each host exposes `npm run e2e:tools` as the non-evidence
+evidence now exists for Word, Excel, and PowerPoint. Each host exposes `npm run e2e:tools` as the non-evidence
 tool E2E command; live Office execution is still opt-in through
 `OFFICE_MCP_RUN_E2E=1`, and release-ready live reports must use a concrete
 activator rather than the `no-activator-configured` skipped path. When enabled,
