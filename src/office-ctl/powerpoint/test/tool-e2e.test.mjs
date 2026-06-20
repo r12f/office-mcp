@@ -13,7 +13,20 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
   ['powerpoint.get_presentation_info', { verify: 'direct-result' }],
   ['powerpoint.get_active_view', { verify: 'direct-result' }],
   ['powerpoint.export_file', { verify: 'direct-result' }],
-  ['powerpoint.update_tags', { args: { action: 'set', key: 'e2e', value: 'true' } }],
+  ['powerpoint.update_tags', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.update_tags', arguments: { action: 'list' } }
+      ]
+    },
+    args: { action: 'set', key: 'e2e-metadata', value: 'true' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.update_tags',
+      readbackArguments: { action: 'list' },
+      expect: { contains: ['e2e-metadata', 'true'] }
+    }
+  }],
   ['powerpoint.list_slides', { verify: 'direct-result' }],
   ['powerpoint.add_slide', {
     setup: {
@@ -198,6 +211,7 @@ test('PowerPoint mutating E2E cases define concrete setup and readback checks', 
   assertConcreteReadback('powerpoint.delete_slide');
   assertConcreteReadback('powerpoint.move_slide');
   assertConcreteReadback('powerpoint.apply_layout');
+  assertConcreteReadback('powerpoint.update_tags');
 });
 
 test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
