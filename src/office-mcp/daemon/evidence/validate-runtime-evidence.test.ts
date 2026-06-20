@@ -61,6 +61,34 @@ const EXCEL_V1_TOOLS = [
   'excel.update_pivot_table'
 ];
 
+const WORD_V1_TOOLS = [
+  'word.get_text',
+  'word.get_outline',
+  'word.get_paragraph',
+  'word.find_text',
+  'word.get_selection',
+  'word.insert_paragraph',
+  'word.insert_table',
+  'word.insert_image',
+  'word.insert_page_break',
+  'word.insert_list',
+  'word.replace_text',
+  'word.update_paragraph',
+  'word.delete_range',
+  'word.apply_formatting',
+  'word.apply_style',
+  'word.read_table',
+  'word.update_table',
+  'word.list_content_controls',
+  'word.insert_content_control',
+  'word.update_content_control',
+  'word.delete_content_control',
+  'word.add_comment',
+  'word.resolve_comment',
+  'word.update_tracked_change',
+  'word.save'
+];
+
 test('runtime evidence validator accepts required runtime gates and optional IRM skip', () => {
   withEvidenceFile(report('skipped'), (path) => {
     const result = runValidator(path);
@@ -187,6 +215,46 @@ test('runtime evidence validator can require PowerPoint smoke evidence', () => {
     const result = runValidator(path, '--require-powerpoint-smoke');
     assert.notEqual(result.status, 0);
     assert.match(outputText(result.stdout), /export_file success or explicit host-capability rejection/);
+  });
+});
+
+test('runtime evidence validator rejects runtime smoke catalogs that only satisfy count lower bounds', () => {
+  const excel = excelOnlyReport();
+  const excelDetails = excel.gates[1].details as Record<string, unknown>;
+  excelDetails.available_tool_count = 21;
+  excelDetails.available_tools = [...EXCEL_V1_TOOLS, 'excel.legacy_macro'];
+  withEvidenceFile(excel, (path) => {
+    const result = runValidator(path, '--require-excel-smoke');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /Excel smoke gate available tools are not aligned with v1 catalog/);
+  });
+
+  const powerpoint = powerpointOnlyReport();
+  const powerpointDetails = powerpoint.gates[1].details as Record<string, unknown>;
+  powerpointDetails.available_tool_count = 26;
+  powerpointDetails.available_tools = [...POWERPOINT_V1_TOOLS, 'powerpoint.export_pdf'];
+  withEvidenceFile(powerpoint, (path) => {
+    const result = runValidator(path, '--require-powerpoint-smoke');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /PowerPoint smoke gate available tools are not aligned with v1 catalog/);
+  });
+});
+
+test('runtime evidence validator rejects product visual runtime evidence without exact host catalogs', () => {
+  withEvidenceFile(uiReport(), (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const visual = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      const wordSession = visual.word_runtime_evidence.session as Record<string, unknown>;
+      const wordDetails = visual.word_runtime_evidence.smoke_details as Record<string, unknown>;
+      wordSession.available_tool_count = 26;
+      wordDetails.available_tool_count = 26;
+      wordDetails.available_tools = ['word.get_text'];
+      writeFileSync(visualPath, JSON.stringify(visual, null, 2));
+
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual Word runtime evidence available tools are not aligned with v1 catalog/);
+    });
   });
 });
 test('runtime evidence validator can require COM tracked-change evidence', () => {
@@ -1444,6 +1512,7 @@ function excelRuntimeEvidence(passed: boolean) {
     },
     smoke_details: {
       session_id: sessionId,
+      available_tools: EXCEL_V1_TOOLS,
       marker_found: passed,
       workbook_info: { sheet_count: 2, table_count: 1 },
       sheet_list_count: 1,
@@ -1486,6 +1555,7 @@ function wordRuntimeEvidence(passed: boolean) {
     smoke_details: {
       session_id: sessionId,
       available_tool_count: 25,
+      available_tools: WORD_V1_TOOLS,
       paragraph_0_text_length: passed ? 23 : 0,
       document_text_length: passed ? 23 : 0,
       find_count: passed ? 1 : 0,

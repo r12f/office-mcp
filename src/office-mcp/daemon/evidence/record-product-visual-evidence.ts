@@ -549,6 +549,7 @@ function readWordRuntimeEvidence(path: string): Record<string, unknown> {
     const details = {
       session_id: report.session_id,
       available_tool_count: readDetails?.available_tool_count,
+      available_tools: readDetails?.available_tools,
       paragraph_0_text_length: readDetails?.paragraph_0_text_length,
       document_text_length: readDetails?.document_text_length,
       find_count: mutationDetails?.find_count,

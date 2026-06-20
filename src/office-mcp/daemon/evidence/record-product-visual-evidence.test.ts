@@ -48,6 +48,34 @@ const SURFACES = [
   'tray-quit-confirmation'
 ];
 
+const WORD_V1_TOOLS = [
+  'word.get_text',
+  'word.get_outline',
+  'word.get_paragraph',
+  'word.find_text',
+  'word.get_selection',
+  'word.insert_paragraph',
+  'word.insert_table',
+  'word.insert_image',
+  'word.insert_page_break',
+  'word.insert_list',
+  'word.replace_text',
+  'word.update_paragraph',
+  'word.delete_range',
+  'word.apply_formatting',
+  'word.apply_style',
+  'word.read_table',
+  'word.update_table',
+  'word.list_content_controls',
+  'word.insert_content_control',
+  'word.update_content_control',
+  'word.delete_content_control',
+  'word.add_comment',
+  'word.resolve_comment',
+  'word.update_tracked_change',
+  'word.save'
+];
+
 test('product visual evidence recorder requires all product surfaces', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -1139,7 +1167,7 @@ function writeWordRuntimeEvidence(dir: string, ready = true): string {
         }
       },
       { name: 'word.e2e_session', status: 'passed', details: { session_id: sessionId, available_tool_count: 25, document_path: 'C:\\Temp\\word.docx' } },
-      { name: 'word.runtime_read_smoke', status, details: { available_tool_count: 25, paragraph_0_text_length: ready ? 23 : 0, document_text_length: ready ? 23 : 0 } },
+      { name: 'word.runtime_read_smoke', status, details: { available_tool_count: 25, available_tools: WORD_V1_TOOLS, paragraph_0_text_length: ready ? 23 : 0, document_text_length: ready ? 23 : 0 } },
       { name: 'word.runtime_mutation_smoke', status, details: { marker: 'marker', insert: { inserted: ready }, find_count: ready ? 1 : 0 } },
       { name: 'word.full_smoke.word-core', status, details: { mode: 'word-core' } },
       { name: 'word.full_smoke.word-formatting', status, details: { mode: 'word-formatting' } },

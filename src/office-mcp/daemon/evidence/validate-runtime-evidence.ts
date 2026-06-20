@@ -171,12 +171,9 @@ function validatePowerPointSmokeGate(gate: EvidenceGate | undefined): void {
     return;
   }
   if (typeof details.session_id !== 'string' || details.session_id.length === 0) failures.push('PowerPoint smoke gate missing session_id.');
-  if (typeof details.available_tool_count !== 'number' || details.available_tool_count < 25) failures.push('PowerPoint smoke gate missing 25-tool available tool count.');
+  validateExactToolCatalog('PowerPoint smoke gate', details.available_tool_count, details.available_tools, powerPointV1Tools());
   if (details.mutation_proved !== true) failures.push('PowerPoint smoke gate did not prove a mutation path.');
   validatePowerPointCategoryProofs(details.tool_category_proofs, 'PowerPoint smoke gate');
-  if (!Array.isArray(details.available_tools) || !details.available_tools.includes('powerpoint.export_file') || details.available_tools.includes('powerpoint.export_pdf')) {
-    failures.push('PowerPoint smoke gate available tools are not aligned with v1 catalog.');
-  }
   if (!isRecord(details.presentation_info)) failures.push('PowerPoint smoke gate missing presentation info proof.');
   if (!isRecord(details.active_view)) failures.push('PowerPoint smoke gate missing active view proof.');
   if (!isRecord(details.list_slides)) failures.push('PowerPoint smoke gate missing list_slides proof.');
@@ -204,11 +201,7 @@ function validateExcelSmokeGate(gate: EvidenceGate | undefined): void {
     return;
   }
   if (typeof details.session_id !== 'string' || details.session_id.length === 0) failures.push('Excel smoke gate missing session_id.');
-  if (typeof details.available_tool_count !== 'number' || details.available_tool_count < 20) failures.push('Excel smoke gate missing 20-tool available tool count.');
-  const availableTools = stringArray(details.available_tools);
-  if (!excelV1Tools().every((tool) => availableTools.includes(tool))) {
-    failures.push('Excel smoke gate available tools are not aligned with v1 catalog.');
-  }
+  validateExactToolCatalog('Excel smoke gate', details.available_tool_count, details.available_tools, excelV1Tools());
   if (details.marker_found !== true) failures.push('Excel smoke gate missing marker readback.');
   if (!isRecord(details.workbook_info)) failures.push('Excel smoke gate missing get_workbook_info proof.');
   if (typeof details.sheet_list_count !== 'number') failures.push('Excel smoke gate missing list_sheets proof.');
@@ -253,6 +246,66 @@ function excelV1Tools(): string[] {
     'excel.update_chart',
     'excel.create_pivot_table',
     'excel.update_pivot_table'
+  ];
+}
+
+function powerPointV1Tools(): string[] {
+  return [
+    'powerpoint.get_presentation_info',
+    'powerpoint.get_active_view',
+    'powerpoint.export_file',
+    'powerpoint.update_tags',
+    'powerpoint.list_slides',
+    'powerpoint.add_slide',
+    'powerpoint.update_slide',
+    'powerpoint.delete_slide',
+    'powerpoint.move_slide',
+    'powerpoint.export_slide',
+    'powerpoint.list_layouts',
+    'powerpoint.apply_layout',
+    'powerpoint.get_selection',
+    'powerpoint.set_selection',
+    'powerpoint.list_shapes',
+    'powerpoint.add_text_box',
+    'powerpoint.add_shape',
+    'powerpoint.insert_image',
+    'powerpoint.update_shape',
+    'powerpoint.read_text',
+    'powerpoint.replace_text',
+    'powerpoint.format_text',
+    'powerpoint.add_table',
+    'powerpoint.read_table',
+    'powerpoint.update_table'
+  ];
+}
+
+function wordV1Tools(): string[] {
+  return [
+    'word.get_text',
+    'word.get_outline',
+    'word.get_paragraph',
+    'word.find_text',
+    'word.get_selection',
+    'word.insert_paragraph',
+    'word.insert_table',
+    'word.insert_image',
+    'word.insert_page_break',
+    'word.insert_list',
+    'word.replace_text',
+    'word.update_paragraph',
+    'word.delete_range',
+    'word.apply_formatting',
+    'word.apply_style',
+    'word.read_table',
+    'word.update_table',
+    'word.list_content_controls',
+    'word.insert_content_control',
+    'word.update_content_control',
+    'word.delete_content_control',
+    'word.add_comment',
+    'word.resolve_comment',
+    'word.update_tracked_change',
+    'word.save'
   ];
 }
 
@@ -343,6 +396,15 @@ function hostToolE2ePathOption(host: 'Word' | 'Excel' | 'PowerPoint'): string {
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function validateExactToolCatalog(label: string, count: unknown, tools: unknown, expected: string[]): void {
+  if (count !== expected.length) {
+    failures.push(`${label} missing ${expected.length}-tool available tool count.`);
+  }
+  if (!sameStrings(stringArray(tools), expected)) {
+    failures.push(`${label} available tools are not aligned with v1 catalog.`);
+  }
 }
 
 function sameStrings(left: string[], right: string[]): boolean {
@@ -852,10 +914,9 @@ function validatePowerPointRuntimeEvidence(evidence: unknown, ready: unknown): v
   if (typeof session.session_id !== 'string' || details.session_id !== session.session_id) failures.push('Product visual PowerPoint runtime evidence session_id mismatch.');
   if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual PowerPoint runtime evidence missing presentation title.');
   if (host?.app !== 'powerpoint') failures.push('Product visual PowerPoint runtime evidence missing PowerPoint host metadata.');
-  if (typeof session.available_tool_count !== 'number' || session.available_tool_count < 25) failures.push('Product visual PowerPoint runtime evidence missing 25-tool available tool count.');
+  validateExactToolCatalog('Product visual PowerPoint runtime evidence', session.available_tool_count, details.available_tools, powerPointV1Tools());
   if (details.mutation_proved !== true) failures.push('Product visual PowerPoint runtime evidence did not prove mutation path.');
   validatePowerPointCategoryProofs(details.tool_category_proofs, 'Product visual PowerPoint runtime evidence');
-  if (!Array.isArray(details.available_tools) || !details.available_tools.includes('powerpoint.export_file') || details.available_tools.includes('powerpoint.export_pdf')) failures.push('Product visual PowerPoint runtime evidence available tools are not aligned with v1 catalog.');
   if (!isRecord(details.presentation_info)) failures.push('Product visual PowerPoint runtime evidence missing presentation info proof.');
   if (!isRecord(details.active_view)) failures.push('Product visual PowerPoint runtime evidence missing active view proof.');
   if (!isRecord(details.list_slides)) failures.push('Product visual PowerPoint runtime evidence missing list_slides proof.');
@@ -897,8 +958,8 @@ function validateWordRuntimeEvidence(evidence: unknown, ready: unknown): void {
   if (typeof session.session_id !== 'string') failures.push('Product visual Word runtime evidence missing session_id.');
   if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual Word runtime evidence missing document title.');
   if (host?.app !== 'word') failures.push('Product visual Word runtime evidence missing Word host metadata.');
-  if (typeof session.available_tool_count !== 'number' || session.available_tool_count < 25) failures.push('Product visual Word runtime evidence missing 25-tool available tool count.');
-  if (typeof details.available_tool_count !== 'number' || details.available_tool_count < 25) failures.push('Product visual Word runtime evidence missing read smoke available tool count.');
+  validateExactToolCatalog('Product visual Word runtime evidence', session.available_tool_count, details.available_tools, wordV1Tools());
+  if (details.available_tool_count !== wordV1Tools().length) failures.push('Product visual Word runtime evidence missing read smoke available tool count.');
   if (Number(details.paragraph_0_text_length ?? 0) <= 0) failures.push('Product visual Word runtime evidence missing paragraph read proof.');
   if (Number(details.document_text_length ?? 0) <= 0) failures.push('Product visual Word runtime evidence missing document read proof.');
   if (Number(details.find_count ?? 0) < 1) failures.push('Product visual Word runtime evidence missing mutation readback.');
@@ -996,7 +1057,7 @@ function validateExcelRuntimeEvidence(evidence: unknown, ready: unknown): void {
   if (typeof session.session_id !== 'string' || details.session_id !== session.session_id) failures.push('Product visual Excel runtime evidence session_id mismatch.');
   if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual Excel runtime evidence missing workbook title.');
   if (host?.app !== 'excel') failures.push('Product visual Excel runtime evidence missing Excel host metadata.');
-  if (typeof session.available_tool_count !== 'number' || session.available_tool_count < 20) failures.push('Product visual Excel runtime evidence missing 20-tool available tool count.');
+  validateExactToolCatalog('Product visual Excel runtime evidence', session.available_tool_count, details.available_tools, excelV1Tools());
   if (details.marker_found !== true) failures.push('Product visual Excel runtime evidence missing marker readback.');
   if (!isRecord(details.workbook_info)) failures.push('Product visual Excel runtime evidence missing get_workbook_info proof.');
   if (typeof details.sheet_list_count !== 'number') failures.push('Product visual Excel runtime evidence missing list_sheets proof.');

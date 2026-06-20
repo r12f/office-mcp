@@ -205,6 +205,7 @@ async function runWordReadGate(sessionId: string): Promise<void> {
     return {
       document_title: (info.document as { title?: string } | undefined)?.title,
       available_tool_count: Array.isArray(info.available_tools) ? info.available_tools.length : undefined,
+      available_tools: Array.isArray(info.available_tools) ? info.available_tools.map(String) : undefined,
       paragraph_0_text_length: String(paragraph.text ?? '').length,
       document_text_length: String(document.text ?? '').length
     };
