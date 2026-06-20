@@ -318,6 +318,7 @@ fn real_tls_websocket_forwards_mcp_tool_call_and_returns_response() {
         &mut stream,
         r#"{"jsonrpc":"2.0","method":"session.added","params":{"session_id":"session-1","instance_id":"instance-1","document":{"filename":"Live.docx"},"available_tools":["word.get_text"],"is_active":true}}"#,
     );
+    wait_for_session(&shared_state.registry, "session-1");
 
     let mcp_shared_state = Arc::clone(&shared_state);
     let mcp_handle = thread::spawn(move || {
@@ -713,6 +714,22 @@ fn read_server_ws_tool_invoke(stream: &mut (impl Read + Write)) -> serde_json::V
         panic!("unexpected websocket message before tool.invoke: {value}");
     }
     panic!("tool.invoke was not received before heartbeat guard limit");
+}
+
+fn wait_for_session(registry: &Arc<Mutex<SessionRegistry>>, session_id: &str) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while std::time::Instant::now() < deadline {
+        if registry
+            .lock()
+            .expect("registry")
+            .get_session_info(session_id)
+            .is_some()
+        {
+            return;
+        }
+        thread::sleep(std::time::Duration::from_millis(10));
+    }
+    panic!("session was not registered before MCP tool call: {session_id}");
 }
 
 fn masked_text_frame(text: &str) -> Vec<u8> {

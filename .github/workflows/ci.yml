@@ -183,6 +183,14 @@ jobs:
         working-directory: src/office-ctl/word
         run: npm ci
 
+      - name: Install Excel add-in dependencies
+        working-directory: src/office-ctl/excel
+        run: npm ci
+
+      - name: Install PowerPoint add-in dependencies
+        working-directory: src/office-ctl/powerpoint
+        run: npm ci
+
       - name: Install packaging dependencies
         working-directory: packaging
         run: npm ci

@@ -59,6 +59,7 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     let store = UiAssetStore::default();
     let html =
         String::from_utf8(store.read("index.html").expect("html").content).expect("html utf8");
+    let html = html.replace("\r\n", "\n");
     let css = String::from_utf8(store.read("app.css").expect("css").content).expect("css utf8");
     let js = String::from_utf8(store.read("app.js").expect("js").content).expect("js utf8");
 
