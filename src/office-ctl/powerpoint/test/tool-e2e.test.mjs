@@ -163,7 +163,20 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { contains: ['updated marker'], notContains: ['baseline marker'] }
     }
   }],
-  ['powerpoint.format_text', { args: { slide_index: 0, shape_id: 'fixture', formatting: { bold: true } } }],
+  ['powerpoint.format_text', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_text_box', saveAs: 'textBoxResult', arguments: { slide_index: 0, text: 'Format me E2E' } }
+      ]
+    },
+    args: { slide_index: 0, shape_id: '${textBoxResult.shape.shape_id}', bold: true, color: '#1F4E79' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.read_text',
+      readbackArguments: { slide_index: 0 },
+      expect: { contains: ['Format me E2E'] }
+    }
+  }],
   ['powerpoint.add_table', {
     setup: {
       actions: [
@@ -212,6 +225,7 @@ test('PowerPoint mutating E2E cases define concrete setup and readback checks', 
   assertConcreteReadback('powerpoint.move_slide');
   assertConcreteReadback('powerpoint.apply_layout');
   assertConcreteReadback('powerpoint.update_tags');
+  assertConcreteReadback('powerpoint.format_text');
 });
 
 test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
