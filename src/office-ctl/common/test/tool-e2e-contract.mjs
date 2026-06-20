@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 const DEFAULT_OFFICE_E2E_DRIVER = fileURLToPath(new URL('./office-e2e-driver.mjs', import.meta.url));
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 export function advertisedTools(addinRoot) {
   const source = readFileSync(join(addinRoot, 'public', 'taskpane.js'), 'utf8');
@@ -13,10 +14,22 @@ export function advertisedTools(addinRoot) {
   return [...match[1].matchAll(/'([^']+)'/g)].map((tool) => tool[1]);
 }
 
-export function assertE2eCaseCoverage({ addinRoot, host, cases }) {
+export function daemonCatalogTools(host, catalogPath = join(REPO_ROOT, 'src', 'office-mcp', 'daemon', 'src', 'mcp', 'catalog.rs')) {
+  const prefix = hostToolPrefix(host);
+  const source = readFileSync(catalogPath, 'utf8');
+  const section = catalogSection(source, prefix);
+  return [...section.matchAll(/"((?:word|excel|powerpoint)\.[^"]+)"/g)]
+    .map((match) => match[1])
+    .filter((tool, index, tools) => tool.startsWith(`${prefix}.`) && tools.indexOf(tool) === index)
+    .sort();
+}
+
+export function assertE2eCaseCoverage({ addinRoot, host, cases, catalogPath }) {
   const tools = advertisedTools(addinRoot);
   const caseNames = Object.keys(cases).sort();
   assert.deepEqual(caseNames, [...tools].sort(), `${host} E2E cases must cover every advertised tool exactly`);
+  const catalogTools = daemonCatalogTools(host, catalogPath);
+  assert.deepEqual(caseNames, catalogTools, `${host} E2E cases must cover every daemon catalog tool exactly`);
 
   for (const tool of tools) {
     const toolCase = cases[tool];
@@ -29,6 +42,25 @@ export function assertE2eCaseCoverage({ addinRoot, host, cases }) {
       assert.ok(toolCase.verify.readbackTool, `${tool} readback verifier must define readbackTool`);
     }
   }
+}
+
+function hostToolPrefix(host) {
+  const normalized = String(host || '').trim().toLowerCase();
+  if (normalized === 'word' || normalized === 'excel' || normalized === 'powerpoint') return normalized;
+  throw new Error(`Unsupported E2E host ${host}.`);
+}
+
+function catalogSection(source, prefix) {
+  const anchors = {
+    word: 'pub const WORD_V1_TOOLS',
+    excel: 'const EXCEL_V1_TOOLS',
+    powerpoint: 'const POWERPOINT_V1_TOOLS'
+  };
+  const start = source.indexOf(anchors[prefix]);
+  assert.notEqual(start, -1, `daemon catalog must define ${anchors[prefix]}`);
+  const end = source.indexOf('];', start);
+  assert.notEqual(end, -1, `daemon catalog section ${anchors[prefix]} must close with ];`);
+  return source.slice(start, end + 2);
 }
 
 export function e2eCase(tool, { setup = 'fixed baseline content', args = {}, verify = 'readback' } = {}) {

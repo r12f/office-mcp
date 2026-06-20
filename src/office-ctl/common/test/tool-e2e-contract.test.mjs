@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { e2eCase, requireOfficeE2eDriver, runOfficeToolE2e } from './tool-e2e-contract.mjs';
+import { assertE2eCaseCoverage, daemonCatalogTools, e2eCase, requireOfficeE2eDriver, runOfficeToolE2e } from './tool-e2e-contract.mjs';
 
 test('shared Office tool E2E loop drives daemon, document, setup, calls, verification, and cleanup', async () => {
   const events = [];
@@ -192,6 +192,49 @@ test('E2E case coverage accepts concrete readback verifiers with explicit expect
   assert.equal(toolCase.verify.kind, 'readback');
   assert.equal(toolCase.verify.readbackTool, 'word.get_text');
   assert.deepEqual(toolCase.verify.expect, { contains: ['updated'], notContains: ['baseline'] });
+});
+
+test('E2E case coverage checks daemon catalog tools as well as task pane tools', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-e2e-catalog-'));
+  const addinRoot = join(dir, 'word');
+  const publicRoot = join(addinRoot, 'public');
+  mkdirSync(publicRoot, { recursive: true });
+  writeFileSync(join(publicRoot, 'taskpane.js'), "const AVAILABLE_TOOLS = ['word.read'];\n");
+  const catalogPath = join(dir, 'catalog.rs');
+  writeFileSync(catalogPath, 'pub const WORD_V1_TOOLS: &[&str] = &["word.read"];\n');
+
+  assertE2eCaseCoverage({
+    addinRoot,
+    host: 'Word',
+    catalogPath,
+    cases: { 'word.read': e2eCase('word.read', { verify: 'direct-result' }) }
+  });
+});
+
+test('E2E case coverage fails when daemon catalog exposes an uncovered tool', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-e2e-catalog-missing-'));
+  const addinRoot = join(dir, 'word');
+  const publicRoot = join(addinRoot, 'public');
+  mkdirSync(publicRoot, { recursive: true });
+  writeFileSync(join(publicRoot, 'taskpane.js'), "const AVAILABLE_TOOLS = ['word.read'];\n");
+  const catalogPath = join(dir, 'catalog.rs');
+  writeFileSync(catalogPath, 'pub const WORD_V1_TOOLS: &[&str] = &["word.read", "word.catalog_only"];\n');
+
+  assert.throws(
+    () => assertE2eCaseCoverage({
+      addinRoot,
+      host: 'Word',
+      catalogPath,
+      cases: { 'word.read': e2eCase('word.read', { verify: 'direct-result' }) }
+    }),
+    /Word E2E cases must cover every daemon catalog tool exactly/
+  );
+});
+
+test('daemonCatalogTools reads the Rust runtime catalog for each Office host', () => {
+  assert.ok(daemonCatalogTools('Word').includes('word.get_text'));
+  assert.ok(daemonCatalogTools('Excel').includes('excel.read_range'));
+  assert.ok(daemonCatalogTools('PowerPoint').includes('powerpoint.list_slides'));
 });
 
 test('shared Office tool E2E loop fails when session tools and case table differ', async () => {
