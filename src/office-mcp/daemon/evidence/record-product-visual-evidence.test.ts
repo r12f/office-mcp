@@ -232,12 +232,17 @@ test('README Word runtime evidence command matches self-contained gate', () => {
 
 test('README describes current Word Excel and PowerPoint product surface', () => {
   const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
+  const mcpSurface = readFileSync(resolve(process.cwd(), '../../../..', 'doc/spec/03-mcp-tool-surface.md'), 'utf8');
 
   assert.match(readme, /exposes Word, Excel, and PowerPoint \(with Outlook planned\)/);
   assert.match(readme, /implementation is in place for Word, Excel, and PowerPoint/);
   assert.match(readme, /Word, Excel, and PowerPoint task pane add-ins/);
   assert.match(readme, /doc\/spec\/04-excel-capabilities\.md/);
+  assert.match(readme, /current Word add-in runtime advertises and executes the refined 25-tool Word v1 surface/);
   assert.match(readme, /PowerPoint v1 presentation tools/);
+  assert.doesNotMatch(readme, /current Word add-in runtime advertises and executes the 27-tool Word v1 compatibility surface/);
+  assert.match(mcpSurface, /"available_tool_count": 25/);
+  assert.doesNotMatch(mcpSurface, /"available_tool_count": 27/);
   assert.match(readme, /cd \.\.\\excel\s+npm run check\s+cd \.\.\\powerpoint\s+npm run check/);
   assert.match(readme, /src\/office-ctl\/powerpoint\/` \| PowerPoint add-in package/);
   assert.match(readme, /Word task pane: `https:\/\/localhost:8765\/word\/taskpane\.html`/);

@@ -85,7 +85,7 @@ No arguments. Returns:
       },
       "is_active": null,
       "capability_tiers": ["core", "review", "tracked_changes"],
-      "available_tool_count": 27,
+      "available_tool_count": 25,
       "registered_at": "2026-06-14T01:25:01Z"
     }
   ]
