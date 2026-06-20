@@ -1294,7 +1294,7 @@ actions, call the tool under test, then call a follow-up read tool and assert
 expected `contains`/`notContains` markers. The first concrete setup/readback
 cases now cover Word `insert_paragraph`, `insert_table`, `insert_list`,
 `replace_text`, `update_paragraph`, `delete_range`, `update_table`,
-`insert_content_control`, `update_content_control`, and
+`apply_style`, `insert_content_control`, `update_content_control`, and
 `delete_content_control`; Excel `add_sheet`, `update_sheet`, `delete_sheet`,
 `write_range`, `clear_range`, `find_replace_cells`, `set_formula`, and
 `format_range`, `sort_range`, `create_table`, `update_table`, `create_chart`,

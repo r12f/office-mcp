@@ -160,7 +160,20 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { notContains: ['e2e-delete-control', 'Delete Control'] }
     }
   }],
-  ['word.apply_style', { args: { anchor: { kind: 'paragraph_index', index: 0 }, style: 'Heading 1' } }],
+  ['word.apply_style', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'E2E Styled Heading' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'E2E Styled Heading' }, heading_level: 1 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_outline',
+      readbackArguments: {},
+      expect: { contains: ['E2E Styled Heading'], pathEquals: [{ path: 'headings.0.level', value: 1 }] }
+    }
+  }],
   ['word.add_comment', { args: { anchor: { kind: 'paragraph_index', index: 0 }, text: 'E2E comment' } }],
   ['word.resolve_comment', { args: { comment_index: 0 } }],
   ['word.update_tracked_change', { args: { change_index: 0, action: 'accept', expected_fingerprint: 'fixture' } }],
@@ -182,6 +195,7 @@ test('Word mutating E2E cases define concrete setup and readback checks', () => 
   assertConcreteReadback('word.insert_content_control');
   assertConcreteReadback('word.update_content_control');
   assertConcreteReadback('word.delete_content_control');
+  assertConcreteReadback('word.apply_style');
 });
 
 test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
