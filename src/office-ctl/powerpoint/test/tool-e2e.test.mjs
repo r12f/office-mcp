@@ -43,11 +43,52 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { contains: ['Updated slide'], notContains: ['Slide Before Update'] }
     }
   }],
-  ['powerpoint.delete_slide', { args: { slide_index: 1 } }],
-  ['powerpoint.move_slide', { args: { slide_index: 1, target_index: 0 } }],
+  ['powerpoint.delete_slide', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Delete slide target' } },
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Keep slide target' } }
+      ]
+    },
+    args: { slide_index: 1 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.list_slides',
+      readbackArguments: {},
+      expect: { pathEquals: [{ path: 'slides.1.slide_index', value: 1 }], pathMissing: ['slides.2'] }
+    }
+  }],
+  ['powerpoint.move_slide', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Move source first' } },
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Move source second' } }
+      ]
+    },
+    args: { slide_index: 1, target_index: 0 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.read_text',
+      readbackArguments: {},
+      expect: { orderedContains: ['Move source second', 'Move source first'] }
+    }
+  }],
   ['powerpoint.export_slide', { verify: 'direct-result' }],
   ['powerpoint.list_layouts', { verify: 'direct-result' }],
-  ['powerpoint.apply_layout', { args: { slide_index: 0, layout: 'Title Slide' } }],
+  ['powerpoint.apply_layout', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank' } }
+      ]
+    },
+    args: { slide_index: 0, layout_type: 'title' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.list_slides',
+      readbackArguments: {},
+      expect: { contains: ['title'] }
+    }
+  }],
   ['powerpoint.get_selection', { verify: 'direct-result' }],
   ['powerpoint.set_selection', { args: { slide_index: 0 } }],
   ['powerpoint.list_shapes', { verify: 'direct-result' }],
@@ -154,6 +195,9 @@ test('PowerPoint mutating E2E cases define concrete setup and readback checks', 
   assertConcreteReadback('powerpoint.add_table');
   assertConcreteReadback('powerpoint.update_table');
   assertConcreteReadback('powerpoint.update_shape');
+  assertConcreteReadback('powerpoint.delete_slide');
+  assertConcreteReadback('powerpoint.move_slide');
+  assertConcreteReadback('powerpoint.apply_layout');
 });
 
 test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

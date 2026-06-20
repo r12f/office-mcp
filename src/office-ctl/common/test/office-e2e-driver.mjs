@@ -295,6 +295,28 @@ function assertReadbackExpectations(tool, readback, expect) {
     }
     previousIndex = index;
   }
+  for (const assertion of arrayOf(expect.pathEquals)) {
+    const actual = readbackPath(readback, assertion.path);
+    if (actual !== assertion.value) {
+      throw new Error(`${tool} readback path ${assertion.path} expected ${JSON.stringify(assertion.value)} but found ${JSON.stringify(actual)}.`);
+    }
+  }
+  for (const path of arrayOf(expect.pathMissing)) {
+    if (readbackPath(readback, path) !== undefined) {
+      throw new Error(`${tool} readback path ${path} was expected to be missing.`);
+    }
+  }
+}
+
+function readbackPath(value, path) {
+  const root = value?.structuredContent ?? value;
+  let current = root;
+  for (const part of String(path).split('.').filter(Boolean)) {
+    if (current === undefined || current === null) return undefined;
+    const key = Array.isArray(current) && /^\d+$/.test(part) ? Number(part) : part;
+    current = current[key];
+  }
+  return current;
 }
 
 function readbackText(value) {

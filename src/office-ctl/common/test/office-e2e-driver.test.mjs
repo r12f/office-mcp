@@ -159,7 +159,7 @@ const server = createServer((request, response) => {
       response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: {} }));
     } else {
       const text = ${JSON.stringify('updated marker remains\nfirst marker\nsecond marker')};
-      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { structuredContent: { text } } }));
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { structuredContent: { text, slides: [{ slide_index: 0, layout_name: 'Blank' }] } } }));
     }
   });
 });
@@ -184,7 +184,13 @@ server.listen(0, '127.0.0.1', () => {
             kind: 'readback',
             readbackTool: 'powerpoint.read_table',
             readbackArguments: { slide_index: 0, shape_id: '${result.shape_id}' },
-            expect: { contains: ['updated marker'], notContains: ['baseline marker'], orderedContains: ['first marker', 'second marker'] }
+            expect: {
+              contains: ['updated marker'],
+              notContains: ['baseline marker'],
+              orderedContains: ['first marker', 'second marker'],
+              pathEquals: [{ path: 'slides.0.layout_name', value: 'Blank' }],
+              pathMissing: ['slides.1']
+            }
           }
         }
       }

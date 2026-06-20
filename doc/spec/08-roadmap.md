@@ -1299,7 +1299,8 @@ cases now cover Word `insert_paragraph`, `insert_table`, `insert_list`,
 `write_range`, `clear_range`, `find_replace_cells`, `set_formula`, and
 `format_range`, `sort_range`, `create_table`, and `update_table`; and
 PowerPoint `add_slide`, `update_slide`, `add_text_box`, `add_shape`,
-`update_shape`, `replace_text`, `add_table`, and `update_table`.
+`update_shape`, `replace_text`, `delete_slide`, `move_slide`, `apply_layout`,
+`add_table`, and `update_table`.
 Full add-in activation, live Office execution, and concrete setup/readback
 verifiers for every
 mutating/destructive tool remain open. Each host exposes
