@@ -1230,6 +1230,28 @@ channel, and MCP `tools/call` dispatch.
       Each host harness creates a fresh empty workbook/presentation, waits for
       the corresponding add-in session, runs all advertised tools for that host,
       and closes/deletes the test file at the end.
+- [ ] Convert the real Office E2E driver from step-local automation to a
+      lifecycle-safe driver that can keep the driver-owned Word, Excel, and
+      PowerPoint files open long enough for the add-in to connect. The driver
+      must preserve state across daemon startup, document creation, session
+      waiting, tool calls, readback verification, and cleanup without closing or
+      modifying any pre-existing user Office windows.
+- [ ] Add PowerPoint-specific real Office automation support that uses a visible
+      window path when COM rejects hidden PowerPoint automation. The test must
+      prove cleanup closes only the presentation created by the E2E driver.
+- [ ] Fill every host tool table with one real case per advertised tool. Each
+      case follows the common pattern from [03-mcp-tool-surface.md](03-mcp-tool-surface.md):
+      create fixed setup content, invoke the MCP tool against that content, and
+      verify the result directly for reads or through readback for mutations and
+      deletes.
+- [ ] Add readback verifier helpers for common Office objects so tool cases do
+      not duplicate boilerplate: Word document text/paragraph/table/content
+      control/comment state, Excel workbook/sheet/range/table/chart/pivot state,
+      and PowerPoint presentation/slide/shape/text/table/chart state.
+- [ ] Make exact advertised-tool coverage part of the real Office gate, not only
+      the synthetic driver contract. A host-specific `npm run e2e:tools` command
+      must fail when `tools/list` or session `available_tools` exposes a tool
+      without a real setup/action/verifier row.
 - [x] Structure each host E2E as one table-driven loop. Every tool case supplies
       only the tool-specific setup content, tool arguments, and verifier. The
       shared loop owns the common steps: create fixed baseline content, call the

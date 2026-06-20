@@ -204,7 +204,44 @@ The daemon lists the stable server-wide catalog. Session-specific support is
 reported by `available_tools`; invoking a listed tool against an incompatible
 session yields a tool execution error, not a protocol error.
 
-## 10. Prompts (templated, optional)
+## 10. Tool-level E2E contract
+
+Runtime evidence and smoke scripts are not substitutes for tool-level E2E
+coverage. Every advertised MCP tool MUST have one non-evidence E2E case before
+it is treated as release-ready for a host.
+
+The host E2E harness owns the common lifecycle:
+
+1. Start the production MCP daemon.
+2. Create a fresh empty Office file for the host: document, workbook, or
+   presentation.
+3. Open the file in the real Office host, activate/connect the Office MCP add-in,
+   and wait until `office.list_sessions` reports the expected active session.
+4. Discover the host's advertised tool catalog from `tools/list` or the
+   session's `available_tools`.
+5. Run one table-driven loop over the exact advertised tools.
+6. Close the driver-owned Office file and delete it during cleanup.
+
+Each tool case supplies only the tool-specific pieces:
+
+- Fixed setup content to add before the tool call.
+- MCP tool arguments for operating on that fixed content.
+- A verifier for the expected result.
+
+The shared loop performs the repeated work for every case: reset or recreate the
+baseline content, call `tools/call`, and verify the outcome. Read tools verify
+their direct result. Mutating tools verify by reading the document back through
+the most appropriate read tool or resource. Destructive tools verify that the
+target content or object is absent after readback. The harness MUST fail when a
+new advertised tool has no case, when setup content cannot be created, when the
+daemon/add-in session does not connect, or when cleanup cannot prove it only
+closed/deleted driver-owned test files.
+
+The E2E command is a separate developer gate from evidence generation. Evidence
+recorders may consume its output later, but `npm run evidence:*` passing does
+not satisfy this contract.
+
+## 11. Prompts (templated, optional)
 
 The server exposes a small set of MCP prompts that demonstrate idiomatic use:
 
