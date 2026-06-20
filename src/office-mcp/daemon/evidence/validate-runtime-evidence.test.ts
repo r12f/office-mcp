@@ -303,6 +303,8 @@ test('README documents Office tool E2E report validation command', () => {
 
   assert.match(readme, /OFFICE_MCP_RUN_E2E = '1'/);
   assert.match(readme, /OFFICE_MCP_E2E_ACTIVATOR/);
+  assert.match(readme, /activate-office-mcp-addin\.ps1/);
+  assert.match(readme, /OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR=0/);
   assert.match(readme, /no-activator-configured/);
   assert.match(readme, /must not restart Office, recreate the document, or reconnect/);
   assert.match(readme, /one table-driven\s+loop across the host's complete tool catalog/);

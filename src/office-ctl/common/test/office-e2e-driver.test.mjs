@@ -87,9 +87,15 @@ test('Office E2E driver uses a visible PowerPoint window and safe cleanup', { sk
 });
 
 test('Office E2E driver activation step is explicit and configurable', () => {
-  const skipped = runDriver({ host: 'Word', step: 'activateAddin', context: { document: { path: 'fixture.docx' }, daemon: { addinEndpoint: 'wss://localhost:8765/addin' } } });
-  assert.equal(skipped.status, 0, skipped.stderr);
-  assert.equal(JSON.parse(skipped.stdout).skipped, 'no-activator-configured');
+  const previousDefault = process.env.OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR;
+  process.env.OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR = '0';
+  try {
+    const skipped = runDriver({ host: 'Word', step: 'activateAddin', context: { document: { path: 'fixture.docx' }, daemon: { addinEndpoint: 'wss://localhost:8765/addin' } } });
+    assert.equal(skipped.status, 0, skipped.stderr);
+    assert.equal(JSON.parse(skipped.stdout).skipped, 'no-activator-configured');
+  } finally {
+    restoreEnv('OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR', previousDefault);
+  }
 
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-activator-'));
   const logPath = join(dir, 'activator-env.json');
@@ -126,6 +132,35 @@ writeFileSync(${JSON.stringify(logPath)}, JSON.stringify({
   assert.equal(env.documentPath, 'deck.pptx');
   assert.equal(env.addinOrigin, 'https://localhost:8765');
   assert.equal(env.addinEndpoint, 'wss://localhost:8765/addin');
+});
+
+test('Office E2E driver provides a default Windows add-in activator', () => {
+  const previousActivator = process.env.OFFICE_MCP_E2E_ACTIVATOR;
+  const previousDryRun = process.env.OFFICE_MCP_E2E_ACTIVATOR_DRY_RUN;
+  const previousDefault = process.env.OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR;
+  delete process.env.OFFICE_MCP_E2E_ACTIVATOR;
+  process.env.OFFICE_MCP_E2E_ACTIVATOR_DRY_RUN = '1';
+  delete process.env.OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR;
+  try {
+    const activated = runDriver({
+      host: 'Excel',
+      step: 'activateAddin',
+      context: {
+        document: { path: 'book.xlsx' },
+        daemon: { addinOrigin: 'https://localhost:8765', addinEndpoint: 'wss://localhost:8765/addin' },
+        timeoutMs: 5000
+      }
+    });
+    assert.equal(activated.status, 0, activated.stderr);
+    const result = JSON.parse(activated.stdout);
+    assert.equal(result.activated, true);
+    assert.equal(result.activator_kind, 'default-windows-taskpane');
+    assert.match(result.activator, /activate-office-mcp-addin\.ps1/);
+  } finally {
+    restoreEnv('OFFICE_MCP_E2E_ACTIVATOR', previousActivator);
+    restoreEnv('OFFICE_MCP_E2E_ACTIVATOR_DRY_RUN', previousDryRun);
+    restoreEnv('OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR', previousDefault);
+  }
 });
 
 test('Office E2E driver callTool posts MCP requests through an injectable endpoint', async () => {

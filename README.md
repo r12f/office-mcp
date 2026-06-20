@@ -219,13 +219,17 @@ the add-in per tool. Per-tool Office launches are diagnostic only; the stable
 path is one opened host program, one connected session, and one table-driven
 loop across the host's complete tool catalog.
 
-Release-ready tool E2E reports must prove the add-in activation step. Set
-`OFFICE_MCP_E2E_ACTIVATOR` to a command that opens the Office MCP Control task
-pane for the driver-owned document. The driver passes `OFFICE_MCP_E2E_HOST`,
-`OFFICE_MCP_E2E_DOCUMENT_PATH`, `OFFICE_MCP_E2E_ADDIN_ORIGIN`, and
-`OFFICE_MCP_E2E_ADDIN_ENDPOINT` to that command. Reports with
-`no-activator-configured` are useful for local manual debugging, but
-`npm run evidence:validate -- --require-office-tool-e2e` rejects them.
+Release-ready tool E2E reports must prove the add-in activation step. On
+Windows, the default activator is
+`src/office-ctl/common/scripts/activate-office-mcp-addin.ps1`; it activates the
+driver-owned document and opens the **Open Control Panel** ribbon command before
+the session wait. Set `OFFICE_MCP_E2E_ACTIVATOR` to override it with another
+command, or set `OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR=0` for manual debugging.
+The driver passes `OFFICE_MCP_E2E_HOST`, `OFFICE_MCP_E2E_DOCUMENT_PATH`,
+`OFFICE_MCP_E2E_ADDIN_ORIGIN`, and `OFFICE_MCP_E2E_ADDIN_ENDPOINT` to the
+activator. Reports with `no-activator-configured` are useful for local manual
+debugging, but `npm run evidence:validate -- --require-office-tool-e2e` rejects
+them.
 
 ```powershell
 cd ..\..\office-ctl\word

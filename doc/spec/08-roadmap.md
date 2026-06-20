@@ -1306,7 +1306,12 @@ and cleanup, a first-class add-in activation step, MCP `tools/call`, and
 explicit session waiting through the `OFFICE_MCP_E2E_DRIVER` JSON step
 protocol. The default driver can invoke an external UI activator command through
 `OFFICE_MCP_E2E_ACTIVATOR`, passing host, document path, add-in origin, and
-add-in endpoint environment variables. The driver also supports generic
+add-in endpoint environment variables. When no custom activator is configured
+on Windows, the driver uses
+`src/office-ctl/common/scripts/activate-office-mcp-addin.ps1` to focus the
+driver-owned Office document and open the `Open Control Panel` ribbon command;
+`OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR=0` disables that fallback for manual
+diagnostics. The driver also supports generic
 setup/reset action metadata, setup-result bindings such as `${table.shape_id}`,
 resource-read bindings such as `${trackChanges.changes.0.fingerprint}`, generic
 direct-result assertions, and generic readback verification metadata. A case can

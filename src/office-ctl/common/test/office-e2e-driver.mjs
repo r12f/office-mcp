@@ -7,6 +7,7 @@ import http from 'node:http';
 
 const DRIVER_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(DRIVER_DIR, '../../../..');
+const DEFAULT_WINDOWS_ACTIVATOR = resolve(REPO_ROOT, 'src/office-ctl/common/scripts/activate-office-mcp-addin.ps1');
 const DEFAULT_TIMEOUT_MS = 120000;
 
 const request = await readRequest();
@@ -197,7 +198,8 @@ async function waitForSession(host, context) {
 }
 
 async function activateAddin(host, context) {
-  const command = process.env.OFFICE_MCP_E2E_ACTIVATOR;
+  const activation = activationCommand();
+  const command = activation.command;
   if (!command) return { activated: false, skipped: 'no-activator-configured' };
   const normalizedHost = normalizeHost(host);
   const document = context.document || {};
@@ -216,7 +218,23 @@ async function activateAddin(host, context) {
   });
   const exitCode = await waitForChildExit(child, Number(context.timeoutMs || 30000));
   if (exitCode !== 0) throw new Error(`Office add-in activator exited with code ${exitCode}.`);
-  return { activated: true, activator: command };
+  return { activated: true, activator: command, activator_kind: activation.kind };
+}
+
+function activationCommand() {
+  if (process.env.OFFICE_MCP_E2E_ACTIVATOR) {
+    return { command: process.env.OFFICE_MCP_E2E_ACTIVATOR, kind: 'custom' };
+  }
+  if (process.env.OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR === '0') {
+    return { command: '', kind: 'disabled' };
+  }
+  if (process.platform !== 'win32' || !existsSync(DEFAULT_WINDOWS_ACTIVATOR)) {
+    return { command: '', kind: 'unavailable' };
+  }
+  return {
+    command: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${DEFAULT_WINDOWS_ACTIVATOR}"`,
+    kind: 'default-windows-taskpane'
+  };
 }
 
 async function resetContent(_host, context) {
