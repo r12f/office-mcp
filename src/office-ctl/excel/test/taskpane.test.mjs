@@ -222,6 +222,10 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /case 'excel.create_pivot_table':/);
   assert.match(js, /case 'excel.update_pivot_table':/);
   assert.match(js, /async function getWorkbookInfoTool/);
+  const workbookInfoBody = functionBody(js, 'getWorkbookInfoTool');
+  assert.match(workbookInfoBody, /worksheets\.load\('items\/id,items\/name,items\/position,items\/visibility,items\/tabColor'\)/);
+  assert.match(js, /excel\.active_sheet_probe\.failed/);
+  assert.match(js, /worksheets\.items\[0\]/);
   assert.match(js, /async function listSheets/);
   assert.match(js, /async function updateSheet/);
   assert.match(js, /async function deleteSheet/);

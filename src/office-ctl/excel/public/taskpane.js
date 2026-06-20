@@ -412,7 +412,7 @@
       const workbook = context.workbook;
       const worksheets = workbook.worksheets;
       const tables = workbook.tables;
-      worksheets.load('items/id,items/name,items/visibility');
+      worksheets.load('items/id,items/name,items/position,items/visibility,items/tabColor');
       tables.load('items/name');
       await context.sync();
       let activeSheet = null;
@@ -423,6 +423,7 @@
         activeSheet = sheetInfo(sheet, true);
       } catch (error) {
         logger.warn('excel.active_sheet_probe.failed', error);
+        if (worksheets.items[0]) activeSheet = sheetInfo(worksheets.items[0], false);
       }
       return {
         title: documentInfo?.title || fileName(Office.context.document?.url || '') || 'Excel Workbook',
