@@ -384,6 +384,138 @@ function Open-OfficialSideloadDocument {
   }
 }
 
+function Set-ZipEntryText {
+  param(
+    [Parameter(Mandatory = $true)]$Zip,
+    [Parameter(Mandatory = $true)][string]$EntryName,
+    [Parameter(Mandatory = $true)][string]$Text
+  )
+
+  $existing = $Zip.GetEntry($EntryName)
+  if ($existing) { $existing.Delete() }
+  $entry = $Zip.CreateEntry($EntryName)
+  $stream = $entry.Open()
+  try {
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    $writer = New-Object System.IO.StreamWriter($stream, $encoding)
+    try { $writer.Write($Text) } finally { $writer.Dispose() }
+  } finally {
+    $stream.Dispose()
+  }
+}
+
+function Get-ZipEntryText {
+  param(
+    [Parameter(Mandatory = $true)]$Zip,
+    [Parameter(Mandatory = $true)][string]$EntryName
+  )
+
+  $entry = $Zip.GetEntry($EntryName)
+  if (-not $entry) { return "" }
+  $stream = $entry.Open()
+  try {
+    $reader = New-Object System.IO.StreamReader($stream)
+    try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
+  } finally {
+    $stream.Dispose()
+  }
+}
+
+function Ensure-XmlBeforeCloseTag {
+  param(
+    [Parameter(Mandatory = $true)][string]$Xml,
+    [Parameter(Mandatory = $true)][string]$Needle,
+    [Parameter(Mandatory = $true)][string]$Insert,
+    [Parameter(Mandatory = $true)][string]$CloseTag
+  )
+
+  if ($Xml -like "*$Needle*") { return $Xml }
+  return $Xml.Replace($CloseTag, "$Insert`r`n$CloseTag")
+}
+
+function Ensure-ExcelSideloadWebExtension {
+  param([Parameter(Mandatory = $true)][string]$WorkbookPath)
+
+  if ($hostKey -ne "excel") { return }
+  if (-not (Test-Path -LiteralPath $WorkbookPath)) {
+    Write-ActivatorLog "excel webextension injection skipped; workbook not found path=$WorkbookPath"
+    return
+  }
+  if ([string]::IsNullOrWhiteSpace($ManifestPath) -or -not (Test-Path -LiteralPath $ManifestPath)) {
+    Write-ActivatorLog "excel webextension injection skipped; manifest not found path=$ManifestPath"
+    return
+  }
+
+  try {
+    [xml]$manifest = Get-Content -LiteralPath $ManifestPath -Raw
+    $addinId = [string]$manifest.OfficeApp.Id
+    $addinVersion = [string]$manifest.OfficeApp.Version
+    $sourceLocation = [string]$manifest.OfficeApp.DefaultSettings.SourceLocation.DefaultValue
+    if ([string]::IsNullOrWhiteSpace($addinId)) { throw "Manifest Id is missing." }
+    if ([string]::IsNullOrWhiteSpace($addinVersion)) { $addinVersion = "1.0.0.0" }
+    if ([string]::IsNullOrWhiteSpace($sourceLocation)) { throw "Manifest SourceLocation is missing." }
+
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::Open($WorkbookPath, [System.IO.Compression.ZipArchiveMode]::Update)
+    try {
+      $contentTypes = Get-ZipEntryText -Zip $zip -EntryName "[Content_Types].xml"
+      $contentTypes = Ensure-XmlBeforeCloseTag -Xml $contentTypes -Needle "application/vnd.ms-office.webextensiontaskpanes+xml" -Insert '  <Override PartName="/xl/webextensions/taskpanes.xml" ContentType="application/vnd.ms-office.webextensiontaskpanes+xml"/>' -CloseTag "</Types>"
+      $contentTypes = Ensure-XmlBeforeCloseTag -Xml $contentTypes -Needle "application/vnd.ms-office.webextension+xml" -Insert '  <Override PartName="/xl/webextensions/webextension1.xml" ContentType="application/vnd.ms-office.webextension+xml"/>' -CloseTag "</Types>"
+      Set-ZipEntryText -Zip $zip -EntryName "[Content_Types].xml" -Text $contentTypes
+
+      $workbookRels = Get-ZipEntryText -Zip $zip -EntryName "xl/_rels/workbook.xml.rels"
+      if ([string]::IsNullOrWhiteSpace($workbookRels)) {
+        $workbookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>'
+      }
+      $workbookRels = Ensure-XmlBeforeCloseTag -Xml $workbookRels -Needle "relationships/webextensiontaskpanes" -Insert '  <Relationship Id="rIdOfficeMcpTaskpanes" Type="http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes" Target="webextensions/taskpanes.xml"/>' -CloseTag "</Relationships>"
+      Set-ZipEntryText -Zip $zip -EntryName "xl/_rels/workbook.xml.rels" -Text $workbookRels
+
+      $taskpanes = @'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<wetp:taskpanes xmlns:wetp="http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11">
+  <wetp:taskpane dockstate="right" visibility="1" width="350" row="4">
+    <wetp:webextensionref xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rIdOfficeMcpWebExtension"/>
+  </wetp:taskpane>
+</wetp:taskpanes>
+'@
+      Set-ZipEntryText -Zip $zip -EntryName "xl/webextensions/taskpanes.xml" -Text $taskpanes
+
+      $taskpaneRels = @'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdOfficeMcpWebExtension" Type="http://schemas.microsoft.com/office/2011/relationships/webextension" Target="webextension1.xml"/>
+</Relationships>
+'@
+      Set-ZipEntryText -Zip $zip -EntryName "xl/webextensions/_rels/taskpanes.xml.rels" -Text $taskpaneRels
+
+      $escapedManifestPath = [System.Security.SecurityElement]::Escape((Get-Item -LiteralPath $ManifestPath).FullName)
+      $escapedSourceLocation = [System.Security.SecurityElement]::Escape($sourceLocation)
+      $escapedAddinId = [System.Security.SecurityElement]::Escape($addinId)
+      $escapedVersion = [System.Security.SecurityElement]::Escape($addinVersion)
+      $webExtension = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<we:webextension xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11" id="{$escapedAddinId}">
+  <we:reference id="$escapedAddinId" version="$escapedVersion" store="$escapedManifestPath" storeType="FileSystem"/>
+  <we:alternateReferences/>
+  <we:properties>
+    <we:property name="Office.AutoShowTaskpaneWithDocument" value="true"/>
+    <we:property name="Office.AutoShowTaskpaneWithDocument.Url" value="$escapedSourceLocation"/>
+  </we:properties>
+  <we:bindings/>
+  <we:snapshot/>
+</we:webextension>
+"@
+      Set-ZipEntryText -Zip $zip -EntryName "xl/webextensions/webextension1.xml" -Text $webExtension
+    } finally {
+      $zip.Dispose()
+    }
+    Write-ActivatorLog "excel webextension injection completed path=$WorkbookPath manifest=$ManifestPath"
+  } catch {
+    Write-ActivatorLog "excel webextension injection failed path=$WorkbookPath error=$($_.Exception.Message)"
+  }
+}
+
 function Write-ActivationResult {
   param(
     [Parameter(Mandatory = $true)][string]$DocumentPath,
@@ -850,6 +982,7 @@ $activeDocumentPath = if ([string]::IsNullOrWhiteSpace($script:officialDocumentP
 if (-not [string]::IsNullOrWhiteSpace($script:officialDocumentPath)) {
   try {
     $copyWaitSeconds = [Math]::Min(8, [Math]::Max(3, $TimeoutSeconds / 3))
+    Ensure-ExcelSideloadWebExtension -WorkbookPath $activeDocumentPath
     Open-OfficialSideloadDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath
     $copyDeadline = (Get-Date).AddSeconds($copyWaitSeconds)
     $driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath -Deadline $copyDeadline

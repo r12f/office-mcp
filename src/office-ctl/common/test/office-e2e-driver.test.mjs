@@ -349,6 +349,12 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /official sideload document opened via shell path=\$Path/);
   assert.match(script, /official sideload excel document opened via new application path=\$Path/);
   assert.match(script, /New-Object -ComObject Excel\.Application/);
+  assert.match(script, /function Ensure-ExcelSideloadWebExtension/);
+  assert.match(script, /Ensure-ExcelSideloadWebExtension -WorkbookPath \$activeDocumentPath/);
+  assert.match(script, /application\/vnd\.ms-office\.webextension\+xml/);
+  assert.match(script, /application\/vnd\.ms-office\.webextensiontaskpanes\+xml/);
+  assert.match(script, /http:\/\/schemas\.microsoft\.com\/office\/2011\/relationships\/webextensiontaskpanes/);
+  assert.match(script, /Office\.AutoShowTaskpaneWithDocument/);
   assert.match(script, /function Try-OpenControlPanelForDriverDocument/);
   assert.match(script, /\$hostKey -ne "excel"/);
   assert.match(script, /\$tabNames = if \(\$hostKey -eq "excel"\)/);
