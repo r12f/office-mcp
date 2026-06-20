@@ -33,13 +33,13 @@ impl UiHttpService {
         registry: &Arc<Mutex<SessionRegistry>>,
     ) -> Option<WireHttpResponse> {
         if matches!(request.path.as_str(), "/ui" | "/ui/" | "/ui/index.html") {
-            return Some(self.assets.serve_ui_asset("index.html"));
+            return Some(StaticResponseService::serve_ui_asset("index.html"));
         }
         if request.path == "/ui/app.css" {
-            return Some(self.assets.serve_ui_asset("app.css"));
+            return Some(StaticResponseService::serve_ui_asset("app.css"));
         }
         if request.path == "/ui/app.js" {
-            return Some(self.assets.serve_ui_asset("app.js"));
+            return Some(StaticResponseService::serve_ui_asset("app.js"));
         }
         if request.path == "/ui/state" {
             return Some(self.ui_state_response(request, ui_state, registry));

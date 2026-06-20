@@ -19,7 +19,7 @@ pub fn tool_failure(code: &str, message: &str, tool: Option<&str>, retriable: bo
         "retriable": retriable,
         "partial_effect": null
     });
-    tool_error_result(error)
+    tool_error_result(&error)
 }
 
 #[must_use]
@@ -32,10 +32,10 @@ pub fn tool_failure_from_command(failure: &CommandFailure) -> Value {
         "retriable": failure.retriable,
         "partial_effect": partial_effect
     });
-    tool_error_result(error)
+    tool_error_result(&error)
 }
 
-fn tool_error_result(error: Value) -> Value {
+fn tool_error_result(error: &Value) -> Value {
     json!({
         "isError": true,
         "content": [{ "type": "text", "text": error.to_string() }],

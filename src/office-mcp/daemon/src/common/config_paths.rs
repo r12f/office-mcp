@@ -14,7 +14,7 @@ impl<'a> ConfigPathResolver<'a> {
     }
 
     #[must_use]
-    pub(crate) fn config_path(&self) -> PathBuf {
+    pub(crate) fn config_path(self) -> PathBuf {
         if cfg!(windows) {
             return PathBuf::from(
                 self.env
@@ -65,16 +65,16 @@ impl<'a> ConfigPathResolver<'a> {
     }
 
     #[must_use]
-    pub(crate) fn audit_path(&self) -> String {
+    pub(crate) fn audit_path(self) -> String {
         self.state_path("audit.jsonl")
     }
 
     #[must_use]
-    pub(crate) fn log_path(&self) -> String {
+    pub(crate) fn log_path(self) -> String {
         self.state_path("office-mcp.log")
     }
 
-    fn state_path(&self, filename: &str) -> String {
+    fn state_path(self, filename: &str) -> String {
         if cfg!(windows) {
             return PathBuf::from(
                 self.env

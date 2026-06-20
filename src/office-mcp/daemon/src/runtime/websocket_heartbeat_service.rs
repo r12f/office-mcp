@@ -59,9 +59,10 @@ impl WebSocketHeartbeatService {
             connection_id,
             SystemTime::now(),
         ) {
-            Ok(HeartbeatDecision::KeepOpen) => Ok(HeartbeatLoopDecision::KeepOpen),
             Ok(HeartbeatDecision::Close { .. }) => Ok(HeartbeatLoopDecision::Close),
-            Err(AddinChannelError::UnknownConnection(_)) => Ok(HeartbeatLoopDecision::KeepOpen),
+            Ok(HeartbeatDecision::KeepOpen) | Err(AddinChannelError::UnknownConnection(_)) => {
+                Ok(HeartbeatLoopDecision::KeepOpen)
+            }
             Err(error) => Err(RuntimeServerError::Internal(error.to_string())),
         }
     }

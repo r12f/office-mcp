@@ -39,21 +39,15 @@ fn stale_check_requires_stale_status_and_elapsed_grace() {
     let stale_since = SystemTime::UNIX_EPOCH + Duration::from_secs(10);
     let mut session = SessionInfo::new(new_session(), stale_since);
 
-    assert!(!session.is_stale_past(
-        stale_since + Duration::from_secs(120),
-        Duration::from_secs(60)
-    ));
+    assert!(!session.is_stale_past(stale_since + Duration::from_mins(2), Duration::from_mins(1)));
 
     session.status = SessionStatus::Stale;
     session.stale_since = Some(stale_since);
 
-    assert!(!session.is_stale_past(
-        stale_since + Duration::from_secs(60),
-        Duration::from_secs(60)
-    ));
+    assert!(!session.is_stale_past(stale_since + Duration::from_mins(1), Duration::from_mins(1)));
     assert!(session.is_stale_past(
         stale_since + Duration::from_secs(61),
-        Duration::from_secs(60)
+        Duration::from_mins(1)
     ));
 }
 

@@ -55,7 +55,7 @@ impl AddinRegistrationPolicy {
     }
 
     #[must_use]
-    pub(crate) fn runtime_from(&self, request: RegisterRequest, now: SystemTime) -> RuntimeInfo {
+    pub(crate) fn runtime_from(request: RegisterRequest, now: SystemTime) -> RuntimeInfo {
         RuntimeInfo {
             instance_id: request.instance_id,
             host: request.host,

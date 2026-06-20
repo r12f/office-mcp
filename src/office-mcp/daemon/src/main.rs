@@ -24,17 +24,17 @@ fn main() {
         [command] if command == "stdio" => run_stdio_bridge(),
         [command] if command == "sessions" => list_sessions(),
         [command, subcommand] if command == "daemon" && subcommand == "run" => {
-            serve_daemon_with_optional_tray(true)
+            serve_daemon_with_optional_tray(true);
         }
         [command, subcommand, flag]
             if command == "daemon" && subcommand == "run" && flag == "--no-tray" =>
         {
-            serve_daemon_with_optional_tray(false)
+            serve_daemon_with_optional_tray(false);
         }
         [command, subcommand, flag]
             if command == "daemon" && subcommand == "run" && flag == "--with-tray" =>
         {
-            serve_daemon_with_optional_tray(true)
+            serve_daemon_with_optional_tray(true);
         }
         [command, subcommand] if command == "daemon" && subcommand == "status" => {
             println!("{}", DaemonController::from_env().status_json());

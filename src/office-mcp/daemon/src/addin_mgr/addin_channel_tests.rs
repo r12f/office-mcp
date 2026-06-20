@@ -39,7 +39,7 @@ fn register_runtime_returns_server_settings_and_updates_registry() {
     let reply = server
         .register_runtime(
             &mut registry,
-            "connection-1".to_string(),
+            "connection-1",
             register_request("instance-1", ADDIN_PROTOCOL_VERSION),
             now,
         )
@@ -59,7 +59,7 @@ fn register_rejects_protocol_major_mismatch() {
     let error = server
         .register_runtime(
             &mut registry,
-            "connection-1".to_string(),
+            "",
             register_request("instance-1", "2.0"),
             SystemTime::UNIX_EPOCH,
         )
@@ -79,7 +79,7 @@ fn session_events_update_registry_with_instance_binding() {
     server
         .register_runtime(
             &mut registry,
-            "connection-1".to_string(),
+            "connection-1",
             register_request("instance-1", ADDIN_PROTOCOL_VERSION),
             now,
         )
@@ -141,7 +141,7 @@ fn session_added_rejects_wrong_instance() {
     server
         .register_runtime(
             &mut registry,
-            "connection-1".to_string(),
+            "connection-1",
             register_request("instance-1", ADDIN_PROTOCOL_VERSION),
             now,
         )
@@ -173,7 +173,7 @@ fn heartbeat_marks_session_stale_after_third_miss() {
     server
         .register_runtime(
             &mut registry,
-            "connection-1".to_string(),
+            "connection-1",
             register_request("instance-1", ADDIN_PROTOCOL_VERSION),
             now,
         )
@@ -265,7 +265,7 @@ fn writes_structured_tracing_events_for_addin_session_lifecycle() {
         server
             .register_runtime(
                 &mut registry,
-                "connection-1".to_string(),
+                "connection-1",
                 register_request("instance-1", ADDIN_PROTOCOL_VERSION),
                 now,
             )

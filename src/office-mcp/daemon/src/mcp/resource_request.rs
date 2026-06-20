@@ -12,6 +12,12 @@ pub enum ResourceReadRequest {
     },
 }
 
+/// Converts an MCP resource URI into the daemon-internal read request.
+///
+/// # Errors
+///
+/// Returns an error if the URI is unsupported, malformed, or references an
+/// unknown document session.
 pub fn resource_request_from_uri(
     registry: &SessionRegistry,
     uri: &str,

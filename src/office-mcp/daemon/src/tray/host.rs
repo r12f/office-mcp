@@ -55,7 +55,7 @@ impl TrayHost {
                 state_fetch_ok = probe["state_fetch_ok"].as_bool().unwrap_or(false),
                 "ran tray probe"
             );
-            println!("{}", probe);
+            println!("{probe}");
             return Ok(());
         }
         tracing::info!(

@@ -15,6 +15,11 @@ impl AddinConnectionHub {
         Self::default()
     }
 
+    /// Registers a new add-in WebSocket connection.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory connection hub mutex is poisoned.
     pub fn register_connection(&self, connection_id: &str) {
         let mut state = self.state.lock().expect("addin connection hub lock");
         state
@@ -23,6 +28,11 @@ impl AddinConnectionHub {
             .or_default();
     }
 
+    /// Binds an add-in runtime instance to an existing connection.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory connection hub mutex is poisoned.
     pub fn bind_instance(&self, connection_id: &str, instance_id: &str) {
         let mut state = self.state.lock().expect("addin connection hub lock");
         state
@@ -35,6 +45,11 @@ impl AddinConnectionHub {
             .insert(instance_id.to_string(), connection_id.to_string());
     }
 
+    /// Removes a connection and wakes any pending invocations.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory connection hub mutex is poisoned.
     pub fn remove_connection(&self, connection_id: &str) {
         let mut state = self.state.lock().expect("addin connection hub lock");
         if let Some(connection) = state.connections.remove(connection_id)
@@ -45,6 +60,15 @@ impl AddinConnectionHub {
         self.response_available.notify_all();
     }
 
+    /// Sends a tool invocation payload to an add-in instance and waits for its response.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no connection is bound to the instance or the response times out.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory connection hub mutex or condition variable is poisoned.
     pub fn invoke(
         &self,
         instance_id: &str,
@@ -89,6 +113,11 @@ impl AddinConnectionHub {
     }
 
     #[must_use]
+    /// Drains queued outbound payloads for a connection.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory connection hub mutex is poisoned.
     pub fn take_outbound(&self, connection_id: &str) -> Vec<String> {
         let mut state = self.state.lock().expect("addin connection hub lock");
         state
@@ -98,6 +127,11 @@ impl AddinConnectionHub {
             .unwrap_or_default()
     }
 
+    /// Queues a payload for a bound add-in instance.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory connection hub mutex is poisoned.
     pub fn send_to_instance(&self, instance_id: &str, payload: String) -> bool {
         let mut state = self.state.lock().expect("addin connection hub lock");
         let Some(connection_id) = state.connection_by_instance.get(instance_id).cloned() else {
@@ -111,6 +145,11 @@ impl AddinConnectionHub {
         true
     }
 
+    /// Completes a pending invocation from a JSON-RPC response payload.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory connection hub mutex is poisoned.
     pub fn complete_from_text(&self, text: &str) -> bool {
         let Ok(value) = serde_json::from_str::<Value>(text) else {
             return false;

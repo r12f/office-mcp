@@ -20,7 +20,7 @@ impl StaticResponseService {
     }
 
     #[must_use]
-    pub(crate) fn serve_ui_asset(&self, name: &str) -> WireHttpResponse {
+    pub(crate) fn serve_ui_asset(name: &str) -> WireHttpResponse {
         let Ok(asset) = UiAssetStore::default().read(name) else {
             return WireHttpResponse::text(404, "Not found".to_string());
         };

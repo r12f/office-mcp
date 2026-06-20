@@ -8,6 +8,7 @@ use crate::common::AuditLog;
 use std::sync::{Arc, Mutex};
 use std::thread;
 #[test]
+#[allow(clippy::too_many_lines)]
 fn mcp_json_rpc_lists_tools_and_connected_sessions() {
     let registry = registry_with_word_session();
 

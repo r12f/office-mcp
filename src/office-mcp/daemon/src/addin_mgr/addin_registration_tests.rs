@@ -38,10 +38,12 @@ fn rejects_protocol_major_mismatch() {
 
 #[test]
 fn builds_runtime_from_register_request() {
-    let policy = policy();
     let now = SystemTime::UNIX_EPOCH + Duration::from_secs(42);
 
-    let runtime = policy.runtime_from(register_request("instance-1", ADDIN_PROTOCOL_VERSION), now);
+    let runtime = AddinRegistrationPolicy::runtime_from(
+        register_request("instance-1", ADDIN_PROTOCOL_VERSION),
+        now,
+    );
 
     assert_eq!(runtime.instance_id, "instance-1");
     assert_eq!(runtime.host.app, "word");
@@ -52,7 +54,7 @@ fn builds_runtime_from_register_request() {
 #[test]
 fn builds_register_result_from_config() {
     let policy = policy();
-    let runtime = policy.runtime_from(
+    let runtime = AddinRegistrationPolicy::runtime_from(
         register_request("instance-1", ADDIN_PROTOCOL_VERSION),
         SystemTime::UNIX_EPOCH,
     );

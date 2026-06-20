@@ -33,7 +33,7 @@ impl RuntimeWebSocketSession {
             .connection_hub
             .register_connection(&connection_id);
         let result = self.run_loop(stream, shared_state, &connection_id);
-        self.remove_connection(shared_state, &connection_id);
+        Self::remove_connection(shared_state, &connection_id);
         result
     }
 
@@ -105,7 +105,7 @@ impl RuntimeWebSocketSession {
                     break;
                 }
                 Some(WebSocketFrame::Ping(payload)) => {
-                    WebSocketCodec::write_pong(stream, &payload)?
+                    WebSocketCodec::write_pong(stream, &payload)?;
                 }
                 Some(WebSocketFrame::Pong) => {}
                 None => break,
@@ -136,7 +136,7 @@ impl RuntimeWebSocketSession {
         }
     }
 
-    fn remove_connection(&self, shared_state: &Arc<RuntimeSharedState>, connection_id: &str) {
+    fn remove_connection(shared_state: &Arc<RuntimeSharedState>, connection_id: &str) {
         let stale_since = SystemTime::now();
         let mut registry = shared_state.registry.lock().expect("session registry lock");
         let mut addin_channel = shared_state

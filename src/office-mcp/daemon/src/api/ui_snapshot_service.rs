@@ -56,8 +56,14 @@ impl UiSnapshotService {
                 UiStateStore::new().snapshot(&sessions, SystemTime::now())
             }
         };
-        snapshot.daemon.mcp_endpoint = endpoints.mcp_endpoint.clone();
-        snapshot.daemon.addin_endpoint = endpoints.addin_endpoint.clone();
+        snapshot
+            .daemon
+            .mcp_endpoint
+            .clone_from(&endpoints.mcp_endpoint);
+        snapshot
+            .daemon
+            .addin_endpoint
+            .clone_from(&endpoints.addin_endpoint);
         let rendered = self.renderer.render_text(&snapshot);
         tracing::debug!(
             component = "ui_snapshot_service",

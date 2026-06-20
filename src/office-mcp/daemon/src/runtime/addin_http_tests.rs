@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 #[test]
 fn healthz_returns_ok_json() {
-    let response = route(request(HttpMethod::Get, "/healthz", BTreeMap::new()));
+    let response = route(&request(HttpMethod::Get, "/healthz", BTreeMap::new()));
 
     assert_eq!(response.status, 200);
     assert!(response_text(&response).contains("{\"ok\":true}"));
@@ -30,7 +30,7 @@ fn websocket_upgrade_accepts_exact_addin_origin() {
     let request = request(HttpMethod::Get, "/addin", headers);
 
     assert!(service.is_valid_websocket_upgrade(&request));
-    let response = route(request);
+    let response = route(&request);
 
     assert_eq!(response.status, 101);
     assert_eq!(
@@ -41,7 +41,7 @@ fn websocket_upgrade_accepts_exact_addin_origin() {
 
 #[test]
 fn websocket_upgrade_rejects_foreign_origin() {
-    let response = route(request(
+    let response = route(&request(
         HttpMethod::Get,
         "/addin",
         BTreeMap::from([
@@ -58,7 +58,7 @@ fn websocket_upgrade_rejects_foreign_origin() {
 
 #[test]
 fn ui_state_uses_origin_guard_and_snapshot_service() {
-    let allowed = route(request(
+    let allowed = route(&request(
         HttpMethod::Get,
         "/ui/state",
         BTreeMap::from([("origin".to_string(), "https://localhost:8765".to_string())]),
@@ -66,7 +66,7 @@ fn ui_state_uses_origin_guard_and_snapshot_service() {
     assert_eq!(allowed.status, 200);
     assert!(response_text(&allowed).contains("\"status\":\"up\""));
 
-    let forbidden = route(request(
+    let forbidden = route(&request(
         HttpMethod::Get,
         "/ui/state",
         BTreeMap::from([("origin".to_string(), "https://evil.example".to_string())]),
@@ -83,19 +83,19 @@ fn addin_diagnostics_accepts_local_events_and_rejects_foreign_origins() {
     );
     allowed.body = br#"{"host_app":"word","event":"websocket.error"}"#.to_vec();
 
-    let response = route(allowed);
+    let response = route(&allowed);
 
     assert_eq!(response.status, 200);
     assert!(response_text(&response).contains("{\"ok\":true}"));
 
-    let forbidden = route(request(
+    let forbidden = route(&request(
         HttpMethod::Post,
         "/addin/diagnostics",
         BTreeMap::from([("origin".to_string(), "https://evil.example".to_string())]),
     ));
     assert_eq!(forbidden.status, 403);
 
-    let method_not_allowed = route(request(
+    let method_not_allowed = route(&request(
         HttpMethod::Get,
         "/addin/diagnostics",
         BTreeMap::new(),
@@ -105,18 +105,22 @@ fn addin_diagnostics_accepts_local_events_and_rejects_foreign_origins() {
 
 #[test]
 fn non_get_requests_outside_addin_upgrade_are_rejected() {
-    let response = route(request(HttpMethod::Post, "/taskpane.html", BTreeMap::new()));
+    let response = route(&request(
+        HttpMethod::Post,
+        "/taskpane.html",
+        BTreeMap::new(),
+    ));
 
     assert_eq!(response.status, 405);
     assert!(response_text(&response).contains("Method not allowed"));
 }
 
-fn route(request: WireHttpRequest) -> crate::runtime::http_wire::WireHttpResponse {
+fn route(request: &WireHttpRequest) -> crate::runtime::http_wire::WireHttpResponse {
     let service = AddinHttpService::from_config(&RuntimeServerConfig::default());
     let ui_state = Arc::new(Mutex::new(UiStateStore::new()));
     let registry = Arc::new(Mutex::new(SessionRegistry::new()));
 
-    service.route_request(&ui_state, &registry, &request)
+    service.route_request(&ui_state, &registry, request)
 }
 
 fn request(method: HttpMethod, path: &str, headers: BTreeMap<String, String>) -> WireHttpRequest {

@@ -13,7 +13,7 @@ impl<'a> ConfigEnv<'a> {
     }
 
     #[must_use]
-    pub(crate) fn string_any(&self, names: &[&str], fallback: String) -> String {
+    pub(crate) fn string_any(self, names: &[&str], fallback: String) -> String {
         names
             .iter()
             .find_map(|name| self.values.get(*name).cloned())
@@ -21,7 +21,7 @@ impl<'a> ConfigEnv<'a> {
     }
 
     pub(crate) fn positive_int_any(
-        &self,
+        self,
         names: &[&str],
         fallback: u64,
     ) -> Result<u64, ConfigError> {
@@ -37,7 +37,7 @@ impl<'a> ConfigEnv<'a> {
             .ok_or_else(|| ConfigError::Validation(format!("{name} must be a positive integer")))
     }
 
-    pub(crate) fn bool_any(&self, names: &[&str], fallback: bool) -> Result<bool, ConfigError> {
+    pub(crate) fn bool_any(self, names: &[&str], fallback: bool) -> Result<bool, ConfigError> {
         let Some((name, raw)) = names
             .iter()
             .find_map(|name| self.values.get(*name).map(|raw| (*name, raw)))

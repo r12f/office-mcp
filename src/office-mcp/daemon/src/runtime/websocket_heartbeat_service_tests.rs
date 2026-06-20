@@ -20,7 +20,7 @@ fn start_ping_returns_json_payload_for_known_connection() {
     let json: Value = serde_json::from_str(&payload).expect("ping json");
 
     assert_eq!(json["method"], "ping");
-    assert_eq!(json["id"].as_str().expect("id").starts_with("ping-"), true);
+    assert!(json["id"].as_str().expect("id").starts_with("ping-"));
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn register_connection(shared_state: &RuntimeSharedState, connection_id: &str) {
     addin_channel
         .register_runtime(
             &mut registry,
-            connection_id.to_string(),
+            connection_id,
             RegisterRequest {
                 id: JsonRpcId::String("register-1".to_string()),
                 instance_id: "instance-1".to_string(),

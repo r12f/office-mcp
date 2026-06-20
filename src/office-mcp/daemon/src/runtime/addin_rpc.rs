@@ -65,7 +65,7 @@ impl AddinJsonRpcRuntime {
         let mut addin_channel = addin_channel.lock().expect("addin channel lock");
         match addin_channel.register_runtime(
             &mut registry,
-            connection_id.to_string(),
+            connection_id,
             request,
             SystemTime::now(),
         ) {

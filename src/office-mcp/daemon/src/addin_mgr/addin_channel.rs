@@ -69,17 +69,17 @@ impl AddinChannelServer {
     pub fn register_runtime(
         &mut self,
         registry: &mut SessionRegistry,
-        connection_id: String,
+        connection_id: &str,
         request: RegisterRequest,
         now: SystemTime,
     ) -> Result<JsonRpcEnvelope, AddinChannelError> {
         let request_id = request.id.clone();
         let registration = AddinRegistrationPolicy::new(SERVER_VERSION, ADDIN_PROTOCOL_VERSION);
-        registration.validate(&connection_id, &request)?;
-        let runtime = registration.runtime_from(request, now);
+        registration.validate(connection_id, &request)?;
+        let runtime = AddinRegistrationPolicy::runtime_from(request, now);
         registry.register_runtime(runtime.clone());
         self.connections.insert(
-            connection_id.clone(),
+            connection_id.to_string(),
             AddinConnectionState::new(runtime.instance_id.clone()),
         );
         tracing::info!(

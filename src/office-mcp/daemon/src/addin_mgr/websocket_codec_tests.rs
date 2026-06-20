@@ -64,7 +64,9 @@ fn assert_ws_error(error: WebSocketCodecError, close_code: u16, reason: &str) {
                 reason
             );
         }
-        other => panic!("expected websocket protocol error, got {other:?}"),
+        other @ WebSocketCodecError::Io(_) => {
+            panic!("expected websocket protocol error, got {other:?}")
+        }
     }
 }
 

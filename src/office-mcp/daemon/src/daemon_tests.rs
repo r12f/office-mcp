@@ -53,12 +53,7 @@ fn daemon_src_root_only_contains_composition_and_transitional_files() {
     let root_files = std::fs::read_dir(&src_dir)
         .expect("read daemon src dir")
         .filter_map(Result::ok)
-        .filter(|entry| {
-            entry
-                .file_type()
-                .map(|file_type| file_type.is_file())
-                .unwrap_or(false)
-        })
+        .filter(|entry| entry.file_type().is_ok_and(|file_type| file_type.is_file()))
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
         .collect::<BTreeSet<_>>();
 

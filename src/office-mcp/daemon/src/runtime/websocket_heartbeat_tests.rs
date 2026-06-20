@@ -45,7 +45,7 @@ fn skipped_ping_defers_until_next_interval() {
 
     state.mark_ping_skipped(now + Duration::from_secs(30));
 
-    assert!(!state.deadline_elapsed(now + Duration::from_secs(60)));
+    assert!(!state.deadline_elapsed(now + Duration::from_mins(1)));
     assert!(!state.should_start_ping(now + Duration::from_secs(59)));
-    assert!(state.should_start_ping(now + Duration::from_secs(60)));
+    assert!(state.should_start_ping(now + Duration::from_mins(1)));
 }
