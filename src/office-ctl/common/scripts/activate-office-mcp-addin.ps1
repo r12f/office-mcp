@@ -33,6 +33,7 @@ function Get-CanonicalPath {
 }
 
 Write-ActivatorLog "start host=$hostKey document=$DocumentPath"
+$script:officialDocumentPath = $null
 
 if ($DryRun) {
   Write-Output (@{
@@ -63,8 +64,25 @@ function Invoke-OfficialSideload {
     "powerpoint" { "PowerPoint" }
   }
   Write-ActivatorLog "official sideload start app=$appName manifest=$ManifestPath document=$DocumentPath"
-  $output = & npx --yes office-addin-dev-settings sideload $ManifestPath desktop --app $appName --document $DocumentPath 2>&1
-  Write-ActivatorLog "official sideload exit=$LASTEXITCODE output=$($output -join ' | ')"
+  try {
+    $manifestArg = '"' + $ManifestPath.Replace('"', '\"') + '"'
+    $documentArg = '"' + $DocumentPath.Replace('"', '\"') + '"'
+    $command = "npx --yes office-addin-dev-settings sideload $manifestArg desktop --app $appName --document $documentArg"
+    $output = & cmd.exe /d /s /c $command 2>&1
+    $exitCode = $LASTEXITCODE
+    Write-ActivatorLog "official sideload exit=$exitCode output=$($output -join ' | ')"
+    $launchLine = @($output | Where-Object { $_ -match '^Launching .* via (.+)$' } | Select-Object -First 1)
+    if ($launchLine -and ($launchLine -match '^Launching .* via (.+)$')) {
+      $script:officialDocumentPath = $Matches[1]
+      Write-ActivatorLog "official sideload document=$script:officialDocumentPath"
+    }
+    if ($exitCode -ne 0) {
+      Write-ActivatorLog "official sideload failed: exit=$exitCode"
+    }
+  } catch {
+    Write-ActivatorLog "official sideload failed: $($_.Exception.Message)"
+    Write-ActivatorLog "official sideload error detail: $($_ | Out-String)"
+  }
 }
 
 function Get-OfficeApplication {
@@ -118,6 +136,26 @@ function Activate-DriverDocument {
     }
   }
   throw "Could not find driver-owned $HostKey document: $target"
+}
+
+function Wait-ForDriverDocument {
+  param(
+    [Parameter(Mandatory = $true)]$Application,
+    [Parameter(Mandatory = $true)][string]$HostKey,
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)]$Deadline
+  )
+
+  $lastError = $null
+  do {
+    try {
+      return Activate-DriverDocument -Application $Application -HostKey $HostKey -Path $Path
+    } catch {
+      $lastError = $_.Exception.Message
+      Start-Sleep -Milliseconds 500
+    }
+  } while ((Get-Date) -lt $Deadline)
+  throw $lastError
 }
 
 function Find-DescendantByName {
@@ -231,9 +269,10 @@ function Try-OpenAddinFromCatalog {
 Invoke-OfficialSideload
 
 $app = Get-OfficeApplication -HostKey $hostKey
-$driverWindowHandle = Activate-DriverDocument -Application $app -HostKey $hostKey -Path $DocumentPath
-
+$activeDocumentPath = if ([string]::IsNullOrWhiteSpace($script:officialDocumentPath)) { $DocumentPath } else { $script:officialDocumentPath }
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+$driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath -Deadline $deadline
+
 do {
   Start-Sleep -Milliseconds 500
   $window = Get-OfficeWindowFromHandle -Handle $driverWindowHandle
@@ -244,7 +283,7 @@ do {
     Write-Output (@{
         activated = $true
         host = $hostKey
-        document_path = $DocumentPath
+        document_path = $activeDocumentPath
         control_name = "Open Control Panel"
       } | ConvertTo-Json -Compress)
     exit 0
@@ -258,7 +297,7 @@ do {
         Write-Output (@{
             activated = $true
             host = $hostKey
-            document_path = $DocumentPath
+            document_path = $activeDocumentPath
             control_name = "Open Control Panel"
             tab_name = $tabName
           } | ConvertTo-Json -Compress)
@@ -270,7 +309,7 @@ do {
     Write-Output (@{
         activated = $true
         host = $hostKey
-        document_path = $DocumentPath
+        document_path = $activeDocumentPath
         control_name = "Open Control Panel"
         activation_path = "catalog-fallback"
       } | ConvertTo-Json -Compress)

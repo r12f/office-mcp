@@ -272,7 +272,10 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
     report.document = summarizeDocument(document);
     if (typeof driver.activateAddin === 'function') {
       report.lifecycle_counts.activate_addin += 1;
-      report.addin_activation = summarizeActivation(await driver.activateAddin(document, { host, daemon }));
+      const activation = await driver.activateAddin(document, { host, daemon });
+      applyActivatedDocument(document, activation);
+      report.addin_activation = summarizeActivation(activation);
+      report.document = summarizeDocument(document);
     }
     report.lifecycle_counts.wait_for_session += 1;
     session = await driver.waitForSession(document, { host, daemon });
@@ -325,6 +328,13 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
       writeE2eReport(reportPath, report);
     }
   }
+}
+
+function applyActivatedDocument(document, activation) {
+  if (!document || !activation || typeof activation.document_path !== 'string') return;
+  if (!activation.document_path.trim()) return;
+  document.original_path ??= document.path;
+  document.path = activation.document_path;
 }
 
 function createE2eReport(host) {

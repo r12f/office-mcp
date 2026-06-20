@@ -27,6 +27,11 @@ test('Office E2E driver describes a driver-owned Word lifecycle', () => {
   assert.ok(document.keeper?.stderrPath, 'keeper stderr log is required');
   assert.match(document.script, /New-OfficeMcpBlankDocx/);
   assert.match(document.script, /Add-Type -AssemblyName System\.IO\.Compression;/);
+  assert.match(document.script, /docProps\/core\.xml/);
+  assert.match(document.script, /word\/_rels\/document\.xml\.rels/);
+  assert.match(document.script, /word\/styles\.xml/);
+  assert.match(document.script, /word\/settings\.xml/);
+  assert.match(document.script, /compatibilityMode/);
   assert.match(document.script, /\$app\.DisplayAlerts=0/);
   assert.match(document.script, /Documents\.Open/);
   assert.match(document.script, /\$confirmConversions=\$false/);
@@ -175,6 +180,7 @@ writeFileSync(${JSON.stringify(logPath)}, JSON.stringify({
   addinOrigin: process.env.OFFICE_MCP_E2E_ADDIN_ORIGIN,
   addinEndpoint: process.env.OFFICE_MCP_E2E_ADDIN_ENDPOINT
 }));
+console.log(JSON.stringify({ activated: true, document_path: 'sideload-copy.pptx' }));
 `);
   const previous = process.env.OFFICE_MCP_E2E_ACTIVATOR;
   process.env.OFFICE_MCP_E2E_ACTIVATOR = `${process.execPath} ${activatorPath}`;
@@ -189,7 +195,9 @@ writeFileSync(${JSON.stringify(logPath)}, JSON.stringify({
       }
     });
     assert.equal(activated.status, 0, activated.stderr);
-    assert.equal(JSON.parse(activated.stdout).activated, true);
+    const activatedResult = JSON.parse(activated.stdout);
+    assert.equal(activatedResult.activated, true);
+    assert.equal(activatedResult.document_path, 'sideload-copy.pptx');
   } finally {
     restoreEnv('OFFICE_MCP_E2E_ACTIVATOR', previous);
   }
@@ -234,7 +242,14 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   const script = readFileSync(DEFAULT_ACTIVATOR, 'utf8');
   assert.match(script, /office-addin-dev-settings/);
   assert.match(script, /sideload/);
+  assert.match(script, /cmd\.exe/);
   assert.match(script, /OFFICE_MCP_E2E_MANIFEST_PATH/);
+  assert.match(script, /officialDocumentPath/);
+  assert.match(script, /Launching .* via/);
+  assert.match(script, /Wait-ForDriverDocument/);
+  assert.match(script, /official sideload failed/);
+  assert.match(script, /official sideload error detail/);
+  assert.match(script, /try \{/);
   assert.match(script, /My Add-ins/);
   assert.match(script, /Office MCP Control/);
   assert.match(script, /Shared Folder/);

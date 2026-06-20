@@ -211,6 +211,41 @@ test('shared Office tool E2E loop writes lifecycle and per-tool report evidence'
   assert.equal(report.tool_runs[1].passed, true);
 });
 
+test('shared Office tool E2E loop uses activator-returned document path for session matching', async () => {
+  const events = [];
+  const driver = {
+    async startDaemon() { return { endpoint: 'http://127.0.0.1:0/mcp' }; },
+    async listTools() { return ['word.read']; },
+    async createDocument() { return { path: 'original.docx', createdByDriver: true, keeper: { closePath: 'close' } }; },
+    async activateAddin(document) {
+      events.push(`activate:${document.path}`);
+      return { activated: true, document_path: 'sideload-copy.docx' };
+    },
+    async waitForSession(document) {
+      events.push(`wait:${document.path}`);
+      return { sessionId: 'session-1', availableTools: ['word.read'] };
+    },
+    async resetContent(_toolCase, _session, context) { events.push(`reset:${context.document.path}`); },
+    async setupContent() {},
+    async callTool() { return { ok: true }; },
+    async verifyResult() {},
+    async cleanupDocument(document) { events.push(`cleanup:${document.path}`); }
+  };
+
+  await runOfficeToolE2e({
+    host: 'Word',
+    cases: { 'word.read': e2eCase('word.read', { setup: { actions: [{ tool: 'word.insert_paragraph', arguments: {} }] }, verify: directResult({ pathEquals: [{ path: 'ok', value: true }] }) }) },
+    driver
+  });
+
+  assert.deepEqual(events, [
+    'activate:original.docx',
+    'wait:sideload-copy.docx',
+    'reset:sideload-copy.docx',
+    'cleanup:sideload-copy.docx'
+  ]);
+});
+
 test('shared Office tool E2E loop writes failed report evidence before rethrowing', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-e2e-report-fail-'));
   const reportPath = join(dir, 'word-tools-report.json');

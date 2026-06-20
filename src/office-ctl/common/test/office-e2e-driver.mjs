@@ -187,12 +187,27 @@ function officeKeeperScript(host, path, closePath, readyPath, startedPath, error
   const retry = `function Invoke-Retry([scriptblock]$Action) { for ($i=0; $i -lt 90; $i++) { try { return & $Action } catch { if ($i -eq 89) { throw }; Start-Sleep -Milliseconds 500 } } }; <# retries RPC_E_CALL_REJECTED and transient Office COM busy states. #> `;
   const prelude = `${retry}Set-Content -LiteralPath '${started}' -Value 'office-mcp-keeper:start:${host}'; Write-Output 'office-mcp-keeper:start:${host}'; `;
   if (host === 'word') {
-    return `$ErrorActionPreference='Stop'; function Add-ZipPart([System.IO.Compression.ZipArchive]$Zip,[string]$Name,[string]$Value) { $entry=$Zip.CreateEntry($Name); $writer=New-Object System.IO.StreamWriter($entry.Open()); try { $writer.Write($Value) } finally { $writer.Dispose() } }; function New-OfficeMcpBlankDocx([string]$Path) { Add-Type -AssemblyName System.IO.Compression; Add-Type -AssemblyName System.IO.Compression.FileSystem; if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force }; $stream=[System.IO.File]::Open($Path,[System.IO.FileMode]::CreateNew); try { $zip=New-Object System.IO.Compression.ZipArchive($stream,[System.IO.Compression.ZipArchiveMode]::Create); try { Add-ZipPart $zip '[Content_Types].xml' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'; Add-ZipPart $zip '_rels/.rels' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'; Add-ZipPart $zip 'word/document.xml' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>office-mcp e2e baseline</w:t></w:r></w:p><w:sectPr/></w:body></w:document>' } finally { $zip.Dispose() } } finally { $stream.Dispose() } }; ${prelude}$app=$null; $doc=$null; try { New-OfficeMcpBlankDocx '${file}'; try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application') } catch { $app=New-Object -ComObject Word.Application }; $app.Visible=$true; $app.DisplayAlerts=0; $confirmConversions=$false; $readOnly=$false; $addToRecentFiles=$false; $doc=Invoke-Retry { $app.Documents.Open('${file}', $confirmConversions, $readOnly, $addToRecentFiles) }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
+    return wordKeeperScript(file, ready, error, prelude);
   }
   if (host === 'excel') {
     return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $wb=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application') } catch { $app=New-Object -ComObject Excel.Application }; $app.Visible=$true; $app.DisplayAlerts=$false; $wb=Invoke-Retry { $app.Workbooks.Add() }; $ws=$wb.Worksheets.Item(1); $ws.Cells.Item(1,1).Value2='office-mcp e2e baseline'; Invoke-Retry { $wb.SaveAs('${file}') }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
   }
   return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $pres=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application') } catch { $app=New-Object -ComObject PowerPoint.Application }; $pres=Invoke-Retry { $app.Presentations.Add($true) }; $slide=Invoke-Retry { $pres.Slides.Add(1, 1) }; $slide.Shapes.Title.TextFrame.TextRange.Text='office-mcp e2e baseline'; Invoke-Retry { $pres.SaveAs('${file}') }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
+}
+
+function wordKeeperScript(file, ready, error, prelude) {
+  const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/><Override PartName="/word/webSettings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml"/></Types>';
+  const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>';
+  const documentRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings" Target="webSettings.xml"/></Relationships>';
+  const core = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Office MCP E2E</dc:title><dc:creator>office-mcp</dc:creator><cp:lastModifiedBy>office-mcp</cp:lastModifiedBy></cp:coreProperties>';
+  const app = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Microsoft Office Word</Application></Properties>';
+  const document = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:t>office-mcp e2e baseline</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>';
+  const styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>';
+  const settings = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>';
+  const fontTable = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="Calibri"/></w:fonts>';
+  const webSettings = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>';
+
+  return `$ErrorActionPreference='Stop'; function Add-ZipPart([System.IO.Compression.ZipArchive]$Zip,[string]$Name,[string]$Value) { $entry=$Zip.CreateEntry($Name); $writer=New-Object System.IO.StreamWriter($entry.Open()); try { $writer.Write($Value) } finally { $writer.Dispose() } }; function New-OfficeMcpBlankDocx([string]$Path) { Add-Type -AssemblyName System.IO.Compression; Add-Type -AssemblyName System.IO.Compression.FileSystem; if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force }; $stream=[System.IO.File]::Open($Path,[System.IO.FileMode]::CreateNew); try { $zip=New-Object System.IO.Compression.ZipArchive($stream,[System.IO.Compression.ZipArchiveMode]::Create); try { Add-ZipPart $zip '[Content_Types].xml' '${psSingle(contentTypes)}'; Add-ZipPart $zip '_rels/.rels' '${psSingle(rootRels)}'; Add-ZipPart $zip 'docProps/core.xml' '${psSingle(core)}'; Add-ZipPart $zip 'docProps/app.xml' '${psSingle(app)}'; Add-ZipPart $zip 'word/_rels/document.xml.rels' '${psSingle(documentRels)}'; Add-ZipPart $zip 'word/document.xml' '${psSingle(document)}'; Add-ZipPart $zip 'word/styles.xml' '${psSingle(styles)}'; Add-ZipPart $zip 'word/settings.xml' '${psSingle(settings)}'; Add-ZipPart $zip 'word/fontTable.xml' '${psSingle(fontTable)}'; Add-ZipPart $zip 'word/webSettings.xml' '${psSingle(webSettings)}' } finally { $zip.Dispose() } } finally { $stream.Dispose() } }; ${prelude}$app=$null; $doc=$null; try { New-OfficeMcpBlankDocx '${file}'; try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application') } catch { $app=New-Object -ComObject Word.Application }; $app.Visible=$true; $app.DisplayAlerts=0; $confirmConversions=$false; $readOnly=$false; $addToRecentFiles=$false; $doc=Invoke-Retry { $app.Documents.Open('${file}', $confirmConversions, $readOnly, $addToRecentFiles) }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
 }
 
 function runOfficePowerShell(scriptPath, stdoutPath, stderrPath, timeoutMs = 45000) {
@@ -263,7 +278,7 @@ async function activateAddin(host, context) {
   const child = spawn(command, [], {
     shell: true,
     windowsHide: true,
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
       OFFICE_MCP_E2E_HOST: normalizedHost,
@@ -274,9 +289,28 @@ async function activateAddin(host, context) {
       OFFICE_MCP_E2E_ACTIVATOR_LOG: activatorLogPath
     }
   });
-  const exitCode = await waitForChildExit(child, Number(context.timeoutMs || 30000), () => activatorLogDetail(activatorLogPath));
-  if (exitCode !== 0) throw new Error(`Office add-in activator exited with code ${exitCode}.${activatorLogDetail(activatorLogPath)}`);
-  return { activated: true, activator: command, activator_kind: activation.kind, log_path: activatorLogPath };
+  const result = await waitForChildExit(child, Number(context.timeoutMs || 30000), () => activatorLogDetail(activatorLogPath));
+  if (result.exitCode !== 0) throw new Error(`Office add-in activator exited with code ${result.exitCode}.${activatorLogDetail(activatorLogPath)}`);
+  return {
+    activated: true,
+    ...parseActivatorResult(result.stdout),
+    activator: command,
+    activator_kind: activation.kind,
+    log_path: activatorLogPath
+  };
+}
+
+function parseActivatorResult(stdout) {
+  const text = String(stdout || '').trim();
+  if (!text) return {};
+  const line = text.split(/\r?\n/).reverse().find((entry) => entry.trim().startsWith('{'));
+  if (!line) return {};
+  try {
+    const parsed = JSON.parse(line);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 function manifestPathForHost(host) {
@@ -719,6 +753,12 @@ async function waitForProcessExit(pid, timeoutMs) {
 
 function waitForChildExit(child, timeoutMs, detail = () => '') {
   return new Promise((resolvePromise, reject) => {
+    let stdout = '';
+    let stderr = '';
+    child.stdout?.setEncoding('utf8');
+    child.stderr?.setEncoding('utf8');
+    child.stdout?.on('data', (chunk) => { stdout += chunk; });
+    child.stderr?.on('data', (chunk) => { stderr += chunk; });
     const timer = setTimeout(() => {
       child.kill();
       reject(new Error(`Timed out waiting ${timeoutMs} ms for Office add-in activator to exit.${detail()}`));
@@ -729,7 +769,7 @@ function waitForChildExit(child, timeoutMs, detail = () => '') {
     });
     child.once('exit', (code) => {
       clearTimeout(timer);
-      resolvePromise(code ?? 0);
+      resolvePromise({ exitCode: code ?? 0, stdout, stderr });
     });
   });
 }
