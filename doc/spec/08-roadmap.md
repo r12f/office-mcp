@@ -1296,6 +1296,17 @@ channel, and MCP `tools/call` dispatch.
 - [x] The E2E suite must be runnable separately from release evidence commands.
       Evidence recorders may consume its output later, but passing E2E is its
       own gate and must not be implemented as `npm run evidence:*`.
+- [ ] Fix live Office E2E window/process cleanup across Word, Excel, and
+      PowerPoint. The current Windows sideload activator can open both the
+      original driver-created file and an Office-generated `* add-in ...` copy,
+      and failures can leave driver-owned Office windows/processes behind. The
+      harness must keep only one visible driver-owned test file per host run,
+      close the original after the sideload copy becomes active, close all
+      driver-owned sideload copies in `finally` even when activation/session/tool
+      verification fails, quit the Office app when no user documents remain, and
+      delete all generated temp files. This is a release blocker for Word as
+      well as PowerPoint; the developer must never have to close E2E-created
+      Office windows by hand.
 
 Current implementation evidence: `src/office-ctl/common/test/tool-e2e-contract.mjs`
 owns the shared table-driven loop and exact coverage checks; Word, Excel, and

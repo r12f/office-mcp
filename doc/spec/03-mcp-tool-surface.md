@@ -222,6 +222,15 @@ The host E2E harness owns the common lifecycle:
 5. Run one table-driven loop over the exact advertised tools.
 6. Close the driver-owned Office file and delete it during cleanup.
 
+Cleanup is part of the E2E contract, not a convenience. The live driver MUST
+close every driver-owned file it opened, including Office sideload copies such
+as `Word add-in ...docx`, `Excel add-in ...xlsx`, or `PowerPoint add-in
+...pptx`, and it MUST quit the Office application when no non-driver-owned
+documents remain. A failed activation, failed session wait, failed tool call,
+or failed verifier MUST still run cleanup in `finally`. The command is not
+release-ready if it leaves driver-owned Word, Excel, or PowerPoint windows,
+Office processes, or temporary Office files for the developer to close by hand.
+
 The normal E2E gate MUST use one Office application/document lifecycle per host
 run: open the host program and driver-owned test file once, connect one add-in
 session, run every advertised tool for that session, and then perform cleanup
