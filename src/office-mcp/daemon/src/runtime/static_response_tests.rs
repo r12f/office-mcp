@@ -6,7 +6,7 @@ fn serves_word_taskpane_static_asset() {
 
     assert!(response.starts_with("HTTP/1.1 200 OK"));
     assert!(response.contains("Content-Type: text/html; charset=utf-8"));
-    assert!(response.contains("Office MCP"));
+    assert!(response.contains("MCP Control"));
     assert!(response.contains("taskpane-shell"));
     assert!(response.contains("/common/browser-ui.js"));
     assert!(response.contains("/common/addin-channel.js"));
@@ -41,7 +41,7 @@ fn serves_versioned_addin_static_assets_with_query_strings() {
 fn serves_excel_taskpane_static_assets() {
     let html = response_text(&service().serve_addin_asset("/excel/taskpane.html"));
     assert!(html.starts_with("HTTP/1.1 200 OK"));
-    assert!(html.contains("Office MCP Control"));
+    assert!(html.contains("MCP Control"));
     assert!(html.contains("/excel/taskpane.js?v=0.1.11"));
     assert!(html.contains("/common/addin-channel.js?v=0.1.11"));
 
@@ -64,7 +64,7 @@ fn serves_excel_taskpane_static_assets() {
 fn serves_powerpoint_taskpane_static_assets() {
     let html = response_text(&service().serve_addin_asset("/powerpoint/taskpane.html"));
     assert!(html.starts_with("HTTP/1.1 200 OK"));
-    assert!(html.contains("Office MCP Control"));
+    assert!(html.contains("MCP Control"));
     assert!(html.contains("/powerpoint/taskpane.js?v=0.1.4"));
     assert!(html.contains("/common/taskpane.css?v=0.1.4"));
     assert!(html.contains("/common/addin-channel.js?v=0.1.4"));

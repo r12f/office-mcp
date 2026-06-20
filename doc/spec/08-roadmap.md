@@ -404,35 +404,35 @@ and server/protocol metadata fits on one row.
 
 User-reported follow-up from the current Word task pane build:
 
-- [ ] Add a top-level capability mode control to the `Tools` surface with three
+- [x] Add a top-level capability mode control to the `Tools` surface with three
       states: `Read`, `Write`, and `All`. `Read` enables only read-only tools;
       `Write` enables read tools plus mutating non-destructive tools; `All`
       enables every supported tool, including delete/destructive operations.
       The selected mode updates the effective `available_tools` for the current
       session and still allows individual per-tool toggles inside the selected
       ceiling.
-- [ ] Simplify every tools count from `Enabled X of Y` to `X/Y`. Category rows
+- [x] Simplify every tools count from `Enabled X of Y` to `X/Y`. Category rows
       must right-align the count and place it immediately before the category
       toggle. The aggregate tools header may also use `X/Y`.
-- [ ] Fix the `Daemon` metadata row height in Word, Excel, and PowerPoint task
+- [x] Fix the `Daemon` metadata row height in Word, Excel, and PowerPoint task
       panes. The endpoint row must vertically center with the other document
       metadata rows; the reconnect control is an icon-only button and must not
       make the row card-height.
-- [ ] Shorten the constrained task-pane title/category text from
+- [x] Shorten the constrained task-pane title/category text from
       `Office MCP Control` to `MCP Control` where it is used as the panel title
       or local category label. Keep the full product name for catalog,
       installer, tray tooltip, and other wider identity surfaces. Add the
       generated product mark to visible `Open Control Panel` buttons.
-- [ ] Replace the current Word tool UI grouping by action buckets
+- [x] Replace the current Word tool UI grouping by action buckets
       (`Read`/`Insert`/`Edit`) with object-owner categories from
       [04-word-capabilities.md](04-word-capabilities.md): Document & structure,
       Range & selection, Paragraphs & lists, Tables, Media, Content controls,
       and Review. Side-effect level remains separate metadata used by the
       `Read`/`Write`/`All` permission mode.
-- [ ] Prevent category collapse when clicking category toggles or per-tool
+- [x] Prevent category collapse when clicking category toggles or per-tool
       toggles. Only the explicit category disclosure hit target changes expanded
       state; toggle clicks update permissions only.
-- [ ] Add task pane contract tests for the new count placement, `Read`/`Write`/
+- [x] Add task pane contract tests for the new count placement, `Read`/`Write`/
       `All` top-level mode, non-collapsing toggles, compact daemon row, `MCP
       Control` local title, `Open Control Panel` icon, and object-owner Word
       categories across Word, Excel, and PowerPoint where applicable.
@@ -441,6 +441,12 @@ User-reported follow-up from the current Word task pane build:
 categories, compact right-aligned counts, a top-level permission mode, and
 independent non-collapsing toggles; the daemon row is vertically centered and no
 long title or text-only control-panel button wastes scarce task-pane space.
+
+Implementation evidence: `feat: polish task pane tool controls` added the
+shared `Read`/`Write`/`All` mode UI, compact `X/Y` counts, object-owner Word
+groups, compact PowerPoint daemon row, and Word/Excel/PowerPoint task pane
+contract tests. Verification passed with `npm test` in each Office add-in and
+`cargo test -p office-mcp-daemon static_response`.
 
 ### M6.5.3 — Product identity, add-in metadata, and native tray polish
 
