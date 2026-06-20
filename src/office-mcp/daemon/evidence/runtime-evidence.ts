@@ -31,7 +31,7 @@ type OfficeE2eSessionContext = {
   document?: OfficeE2eDriverContext;
 };
 
-type OfficeE2eHost = 'Excel' | 'PowerPoint';
+type OfficeE2eHost = 'Word' | 'Excel' | 'PowerPoint';
 
 const evidenceRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(evidenceRoot, '../../../..');
@@ -43,6 +43,7 @@ const outputPath = resolve(readOption('--output') ?? join(repoRoot, 'artifacts/r
 const requestedSessionId = readOption('--session-id');
 const includeMutation = hasFlag('--include-mutation');
 const includeFullWordSmoke = hasFlag('--include-full-word-smoke');
+const useWordE2eSession = hasFlag('--word-e2e-session');
 const includeExcelSmoke = hasFlag('--include-excel-smoke');
 const useExcelE2eSession = hasFlag('--excel-e2e-session');
 const includePowerPointSmoke = hasFlag('--include-powerpoint-smoke');
@@ -53,6 +54,7 @@ const irmMode = readOption('--irm-mode') ?? 'none';
 const irmDocumentPath = readOption('--irm-document-path') ?? process.env.OFFICE_MCP_IRM_DOCUMENT_PATH;
 const waitForSessionMs = intOption('--wait-for-session-ms', 0);
 const agentClientEvidencePath = readOption('--agent-client-evidence-path') ?? process.env.OFFICE_MCP_AGENT_CLIENT_EVIDENCE_PATH;
+let wordSmokeDocumentUrl = process.env.OFFICE_MCP_SMOKE_DOCUMENT_URL ?? '';
 const wantsWordRuntime = Boolean(
   requestedSessionId ||
   irmDocumentPath ||
@@ -92,12 +94,14 @@ try {
     const waitResult = await runWaitForHostSessionGate('powerpoint', waitForSessionMs);
     sessions = Array.isArray(waitResult.sessions) ? waitResult.sessions as Array<Record<string, unknown>> : sessions;
   }
-  const sessionId = wantsWordBaseline ? requestedSessionId ?? selectWordSessionId(sessions, irmDocumentPath) : '';
+  let sessionId = wantsWordBaseline ? requestedSessionId ?? selectWordSessionId(sessions, irmDocumentPath) : '';
   const excelSessionId = selectHostSessionId(sessions, 'excel');
   const powerPointSessionId = selectHostSessionId(sessions, 'powerpoint');
   if (sessionId) report.session_id = sessionId;
 
-  if (!sessionId && wantsWordBaseline) {
+  if (useWordE2eSession) {
+    sessionId = await runWordE2eSessionSmoke();
+  } else if (!sessionId && wantsWordBaseline) {
     const reason = irmDocumentPath
       ? `No connected Word add-in session matched the requested IRM document path: ${irmDocumentPath}. Open that document and open Office MCP Control, then rerun this script.`
       : 'No connected Word add-in session. Open Word, open Office MCP Control, then rerun this script.';
@@ -439,6 +443,54 @@ async function runExcelE2eSessionSmoke(): Promise<void> {
     });
     if (context.daemon) await runOfficeE2eDriverStep('Excel', 'stopDaemon', context).catch((error) => {
       addGate('excel.e2e_stop_daemon', 'failed', { error: errorMessage(error) });
+      return {};
+    });
+  }
+}
+
+async function runWordE2eSessionSmoke(): Promise<string> {
+  const context: OfficeE2eSessionContext = {};
+  let sessionId = '';
+  try {
+    await runGate('word.e2e_session', async () => {
+      const daemon = await runOfficeE2eDriverStep('Word', 'startDaemon', context);
+      context.daemon = daemon;
+      const document = await runOfficeE2eDriverStep('Word', 'createDocument', context);
+      context.document = document;
+      wordSmokeDocumentUrl = String(document.path ?? '');
+      await runOfficeE2eDriverStep('Word', 'activateAddin', context);
+      const session = await runOfficeE2eDriverStep('Word', 'waitForSession', context);
+      sessionId = String(session.sessionId ?? '');
+      if (!sessionId) throw new Error('Word E2E driver did not return a sessionId.');
+      report.session_id = sessionId;
+      return {
+        session_id: sessionId,
+        driver: officeE2eDriverPath,
+        daemon_started_by_driver: daemon.startedByDriver,
+        document_path: document.path,
+        available_tool_count: Array.isArray(session.availableTools) ? session.availableTools.length : undefined
+      };
+    });
+    if (sessionId) {
+      await runWordReadGate(sessionId);
+      if (includeMutation) await runWordMutationGate(sessionId);
+      if (includeFullWordSmoke) await runFullWordSmokeGate(sessionId);
+      await runAgentClientBridgeGate(sessionId);
+      await runClaudeDesktopInstallationGate();
+      await runAgentClientPromptGate(agentClientEvidencePath);
+      if (includeTrackedChanges) await runTrackedChangeGate(sessionId);
+      if (includeComTrackedChanges) await runComTrackedChangeGate(sessionId);
+      await runIrmGate(sessionId, irmMode, undefined, irmDocumentPath);
+      if (irmDocumentPath) await runIrmDocumentPreflightGate(irmDocumentPath);
+    }
+    return sessionId;
+  } finally {
+    if (context.document) await runOfficeE2eDriverStep('Word', 'cleanupDocument', context).catch((error) => {
+      addGate('word.e2e_cleanup', 'failed', { error: errorMessage(error) });
+      return {};
+    });
+    if (context.daemon) await runOfficeE2eDriverStep('Word', 'stopDaemon', context).catch((error) => {
+      addGate('word.e2e_stop_daemon', 'failed', { error: errorMessage(error) });
       return {};
     });
   }
@@ -807,7 +859,8 @@ function runSmokeMode(mode: string, sessionId: string, extraArg?: string): strin
   const raw = execFileSync(process.execPath, [tsxCli, ...args], {
     cwd: evidenceRoot,
     encoding: 'utf8',
-    maxBuffer: 20 * 1024 * 1024
+    maxBuffer: 20 * 1024 * 1024,
+    env: { ...process.env, OFFICE_MCP_SMOKE_DOCUMENT_URL: wordSmokeDocumentUrl }
   });
   const jsonStart = raw.indexOf('{');
   if (jsonStart === -1) throw new Error(`Smoke mode ${mode} did not emit JSON.`);

@@ -24,12 +24,15 @@
 - [x] Architecture & protocol specs
 - [x] Automated feasibility harness: protocol, MCP transport, WSS, manifest,
       stable API types, requirement-set boundaries, and save behavior
-- [x] Consented Word runtime smoke test plus representative IRM rights matrix
-      (`npm run evidence:runtime -- --include-full-word-smoke
-      --include-com-tracked-changes` generates structured full Word runtime
-      evidence from `src/office-mcp/daemon/evidence`; `npm run evidence:irm`
-      plus `--require-irm-preflight` and `--require-irm` validates the
-      representative protected document)
+- [x] Consented Word runtime smoke test plus representative IRM rights matrix.
+      `npm run evidence:word` now owns a self-contained live Word document
+      lifecycle: it starts or reuses the daemon, creates a driver-owned
+      document, activates the add-in, records a `word.e2e_session` gate, runs
+      Word read/mutation/full-smoke/COM tracked-change evidence, cleans up the
+      document, and writes `artifacts/runtime-evidence-word.json`. `npm run
+      evidence:runtime` aliases that self-contained Word run. `npm run
+      evidence:irm` plus `--require-irm-preflight` and `--require-irm`
+      validates the representative protected document.
 - [x] Repository scaffolding (Rust daemon package + Word `src/office-ctl/word/` scaffold)
 - [x] CI matrix (Win x64, macOS arm64, Linux x64 for the server; manifest + task pane syntax check for the add-in)
 

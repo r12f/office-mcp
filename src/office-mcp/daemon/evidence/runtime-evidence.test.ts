@@ -128,6 +128,33 @@ test('Excel runtime evidence can own the live Office E2E lifecycle', () => {
   assert.doesNotMatch(roadmap, /fresh live Excel run is still required/i);
 });
 
+test('Word runtime evidence can own the live Office E2E lifecycle', () => {
+  const source = readFileSync(evidencePath('runtime-evidence.ts'), 'utf8');
+  const packageJson = readFileSync(evidencePath('package.json'), 'utf8');
+  const roadmap = readFileSync(resolve(process.cwd(), '../../../../doc/spec/08-roadmap.md'), 'utf8');
+
+  assert.match(source, /--word-e2e-session/);
+  assert.match(source, /type OfficeE2eHost = 'Word' \| 'Excel' \| 'PowerPoint'/);
+  assert.match(source, /runWordE2eSessionSmoke/);
+  assert.match(source, /runOfficeE2eDriverStep\('Word', 'startDaemon'/);
+  assert.match(source, /runOfficeE2eDriverStep\('Word', 'createDocument'/);
+  assert.match(source, /runOfficeE2eDriverStep\('Word', 'activateAddin'/);
+  assert.match(source, /runOfficeE2eDriverStep\('Word', 'waitForSession'/);
+  assert.match(source, /runOfficeE2eDriverStep\('Word', 'cleanupDocument'/);
+  assert.match(source, /runOfficeE2eDriverStep\('Word', 'stopDaemon'/);
+  assert.match(source, /word\.e2e_session/);
+  assert.match(source, /await runWordReadGate\(sessionId\)/);
+  assert.match(source, /if \(includeMutation\) await runWordMutationGate\(sessionId\)/);
+  assert.match(source, /if \(includeFullWordSmoke\) await runFullWordSmokeGate\(sessionId\)/);
+  assert.match(source, /if \(includeComTrackedChanges\) await runComTrackedChangeGate\(sessionId\)/);
+  assert.match(source, /wordSmokeDocumentUrl/);
+  assert.match(source, /OFFICE_MCP_SMOKE_DOCUMENT_URL/);
+  assert.match(packageJson, /"evidence:word"[^\n]+--word-e2e-session/);
+  assert.match(roadmap, /self-contained live Word document/);
+  assert.match(roadmap, /word\.e2e_session/);
+  assert.doesNotMatch(roadmap, /fresh live Word run is still required/i);
+});
+
 test('Excel runtime smoke uses worksheet names within Excel limits', () => {
   const source = readFileSync(evidencePath('runtime-evidence.ts'), 'utf8');
 

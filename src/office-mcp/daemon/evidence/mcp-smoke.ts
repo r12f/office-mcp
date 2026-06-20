@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 
 const endpoint = process.argv[2] ?? 'http://127.0.0.1:8800/mcp';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../..');
+const smokeDocumentUrl = process.env.OFFICE_MCP_SMOKE_DOCUMENT_URL ?? '';
 let client = new Client({ name: 'office-mcp-smoke', version: '0.1.0' });
 let transport = new StreamableHTTPClientTransport(new URL(endpoint));
 const ONE_BY_ONE_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -129,7 +130,7 @@ if (mode === 'sessions') {
     arguments: { session_id: sessionId, find: 'scope target', replace: 'scoped replacement', scope: { paragraph_range: [0, 999] }, partial_ok: true }
   });
   const info = toolJson(await client.callTool({ name: 'office.get_session_info', arguments: { session_id: sessionId } }));
-  const bookmark = createComBookmark(info.document?.url, 'OfficeMcpSpecArgs' + String(suffix).slice(-8));
+  const bookmark = createComBookmark(info.document?.url ?? smokeDocumentUrl, 'OfficeMcpSpecArgs' + String(suffix).slice(-8));
   const bookmarkComment = await client.callTool({
     name: 'word.add_comment',
     arguments: { session_id: sessionId, anchor: { kind: 'bookmark', name: bookmark.name }, text: 'Bookmark anchor smoke ' + suffix }
@@ -210,7 +211,7 @@ if (mode === 'sessions') {
   const action = parseTrackChangeAction(process.argv[5] ?? 'accept');
   if (!sessionId) throw new Error('word-track-change-com mode requires a session ID argument');
   const info = toolJson(await client.callTool({ name: 'office.get_session_info', arguments: { session_id: sessionId } }));
-  const documentUrl = info.document?.url;
+  const documentUrl = info.document?.url ?? smokeDocumentUrl;
   if (!documentUrl) throw new Error('Selected session does not expose a local document URL for COM smoke.');
   const com = createComTrackedChange(documentUrl, action);
   const mutation = await mutateFirstTrackedChange(sessionId, action);
