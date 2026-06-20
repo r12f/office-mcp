@@ -8,6 +8,7 @@ import {
 } from '../../common/test/tool-e2e-contract.mjs';
 
 const ADDIN_ROOT = process.cwd();
+const PNG_1X1_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
 const WORD_E2E_CASES = Object.fromEntries([
   ['word.get_text', { verify: 'direct-result' }],
@@ -29,7 +30,23 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { contains: ['insert anchor marker', 'E2E paragraph'] }
     }
   }],
-  ['word.insert_image', { args: { anchor: { kind: 'end_of_document' }, image: { base64: 'fixture' } } }],
+  ['word.insert_image', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'image anchor marker' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'image anchor marker' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'E2E image', width_pt: 24, height_pt: 24 },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        pathEquals: [
+          { path: 'inserted', value: true },
+          { path: 'mime_type', value: 'image/png' }
+        ]
+      }
+    }
+  }],
   ['word.insert_table', {
     setup: {
       actions: [
@@ -44,7 +61,18 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { contains: ['E2E-A', 'E2E-B'] }
     }
   }],
-  ['word.insert_page_break', { args: { anchor: { kind: 'end_of_document' } } }],
+  ['word.insert_page_break', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'page break anchor marker' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'page break anchor marker' } },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'inserted', value: true }, { path: 'break_type', value: 'page' }] }
+    }
+  }],
   ['word.insert_list', {
     setup: {
       actions: [
@@ -101,7 +129,18 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { notContains: ['Delete this E2E paragraph'] }
     }
   }],
-  ['word.apply_formatting', { args: { anchor: { kind: 'paragraph_index', index: 0 }, formatting: { bold: true } } }],
+  ['word.apply_formatting', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Format this E2E paragraph' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'Format this E2E paragraph' }, formatting: { bold: true, color: '#1F4E79' } },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'formatted', value: true }] }
+    }
+  }],
   ['word.read_table', { verify: 'direct-result' }],
   ['word.update_table', {
     setup: {
@@ -174,10 +213,44 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { contains: ['E2E Styled Heading'], pathEquals: [{ path: 'headings.0.level', value: 1 }] }
     }
   }],
-  ['word.add_comment', { args: { anchor: { kind: 'paragraph_index', index: 0 }, text: 'E2E comment' } }],
-  ['word.resolve_comment', { args: { comment_index: 0 } }],
+  ['word.add_comment', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Comment target paragraph' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'Comment target paragraph' }, text: 'E2E comment' },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'content', value: 'E2E comment' }, { path: 'resolved', value: false }] }
+    }
+  }],
+  ['word.resolve_comment', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Resolve comment target' } },
+        { tool: 'word.add_comment', saveAs: 'commentResult', arguments: { anchor: { kind: 'after_text', text: 'Resolve comment target' }, text: 'Resolve me E2E' } }
+      ]
+    },
+    args: { comment_id: '${commentResult.comment_id}' },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'resolved', value: true }] }
+    }
+  }],
   ['word.update_tracked_change', { args: { change_index: 0, action: 'accept', expected_fingerprint: 'fixture' } }],
-  ['word.save', {}]
+  ['word.save', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Save dirty marker' } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'saved', value: true }] }
+    }
+  }]
 ].map(([tool, options]) => [tool, e2eCase(tool, options)]));
 
 test('Word E2E case table covers every advertised tool', () => {
@@ -196,6 +269,12 @@ test('Word mutating E2E cases define concrete setup and readback checks', () => 
   assertConcreteReadback('word.update_content_control');
   assertConcreteReadback('word.delete_content_control');
   assertConcreteReadback('word.apply_style');
+  assertDirectResult('word.insert_image');
+  assertDirectResult('word.insert_page_break');
+  assertDirectResult('word.apply_formatting');
+  assertDirectResult('word.add_comment');
+  assertDirectResult('word.resolve_comment');
+  assertDirectResult('word.save');
 });
 
 test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
@@ -212,4 +291,11 @@ function assertConcreteReadback(tool) {
   if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
   if (!toolCase.verify.readbackTool) throw new Error(`${tool} must define a readback tool`);
   if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
+}
+
+function assertDirectResult(tool) {
+  const toolCase = WORD_E2E_CASES[tool];
+  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
+  if (toolCase.verify?.kind !== 'direct-result') throw new Error(`${tool} must use direct-result verification`);
+  if (!toolCase.verify.expect) throw new Error(`${tool} must define direct-result expectations`);
 }
