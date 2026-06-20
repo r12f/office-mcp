@@ -1,5 +1,6 @@
 use super::SessionDescriptorView;
 use crate::addin_mgr::{DocumentDescriptor, HostDescriptor, SessionDescriptor, SessionStatus};
+use crate::mcp::WORD_V1_TOOLS;
 use std::time::{Duration, SystemTime};
 
 #[test]
@@ -15,7 +16,7 @@ fn renders_active_session_descriptor_json() {
     assert_eq!(rendered["document"]["is_dirty"], true);
     assert_eq!(rendered["capability_tiers"][0], "core");
     assert_eq!(rendered["available_tools"][0], "word.get_text");
-    assert_eq!(rendered["available_tool_count"], 27);
+    assert_eq!(rendered["available_tool_count"], 25);
     assert_eq!(rendered["queue_depth"], 2);
     assert_eq!(rendered["registered_at"], "unix:5");
     assert_eq!(rendered["status"], "active");
@@ -54,7 +55,7 @@ fn descriptor(status: SessionStatus) -> SessionDescriptor {
         is_active: Some(true),
         capability_tiers: vec!["core".to_string()],
         available_tools: vec!["word.get_text".to_string()],
-        available_tool_count: 27,
+        available_tool_count: WORD_V1_TOOLS.len(),
         queue_depth: 2,
         registered_at: SystemTime::UNIX_EPOCH + Duration::from_secs(5),
         status,

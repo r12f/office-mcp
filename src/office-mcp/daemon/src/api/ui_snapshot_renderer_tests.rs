@@ -6,6 +6,7 @@ use crate::api::{
     UiClientRecord, UiClientTransport, UiCommandError, UiCommandRecord, UiCommandStatus,
     UiDaemonSnapshot, UiHealth, UiSnapshot,
 };
+use crate::mcp::WORD_V1_TOOLS;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime};
@@ -41,6 +42,7 @@ fn renders_daemon_endpoints_and_grouped_documents() {
     assert_eq!(rendered["clients"][0]["connected_at"], 1_000);
     assert_eq!(rendered["documents"]["word"][0]["registered_at"], "unix:3");
     assert_eq!(rendered["documents"]["word"][0]["status"], "active");
+    assert_eq!(rendered["documents"]["word"][0]["available_tool_count"], 25);
     assert_eq!(rendered["current_tasks"][0]["status"], "running");
     assert_eq!(rendered["current_tasks"][0]["deadline_at"], 7_000);
 }
@@ -165,7 +167,7 @@ fn descriptor() -> SessionDescriptor {
         is_active: Some(true),
         capability_tiers: vec!["core".to_string()],
         available_tools: vec!["word.get_text".to_string()],
-        available_tool_count: 27,
+        available_tool_count: WORD_V1_TOOLS.len(),
         queue_depth: 0,
         registered_at: SystemTime::UNIX_EPOCH + Duration::from_secs(3),
         status: SessionStatus::Active,
