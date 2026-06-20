@@ -232,11 +232,20 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   assert.match(js, /async function getActiveView\(_?args\)/);
   assert.match(js, /async function exportFile\(args\)/);
   assert.match(js, /async function updateTags\(args\)/);
+  const updateTagsBody = functionBody(js, 'updateTags');
+  assert.match(updateTagsBody, /getItemOrNullObject\(key\)/);
+  const tagMetadataBody = functionBody(js, 'tagMetadata');
+  assert.match(tagMetadataBody, /normalized_key/);
+  assert.match(tagMetadataBody, /host_key/);
   assert.match(js, /async function listSlides\(args\)/);
   assert.match(js, /async function addSlide\(args\)/);
   assert.match(js, /slides\.add\(slideOptions\(args\)\)/);
   assert.match(js, /added\.shapes\.addTextBox\(title/);
   assert.match(js, /async function updateSlide\(args\)/);
+  const updateSlideBody = functionBody(js, 'updateSlide');
+  assert.match(updateSlideBody, /slide\.load\('id,index,tags\/items\/key,value,layout\/id,layout\/name,shapes\/items\/id'\)/);
+  assert.match(updateSlideBody, /slide\.tags\.getItemOrNullObject\(key\)/);
+  assert.match(updateSlideBody, /Slide tag updates are not persisted by this PowerPoint host/);
   assert.match(js, /async function deleteSlide\(args\)/);
   assert.match(js, /async function moveSlide\(args\)/);
   assert.match(js, /async function exportSlide\(args\)/);
@@ -270,6 +279,11 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   assert.doesNotMatch(replaceTextBody, /slides\.items/, 'replace_text must not read collection items before sync');
   assert.match(js, /shape\.textFrame\?\.textRange/);
   assert.match(js, /range\.text = nextText/);
+  assert.match(replaceTextBody, /isOfficeInvalidArgument\(error\)/);
+  assert.match(replaceTextBody, /return await PowerPoint\.run/);
+  assert.match(js, /function isOfficeInvalidArgument\(error\)/);
+  assert.match(js, /debugInfo\?\.code/);
+  assert.match(js, /PowerPoint text replacement is not available in this host\./);
   const loadSlidesWithShapesBody = functionBody(js, 'loadSlidesWithShapes');
   assert.match(loadSlidesWithShapesBody, /slides\.load\('items'\)/);
   assert.match(loadSlidesWithShapesBody, /await context\.sync\(\)/);
@@ -341,6 +355,7 @@ test('PowerPoint owner update tools cover the spec action surface', () => {
   }
   assert.match(updateShapeBody, /slide\.shapes\.addGroup\(args\.shape_ids\)/);
   assert.match(updateShapeBody, /shape\.group\.ungroup\(\)/);
+  assert.match(updateShapeBody, /textFrame\/hasText,textFrame\/textRange\/text/);
   for (const property of ['left', 'top', 'width', 'height', 'rotation', 'alt_text_title', 'alt_text_description', 'is_decorative', 'visible']) {
     assert.match(applyShapePropertiesBody, new RegExp(property), `update_shape must own ${property}`);
   }

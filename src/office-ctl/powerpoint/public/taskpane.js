@@ -489,20 +489,25 @@
     requireRequirementSet('PowerPointApi', '1.3', 'presentation tags');
     return PowerPoint.run(async (context) => {
       const tags = context.presentation.tags;
-      tags.load('items/key,value');
-      await context.sync();
       const action = String(args.action || 'list').toLowerCase();
+      const key = args.key === undefined ? undefined : requiredString(args, 'key', `powerpoint.update_tags ${action} requires key.`);
       if (action === 'set') {
-        tags.add(requiredString(args, 'key', 'powerpoint.update_tags set requires key.'), requiredString(args, 'value', 'powerpoint.update_tags set requires value.'));
+        tags.add(key, requiredString(args, 'value', 'powerpoint.update_tags set requires value.'));
       } else if (action === 'delete') {
-        tags.delete(requiredString(args, 'key', 'powerpoint.update_tags delete requires key.'));
+        tags.delete(key);
       } else if (action !== 'list') {
         throw invalidArgument(`Unsupported powerpoint.update_tags action ${action}.`);
       }
       await context.sync();
       tags.load('items/key,value');
+      const selected = key ? tags.getItemOrNullObject(key) : null;
+      if (selected) selected.load('key,value,isNullObject');
       await context.sync();
-      return { action, tags: (tags.items || []).map((tag) => ({ key: tag.key, value: tag.value })) };
+      return {
+        action,
+        tag: selected && !selected.isNullObject ? tagMetadata(selected, key) : null,
+        tags: (tags.items || []).map((tag) => tagMetadata(tag))
+      };
     });
   }
 
@@ -520,10 +525,13 @@
     return PowerPoint.run(async (context) => {
       const slide = targetSlide(context, args);
       const action = String(args.action || 'set_tags').toLowerCase();
+      let key = null;
       if (action === 'set_tag') {
-        slide.tags.add(requiredString(args, 'key', 'powerpoint.update_slide set_tag requires key.'), requiredString(args, 'value', 'powerpoint.update_slide set_tag requires value.'));
+        key = requiredString(args, 'key', 'powerpoint.update_slide set_tag requires key.');
+        slide.tags.add(key, requiredString(args, 'value', 'powerpoint.update_slide set_tag requires value.'));
       } else if (action === 'delete_tag') {
-        slide.tags.delete(requiredString(args, 'key', 'powerpoint.update_slide delete_tag requires key.'));
+        key = requiredString(args, 'key', 'powerpoint.update_slide delete_tag requires key.');
+        slide.tags.delete(key);
       } else if (action === 'set_background') {
         requireRequirementSet('PowerPointApi', '1.10', 'slide background updates');
         if (slide.background?.fill?.setSolidColor) slide.background.fill.setSolidColor(requiredString(args, 'color', 'powerpoint.update_slide set_background requires color.'));
@@ -531,9 +539,14 @@
       } else if (action !== 'set_tags') {
         throw invalidArgument(`Unsupported powerpoint.update_slide action ${action}.`);
       }
-      slide.load('id,index,tags/items/key,value');
+      slide.load('id,index,tags/items/key,value,layout/id,layout/name,shapes/items/id');
+      const selectedTag = key ? slide.tags.getItemOrNullObject(key) : null;
+      if (selectedTag) selectedTag.load('key,value,isNullObject');
       await context.sync();
-      return { action, slide: slideMetadata(slide, true) };
+      if (action === 'set_tag' && (!selectedTag || selectedTag.isNullObject)) {
+        throw hostCapabilityUnavailable('Slide tag updates are not persisted by this PowerPoint host.');
+      }
+      return { action, slide: slideMetadata(slide, true), tag: selectedTag && !selectedTag.isNullObject ? tagMetadata(selectedTag, key) : null };
     });
   }
 
@@ -600,28 +613,49 @@
     const search = requiredString(args, 'search', 'powerpoint.replace_text requires search text.');
     const replacement = requiredString(args, 'replacement', 'powerpoint.replace_text requires replacement text.');
     const matchCase = Boolean(args.match_case);
-    return PowerPoint.run(async (context) => {
-      const slides = await loadSlidesWithShapes(context, args);
-      for (const slide of slides) {
-        for (const shape of slide.shapes.items || []) shape.load('id,textFrame/hasText,textFrame/textRange/text');
-      }
-      await context.sync();
-      const touchedShapes = [];
-      let replacements = 0;
-      for (const slide of slides) {
-        for (const shape of slide.shapes.items || []) {
-          const range = shape.textFrame?.textRange;
-          if (!shape.textFrame?.hasText || !range || typeof range.text !== 'string') continue;
-          const nextText = replaceAllText(range.text, search, replacement, matchCase);
-          if (nextText === range.text) continue;
-          replacements += countMatches(range.text, search, matchCase);
-          range.text = nextText;
-          touchedShapes.push({ slide_id: slide.id, shape_id: shape.id });
+    try {
+      return await PowerPoint.run(async (context) => {
+        const slides = await loadSlidesWithShapes(context, args);
+        for (const slide of slides) {
+          for (const shape of slide.shapes.items || []) shape.load('id,textFrame/hasText,textFrame/textRange/text');
         }
+        await context.sync();
+        const touchedShapes = [];
+        let replacements = 0;
+        for (const slide of slides) {
+          for (const shape of slide.shapes.items || []) {
+            const range = shape.textFrame?.textRange;
+            if (!shape.textFrame?.hasText || !range || typeof range.text !== 'string') continue;
+            const nextText = replaceAllText(range.text, search, replacement, matchCase);
+            if (nextText === range.text) continue;
+            try {
+              range.text = nextText;
+            } catch (error) {
+              if (isOfficeInvalidArgument(error)) {
+                throw hostCapabilityUnavailable('PowerPoint text replacement is not available in this host.');
+              }
+              throw error;
+            }
+            replacements += countMatches(range.text, search, matchCase);
+            touchedShapes.push({ slide_id: slide.id, shape_id: shape.id });
+          }
+        }
+        try {
+          await context.sync();
+        } catch (error) {
+          if (isOfficeInvalidArgument(error)) {
+            throw hostCapabilityUnavailable('PowerPoint text replacement is not available in this host.');
+          }
+          throw error;
+        }
+        return { replacements, touched_shapes: touchedShapes };
+      });
+    } catch (error) {
+      if (isOfficeInvalidArgument(error)) {
+        throw hostCapabilityUnavailable('PowerPoint text replacement is not available in this host.');
       }
-      await context.sync();
-      return { replacements, touched_shapes: touchedShapes };
-    });
+      throw error;
+    }
   }
 
   async function insertImage(args) {
@@ -739,7 +773,7 @@
         shape.setZOrder(shapeZOrderAction(action));
       } else if (action !== 'set_properties') throw invalidArgument(`Unsupported powerpoint.update_shape action ${action}.`);
       applyShapeProperties(shape, args);
-      shape.load('id,name,type,left,top,width,height,rotation,altTextTitle,altTextDescription,isDecorative,visible,zOrderPosition');
+      shape.load('id,name,type,left,top,width,height,rotation,altTextTitle,altTextDescription,isDecorative,visible,zOrderPosition,textFrame/hasText,textFrame/textRange/text');
       slide.load('id,index');
       await context.sync();
       return { action, slide_id: slide.id, slide_index: slide.index, shape: shapeMetadata(shape) };
@@ -986,8 +1020,14 @@
       layout_id: slide.layout?.id || null,
       layout_name: slide.layout?.name || null,
       shape_count: slide.shapes?.items?.length ?? null,
-      tags: includeTags ? (slide.tags?.items || []).map((tag) => ({ key: tag.key, value: tag.value })) : undefined
+      tags: includeTags ? (slide.tags?.items || []).map((tag) => tagMetadata(tag)) : undefined
     };
+  }
+
+  function tagMetadata(tag, requestedKey) {
+    const hostKey = tag.key || '';
+    const normalizedKey = String(requestedKey || hostKey).toLowerCase();
+    return { key: normalizedKey, normalized_key: normalizedKey, host_key: hostKey, value: tag.value || '' };
   }
 
   function shapeMetadata(shape) {
@@ -1168,6 +1208,19 @@
 
   function invalidArgument(message) {
     return Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  function isOfficeInvalidArgument(error) {
+    const detail = [
+      error?.code,
+      error?.name,
+      error?.message,
+      error?.debugInfo?.code,
+      error?.debugInfo?.message,
+      error?.debugInfo?.errorLocation
+    ].filter(Boolean).join(' ');
+    if (/InvalidArgument/i.test(detail)) return true;
+    try { return /InvalidArgument/i.test(JSON.stringify(error)); } catch { return false; }
   }
 
   function officeAsync(start, options = {}) {
