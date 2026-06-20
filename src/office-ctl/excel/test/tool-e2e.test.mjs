@@ -170,8 +170,35 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['E2ETableRenamed'], notContains: ['E2ETableToRename'] }
     }
   }],
-  ['excel.create_chart', { args: { sheet: 'Sheet1', source_range: 'A1:B3', chart_type: 'columnClustered' } }],
-  ['excel.update_chart', { args: { chart: 'E2EChart', title: 'Updated chart' } }],
+  ['excel.create_chart', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'G1:H3', values: [['Label', 'Value'], ['Alpha', 1], ['Beta', 2]] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'G1:H3', type: 'columnClustered', title: 'E2E Chart' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.update_chart',
+      readbackArguments: { sheet: 'Sheet1', chart: '${result.chart}', action: 'metadata' },
+      expect: { contains: ['E2E Chart', 'columnClustered'] }
+    }
+  }],
+  ['excel.update_chart', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'J1:K3', values: [['Label', 'Value'], ['Alpha', 3], ['Beta', 4]] } },
+        { tool: 'excel.create_chart', saveAs: 'chartResult', arguments: { sheet: 'Sheet1', address: 'J1:K3', type: 'columnClustered', title: 'Chart Before Update' } }
+      ]
+    },
+    args: { sheet: 'Sheet1', chart: '${chartResult.chart}', action: 'title', title: 'Updated chart' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.update_chart',
+      readbackArguments: { sheet: 'Sheet1', chart: '${chartResult.chart}', action: 'metadata' },
+      expect: { contains: ['Updated chart'], notContains: ['Chart Before Update'] }
+    }
+  }],
   ['excel.create_pivot_table', { args: { sheet: 'Sheet1', source_range: 'A1:B4', destination: 'D1' } }],
   ['excel.update_pivot_table', { args: { pivot_table: 'E2EPivot', action: 'refresh' } }]
 ].map(([tool, options]) => [tool, e2eCase(tool, options)]));
@@ -192,6 +219,8 @@ test('Excel mutating E2E cases define concrete setup and readback checks', () =>
   assertConcreteReadback('excel.format_range');
   assertConcreteReadback('excel.sort_range');
   assertConcreteReadback('excel.update_table');
+  assertConcreteReadback('excel.create_chart');
+  assertConcreteReadback('excel.update_chart');
 });
 
 test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

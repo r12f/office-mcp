@@ -1297,7 +1297,8 @@ cases now cover Word `insert_paragraph`, `insert_table`, `insert_list`,
 `insert_content_control`, `update_content_control`, and
 `delete_content_control`; Excel `add_sheet`, `update_sheet`, `delete_sheet`,
 `write_range`, `clear_range`, `find_replace_cells`, `set_formula`, and
-`format_range`, `sort_range`, `create_table`, and `update_table`; and
+`format_range`, `sort_range`, `create_table`, `update_table`, `create_chart`,
+and `update_chart`; and
 PowerPoint `add_slide`, `update_slide`, `add_text_box`, `add_shape`,
 `update_shape`, `replace_text`, `delete_slide`, `move_slide`, `apply_layout`,
 `add_table`, and `update_table`.
