@@ -1,5 +1,5 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -141,8 +141,10 @@ async function createDocument(host, context) {
   mkdirSync(workDir, { recursive: true });
   const extension = normalizedHost === 'word' ? 'docx' : normalizedHost === 'excel' ? 'xlsx' : 'pptx';
   const path = resolve(workDir, `office-mcp-e2e-${normalizedHost}-${Date.now()}.${extension}`);
-  const keeper = startOfficeKeeper(normalizedHost, path);
-  await waitForFile(keeper.readyPath, Number(context.keeperTimeoutMs || 30000), keeper);
+  const keeperTimeoutMs = Number(context.keeperTimeoutMs || 90000);
+  const powerShellTimeoutMs = Number(context.powerShellTimeoutMs || keeperTimeoutMs + 10000);
+  const keeper = startOfficeKeeper(normalizedHost, path, powerShellTimeoutMs);
+  await waitForFile(keeper.readyPath, keeperTimeoutMs, keeper);
   return {
     host,
     path,
@@ -158,7 +160,7 @@ async function listTools(context) {
   return Array.isArray(result.tools) ? result.tools.map((tool) => tool.name).filter(Boolean) : [];
 }
 
-function startOfficeKeeper(host, path) {
+function startOfficeKeeper(host, path, powerShellTimeoutMs) {
   const closePath = `${path}.office-mcp-close`;
   const readyPath = `${path}.office-mcp-ready`;
   const startedPath = `${path}.office-mcp-started`;
@@ -172,7 +174,7 @@ function startOfficeKeeper(host, path) {
   }
   const script = officeKeeperScript(host, path, closePath, readyPath, startedPath, errorPath);
   writeFileSync(scriptPath, script, 'utf8');
-  runOfficePowerShell(scriptPath, stdoutPath, stderrPath);
+  runOfficePowerShell(scriptPath, stdoutPath, stderrPath, powerShellTimeoutMs);
   return { closePath, readyPath, startedPath, errorPath, stdoutPath, stderrPath, pidPath, scriptPath };
 }
 
@@ -182,10 +184,10 @@ function officeKeeperScript(host, path, closePath, readyPath, startedPath, error
   const ready = psSingle(readyPath);
   const started = psSingle(startedPath);
   const error = psSingle(errorPath);
-  const retry = `function Invoke-Retry([scriptblock]$Action) { for ($i=0; $i -lt 30; $i++) { try { return & $Action } catch { if ($i -eq 29) { throw }; Start-Sleep -Milliseconds 500 } } }; # retries RPC_E_CALL_REJECTED and transient Office COM busy states. `;
+  const retry = `function Invoke-Retry([scriptblock]$Action) { for ($i=0; $i -lt 90; $i++) { try { return & $Action } catch { if ($i -eq 89) { throw }; Start-Sleep -Milliseconds 500 } } }; <# retries RPC_E_CALL_REJECTED and transient Office COM busy states. #> `;
   const prelude = `${retry}Set-Content -LiteralPath '${started}' -Value 'office-mcp-keeper:start:${host}'; Write-Output 'office-mcp-keeper:start:${host}'; `;
   if (host === 'word') {
-    return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $doc=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application') } catch { $app=New-Object -ComObject Word.Application }; $app.Visible=$true; $doc=Invoke-Retry { $app.Documents.Add() }; Invoke-Retry { $doc.SaveAs2('${file}') }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
+    return `$ErrorActionPreference='Stop'; function Add-ZipPart([System.IO.Compression.ZipArchive]$Zip,[string]$Name,[string]$Value) { $entry=$Zip.CreateEntry($Name); $writer=New-Object System.IO.StreamWriter($entry.Open()); try { $writer.Write($Value) } finally { $writer.Dispose() } }; function New-OfficeMcpBlankDocx([string]$Path) { Add-Type -AssemblyName System.IO.Compression; Add-Type -AssemblyName System.IO.Compression.FileSystem; if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force }; $stream=[System.IO.File]::Open($Path,[System.IO.FileMode]::CreateNew); try { $zip=New-Object System.IO.Compression.ZipArchive($stream,[System.IO.Compression.ZipArchiveMode]::Create); try { Add-ZipPart $zip '[Content_Types].xml' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'; Add-ZipPart $zip '_rels/.rels' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'; Add-ZipPart $zip 'word/document.xml' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>office-mcp e2e baseline</w:t></w:r></w:p><w:sectPr/></w:body></w:document>' } finally { $zip.Dispose() } } finally { $stream.Dispose() } }; ${prelude}$app=$null; $doc=$null; try { New-OfficeMcpBlankDocx '${file}'; try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application') } catch { $app=New-Object -ComObject Word.Application }; $app.Visible=$true; $app.DisplayAlerts=0; $confirmConversions=$false; $readOnly=$false; $addToRecentFiles=$false; $doc=Invoke-Retry { $app.Documents.Open('${file}', $confirmConversions, $readOnly, $addToRecentFiles) }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
   }
   if (host === 'excel') {
     return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $wb=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application') } catch { $app=New-Object -ComObject Excel.Application }; $app.Visible=$true; $app.DisplayAlerts=$false; $wb=Invoke-Retry { $app.Workbooks.Add() }; $ws=$wb.Worksheets.Item(1); $ws.Cells.Item(1,1).Value2='office-mcp e2e baseline'; Invoke-Retry { $wb.SaveAs('${file}') }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
@@ -193,18 +195,20 @@ function officeKeeperScript(host, path, closePath, readyPath, startedPath, error
   return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $pres=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application') } catch { $app=New-Object -ComObject PowerPoint.Application }; $pres=Invoke-Retry { $app.Presentations.Add($true) }; $slide=Invoke-Retry { $pres.Slides.Add(1, 1) }; $slide.Shapes.Title.TextFrame.TextRange.Text='office-mcp e2e baseline'; Invoke-Retry { $pres.SaveAs('${file}') }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
 }
 
-function runOfficePowerShell(scriptPath, stdoutPath, stderrPath) {
+function runOfficePowerShell(scriptPath, stdoutPath, stderrPath, timeoutMs = 45000) {
   const shell = powerShellCommand(scriptPath);
   const result = spawnSync(shell.command, shell.args, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 45000,
+    timeout: timeoutMs,
     windowsHide: true
   });
   writeFileSync(stdoutPath, result.stdout || '', 'utf8');
   writeFileSync(stderrPath, result.stderr || result.error?.message || '', 'utf8');
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`Office keeper PowerShell exited with status ${result.status}.`);
+  if (result.error) throw new Error(`${result.error.message}.${keeperLogDetail({ stdoutPath, stderrPath })}`);
+  if (result.status !== 0) {
+    throw new Error(`Office keeper PowerShell exited with status ${result.status}.${keeperLogDetail({ stdoutPath, stderrPath })}`);
+  }
 }
 
 function powerShellCommand(scriptPath) {
@@ -489,7 +493,7 @@ async function cleanupDocument(context) {
   }
   const resolved = resolve(document.path);
   runOfficeCleanup(document.host, resolved, Number(context.timeoutMs || 30000));
-  if (existsSync(resolved)) rmSync(resolved, { force: true });
+  await removeFileWithRetry(resolved, Number(context.deleteTimeoutMs || 10000));
   if (document.keeper.closePath) rmSync(document.keeper.closePath, { force: true });
   if (document.keeper.readyPath) rmSync(document.keeper.readyPath, { force: true });
   if (document.keeper.startedPath) rmSync(document.keeper.startedPath, { force: true });
@@ -499,6 +503,23 @@ async function cleanupDocument(context) {
   if (document.keeper.pidPath) rmSync(document.keeper.pidPath, { force: true });
   if (document.keeper.scriptPath) rmSync(document.keeper.scriptPath, { force: true });
   return { closedByDriver: true, deleted: !existsSync(resolved), path: resolved };
+}
+
+async function removeFileWithRetry(path, timeoutMs) {
+  const started = Date.now();
+  let lastError;
+  while (Date.now() - started <= timeoutMs) {
+    if (!existsSync(path)) return;
+    try {
+      unlinkSync(path);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!['EPERM', 'EBUSY', 'EACCES'].includes(error?.code)) throw error;
+      await sleep(200);
+    }
+  }
+  throw lastError || new Error(`Timed out deleting ${path}.`);
 }
 
 function runOfficeCleanup(host, path, timeoutMs) {
@@ -513,9 +534,9 @@ function runOfficeCleanup(host, path, timeoutMs) {
 
 function officeCleanupScript(host, path) {
   const target = psSingle(resolve(path));
-  const canonical = `function Canonical($value) { try { return (Get-Item -LiteralPath $value -ErrorAction Stop).FullName.ToLowerInvariant() } catch { return [System.IO.Path]::GetFullPath($value).ToLowerInvariant() } }; $target=Canonical '${target}';`;
+  const canonical = `function Canonical($value) { if ([string]::IsNullOrWhiteSpace($value)) { return '' }; try { return (Get-Item -LiteralPath $value -ErrorAction Stop).FullName.ToLowerInvariant() } catch { try { return [System.IO.Path]::GetFullPath($value).ToLowerInvariant() } catch { return '' } } }; $target=Canonical '${target}'; $targetName=[System.IO.Path]::GetFileName('${target}');`;
   if (host === 'word') {
-    return `$ErrorActionPreference='Stop'; ${canonical} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application'); foreach ($doc in @($app.Documents)) { if ((Canonical $doc.FullName) -eq $target) { $doc.Close($false); break } }`;
+    return `$ErrorActionPreference='Stop'; ${canonical} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application'); $app.DisplayAlerts=0; $closed=$false; foreach ($doc in @($app.Documents)) { if ((Canonical $doc.FullName) -eq $target) { $doc.Close($false); $closed=$true; break } }; if (-not $closed) { foreach ($win in @($app.Windows)) { if (($win.Caption -like "*$targetName*") -and ($targetName -like 'office-mcp-e2e-word-*.docx')) { $win.Document.Close($false); break } } }`;
   }
   if (host === 'excel') {
     return `$ErrorActionPreference='Stop'; ${canonical} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application'); foreach ($wb in @($app.Workbooks)) { if ((Canonical $wb.FullName) -eq $target) { $wb.Close($false); break } }`;

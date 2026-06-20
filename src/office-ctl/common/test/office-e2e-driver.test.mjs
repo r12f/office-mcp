@@ -25,9 +25,18 @@ test('Office E2E driver describes a driver-owned Word lifecycle', () => {
   assert.ok(document.keeper?.pidPath, 'keeper pid file is required');
   assert.ok(document.keeper?.stdoutPath, 'keeper stdout log is required');
   assert.ok(document.keeper?.stderrPath, 'keeper stderr log is required');
-  assert.match(document.script, /Documents\.Add\(\)/);
+  assert.match(document.script, /New-OfficeMcpBlankDocx/);
+  assert.match(document.script, /Add-Type -AssemblyName System\.IO\.Compression;/);
+  assert.match(document.script, /\$app\.DisplayAlerts=0/);
+  assert.match(document.script, /Documents\.Open/);
+  assert.match(document.script, /\$confirmConversions=\$false/);
+  assert.match(document.script, /\$addToRecentFiles=\$false/);
+  assert.doesNotMatch(document.script, /SaveAs2/, 'Word E2E creation must not depend on COM SaveAs2');
   assert.match(document.script, /Invoke-Retry/);
+  assert.match(document.script, /\$i -lt 90/, 'Word COM creation needs a long retry window for busy desktop hosts');
   assert.match(document.script, /RPC_E_CALL_REJECTED/);
+  assert.doesNotMatch(document.script, /;\s*# retries[^\r\n]*Set-Content/, 'retry comment must not comment out the started sentinel');
+  assert.match(document.script, /<# retries RPC_E_CALL_REJECTED and transient Office COM busy states\. #>/);
   assert.doesNotMatch(document.script, /\.Content\.Text=/);
   assert.doesNotMatch(document.script, /\.Content\.InsertAfter/);
   assert.doesNotMatch(document.script, /TrackRevisions/);
@@ -114,7 +123,22 @@ test('Office E2E driver cleanup canonicalizes Office document paths', () => {
   assert.equal(result.status, 0, result.stderr);
   const document = JSON.parse(result.stdout);
   assert.match(document.cleanupScript, /function Canonical/);
+  assert.match(document.cleanupScript, /\[string\]::IsNullOrWhiteSpace\(\$value\)/);
+  assert.match(document.cleanupScript, /catch \{ return '' \}/);
   assert.match(document.cleanupScript, /Canonical \$doc\.FullName/);
+  assert.match(document.cleanupScript, /\$targetName=/);
+  assert.match(document.cleanupScript, /\$win\.Caption/);
+  assert.match(document.cleanupScript, /\$app\.DisplayAlerts=0/);
+});
+
+test('Office E2E driver cleanup retries deletion while Office releases the document lock', () => {
+  const result = runDriver({ host: 'Word', step: 'describeDocumentLifecycle', context: { workDir: mkdtempSync(join(tmpdir(), 'office-mcp-driver-cleanup-retry-')) } });
+  assert.equal(result.status, 0, result.stderr);
+  const document = JSON.parse(result.stdout);
+  assert.match(document.cleanupScript, /Close\(\$false\)/);
+  const driver = readFileSync(DRIVER, 'utf8');
+  assert.match(driver, /removeFileWithRetry/);
+  assert.match(driver, /EPERM|EBUSY|EACCES/);
 });
 
 test('Office E2E driver uses a visible PowerPoint window and safe cleanup', { skip: !RUN_OFFICE_COM }, () => {
@@ -801,6 +825,56 @@ appendFileSync(2, 'fake keeper stderr\\n');
     assert.match(result.stderr, /error=missing/);
     assert.match(result.stderr, /stdout: fake keeper stdout/);
     assert.match(result.stderr, /stderr: fake keeper stderr/);
+  } finally {
+    restoreEnv('OFFICE_MCP_E2E_POWERSHELL', previous);
+  }
+});
+
+test('Office E2E driver includes keeper logs when document creation exits with an error', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-create-error-'));
+  const fakePowerShell = join(dir, 'fake-powershell-error.mjs');
+  writeFileSync(fakePowerShell, `
+import { appendFileSync } from 'node:fs';
+appendFileSync(1, 'keeper started before failure\\n');
+appendFileSync(2, 'simulated COM failure\\n');
+process.exit(1);
+`);
+  const previous = process.env.OFFICE_MCP_E2E_POWERSHELL;
+  process.env.OFFICE_MCP_E2E_POWERSHELL = `${process.execPath} ${fakePowerShell}`;
+  try {
+    const result = runDriver({
+      host: 'Word',
+      step: 'createDocument',
+      context: { workDir: dir, keeperTimeoutMs: 50 }
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Office keeper PowerShell exited with status 1/);
+    assert.match(result.stderr, /stdout: keeper started before failure/);
+    assert.match(result.stderr, /stderr: simulated COM failure/);
+  } finally {
+    restoreEnv('OFFICE_MCP_E2E_POWERSHELL', previous);
+  }
+});
+
+test('Office E2E driver includes keeper logs when document creation process times out', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-create-timeout-'));
+  const fakePowerShell = join(dir, 'fake-powershell-timeout.mjs');
+  writeFileSync(fakePowerShell, `
+import { appendFileSync } from 'node:fs';
+appendFileSync(1, 'keeper started before timeout\\n');
+setTimeout(() => {}, 10000);
+`);
+  const previous = process.env.OFFICE_MCP_E2E_POWERSHELL;
+  process.env.OFFICE_MCP_E2E_POWERSHELL = `${process.execPath} ${fakePowerShell}`;
+  try {
+    const result = runDriver({
+      host: 'Word',
+      step: 'createDocument',
+      context: { workDir: dir, keeperTimeoutMs: 50, powerShellTimeoutMs: 100 }
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /ETIMEDOUT/);
+    assert.match(result.stderr, /stderr: .*ETIMEDOUT/);
   } finally {
     restoreEnv('OFFICE_MCP_E2E_POWERSHELL', previous);
   }
