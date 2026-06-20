@@ -6,6 +6,7 @@
   "scripts": {
     "check": "npm run validate:manifest && npm run check:taskpane && npm test",
     "check:taskpane": "node --check public/taskpane.js",
+    "e2e:tools": "node --test ../common/test/tool-e2e-contract.test.mjs test/tool-e2e.test.mjs",
     "test": "node --test test/*.test.mjs",
     "validate:manifest": "office-addin-manifest validate manifest.xml"
   },

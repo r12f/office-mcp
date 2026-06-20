@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
-import { e2eCase, runOfficeToolE2e } from './tool-e2e-contract.mjs';
+import { e2eCase, requireRealOfficeE2eDriver, runOfficeToolE2e } from './tool-e2e-contract.mjs';
 
 test('shared Office tool E2E loop drives daemon, document, setup, calls, verification, and cleanup', async () => {
   const events = [];
@@ -129,3 +132,92 @@ test('shared Office tool E2E loop still cleans up when a verifier fails', async 
   );
   assert.deepEqual(events, ['startDaemon', 'createDocument', 'waitForSession', 'reset', 'setup', 'call', 'verify', 'cleanupDocument', 'stopDaemon']);
 });
+
+test('external Office E2E driver adapter exchanges one JSON request per step', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-e2e-driver-'));
+  const logPath = join(dir, 'calls.jsonl');
+  const driverPath = join(dir, 'mock-driver.mjs');
+  writeFileSync(driverPath, `
+import { appendFileSync } from 'node:fs';
+const input = await new Promise((resolve) => {
+  let body = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (chunk) => { body += chunk; });
+  process.stdin.on('end', () => resolve(body));
+});
+const request = JSON.parse(input);
+appendFileSync(${JSON.stringify(logPath)}, JSON.stringify({ host: request.host, step: request.step, context: request.context }) + '\\n');
+const responses = {
+  startDaemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
+  createDocument: { path: 'external.docx' },
+  waitForSession: { sessionId: 'session-1', availableTools: ['word.read'] },
+  resetContent: { reset: true },
+  setupContent: { setup: true },
+  callTool: { ok: true },
+  verifyResult: { verified: true },
+  cleanupDocument: { cleaned: true },
+  stopDaemon: { stopped: true }
+};
+process.stdout.write(JSON.stringify(responses[request.step] || {}));
+`);
+  const previousRun = process.env.OFFICE_MCP_RUN_E2E;
+  const previousDriver = process.env.OFFICE_MCP_E2E_DRIVER;
+  process.env.OFFICE_MCP_RUN_E2E = '1';
+  process.env.OFFICE_MCP_E2E_DRIVER = driverPath;
+  try {
+    await runOfficeToolE2e({
+      host: 'Word',
+      cases: { 'word.read': e2eCase('word.read', { verify: 'direct-result' }) },
+      driver: requireRealOfficeE2eDriver('Word')
+    });
+  } finally {
+    restoreEnv('OFFICE_MCP_RUN_E2E', previousRun);
+    restoreEnv('OFFICE_MCP_E2E_DRIVER', previousDriver);
+  }
+
+  const calls = readFileSync(logPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+  assert.deepEqual(calls.map((call) => call.step), [
+    'startDaemon',
+    'createDocument',
+    'waitForSession',
+    'resetContent',
+    'setupContent',
+    'callTool',
+    'verifyResult',
+    'cleanupDocument',
+    'stopDaemon'
+  ]);
+  assert.equal(calls[0].host, 'Word');
+  assert.equal(calls[3].context.toolCase.tool, 'word.read');
+  assert.equal(calls[5].context.session.sessionId, 'session-1');
+});
+
+test('external Office E2E driver adapter reports failed step stderr', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-e2e-driver-fail-'));
+  const driverPath = join(dir, 'failing-driver.mjs');
+  writeFileSync(driverPath, `
+console.error('driver exploded');
+process.exit(7);
+`);
+  const previousRun = process.env.OFFICE_MCP_RUN_E2E;
+  const previousDriver = process.env.OFFICE_MCP_E2E_DRIVER;
+  process.env.OFFICE_MCP_RUN_E2E = '1';
+  process.env.OFFICE_MCP_E2E_DRIVER = driverPath;
+  try {
+    await assert.rejects(
+      () => requireRealOfficeE2eDriver('Word').startDaemon({ host: 'Word' }),
+      /Word E2E driver step startDaemon failed with exit code 7: driver exploded/
+    );
+  } finally {
+    restoreEnv('OFFICE_MCP_RUN_E2E', previousRun);
+    restoreEnv('OFFICE_MCP_E2E_DRIVER', previousDriver);
+  }
+});
+
+function restoreEnv(name, value) {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+}

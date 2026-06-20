@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -132,6 +133,36 @@ function createExternalOfficeE2eDriver(host, script) {
   };
 }
 
-async function runExternalDriverStep(_script, host, step) {
-  assert.fail(`${host} real Office E2E external driver step ${step} is not wired yet.`);
+async function runExternalDriverStep(script, host, step, context = {}) {
+  const request = { host, step, context };
+  const { status, stdout, stderr } = await runDriverProcess(script, request);
+  if (status !== 0) {
+    const detail = stderr.trim() || stdout.trim() || 'no driver output';
+    throw new Error(`${host} E2E driver step ${step} failed with exit code ${status}: ${detail}`);
+  }
+  const text = stdout.trim();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${host} E2E driver step ${step} returned invalid JSON: ${error.message}`);
+  }
+}
+
+function runDriverProcess(script, request) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [script], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('error', reject);
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
+    child.stdin.end(JSON.stringify(request));
+  });
 }

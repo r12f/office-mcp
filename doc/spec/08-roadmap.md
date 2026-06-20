@@ -1245,7 +1245,7 @@ channel, and MCP `tools/call` dispatch.
       list discovery is authoritative: `tools/list` or session
       `available_tools` defines the expected set, and the test asserts exact
       coverage for the host's current catalog.
-- [ ] The E2E suite must be runnable separately from release evidence commands.
+- [x] The E2E suite must be runnable separately from release evidence commands.
       Evidence recorders may consume its output later, but passing E2E is its
       own gate and must not be implemented as `npm run evidence:*`.
 
@@ -1253,9 +1253,11 @@ Current implementation evidence: `src/office-ctl/common/test/tool-e2e-contract.m
 owns the shared table-driven loop and exact coverage checks; Word, Excel, and
 PowerPoint each provide host case tables. The shared loop contract is covered by
 `src/office-ctl/common/test/tool-e2e-contract.test.mjs`. The real Office host
-automation driver remains open: `OFFICE_MCP_RUN_E2E=1` enters the shared loop but
-still requires a concrete `OFFICE_MCP_E2E_DRIVER` adapter that can launch Office,
-activate the add-in, and drive MCP calls against a live document.
+automation driver remains open: `OFFICE_MCP_RUN_E2E=1` enters the shared loop
+through the `OFFICE_MCP_E2E_DRIVER` JSON step protocol, but still requires a
+concrete adapter that can launch Office, activate the add-in, and drive MCP
+calls against a live document. Each host exposes `npm run e2e:tools` as the
+non-evidence tool E2E command.
 
 **Exit criterion**: A developer can run one command per Office host and see the
 daemon start, a blank document connect, every MCP tool execute against fixed
