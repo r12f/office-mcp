@@ -138,6 +138,48 @@ server.listen(0, '127.0.0.1', () => {
   }
 });
 
+test('Office E2E driver listTools reads daemon MCP tools/list names', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-list-tools-'));
+  const logPath = join(dir, 'mcp-requests.jsonl');
+  const serverPath = join(dir, 'mcp-server.mjs');
+  writeFileSync(serverPath, `
+import { appendFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+const logPath = ${JSON.stringify(logPath)};
+const server = createServer((request, response) => {
+  let body = '';
+  request.setEncoding('utf8');
+  request.on('data', (chunk) => { body += chunk; });
+  request.on('end', () => {
+    const parsed = JSON.parse(body);
+    appendFileSync(logPath, JSON.stringify({ session: request.headers['mcp-session-id'] || null, body: parsed }) + '\\n');
+    response.setHeader('Content-Type', 'application/json');
+    if (!request.headers['mcp-session-id']) {
+      response.setHeader('MCP-Session-Id', 'mcp-session-test');
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: {} }));
+      return;
+    }
+    response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { tools: [{ name: 'office.list_sessions' }, { name: 'word.get_text' }, { name: 'excel.read_range' }] } }));
+  });
+});
+server.listen(0, '127.0.0.1', () => {
+  const address = server.address();
+  console.log(JSON.stringify({ endpoint: 'http://127.0.0.1:' + address.port + '/mcp' }));
+});
+`);
+  const server = spawn(process.execPath, [serverPath], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  try {
+    const { endpoint } = JSON.parse(await firstStdoutLine(server));
+    const result = runDriver({ host: 'Word', step: 'listTools', context: { daemon: { endpoint } } });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), ['office.list_sessions', 'word.get_text', 'excel.read_range']);
+    const requests = readFileSync(logPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    assert.ok(requests.some((entry) => entry.body.method === 'tools/list'));
+  } finally {
+    server.kill();
+  }
+});
+
 test('Office E2E driver verifies readback expectations through an MCP read tool', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-readback-'));
   const logPath = join(dir, 'mcp-requests.jsonl');

@@ -183,6 +183,7 @@ export async function runOfficeToolE2e({ host, cases, driver }) {
   assert.ok(host, 'E2E host name is required');
   assert.ok(driver, `${host} E2E driver is required`);
   assertDriverMethod(driver, 'startDaemon', host);
+  assertDriverMethod(driver, 'listTools', host);
   assertDriverMethod(driver, 'createDocument', host);
   assertDriverMethod(driver, 'waitForSession', host);
   assertDriverMethod(driver, 'resetContent', host);
@@ -195,6 +196,8 @@ export async function runOfficeToolE2e({ host, cases, driver }) {
   let session;
   try {
     daemon = await driver.startDaemon({ host });
+    const daemonTools = await driver.listTools({ host, daemon });
+    assertDaemonToolsCaseCoverage({ host, tools: daemonTools, cases });
     document = await driver.createDocument({ host, daemon });
     session = await driver.waitForSession(document, { host, daemon });
     assertSessionCaseCoverage({ host, session, cases });
@@ -241,6 +244,24 @@ function assertSessionCaseCoverage({ host, session, cases }) {
   );
 }
 
+function assertDaemonToolsCaseCoverage({ host, tools, cases }) {
+  const hostTools = hostNamedTools(host, tools);
+  assert.deepEqual(
+    hostTools,
+    Object.keys(cases).sort(),
+    `${host} E2E daemon tools/list must match the case table exactly`
+  );
+}
+
+function hostNamedTools(host, tools) {
+  assert.ok(Array.isArray(tools), `${host} E2E driver must return daemon tools/list tools`);
+  const prefix = `${hostToolPrefix(host)}.`;
+  return tools
+    .map((tool) => (typeof tool === 'string' ? tool : tool?.name))
+    .filter((name) => typeof name === 'string' && name.startsWith(prefix))
+    .sort();
+}
+
 function orderedCases(cases, availableTools) {
   return availableTools.map((tool) => cases[tool]);
 }
@@ -258,6 +279,9 @@ function createExternalOfficeE2eDriver(host, script) {
   return {
     async startDaemon(context) {
       return runExternalDriverStep(script, host, 'startDaemon', context);
+    },
+    async listTools(context) {
+      return runExternalDriverStep(script, host, 'listTools', context);
     },
     async createDocument(context) {
       return runExternalDriverStep(script, host, 'createDocument', context);

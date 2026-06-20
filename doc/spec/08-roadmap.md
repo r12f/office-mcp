@@ -1264,10 +1264,16 @@ channel, and MCP `tools/call` dispatch.
       PowerPoint after the helper slice. PowerPoint chart helpers remain out of
       v1 scope because the refined PowerPoint catalog explicitly excludes
       charts.
-- [ ] Make exact advertised-tool coverage part of the Office E2E gate, not only
+- [x] Make exact advertised-tool coverage part of the Office E2E gate, not only
       the synthetic driver contract. A host-specific `npm run e2e:tools` command
       must fail when `tools/list` or session `available_tools` exposes a tool
-      without a real setup/action/verifier row.
+      without a real setup/action/verifier row. Current coverage requires every
+      Office E2E driver to expose a daemon `tools/list` step, filters that list
+      to the current host namespace, compares it exactly with the host case
+      table, and still compares session `available_tools` after add-in
+      connection. Common contract tests include explicit failure coverage for a
+      daemon-only uncovered host tool, and `npm run e2e:tools` passes for Word,
+      Excel, and PowerPoint with the strengthened gate.
 - [x] Structure each host E2E as one table-driven loop. Every tool case supplies
       only the tool-specific setup content, tool arguments, and verifier. The
       shared loop owns the common steps: create fixed baseline content, call the

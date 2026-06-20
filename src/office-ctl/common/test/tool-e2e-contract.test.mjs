@@ -24,6 +24,10 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
       events.push('startDaemon');
       return { endpoint: 'http://127.0.0.1:0/mcp' };
     },
+    async listTools() {
+      events.push('listTools');
+      return ['office.list_sessions', 'word.read', 'word.write', 'excel.read'];
+    },
     async createDocument() {
       events.push('createDocument');
       return { path: 'fixture.docx' };
@@ -61,6 +65,7 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
 
   assert.deepEqual(events, [
     'startDaemon',
+    'listTools',
     'createDocument',
     'waitForSession:fixture.docx',
     'reset:word.read:session-1',
@@ -83,6 +88,9 @@ test('shared Office tool E2E loop records per-tool run metadata without body tex
   const records = [];
   const driver = {
     async startDaemon() {},
+    async listTools() {
+      return ['word.read'];
+    },
     async createDocument() {
       return {};
     },
@@ -121,6 +129,9 @@ test('shared Office tool E2E loop preserves concrete readback verifier metadata'
   const verifiers = [];
   const driver = {
     async startDaemon() {},
+    async listTools() {
+      return ['word.write'];
+    },
     async createDocument() {
       return {};
     },
@@ -163,6 +174,9 @@ test('shared Office tool E2E loop carries setup bindings into call and verify st
   const observed = [];
   const driver = {
     async startDaemon() {},
+    async listTools() {
+      return ['powerpoint.update_table'];
+    },
     async createDocument() {
       return {};
     },
@@ -317,6 +331,9 @@ test('daemonCatalogTools reads the Rust runtime catalog for each Office host', (
 test('shared Office tool E2E loop fails when session tools and case table differ', async () => {
   const driver = {
     async startDaemon() {},
+    async listTools() {
+      return ['word.read'];
+    },
     async createDocument() {
       return {};
     },
@@ -340,11 +357,41 @@ test('shared Office tool E2E loop fails when session tools and case table differ
   );
 });
 
+test('shared Office tool E2E loop fails when daemon tools/list exposes an uncovered host tool', async () => {
+  const driver = {
+    async startDaemon() {},
+    async listTools() {
+      return ['office.list_sessions', 'word.read', 'word.catalog_only', 'excel.read_range'];
+    },
+    async createDocument() {
+      return {};
+    },
+    async waitForSession() {
+      return { sessionId: 'session-1', availableTools: ['word.read'] };
+    },
+    async resetContent() {},
+    async setupContent() {},
+    async callTool() {},
+    async verifyResult() {},
+    async cleanupDocument() {},
+    async stopDaemon() {}
+  };
+
+  await assert.rejects(
+    () => runOfficeToolE2e({ host: 'Word', cases: { 'word.read': e2eCase('word.read') }, driver }),
+    /Word E2E daemon tools\/list must match the case table exactly/
+  );
+});
+
 test('shared Office tool E2E loop still cleans up when a verifier fails', async () => {
   const events = [];
   const driver = {
     async startDaemon() {
       events.push('startDaemon');
+    },
+    async listTools() {
+      events.push('listTools');
+      return ['word.read'];
     },
     async createDocument() {
       events.push('createDocument');
@@ -380,7 +427,7 @@ test('shared Office tool E2E loop still cleans up when a verifier fails', async 
     () => runOfficeToolE2e({ host: 'Word', cases: { 'word.read': e2eCase('word.read') }, driver }),
     /verification failed/
   );
-  assert.deepEqual(events, ['startDaemon', 'createDocument', 'waitForSession', 'reset', 'setup', 'call', 'verify', 'cleanupDocument', 'stopDaemon']);
+  assert.deepEqual(events, ['startDaemon', 'listTools', 'createDocument', 'waitForSession', 'reset', 'setup', 'call', 'verify', 'cleanupDocument', 'stopDaemon']);
 });
 
 test('external Office E2E driver adapter exchanges one JSON request per step', async () => {
@@ -399,6 +446,7 @@ const request = JSON.parse(input);
 appendFileSync(${JSON.stringify(logPath)}, JSON.stringify({ host: request.host, step: request.step, context: request.context }) + '\\n');
 const responses = {
   startDaemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
+  listTools: ['word.read'],
   createDocument: { path: 'external.docx' },
   waitForSession: { sessionId: 'session-1', availableTools: ['word.read'] },
   resetContent: { reset: true },
@@ -428,6 +476,7 @@ process.stdout.write(JSON.stringify(responses[request.step] || {}));
   const calls = readFileSync(logPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
   assert.deepEqual(calls.map((call) => call.step), [
     'startDaemon',
+    'listTools',
     'createDocument',
     'waitForSession',
     'resetContent',
@@ -438,8 +487,8 @@ process.stdout.write(JSON.stringify(responses[request.step] || {}));
     'stopDaemon'
   ]);
   assert.equal(calls[0].host, 'Word');
-  assert.equal(calls[3].context.toolCase.tool, 'word.read');
-  assert.equal(calls[5].context.session.sessionId, 'session-1');
+  assert.equal(calls[4].context.toolCase.tool, 'word.read');
+  assert.equal(calls[6].context.session.sessionId, 'session-1');
 });
 
 test('external Office E2E driver adapter reports failed step stderr', async () => {

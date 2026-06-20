@@ -23,6 +23,8 @@ async function dispatch({ host, step, context = {} }) {
   switch (step) {
     case 'startDaemon':
       return startDaemon(context);
+    case 'listTools':
+      return listTools(context);
     case 'createDocument':
       return createDocument(host, context);
     case 'waitForSession':
@@ -124,6 +126,12 @@ async function createDocument(host, context) {
     officeWindowMode: officeWindowMode(normalizedHost),
     keeper
   };
+}
+
+async function listTools(context) {
+  const daemon = context.daemon || {};
+  const result = await mcpToolsList(daemon.endpoint);
+  return Array.isArray(result.tools) ? result.tools.map((tool) => tool.name).filter(Boolean) : [];
 }
 
 function startOfficeKeeper(host, path) {
@@ -398,6 +406,12 @@ async function mcpToolCall(endpoint = 'http://127.0.0.1:8800/mcp', name, args) {
 async function mcpResourceRead(endpoint = 'http://127.0.0.1:8800/mcp', uri) {
   const sessionId = await initializeMcp(endpoint);
   const response = await postJson(endpoint, { jsonrpc: '2.0', id: 3, method: 'resources/read', params: { uri } }, sessionId);
+  return response.body.result || response.body;
+}
+
+async function mcpToolsList(endpoint = 'http://127.0.0.1:8800/mcp') {
+  const sessionId = await initializeMcp(endpoint);
+  const response = await postJson(endpoint, { jsonrpc: '2.0', id: 4, method: 'tools/list', params: {} }, sessionId);
   return response.body.result || response.body;
 }
 
