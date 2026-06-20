@@ -52,10 +52,11 @@ test('product visual evidence recorder requires all product surfaces', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const wordRuntimeEvidencePath = writeWordRuntimeEvidence(dir);
     const excelRuntimeEvidencePath = writeExcelRuntimeEvidence(dir);
     const powerPointRuntimeEvidencePath = writePowerPointRuntimeEvidence(dir);
     const output = join(dir, 'product-visual-evidence.json');
-    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-runtime-evidence-path', excelRuntimeEvidencePath, '--powerpoint-runtime-evidence-path', powerPointRuntimeEvidencePath);
+    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--word-runtime-evidence-path', wordRuntimeEvidencePath, '--excel-runtime-evidence-path', excelRuntimeEvidencePath, '--powerpoint-runtime-evidence-path', powerPointRuntimeEvidencePath);
     assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.kind, 'product_visual_evidence');
@@ -68,6 +69,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal(evidence.tray_menu_surface_kind, 'native');
     assert.equal(evidence.tray_menu_surface_native, true);
     assert.equal((evidence.word_taskpane as Record<string, unknown>).density_ready, true);
+    assert.equal((evidence.word_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).density_ready, true);
@@ -92,13 +94,14 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.display_name, 'Office MCP Control');
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.icon_url, 'https://localhost:8765/assets/icon-32.png');
     assert.equal(evidence.rendered_logo_review_ready, true);
+    assert.equal(evidence.word_runtime_evidence_ready, true);
     assert.equal(evidence.powerpoint_runtime_evidence_ready, true);
     assert.equal(evidence.daemon_context_ready, true);
     assert.equal(evidence.passed, true);
 
     const missingScreenshots = { ...screenshots };
     missingScreenshots['tray-native-menu'] = join(dir, 'missing-tray-menu.png');
-    const missingTray = runRecorder(join(dir, 'missing-tray.json'), missingScreenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-runtime-evidence-path', excelRuntimeEvidencePath, '--powerpoint-runtime-evidence-path', powerPointRuntimeEvidencePath);
+    const missingTray = runRecorder(join(dir, 'missing-tray.json'), missingScreenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--word-runtime-evidence-path', wordRuntimeEvidencePath, '--excel-runtime-evidence-path', excelRuntimeEvidencePath, '--powerpoint-runtime-evidence-path', powerPointRuntimeEvidencePath);
     assert.notEqual(missingTray.status, 0);
     const failed = JSON.parse(outputText(missingTray.stdout)) as Record<string, unknown>;
     assert.equal(failed.passed, false);
@@ -494,6 +497,28 @@ test('product visual evidence recorder requires Excel runtime evidence', () => {
   });
 });
 
+test('product visual evidence recorder requires Word runtime evidence', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const output = join(dir, 'missing-word-runtime-evidence.json');
+    const missing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--word-runtime-evidence-path', join(dir, 'missing-word.json'));
+    assert.notEqual(missing.status, 0);
+    let evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.word_runtime_evidence_ready, false);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).word_runtime_evidence_ready, false);
+    assert.equal((evidence.word_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
+    assert.equal((evidence.word_taskpane as Record<string, unknown>).density_ready, false);
+
+    const broken = runRecorder(join(dir, 'broken-word-runtime-evidence.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--word-runtime-evidence-path', writeWordRuntimeEvidence(dir, false));
+    assert.notEqual(broken.status, 0);
+    evidence = JSON.parse(outputText(broken.stdout)) as Record<string, unknown>;
+    assert.equal(evidence.word_runtime_evidence_ready, false);
+    assert.equal((evidence.word_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
+    assert.equal((evidence.word_taskpane as Record<string, unknown>).density_ready, false);
+  });
+});
+
 test('product visual evidence recorder requires embedded manual tray evidence', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -700,6 +725,7 @@ test('product visual evidence recorder reads evidence artifact paths from enviro
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const wordRuntimeEvidencePath = writeWordRuntimeEvidence(dir);
     const excelRuntimeEvidencePath = writeExcelRuntimeEvidence(dir);
     const powerPointRuntimeEvidencePath = writePowerPointRuntimeEvidence(dir);
     const manualTrayEvidencePath = writeManualTrayEvidence(dir);
@@ -711,6 +737,7 @@ test('product visual evidence recorder reads evidence artifact paths from enviro
       '--skip-logo-surface-args',
       '--skip-tray-surface-args',
       '--env-rendered-logo-review-path', renderedLogoReviewPath,
+      '--env-word-runtime-evidence-path', wordRuntimeEvidencePath,
       '--env-excel-runtime-evidence-path', excelRuntimeEvidencePath,
       '--env-powerpoint-runtime-evidence-path', powerPointRuntimeEvidencePath,
       '--env-manual-tray-evidence-path', manualTrayEvidencePath
@@ -720,10 +747,12 @@ test('product visual evidence recorder reads evidence artifact paths from enviro
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.rendered_logo_review_ready, true);
     assert.equal(evidence.catalog_identity_review_ready, true);
+    assert.equal((evidence.word_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).density_ready, true);
     assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).runtime_evidence_ready, true);
     assert.equal(evidence.powerpoint_runtime_evidence_ready, true);
+    assert.equal(evidence.word_runtime_evidence_ready, true);
     assert.equal(evidence.manual_tray_evidence_ready, true);
     assert.equal(evidence.passed, true);
   });
@@ -754,6 +783,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const skipCatalogIdentityReview = extra.includes('--skip-catalog-identity-review');
   const skipOfficeToolE2eReports = extra.includes('--skip-office-tool-e2e-reports');
   const envRenderedLogoReviewPath = optionValue(extra, '--env-rendered-logo-review-path');
+  const envWordRuntimeEvidencePath = optionValue(extra, '--env-word-runtime-evidence-path');
   const envExcelRuntimeEvidencePath = optionValue(extra, '--env-excel-runtime-evidence-path');
   const envPowerPointRuntimeEvidencePath = optionValue(extra, '--env-powerpoint-runtime-evidence-path');
   const envManualTrayEvidencePath = optionValue(extra, '--env-manual-tray-evidence-path');
@@ -767,7 +797,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const explicitPowerPointDocumentState = extra.includes('--powerpoint-document-state');
   const filteredExtra = extra.filter((item, index) => {
     const previous = extra[index - 1];
-    if (previous === '--env-rendered-logo-review-path' || previous === '--env-excel-runtime-evidence-path' || previous === '--env-powerpoint-runtime-evidence-path' || previous === '--env-manual-tray-evidence-path' || previous === '--env-catalog-identity-review-path') return false;
+    if (previous === '--env-rendered-logo-review-path' || previous === '--env-word-runtime-evidence-path' || previous === '--env-excel-runtime-evidence-path' || previous === '--env-powerpoint-runtime-evidence-path' || previous === '--env-manual-tray-evidence-path' || previous === '--env-catalog-identity-review-path') return false;
     return item !== '--skip-product-review-flags'
       && item !== '--skip-rendered-logo-and-first-run-flags'
       && item !== '--skip-logo-surface-args'
@@ -776,6 +806,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
       && item !== '--skip-catalog-identity-review'
       && item !== '--skip-office-tool-e2e-reports'
       && item !== '--env-rendered-logo-review-path'
+      && item !== '--env-word-runtime-evidence-path'
       && item !== '--env-excel-runtime-evidence-path'
       && item !== '--env-powerpoint-runtime-evidence-path'
       && item !== '--env-manual-tray-evidence-path'
@@ -784,6 +815,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const hasWordManifest = filteredExtra.includes('--word-manifest-path');
   const hasExcelManifest = filteredExtra.includes('--excel-manifest-path');
   const hasPowerPointManifest = filteredExtra.includes('--powerpoint-manifest-path');
+  const hasWordRuntimeEvidence = filteredExtra.includes('--word-runtime-evidence-path');
   const hasExcelRuntimeEvidence = filteredExtra.includes('--excel-runtime-evidence-path');
   const hasPowerPointRuntimeEvidence = filteredExtra.includes('--powerpoint-runtime-evidence-path');
   const hasManualTrayEvidence = filteredExtra.includes('--manual-tray-evidence-path');
@@ -834,6 +866,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   if (!hasWordManifest) args.push('--word-manifest-path', writeManifest(outputDir, 'word'));
   if (!hasExcelManifest) args.push('--excel-manifest-path', writeManifest(outputDir, 'excel'));
   if (!hasPowerPointManifest) args.push('--powerpoint-manifest-path', writeManifest(outputDir, 'powerpoint'));
+  if (!hasWordRuntimeEvidence) args.push('--word-runtime-evidence-path', writeWordRuntimeEvidence(outputDir));
   if (!hasExcelRuntimeEvidence) args.push('--excel-runtime-evidence-path', writeExcelRuntimeEvidence(outputDir));
   if (!hasPowerPointRuntimeEvidence) args.push('--powerpoint-runtime-evidence-path', writePowerPointRuntimeEvidence(outputDir));
   if (!hasManualTrayEvidence && !skipManualTrayEvidence) args.push('--manual-tray-evidence-path', writeManualTrayEvidence(outputDir));
@@ -877,6 +910,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const env = {
     ...process.env,
     ...(envRenderedLogoReviewPath ? { OFFICE_MCP_RENDERED_LOGO_REVIEW_PATH: envRenderedLogoReviewPath } : {}),
+    ...(envWordRuntimeEvidencePath ? { OFFICE_MCP_WORD_RUNTIME_EVIDENCE_PATH: envWordRuntimeEvidencePath } : {}),
     ...(envExcelRuntimeEvidencePath ? { OFFICE_MCP_EXCEL_RUNTIME_EVIDENCE_PATH: envExcelRuntimeEvidencePath } : {}),
     ...(envPowerPointRuntimeEvidencePath ? { OFFICE_MCP_POWERPOINT_RUNTIME_EVIDENCE_PATH: envPowerPointRuntimeEvidencePath } : {}),
     ...(envManualTrayEvidencePath ? { OFFICE_MCP_TRAY_MANUAL_EVIDENCE_PATH: envManualTrayEvidencePath } : {}),
@@ -1058,6 +1092,46 @@ function writeExcelRuntimeEvidence(dir: string, ready = true): string {
       { name: 'excel.runtime_smoke', status: ready ? 'passed' : 'failed', details: smokeDetails }
     ]
   }, null, 2));
+  return path;
+}
+
+function writeWordRuntimeEvidence(dir: string, ready = true): string {
+  const path = join(dir, `word-runtime-${ready ? 'ready' : 'broken'}.json`);
+  const sessionId = '00000000-1111-2222-3333-444444444444';
+  const status = ready ? 'passed' : 'failed';
+  const report = {
+    schema_version: 1,
+    endpoint: 'http://127.0.0.1:8800/mcp',
+    generated_at: new Date().toISOString(),
+    session_id: sessionId,
+    gates: [
+      {
+        name: 'word.session_discovery',
+        status: 'passed',
+        details: {
+          sessions: [{
+            app: 'word',
+            status: 'active',
+            session_id: sessionId,
+            available_tool_count: 25,
+            document: { title: 'Word Document' },
+            host: { app: 'word', platform: 'pc', version: '16.0' }
+          }]
+        }
+      },
+      { name: 'word.e2e_session', status: 'passed', details: { session_id: sessionId, available_tool_count: 25, document_path: 'C:\\Temp\\word.docx' } },
+      { name: 'word.runtime_read_smoke', status, details: { available_tool_count: 25, paragraph_0_text_length: ready ? 23 : 0, document_text_length: ready ? 23 : 0 } },
+      { name: 'word.runtime_mutation_smoke', status, details: { marker: 'marker', insert: { inserted: ready }, find_count: ready ? 1 : 0 } },
+      { name: 'word.full_smoke.word-core', status, details: { mode: 'word-core' } },
+      { name: 'word.full_smoke.word-formatting', status, details: { mode: 'word-formatting' } },
+      { name: 'word.full_smoke.word-review', status, details: { mode: 'word-review' } },
+      { name: 'word.full_smoke.word-resources', status, details: { mode: 'word-resources' } },
+      { name: 'word.full_smoke.word-spec-args', status, details: { mode: 'word-spec-args' } },
+      { name: 'word.tracked_change_com.accept', status, details: { action: 'accept', mutation_action: ready ? 'accept' : undefined } },
+      { name: 'word.tracked_change_com.reject', status, details: { action: 'reject', mutation_action: ready ? 'reject' : undefined } }
+    ]
+  };
+  writeFileSync(path, JSON.stringify(report, null, 2));
   return path;
 }
 

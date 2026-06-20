@@ -456,6 +456,7 @@ function validateProductVisualEvidence(): void {
   validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
   validateFirstRunIdentity(visual.first_run_identity);
   validateDaemonMainWindowVisualEvidence(visual.daemon_main_window);
+  validateWordRuntimeEvidence(visual.word_runtime_evidence, visual.word_runtime_evidence_ready);
   validatePowerPointRuntimeEvidence(visual.powerpoint_runtime_evidence, visual.powerpoint_runtime_evidence_ready);
   validateProductVisualOfficeToolE2e(visual.office_tool_e2e, visual.office_tool_e2e_ready);
   validateWordTaskpaneVisualEvidence(visual.word_taskpane);
@@ -588,6 +589,7 @@ function validateProductIdentityReview(review: unknown): void {
     ['word_first_run_identity_ready', 'Word first-run identity ready flag'],
     ['excel_first_run_identity_ready', 'Excel first-run identity ready flag'],
     ['powerpoint_first_run_identity_ready', 'PowerPoint first-run identity ready flag'],
+    ['word_runtime_evidence_ready', 'Word runtime evidence ready flag'],
     ['powerpoint_runtime_evidence_ready', 'PowerPoint runtime evidence ready flag'],
     ['ready', 'product identity review ready flag']
   ] as const) {
@@ -873,6 +875,37 @@ function validatePowerPointRuntimeEvidence(evidence: unknown, ready: unknown): v
   if (!exportSupported && !exportHostRejection) failures.push('Product visual PowerPoint runtime evidence missing export_file success or explicit host-capability rejection.');
 }
 
+function validateWordRuntimeEvidence(evidence: unknown, ready: unknown): void {
+  if (ready !== true) failures.push('Product visual evidence missing Word runtime evidence ready flag.');
+  if (!isRecord(evidence)) {
+    failures.push('Product visual evidence missing Word runtime evidence details.');
+    return;
+  }
+  if (evidence.ok !== true) failures.push('Product visual Word runtime evidence was not read successfully.');
+  if (evidence.schema_version !== 1) failures.push(`Unsupported Word runtime evidence schema_version: ${evidence.schema_version}`);
+  if (evidence.smoke_passed !== true) failures.push('Product visual evidence missing passed Word runtime smoke gates.');
+  if (evidence.ready !== true) failures.push('Product visual Word runtime evidence is not ready.');
+  const session = evidence.session;
+  const details = evidence.smoke_details;
+  if (!isRecord(session) || !isRecord(details)) {
+    failures.push('Product visual Word runtime evidence missing session or smoke details.');
+    return;
+  }
+  const document = isRecord(session.document) ? session.document : undefined;
+  const host = isRecord(session.host) ? session.host : undefined;
+  if (session.app !== 'word' || session.status !== 'active') failures.push('Product visual Word runtime evidence missing active Word session.');
+  if (typeof session.session_id !== 'string') failures.push('Product visual Word runtime evidence missing session_id.');
+  if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual Word runtime evidence missing document title.');
+  if (host?.app !== 'word') failures.push('Product visual Word runtime evidence missing Word host metadata.');
+  if (typeof session.available_tool_count !== 'number' || session.available_tool_count < 25) failures.push('Product visual Word runtime evidence missing 25-tool available tool count.');
+  if (typeof details.available_tool_count !== 'number' || details.available_tool_count < 25) failures.push('Product visual Word runtime evidence missing read smoke available tool count.');
+  if (Number(details.paragraph_0_text_length ?? 0) <= 0) failures.push('Product visual Word runtime evidence missing paragraph read proof.');
+  if (Number(details.document_text_length ?? 0) <= 0) failures.push('Product visual Word runtime evidence missing document read proof.');
+  if (Number(details.find_count ?? 0) < 1) failures.push('Product visual Word runtime evidence missing mutation readback.');
+  if (details.full_smoke_passed !== true) failures.push('Product visual Word runtime evidence missing full smoke proof.');
+  if (details.com_tracked_change_passed !== true) failures.push('Product visual Word runtime evidence missing COM tracked-change proof.');
+}
+
 function validateProductVisualOfficeToolE2e(evidence: unknown, ready: unknown): void {
   if (ready !== true) failures.push('Product visual evidence missing Office tool E2E ready flag.');
   if (!isRecord(evidence)) {
@@ -908,6 +941,7 @@ function validateEmbeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoin
 
 function validateWordTaskpaneVisualEvidence(taskpane: unknown): void {
   validateTaskpaneDensityEvidence(taskpane, 'Word');
+  if (isRecord(taskpane)) validateWordRuntimeEvidence(taskpane.runtime_evidence, taskpane.runtime_evidence_ready);
 }
 
 function validateExcelTaskpaneVisualEvidence(taskpane: unknown): void {

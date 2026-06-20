@@ -13,6 +13,7 @@ const tester = readOption('--tester') ?? process.env.USERNAME ?? process.env.USE
 const notes = readOption('--notes');
 const daemonBin = readOption('--daemon-bin');
 const renderedLogoReviewPath = readOption('--rendered-logo-review-path') ?? process.env.OFFICE_MCP_RENDERED_LOGO_REVIEW_PATH;
+const wordRuntimeEvidencePath = readOption('--word-runtime-evidence-path') ?? process.env.OFFICE_MCP_WORD_RUNTIME_EVIDENCE_PATH;
 const excelRuntimeEvidencePath = readOption('--excel-runtime-evidence-path') ?? process.env.OFFICE_MCP_EXCEL_RUNTIME_EVIDENCE_PATH;
 const powerPointRuntimeEvidencePath = readOption('--powerpoint-runtime-evidence-path') ?? process.env.OFFICE_MCP_POWERPOINT_RUNTIME_EVIDENCE_PATH;
 const wordToolE2eReportPath = readOption('--word-tool-e2e-report-path') ?? process.env.OFFICE_MCP_WORD_TOOL_E2E_REPORT_PATH;
@@ -113,6 +114,8 @@ const powerPointServerProtocolRow = readOption('--powerpoint-server-protocol-row
 const powerPointDocumentState = readOption('--powerpoint-document-state');
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
+const wordRuntimeEvidence = wordRuntimeEvidencePath ? readWordRuntimeEvidence(resolve(wordRuntimeEvidencePath)) : undefined;
+const wordRuntimeEvidenceReady = wordRuntimeEvidenceLooksReady(wordRuntimeEvidence);
 const excelRuntimeEvidence = excelRuntimeEvidencePath ? readExcelRuntimeEvidence(resolve(excelRuntimeEvidencePath)) : undefined;
 const excelRuntimeEvidenceReady = excelRuntimeEvidenceLooksReady(excelRuntimeEvidence);
 const powerPointRuntimeEvidence = powerPointRuntimeEvidencePath ? readPowerPointRuntimeEvidence(resolve(powerPointRuntimeEvidencePath)) : undefined;
@@ -140,7 +143,7 @@ const excelFirstRunIdentityReady = excelFirstRunIdentityReviewed && catalogIdent
 const powerPointFirstRunIdentityReady = powerPointFirstRunIdentityReviewed && catalogIdentityLooksReady(powerPointFirstRunIdentity);
 const wordServerProtocolReady = typeof wordServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(wordServerProtocolRow);
 const wordDocumentStateReady = typeof wordDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(wordDocumentState) && !/unknown/i.test(wordDocumentState);
-const wordTaskpaneDensityReady = wordCompactTopBlock && wordToolsPermissionsMerged && wordInlineSettings && wordServerProtocolReady && wordDocumentStateReady;
+const wordTaskpaneDensityReady = wordCompactTopBlock && wordToolsPermissionsMerged && wordInlineSettings && wordServerProtocolReady && wordDocumentStateReady && wordRuntimeEvidenceReady;
 const excelServerProtocolReady = typeof excelServerProtocolRow === 'string' && /^Server .+ \/ Protocol .+$/.test(excelServerProtocolRow);
 const excelDocumentStateReady = typeof excelDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(excelDocumentState) && !/unknown/i.test(excelDocumentState);
 const excelTaskpaneDensityReady = excelCompactTopBlock && excelToolsPermissionsMerged && excelInlineSettings && excelServerProtocolReady && excelDocumentStateReady && excelRuntimeEvidenceReady;
@@ -149,8 +152,8 @@ const powerPointDocumentStateReady = typeof powerPointDocumentState === 'string'
 const powerPointTaskpaneDensityReady = powerPointCompactTopBlock && powerPointToolsPermissionsMerged && powerPointInlineSettings && powerPointServerProtocolReady && powerPointDocumentStateReady && powerPointRuntimeEvidenceReady;
 const currentScreenshotFeedbackReady = currentLogoScreenshotFeedbackReviewed && currentAddinScreenshotFeedbackReviewed && currentTrayScreenshotFeedbackReviewed;
 const daemonMainWindowReady = daemonMainWindowReviewed && daemonMainWindowCompactReviewed && daemonMainWindowThreeColumnReviewed;
-const productIdentityReviewReady = logoQualityReviewed && logoFutureOfficeControlReviewed && finalLogoUserSurfaceReviewed && currentLogoScreenshotFeedbackReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinTitleIconTypeReviewed && addinInstallableSurfaceReviewed && currentAddinScreenshotFeedbackReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNativeFirstImpressionReviewed && trayNormalWindowsLaunchReviewed && currentTrayScreenshotFeedbackReviewed;
-const passed = productTextReady && allScreenshotsExist && allScreenshotsFresh && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && officeToolE2eReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && daemonMainWindowReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
+const productIdentityReviewReady = logoQualityReviewed && logoFutureOfficeControlReviewed && finalLogoUserSurfaceReviewed && currentLogoScreenshotFeedbackReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinTitleIconTypeReviewed && addinInstallableSurfaceReviewed && currentAddinScreenshotFeedbackReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && wordRuntimeEvidenceReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNativeFirstImpressionReviewed && trayNormalWindowsLaunchReviewed && currentTrayScreenshotFeedbackReviewed;
+const passed = productTextReady && allScreenshotsExist && allScreenshotsFresh && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && officeToolE2eReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && daemonMainWindowReady && productIdentityReviewReady && renderedLogoReviewReady && wordRuntimeEvidenceReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -203,6 +206,7 @@ const evidence = {
     word_first_run_identity_ready: wordFirstRunIdentityReady,
     excel_first_run_identity_ready: excelFirstRunIdentityReady,
     powerpoint_first_run_identity_ready: powerPointFirstRunIdentityReady,
+    word_runtime_evidence_ready: wordRuntimeEvidenceReady,
     powerpoint_runtime_evidence_ready: powerPointRuntimeEvidenceReady,
     ready: productIdentityReviewReady
   },
@@ -231,6 +235,8 @@ const evidence = {
   },
   rendered_logo_review: renderedLogoReview,
   rendered_logo_review_ready: renderedLogoReviewReady,
+  word_runtime_evidence: wordRuntimeEvidence,
+  word_runtime_evidence_ready: wordRuntimeEvidenceReady,
   powerpoint_runtime_evidence: powerPointRuntimeEvidence,
   powerpoint_runtime_evidence_ready: powerPointRuntimeEvidenceReady,
   office_tool_e2e: officeToolE2e,
@@ -243,6 +249,8 @@ const evidence = {
     server_protocol_row_ready: wordServerProtocolReady,
     document_state: wordDocumentState,
     document_state_ready: wordDocumentStateReady,
+    runtime_evidence: wordRuntimeEvidence,
+    runtime_evidence_ready: wordRuntimeEvidenceReady,
     density_ready: wordTaskpaneDensityReady
   },
   excel_taskpane: {
@@ -524,6 +532,57 @@ function excelRuntimeEvidenceLooksReady(evidence: Record<string, unknown> | unde
   return evidence.ok === true && evidence.schema_version === 1 && evidence.smoke_passed === true && evidence.ready === true;
 }
 
+function readWordRuntimeEvidence(path: string): Record<string, unknown> {
+  try {
+    const report = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    const gates = Array.isArray(report.gates) ? report.gates.filter(isRecord) : [];
+    const discovery = gates.find((gate) => gate.name === 'word.session_discovery' && gate.status === 'passed');
+    const readSmoke = gates.find((gate) => gate.name === 'word.runtime_read_smoke' && gate.status === 'passed');
+    const mutationSmoke = gates.find((gate) => gate.name === 'word.runtime_mutation_smoke' && gate.status === 'passed');
+    const fullSmokePassed = ['word-core', 'word-formatting', 'word-review', 'word-resources', 'word-spec-args']
+      .every((mode) => gates.some((gate) => gate.name === `word.full_smoke.${mode}` && gate.status === 'passed'));
+    const comTrackedChangePassed = ['accept', 'reject']
+      .every((action) => gates.some((gate) => gate.name === `word.tracked_change_com.${action}` && gate.status === 'passed'));
+    const session = wordSessionFromDiscovery(discovery, report.session_id);
+    const readDetails = isRecord(readSmoke?.details) ? readSmoke.details : undefined;
+    const mutationDetails = isRecord(mutationSmoke?.details) ? mutationSmoke.details : undefined;
+    const details = {
+      session_id: report.session_id,
+      available_tool_count: readDetails?.available_tool_count,
+      paragraph_0_text_length: readDetails?.paragraph_0_text_length,
+      document_text_length: readDetails?.document_text_length,
+      find_count: mutationDetails?.find_count,
+      full_smoke_passed: fullSmokePassed,
+      com_tracked_change_passed: comTrackedChangePassed
+    };
+    return {
+      path,
+      ok: true,
+      schema_version: report.schema_version,
+      endpoint: report.endpoint,
+      generated_at: report.generated_at,
+      session,
+      smoke_details: details,
+      smoke_passed: Boolean(readSmoke && mutationSmoke && fullSmokePassed && comTrackedChangePassed),
+      ready: wordRuntimeDetailsLookReady(session, details)
+    };
+  } catch (error) {
+    return { path, ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function wordSessionFromDiscovery(discovery: Record<string, unknown> | undefined, reportSessionId: unknown): Record<string, unknown> | undefined {
+  const discoveryDetails = isRecord(discovery?.details) ? discovery.details : undefined;
+  const sessions = Array.isArray(discoveryDetails?.sessions) ? discoveryDetails.sessions.filter(isRecord) : [];
+  const sessionId = typeof reportSessionId === 'string' ? reportSessionId : undefined;
+  return sessions.find((session) => session.app === 'word' && (!sessionId || session.session_id === sessionId));
+}
+
+function wordRuntimeEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
+  if (!evidence) return false;
+  return evidence.ok === true && evidence.schema_version === 1 && evidence.smoke_passed === true && evidence.ready === true;
+}
+
 function readPowerPointRuntimeEvidence(path: string): Record<string, unknown> {
   try {
     const report = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
@@ -726,6 +785,27 @@ function excelRuntimeDetailsLookReady(session: Record<string, unknown> | undefin
     && isRecord(details.pivot_table) && typeof details.pivot_table.pivot_table === 'string'
     && isRecord(details.pivot_update) && details.pivot_update.refreshed === true
     && isRecord(details.sheet) && details.sheet.activated === true;
+}
+
+function wordRuntimeDetailsLookReady(session: Record<string, unknown> | undefined, details: Record<string, unknown> | undefined): boolean {
+  if (!session || !details) return false;
+  const document = isRecord(session.document) ? session.document : undefined;
+  const host = isRecord(session.host) ? session.host : undefined;
+  return session.app === 'word'
+    && session.status === 'active'
+    && typeof session.session_id === 'string'
+    && typeof document?.title === 'string'
+    && document.title.length > 0
+    && host?.app === 'word'
+    && typeof session.available_tool_count === 'number'
+    && session.available_tool_count >= 25
+    && typeof details.available_tool_count === 'number'
+    && details.available_tool_count >= 25
+    && Number(details.paragraph_0_text_length ?? 0) > 0
+    && Number(details.document_text_length ?? 0) > 0
+    && Number(details.find_count ?? 0) >= 1
+    && details.full_smoke_passed === true
+    && details.com_tracked_change_passed === true;
 }
 
 function readManualTrayEvidence(path: string): Record<string, unknown> {

@@ -513,6 +513,26 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.word_runtime_evidence_ready = false;
+      broken.product_identity_review.word_runtime_evidence_ready = false;
+      broken.word_taskpane.runtime_evidence_ready = false;
+      broken.word_taskpane.runtime_evidence.smoke_details.find_count = 0;
+      (broken.word_taskpane.runtime_evidence.smoke_details as Record<string, unknown>).com_tracked_change_passed = false;
+      broken.word_taskpane.density_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Word runtime evidence ready flag/);
+      assert.match(outputText(result.stdout), /Word runtime evidence missing mutation readback/);
+      assert.match(outputText(result.stdout), /Word runtime evidence missing COM tracked-change proof/);
+      assert.match(outputText(result.stdout), /Word task pane density pass flag/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.daemon_main_window.compact_status_details_reviewed = false;
       broken.daemon_main_window.three_column_layout_reviewed = false;
       broken.daemon_main_window.ready = false;
@@ -1251,6 +1271,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       word_first_run_identity_ready: passed,
       excel_first_run_identity_ready: passed,
       powerpoint_first_run_identity_ready: passed,
+      word_runtime_evidence_ready: passed,
       powerpoint_runtime_evidence_ready: passed,
       ready: passed
     },
@@ -1288,6 +1309,8 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     },
     rendered_logo_review: renderedLogoReview(passed, screenshots.logo_tray_size),
     rendered_logo_review_ready: passed,
+    word_runtime_evidence: wordRuntimeEvidence(passed),
+    word_runtime_evidence_ready: passed,
     daemon_main_window: {
       reviewed: passed,
       compact_status_details_reviewed: passed,
@@ -1310,6 +1333,8 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       server_protocol_row_ready: passed,
       document_state: 'Editable',
       document_state_ready: passed,
+      runtime_evidence: wordRuntimeEvidence(passed),
+      runtime_evidence_ready: passed,
       density_ready: passed
     },
     excel_taskpane: {
@@ -1437,6 +1462,35 @@ function excelRuntimeEvidence(passed: boolean) {
       pivot_update: { refreshed: passed },
       sheet: { activated: passed }
     }
+  };
+}
+
+function wordRuntimeEvidence(passed: boolean) {
+  const sessionId = '00000000-1111-2222-3333-444444444444';
+  return {
+    ok: passed,
+    schema_version: 1,
+    endpoint: 'http://127.0.0.1:8800/mcp',
+    generated_at: new Date().toISOString(),
+    session: {
+      app: 'word',
+      status: 'active',
+      session_id: sessionId,
+      available_tool_count: 25,
+      document: { title: 'Word Document' },
+      host: { app: 'word', platform: 'pc', version: '16.0' }
+    },
+    smoke_details: {
+      session_id: sessionId,
+      available_tool_count: 25,
+      paragraph_0_text_length: passed ? 23 : 0,
+      document_text_length: passed ? 23 : 0,
+      find_count: passed ? 1 : 0,
+      full_smoke_passed: passed,
+      com_tracked_change_passed: passed
+    },
+    smoke_passed: passed,
+    ready: passed
   };
 }
 
