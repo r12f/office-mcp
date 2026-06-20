@@ -140,7 +140,25 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { orderedContains: ['Alpha', 'Bravo', 'Charlie'] }
     }
   }],
-  ['excel.apply_filter', { args: { sheet: 'Sheet1', address: 'A1:B3', column: 0, criterion: 'A' } }],
+  ['excel.apply_filter', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B3', values: [['Name', 'Value'], ['Alpha', '1'], ['Beta', '2']] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'A1:B3', target_type: 'range', column_index: 0, criteria: { filter_on: 'values', values: ['Alpha'] } },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        pathEquals: [
+          { path: 'target_type', value: 'range' },
+          { path: 'address', value: 'A1:B3' },
+          { path: 'column_index', value: 0 },
+          { path: 'filtered', value: true }
+        ]
+      }
+    }
+  }],
   ['excel.create_table', {
     setup: {
       actions: [
@@ -199,8 +217,35 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['Updated chart'], notContains: ['Chart Before Update'] }
     }
   }],
-  ['excel.create_pivot_table', { args: { sheet: 'Sheet1', source_range: 'A1:B4', destination: 'D1' } }],
-  ['excel.update_pivot_table', { args: { pivot_table: 'E2EPivot', action: 'refresh' } }]
+  ['excel.create_pivot_table', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'M1:N4', values: [['Region', 'Sales'], ['West', 10], ['East', 15], ['West', 20]] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'M1:N4', name: 'E2EPivotCreate', destination: 'P1' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.update_pivot_table',
+      readbackArguments: { pivot_table: 'E2EPivotCreate', action: 'metadata' },
+      expect: { contains: ['E2EPivotCreate'] }
+    }
+  }],
+  ['excel.update_pivot_table', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'R1:S4', values: [['Region', 'Sales'], ['West', 10], ['East', 15], ['West', 20]] } },
+        { tool: 'excel.create_pivot_table', arguments: { sheet: 'Sheet1', address: 'R1:S4', name: 'E2EPivotUpdate', destination: 'U1' } }
+      ]
+    },
+    args: { pivot_table: 'E2EPivotUpdate', action: 'add_hierarchy', axis: 'row', hierarchy: 'Region' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.update_pivot_table',
+      readbackArguments: { pivot_table: 'E2EPivotUpdate', action: 'metadata' },
+      expect: { contains: ['E2EPivotUpdate', 'Region'] }
+    }
+  }]
 ].map(([tool, options]) => [tool, e2eCase(tool, options)]));
 
 test('Excel E2E case table covers every advertised tool', () => {
@@ -221,6 +266,9 @@ test('Excel mutating E2E cases define concrete setup and readback checks', () =>
   assertConcreteReadback('excel.update_table');
   assertConcreteReadback('excel.create_chart');
   assertConcreteReadback('excel.update_chart');
+  assertDirectResult('excel.apply_filter');
+  assertConcreteReadback('excel.create_pivot_table');
+  assertConcreteReadback('excel.update_pivot_table');
 });
 
 test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
@@ -237,4 +285,11 @@ function assertConcreteReadback(tool) {
   if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
   if (!toolCase.verify.readbackTool) throw new Error(`${tool} must define a readback tool`);
   if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
+}
+
+function assertDirectResult(tool) {
+  const toolCase = EXCEL_E2E_CASES[tool];
+  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
+  if (toolCase.verify?.kind !== 'direct-result') throw new Error(`${tool} must use direct-result verification`);
+  if (!toolCase.verify.expect) throw new Error(`${tool} must define direct-result expectations`);
 }
