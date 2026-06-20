@@ -1,7 +1,7 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
 
@@ -72,14 +72,16 @@ function describeDocumentLifecycle(host, context) {
   const stdoutPath = `${path}.office-mcp-stdout.log`;
   const stderrPath = `${path}.office-mcp-stderr.log`;
   const pidPath = `${path}.office-mcp-pid`;
+  const activationLogPath = activationLogPathForDocument(path, normalizedHost);
   return {
     host,
     path,
     createdByDriver: true,
     officeWindowMode: officeWindowMode(normalizedHost),
+    activationLogPath,
     keeper: { closePath, readyPath, startedPath, errorPath, stdoutPath, stderrPath, pidPath, scriptPath: `${path}.office-mcp-keeper.ps1` },
     script: officeKeeperScript(normalizedHost, path, closePath, readyPath, startedPath, errorPath),
-    cleanupScript: officeCleanupScript(normalizedHost, path)
+    cleanupScript: officeCleanupScript(normalizedHost, [path], [])
   };
 }
 
@@ -144,15 +146,26 @@ async function createDocument(host, context) {
   const path = resolve(workDir, `office-mcp-e2e-${normalizedHost}-${Date.now()}.${extension}`);
   const keeperTimeoutMs = Number(context.keeperTimeoutMs || 90000);
   const powerShellTimeoutMs = Number(context.powerShellTimeoutMs || keeperTimeoutMs + 10000);
-  const keeper = startOfficeKeeper(normalizedHost, path, powerShellTimeoutMs);
-  await waitForFile(keeper.readyPath, keeperTimeoutMs, keeper);
+  let keeper;
+  try {
+    keeper = startOfficeKeeper(normalizedHost, path, powerShellTimeoutMs);
+    await waitForFile(keeper.readyPath, keeperTimeoutMs, keeper);
+  } catch (error) {
+    cleanupKeeperArtifacts(keeper, path);
+    throw error;
+  }
   return {
     host,
     path,
     createdByDriver: true,
     officeWindowMode: officeWindowMode(normalizedHost),
+    activationLogPath: activationLogPathForDocument(path, normalizedHost),
     keeper
   };
+}
+
+function activationLogPathForDocument(path, host) {
+  return `${path || resolve(tmpdir(), `office-mcp-e2e-${normalizeHost(host)}`)}.office-mcp-activator.log`;
 }
 
 async function listTools(context) {
@@ -175,8 +188,30 @@ function startOfficeKeeper(host, path, powerShellTimeoutMs) {
   }
   const script = officeKeeperScript(host, path, closePath, readyPath, startedPath, errorPath);
   writeFileSync(scriptPath, script, 'utf8');
-  runOfficePowerShell(scriptPath, stdoutPath, stderrPath, powerShellTimeoutMs);
-  return { closePath, readyPath, startedPath, errorPath, stdoutPath, stderrPath, pidPath, scriptPath };
+  const keeper = { closePath, readyPath, startedPath, errorPath, stdoutPath, stderrPath, pidPath, scriptPath };
+  try {
+    runOfficePowerShell(scriptPath, stdoutPath, stderrPath, powerShellTimeoutMs);
+    return keeper;
+  } catch (error) {
+    cleanupKeeperArtifacts(keeper, path);
+    throw error;
+  }
+}
+
+function cleanupKeeperArtifacts(keeper, path) {
+  for (const file of [
+    path,
+    keeper?.closePath,
+    keeper?.readyPath,
+    keeper?.startedPath,
+    keeper?.errorPath,
+    keeper?.stdoutPath,
+    keeper?.stderrPath,
+    keeper?.pidPath,
+    keeper?.scriptPath
+  ]) {
+    if (file) rmSync(file, { force: true });
+  }
 }
 
 function officeKeeperScript(host, path, closePath, readyPath, startedPath, errorPath) {
@@ -185,13 +220,15 @@ function officeKeeperScript(host, path, closePath, readyPath, startedPath, error
   const ready = psSingle(readyPath);
   const started = psSingle(startedPath);
   const error = psSingle(errorPath);
+  const pid = psSingle(`${path}.office-mcp-pid`);
   const retry = `function Invoke-Retry([scriptblock]$Action) { for ($i=0; $i -lt 90; $i++) { try { return & $Action } catch { if ($i -eq 89) { throw }; Start-Sleep -Milliseconds 500 } } }; <# retries RPC_E_CALL_REJECTED and transient Office COM busy states. #> `;
-  const prelude = `${retry}Set-Content -LiteralPath '${started}' -Value 'office-mcp-keeper:start:${host}'; Write-Output 'office-mcp-keeper:start:${host}'; `;
+  const processIdHelper = `function Write-OfficeMcpProcessPid([IntPtr]$Handle) { try { $element=[System.Windows.Automation.AutomationElement]::FromHandle($Handle); if ($element) { Set-Content -LiteralPath '${pid}' -Value $element.Current.ProcessId } } catch {} }; `;
+  const prelude = `${retry}${processIdHelper}Set-Content -LiteralPath '${started}' -Value 'office-mcp-keeper:start:${host}'; Write-Output 'office-mcp-keeper:start:${host}'; `;
   if (host === 'word') {
     return wordKeeperScript(file, ready, error, prelude);
   }
   if (host === 'excel') {
-    return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $wb=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application') } catch { $app=New-Object -ComObject Excel.Application }; $app.Visible=$true; $app.DisplayAlerts=$false; $wb=Invoke-Retry { $app.Workbooks.Add() }; $ws=$wb.Worksheets.Item(1); $ws.Cells.Item(1,1).Value2='office-mcp e2e baseline'; Invoke-Retry { $wb.SaveAs('${file}') }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
+    return `$ErrorActionPreference='Stop'; Add-Type -AssemblyName UIAutomationClient; ${prelude}$app=$null; $wb=$null; try { $app=Invoke-Retry { New-Object -ComObject Excel.Application }; Invoke-Retry { $app.Visible=$true }; Write-OfficeMcpProcessPid -Handle $app.Hwnd; Invoke-Retry { $app.DisplayAlerts=$false }; $wb=Invoke-Retry { $app.Workbooks.Add() }; $ws=Invoke-Retry { $wb.Worksheets.Item(1) }; Invoke-Retry { $ws.Cells.Item(1,1).Value2='office-mcp e2e baseline' }; Invoke-Retry { $wb.SaveAs('${file}') }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
   }
   return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $pres=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application') } catch { $app=New-Object -ComObject PowerPoint.Application }; $pres=Invoke-Retry { $app.Presentations.Add($true) }; $slide=Invoke-Retry { $pres.Slides.Add(1, 1) }; $slide.Shapes.Title.TextFrame.TextRange.Text='office-mcp e2e baseline'; Invoke-Retry { $pres.SaveAs('${file}') }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
 }
@@ -274,7 +311,7 @@ async function activateAddin(host, context) {
   const normalizedHost = normalizeHost(host);
   const document = context.document || {};
   const daemon = context.daemon || {};
-  const activatorLogPath = `${document.path || resolve(tmpdir(), `office-mcp-e2e-${normalizedHost}`)}.office-mcp-activator.log`;
+  const activatorLogPath = document.activationLogPath || activationLogPathForDocument(document.path, normalizedHost);
   rmSync(activatorLogPath, { force: true });
   const child = spawn(command, [], {
     shell: true,
@@ -290,7 +327,7 @@ async function activateAddin(host, context) {
       OFFICE_MCP_E2E_ACTIVATOR_LOG: activatorLogPath
     }
   });
-  const result = await waitForChildExit(child, Number(context.timeoutMs || 30000), () => activatorLogDetail(activatorLogPath));
+  const result = await waitForChildExit(child, Number(context.timeoutMs || process.env.OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS || 90000), () => activatorLogDetail(activatorLogPath));
   if (result.exitCode !== 0) throw new Error(`Office add-in activator exited with code ${result.exitCode}.${activatorLogDetail(activatorLogPath)}`);
   return {
     activated: true,
@@ -335,7 +372,7 @@ function activationCommand() {
     return { command: '', kind: 'unavailable' };
   }
   return {
-    command: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${DEFAULT_WINDOWS_ACTIVATOR}" -TimeoutSeconds 20`,
+    command: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${DEFAULT_WINDOWS_ACTIVATOR}" -TimeoutSeconds 45`,
     kind: 'default-windows-taskpane'
   };
 }
@@ -357,14 +394,23 @@ async function runToolActions(context, actions) {
   const session = context.session || {};
   const document = context.document || {};
   const bindings = { session_id: session.sessionId, ...(session.bindings || {}) };
+  let acceptedErrorCode;
   for (const action of actions) {
     if (!action?.tool && !action?.resource && !action?.driver) throw new Error('Office E2E setup/reset action must define a tool, resource, or driver action.');
     const result = await runSetupAction({ action, bindings, daemon, document, session });
     if (result.error || result.structuredContent?.error) {
-      throw new Error(`Office E2E setup/reset action ${action.tool || action.resource || action.driver} failed: ${JSON.stringify(result.error || result.structuredContent.error)}`);
+      const error = result.error || result.structuredContent.error;
+      const code = error.office_mcp_code || error.code;
+      if (arrayOf(action.allowErrorCodes).includes(code)) {
+        if (action.saveAs) bindings[action.saveAs] = { skipped: true, accepted_error_code: code };
+        acceptedErrorCode ??= code;
+        continue;
+      }
+      throw new Error(`Office E2E setup/reset action ${action.tool || action.resource || action.driver} failed: ${JSON.stringify(error)}`);
     }
     if (action.saveAs) bindings[action.saveAs] = action.resource ? resourceResultData(result) : actionResultData(result);
   }
+  if (acceptedErrorCode) bindings.__accepted_error_code = acceptedErrorCode;
   return bindings;
 }
 
@@ -575,9 +621,11 @@ async function cleanupDocument(context) {
   if (document.createdByDriver !== true || !document.keeper?.closePath) {
     return { deleted: false, skipped: 'not-driver-owned' };
   }
-  const resolved = resolve(document.path);
-  runOfficeCleanup(document.host, resolved, Number(context.timeoutMs || 30000));
-  await removeFileWithRetry(resolved, Number(context.deleteTimeoutMs || 10000));
+  const initialPaths = driverOwnedCleanupPaths(document);
+  const processIds = driverOwnedProcessIds(document);
+  runOfficeCleanup(document.host, initialPaths, processIds, Number(context.timeoutMs || 30000));
+  const cleanupPaths = [...new Set([...initialPaths, ...driverOwnedCleanupPaths(document)])];
+  for (const path of cleanupPaths) await removeFileWithRetry(path, Number(context.deleteTimeoutMs || 10000));
   if (document.keeper.closePath) rmSync(document.keeper.closePath, { force: true });
   if (document.keeper.readyPath) rmSync(document.keeper.readyPath, { force: true });
   if (document.keeper.startedPath) rmSync(document.keeper.startedPath, { force: true });
@@ -586,7 +634,54 @@ async function cleanupDocument(context) {
   if (document.keeper.stderrPath) rmSync(document.keeper.stderrPath, { force: true });
   if (document.keeper.pidPath) rmSync(document.keeper.pidPath, { force: true });
   if (document.keeper.scriptPath) rmSync(document.keeper.scriptPath, { force: true });
-  return { closedByDriver: true, deleted: !existsSync(resolved), path: resolved };
+  if (document.activationLogPath) rmSync(document.activationLogPath, { force: true });
+  return { closedByDriver: true, deleted: cleanupPaths.every((path) => !existsSync(path)), path: resolve(document.path), deletedPaths: cleanupPaths };
+}
+
+function driverOwnedCleanupPaths(document) {
+  const paths = new Set();
+  for (const path of [document.path, document.original_path]) {
+    if (path) paths.add(resolve(path));
+  }
+  for (const path of officeSideloadCopyCandidates(document.host)) paths.add(resolve(path));
+  return [...paths];
+}
+
+function driverOwnedProcessIds(document) {
+  const ids = new Set();
+  const pid = Number(document.keeper?.officeProcessId || (document.keeper?.pidPath && existsSync(document.keeper.pidPath) ? readText(document.keeper.pidPath) : 0));
+  if (Number.isInteger(pid) && pid > 0) ids.add(pid);
+  return [...ids];
+}
+
+function officeSideloadCopyCandidates(host) {
+  const normalizedHost = normalizeHost(host);
+  const specs = {
+    word: { extension: 'docx', id: '11111111-aaaa-bbbb-cccc-222222222222' },
+    excel: { extension: 'xlsx', id: '33333333-aaaa-bbbb-cccc-444444444444' },
+    powerpoint: { extension: 'pptx', id: '44444444-aaaa-bbbb-cccc-555555555555' }
+  };
+  const spec = specs[normalizedHost];
+  if (!spec) return [];
+  return [
+    ...globTempFiles(`Office add-in ${spec.id}*.${spec.extension}`),
+    ...globTempFiles(`${officeAppName(normalizedHost)} add-in ${spec.id}*.${spec.extension}`)
+  ];
+}
+
+function officeAppName(host) {
+  if (host === 'word') return 'Word';
+  if (host === 'excel') return 'Excel';
+  return 'PowerPoint';
+}
+
+function globTempFiles(pattern) {
+  const script = `Get-ChildItem -LiteralPath '${psSingle(tmpdir())}' -Filter '${psSingle(pattern)}' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }`;
+  const output = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore']
+  }).trim();
+  return output ? output.split(/\r?\n/).filter(Boolean) : [];
 }
 
 async function removeFileWithRetry(path, timeoutMs) {
@@ -606,26 +701,33 @@ async function removeFileWithRetry(path, timeoutMs) {
   throw lastError || new Error(`Timed out deleting ${path}.`);
 }
 
-function runOfficeCleanup(host, path, timeoutMs) {
+function runOfficeCleanup(host, paths, processIds, timeoutMs) {
   const normalizedHost = normalizeHost(host);
-  const script = officeCleanupScript(normalizedHost, path);
-  execFileSync('powershell.exe', ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: timeoutMs
-  });
+  const script = officeCleanupScript(normalizedHost, Array.isArray(paths) ? paths : [paths], Array.isArray(processIds) ? processIds : []);
+  try {
+    execFileSync('powershell.exe', ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: timeoutMs
+    });
+  } catch (error) {
+    const detail = `${error?.stdout || ''}\n${error?.stderr || ''}\n${error?.message || ''}`;
+    if (!/MK_E_UNAVAILABLE|Operation unavailable|GetActiveObject/.test(detail)) throw error;
+  }
 }
 
-function officeCleanupScript(host, path) {
-  const target = psSingle(resolve(path));
-  const canonical = `function Canonical($value) { if ([string]::IsNullOrWhiteSpace($value)) { return '' }; try { return (Get-Item -LiteralPath $value -ErrorAction Stop).FullName.ToLowerInvariant() } catch { try { return [System.IO.Path]::GetFullPath($value).ToLowerInvariant() } catch { return '' } } }; $target=Canonical '${target}'; $targetName=[System.IO.Path]::GetFileName('${target}');`;
+function officeCleanupScript(host, paths, processIds = []) {
+  const targets = paths.map((path) => `@{ Path='${psSingle(resolve(path))}'; Name='${psSingle(basename(resolve(path)))}' }`).join(',');
+  const processIdList = processIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0).join(',');
+  const canonical = `function Canonical($value) { if ([string]::IsNullOrWhiteSpace($value)) { return '' }; try { return (Get-Item -LiteralPath $value -ErrorAction Stop).FullName.ToLowerInvariant() } catch { try { return [System.IO.Path]::GetFullPath($value).ToLowerInvariant() } catch { return '' } } }; $targets=@(${targets}); foreach ($targetSpec in $targets) { $targetSpec.Path = Canonical $targetSpec.Path };`;
+  const helpers = `function Target-Matches($candidate,$caption) { $canonicalCandidate = Canonical $candidate; foreach ($targetSpec in $targets) { if ($canonicalCandidate -and $canonicalCandidate -eq $targetSpec.Path) { return $true }; if (-not [string]::IsNullOrWhiteSpace($caption) -and $caption -like ('*' + $targetSpec.Name + '*')) { return $true } }; return $false }; $processIds=@(${processIdList}); function Close-DriverOwnedDocuments([scriptblock]$CloseDocuments) { & $CloseDocuments }; function Close-DriverOwnedProcessIds { foreach ($processId in $processIds) { try { $process=Get-Process -Id $processId -ErrorAction Stop; $process.CloseMainWindow() | Out-Null; if (-not $process.WaitForExit(5000)) { Stop-Process -Id $processId -Force } } catch {} } }; function Maybe-QuitEmptyOfficeApplication($app,[int]$count) { if ($count -eq 0) { $app.Quit() } };`;
   if (host === 'word') {
-    return `$ErrorActionPreference='Stop'; ${canonical} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application'); $app.DisplayAlerts=0; $closed=$false; foreach ($doc in @($app.Documents)) { if ((Canonical $doc.FullName) -eq $target) { $doc.Close($false); $closed=$true; break } }; if (-not $closed) { foreach ($win in @($app.Windows)) { if (($win.Caption -like "*$targetName*") -and ($targetName -like 'office-mcp-e2e-word-*.docx')) { $win.Document.Close($false); break } } }`;
+    return `$ErrorActionPreference='Stop'; ${canonical} ${helpers} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application'); $app.DisplayAlerts=0; Close-DriverOwnedDocuments { foreach ($doc in @($app.Documents)) { if (Target-Matches $doc.FullName $doc.Name) { $doc.Close($false) } }; foreach ($win in @($app.Windows)) { if (Target-Matches $win.Document.FullName $win.Caption) { $win.Document.Close($false) } } }; Maybe-QuitEmptyOfficeApplication $app $app.Documents.Count`;
   }
   if (host === 'excel') {
-    return `$ErrorActionPreference='Stop'; ${canonical} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application'); foreach ($wb in @($app.Workbooks)) { if ((Canonical $wb.FullName) -eq $target) { $wb.Close($false); break } }`;
+    return `$ErrorActionPreference='Stop'; ${canonical} ${helpers} function Close-ExcelByWindowTitle { foreach ($process in @(Get-Process -Name 'EXCEL' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })) { foreach ($targetSpec in $targets) { if (-not [string]::IsNullOrWhiteSpace($process.MainWindowTitle) -and $process.MainWindowTitle -like ('*' + $targetSpec.Name + '*')) { try { $process.CloseMainWindow() | Out-Null; if (-not $process.WaitForExit(5000)) { Stop-Process -Id $process.Id -Force } } catch {} } } } }; try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application'); $app.DisplayAlerts=$false; Close-DriverOwnedDocuments { foreach ($wb in @($app.Workbooks)) { if (Target-Matches $wb.FullName $wb.Name) { $wb.Close($false) } } }; Maybe-QuitEmptyOfficeApplication $app $app.Workbooks.Count } catch { if ($_.Exception.Message -notmatch 'MK_E_UNAVAILABLE|Operation unavailable|GetActiveObject') { Write-Output $_.Exception.Message } }; Close-ExcelByWindowTitle; Close-DriverOwnedProcessIds`;
   }
-  return `$ErrorActionPreference='Stop'; ${canonical} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application'); foreach ($pres in @($app.Presentations)) { if ((Canonical $pres.FullName) -eq $target) { $pres.Close(); break } }`;
+  return `$ErrorActionPreference='Stop'; ${canonical} ${helpers} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application'); Close-DriverOwnedDocuments { foreach ($pres in @($app.Presentations)) { if (Target-Matches $pres.FullName $pres.Name) { $pres.Close() } } }; Maybe-QuitEmptyOfficeApplication $app $app.Presentations.Count`;
 }
 
 async function stopDaemon(context) {

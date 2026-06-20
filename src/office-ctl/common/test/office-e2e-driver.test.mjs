@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -74,7 +74,16 @@ test('Office E2E driver describes a driver-owned Excel lifecycle', () => {
   assert.ok(document.keeper?.pidPath, 'keeper pid file is required');
   assert.ok(document.keeper?.stdoutPath, 'keeper stdout log is required');
   assert.ok(document.keeper?.stderrPath, 'keeper stderr log is required');
+  assert.doesNotMatch(document.script, /GetActiveObject\('Excel\.Application'\)/);
+  assert.match(document.script, /New-Object -ComObject Excel\.Application/);
+  assert.match(document.script, /function Write-OfficeMcpProcessPid/);
+  assert.match(document.script, /Write-OfficeMcpProcessPid -Handle \$app\.Hwnd/);
+  assert.match(document.script, /office-mcp-pid/);
+  assert.match(document.script, /Invoke-Retry \{ \$app\.Visible=\$true \}/);
+  assert.match(document.script, /Invoke-Retry \{ \$app\.DisplayAlerts=\$false \}/);
   assert.match(document.script, /Workbooks\.Add\(\)/);
+  assert.match(document.script, /Invoke-Retry \{ \$wb\.Worksheets\.Item\(1\) \}/);
+  assert.match(document.script, /Invoke-Retry \{ \$ws\.Cells\.Item\(1,1\)\.Value2='office-mcp e2e baseline' \}/);
   assert.match(document.script, /office-mcp-ready/);
   assert.match(document.script, /office-mcp-ready/);
   assert.doesNotMatch(document.script, /\.Quit\(\)/, 'keeper must not quit user Office applications');
@@ -130,10 +139,45 @@ test('Office E2E driver cleanup canonicalizes Office document paths', () => {
   assert.match(document.cleanupScript, /function Canonical/);
   assert.match(document.cleanupScript, /\[string\]::IsNullOrWhiteSpace\(\$value\)/);
   assert.match(document.cleanupScript, /catch \{ return '' \}/);
-  assert.match(document.cleanupScript, /Canonical \$doc\.FullName/);
-  assert.match(document.cleanupScript, /\$targetName=/);
+  assert.match(document.cleanupScript, /Target-Matches \$doc\.FullName \$doc\.Name/);
+  assert.match(document.cleanupScript, /\$targets=@\(/);
+  assert.match(document.cleanupScript, /\$targetSpec\.Name/);
   assert.match(document.cleanupScript, /\$win\.Caption/);
   assert.match(document.cleanupScript, /\$app\.DisplayAlerts=0/);
+  assert.match(document.cleanupScript, /Close-DriverOwnedDocuments/);
+  const driver = readFileSync(DRIVER, 'utf8');
+  assert.match(driver, /11111111-aaaa-bbbb-cccc-222222222222/);
+  assert.match(document.cleanupScript, /Maybe-QuitEmptyOfficeApplication/);
+  assert.match(document.cleanupScript, /\$app\.Quit\(\)/);
+});
+
+test('Office E2E driver cleanup covers activated sideload copies and original fixtures', () => {
+  const result = runDriver({ host: 'PowerPoint', step: 'describeDocumentLifecycle', context: { workDir: mkdtempSync(join(tmpdir(), 'office-mcp-driver-cleanup-sideload-')) } });
+  assert.equal(result.status, 0, result.stderr);
+  const document = JSON.parse(result.stdout);
+  assert.match(document.cleanupScript, /office-mcp-e2e-powerpoint-fixture\.pptx/);
+  assert.match(document.cleanupScript, /Close-DriverOwnedDocuments/);
+  assert.match(document.cleanupScript, /Maybe-QuitEmptyOfficeApplication/);
+  const driver = readFileSync(DRIVER, 'utf8');
+  assert.match(driver, /officeSideloadCopyCandidates/);
+  assert.match(driver, /Office add-in \$\{spec\.id\}\*\.\$\{spec\.extension\}/);
+  assert.match(driver, /officeAppName\(normalizedHost\)\} add-in \$\{spec\.id\}\*\.\$\{spec\.extension\}/);
+  assert.match(driver, /44444444-aaaa-bbbb-cccc-555555555555/);
+  assert.match(driver, /const initialPaths = driverOwnedCleanupPaths\(document\)/);
+  assert.match(driver, /const cleanupPaths = \[\.\.\.new Set\(\[\.\.\.initialPaths, \.\.\.driverOwnedCleanupPaths\(document\)\]\)\]/);
+  assert.match(driver, /MK_E_UNAVAILABLE\|Operation unavailable\|GetActiveObject/);
+  assert.match(driver, /function Close-ExcelByWindowTitle/);
+  assert.match(driver, /function Close-DriverOwnedProcessIds/);
+  assert.match(driver, /const processIds = driverOwnedProcessIds\(document\)/);
+  assert.match(driver, /MainWindowTitle -like/);
+  assert.match(driver, /Stop-Process -Id \$process\.Id -Force/);
+});
+
+test('default Windows add-in activator closes the original file after sideload copy opens', () => {
+  const script = readFileSync(resolve(REPO_ROOT, 'src/office-ctl/common/scripts/activate-office-mcp-addin.ps1'), 'utf8');
+  assert.match(script, /function Close-DriverDocumentIfDifferent/);
+  assert.match(script, /closing original powerpoint presentation after sideload copy/);
+  assert.match(script, /Close-DriverDocumentIfDifferent -Application \$app -HostKey \$hostKey -OriginalPath \$DocumentPath -ActivePath \$activeDocumentPath/);
 });
 
 test('Office E2E driver cleanup retries deletion while Office releases the document lock', () => {
@@ -144,6 +188,38 @@ test('Office E2E driver cleanup retries deletion while Office releases the docum
   const driver = readFileSync(DRIVER, 'utf8');
   assert.match(driver, /removeFileWithRetry/);
   assert.match(driver, /EPERM|EBUSY|EACCES/);
+});
+
+test('Office E2E driver cleanup removes activation logs', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-activation-log-cleanup-'));
+  const path = join(dir, 'office-mcp-e2e-word-fixture.docx');
+  const activationLogPath = join(dir, 'office-mcp-e2e-word-fixture.docx.office-mcp-activator.log');
+  writeFileSync(path, 'fixture');
+  writeFileSync(activationLogPath, 'activation log');
+  const cleanup = runDriver({
+    host: 'Word',
+    step: 'cleanupDocument',
+    context: {
+      document: {
+        host: 'Word',
+        path,
+        createdByDriver: true,
+        activationLogPath,
+        keeper: { closePath: join(dir, 'close') }
+      }
+    }
+  });
+  assert.equal(cleanup.status, 0, cleanup.stderr);
+  assert.equal(existsSync(activationLogPath), false);
+});
+
+test('Office E2E driver records activation logs before activation can fail', () => {
+  const result = runDriver({ host: 'Excel', step: 'describeDocumentLifecycle', context: { workDir: mkdtempSync(join(tmpdir(), 'office-mcp-driver-activation-log-path-')) } });
+  assert.equal(result.status, 0, result.stderr);
+  const document = JSON.parse(result.stdout);
+  assert.equal(document.activationLogPath, `${document.path}.office-mcp-activator.log`);
+  assert.match(document.cleanupScript, /Close-DriverOwnedProcessIds/);
+  assert.match(document.cleanupScript, /office-mcp-e2e-excel-/);
 });
 
 test('Office E2E driver uses a visible PowerPoint window and safe cleanup', { skip: !RUN_OFFICE_COM }, () => {
@@ -229,8 +305,11 @@ test('Office E2E driver provides a default Windows add-in activator', () => {
     assert.equal(activated.status, 0, activated.stderr);
     const result = JSON.parse(activated.stdout);
     assert.equal(result.activated, true);
-    assert.equal(result.activator_kind, 'default-windows-taskpane');
-    assert.match(result.activator, /activate-office-mcp-addin\.ps1/);
+  assert.equal(result.activator_kind, 'default-windows-taskpane');
+  assert.match(result.activator, /activate-office-mcp-addin\.ps1/);
+  const driver = readFileSync(DRIVER, 'utf8');
+  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS \|\| 90000/);
+  assert.match(driver, /-TimeoutSeconds 45/);
   } finally {
     restoreEnv('OFFICE_MCP_E2E_ACTIVATOR', previousActivator);
     restoreEnv('OFFICE_MCP_E2E_ACTIVATOR_DRY_RUN', previousDryRun);
@@ -256,6 +335,15 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /OFFICE_MCP_E2E_MANIFEST_PATH/);
   assert.match(script, /officialDocumentPath/);
   assert.match(script, /Launching .* via/);
+  assert.match(script, /function Try-OpenControlPanelForDriverDocument/);
+  assert.match(script, /\$hostKey -ne "excel"/);
+  assert.match(script, /\$tabNames = if \(\$hostKey -eq "excel"\)/);
+  assert.match(script, /\$copyWaitSeconds = if \(\$hostKey -eq "excel"\) \{ 2 \}/);
+  assert.match(script, /official sideload copy is active; attempting to open control panel/);
+  assert.match(script, /control panel best-effort timed out/);
+  assert.match(script, /activationPath = if/);
+  assert.match(script, /official-sideload/);
+  assert.match(script, /control_opened = \$ControlOpened/);
   assert.match(script, /official sideload timed out/);
   assert.match(script, /Start-Process/);
   assert.match(script, /Wait-ForDriverDocument/);
@@ -271,11 +359,25 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /official sideload copy was not visible/);
   assert.match(script, /official sideload failed/);
   assert.match(script, /official sideload error detail/);
+  assert.match(script, /Get-PowerPointMainWindowHandle/);
+  assert.match(script, /Get-ExcelMainWindowHandle/);
+  assert.match(script, /using excel main window fallback/);
+  assert.match(script, /workbookName -eq \$targetName/);
+  assert.match(script, /powerpoint presentation window handle unavailable/);
+  assert.match(script, /using powerpoint main window fallback/);
+  assert.match(script, /function Test-ActivatorDeadline/);
+  assert.match(script, /Test-ActivatorDeadline -Deadline \$Deadline/);
   assert.match(script, /try \{/);
   assert.match(script, /My Add-ins/);
   assert.match(script, /Office MCP Control/);
   assert.match(script, /Shared Folder/);
   assert.match(script, /Add/);
+});
+
+test('default Windows add-in activator exits before the external driver timeout', () => {
+  const driver = readFileSync(DRIVER, 'utf8');
+  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS \|\| 90000/);
+  assert.match(driver, /-TimeoutSeconds 45/);
 });
 
 test('Office E2E driver callTool posts MCP requests through an injectable endpoint', async () => {
@@ -648,6 +750,57 @@ server.listen(0, '127.0.0.1', () => {
   }
 });
 
+test('Office E2E driver setupContent accepts declared host capability errors', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-setup-capability-'));
+  const serverPath = join(dir, 'mcp-server.mjs');
+  writeFileSync(serverPath, `
+import { createServer } from 'node:http';
+const server = createServer((request, response) => {
+  let body = '';
+  request.setEncoding('utf8');
+  request.on('data', (chunk) => { body += chunk; });
+  request.on('end', () => {
+    const parsed = JSON.parse(body);
+    response.setHeader('Content-Type', 'application/json');
+    if (!request.headers['mcp-session-id']) {
+      response.setHeader('MCP-Session-Id', 'mcp-session-test');
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: {} }));
+      return;
+    }
+    response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { structuredContent: { error: { office_mcp_code: 'HOST_CAPABILITY_UNAVAILABLE', message: 'not available' } } } }));
+  });
+});
+server.listen(0, '127.0.0.1', () => {
+  const address = server.address();
+  console.log(JSON.stringify({ endpoint: 'http://127.0.0.1:' + address.port + '/mcp' }));
+});
+`);
+  const server = spawn(process.execPath, [serverPath], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  try {
+    const { endpoint } = JSON.parse(await firstStdoutLine(server));
+    const result = runDriver({
+      host: 'PowerPoint',
+      step: 'setupContent',
+      context: {
+        daemon: { endpoint },
+        session: { sessionId: 'session-1' },
+        toolCase: {
+          setup: {
+            actions: [
+              { tool: 'powerpoint.add_table', saveAs: 'table', allowErrorCodes: ['HOST_CAPABILITY_UNAVAILABLE'], arguments: { slide_index: 0, values: [['A']] } }
+            ]
+          }
+        }
+      }
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.bindings.table, { skipped: true, accepted_error_code: 'HOST_CAPABILITY_UNAVAILABLE' });
+  } finally {
+    server.kill();
+  }
+});
+
 test('Office E2E driver resolves setup action result references in later calls', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-bindings-'));
   const logPath = join(dir, 'mcp-requests.jsonl');
@@ -927,6 +1080,31 @@ process.exit(1);
     assert.match(result.stderr, /Office keeper PowerShell exited with status 1/);
     assert.match(result.stderr, /stdout: keeper started before failure/);
     assert.match(result.stderr, /stderr: simulated COM failure/);
+  } finally {
+    restoreEnv('OFFICE_MCP_E2E_POWERSHELL', previous);
+  }
+});
+
+test('Office E2E driver removes keeper sidecars when document creation fails', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-create-cleanup-'));
+  const fakePowerShell = join(dir, 'fake-powershell-error.mjs');
+  writeFileSync(fakePowerShell, `
+import { appendFileSync } from 'node:fs';
+appendFileSync(1, 'keeper started before failure\n');
+appendFileSync(2, 'simulated COM failure\n');
+process.exit(1);
+`);
+  const previous = process.env.OFFICE_MCP_E2E_POWERSHELL;
+  process.env.OFFICE_MCP_E2E_POWERSHELL = `${process.execPath} ${fakePowerShell}`;
+  try {
+    const result = runDriver({
+      host: 'Excel',
+      step: 'createDocument',
+      context: { workDir: dir, keeperTimeoutMs: 50 }
+    });
+    assert.notEqual(result.status, 0);
+    const residue = readdirSync(dir).filter((name) => name.startsWith('office-mcp-e2e-excel-'));
+    assert.deepEqual(residue, []);
   } finally {
     restoreEnv('OFFICE_MCP_E2E_POWERSHELL', previous);
   }

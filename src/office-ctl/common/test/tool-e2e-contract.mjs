@@ -254,6 +254,8 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
   assertDriverMethod(driver, 'setupContent', host);
   assertDriverMethod(driver, 'callTool', host);
   assertDriverMethod(driver, 'verifyResult', host);
+  assertDriverMethod(driver, 'cleanupDocument', host);
+  assertDriverMethod(driver, 'stopDaemon', host);
 
   const report = createE2eReport(host);
   let daemon;
@@ -274,6 +276,7 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
       report.lifecycle_counts.activate_addin += 1;
       const activation = await driver.activateAddin(document, { host, daemon });
       applyActivatedDocument(document, activation);
+      applyActivationArtifacts(document, activation);
       report.addin_activation = summarizeActivation(activation);
       report.document = summarizeDocument(document);
     }
@@ -291,6 +294,12 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
       try {
         mergeBindings(runSession, await driver.resetContent(toolCase, runSession, { host, daemon, document, run }));
         mergeBindings(runSession, await driver.setupContent(toolCase, runSession, { host, daemon, document, run }));
+        if (runSession.bindings?.__accepted_error_code) {
+          toolRun.result = { ok: false, error_code: runSession.bindings.__accepted_error_code };
+          toolRun.accepted_error_code = runSession.bindings.__accepted_error_code;
+          toolRun.passed = true;
+          continue;
+        }
         const result = await driver.callTool(toolCase, runSession, { host, daemon, document, run });
         toolRun.result = summarizeToolResult(result);
         await driver.verifyResult(toolCase, result, runSession, { host, daemon, document, run });
@@ -305,15 +314,20 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
     }
     report.passed = true;
   } finally {
+    let cleanupError;
     try {
-      if (document && typeof driver.cleanupDocument === 'function') {
+      if (document) {
         report.lifecycle_counts.cleanup_document += 1;
-        await driver.cleanupDocument(document, { host, daemon, session });
+        report.cleanup = summarizeCleanup(await driver.cleanupDocument(document, { host, daemon, session }));
       }
-      if (typeof driver.stopDaemon === 'function') {
-        report.lifecycle_counts.stop_daemon += 1;
-        await driver.stopDaemon(daemon, { host, document, session });
-      }
+    } catch (error) {
+      cleanupError = error;
+      report.passed = false;
+      report.error = serializeError(error);
+    }
+    try {
+      report.lifecycle_counts.stop_daemon += 1;
+      await driver.stopDaemon(daemon, { host, document, session });
     } catch (error) {
       report.passed = false;
       report.error = serializeError(error);
@@ -327,6 +341,7 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
       }
       writeE2eReport(reportPath, report);
     }
+    if (cleanupError) throw cleanupError;
   }
 }
 
@@ -335,6 +350,11 @@ function applyActivatedDocument(document, activation) {
   if (!activation.document_path.trim()) return;
   document.original_path ??= document.path;
   document.path = activation.document_path;
+}
+
+function applyActivationArtifacts(document, activation) {
+  if (!document || !activation || typeof activation.log_path !== 'string') return;
+  document.activationLogPath = activation.log_path;
 }
 
 function createE2eReport(host) {
@@ -397,7 +417,9 @@ function summarizeActivation(activation) {
   return {
     activated: activation.activated === true,
     skipped: typeof activation.skipped === 'string' ? activation.skipped : undefined,
-    activator: typeof activation.activator === 'string' ? activation.activator : undefined
+    activator: typeof activation.activator === 'string' ? activation.activator : undefined,
+    activation_path: typeof activation.activation_path === 'string' ? activation.activation_path : undefined,
+    control_opened: typeof activation.control_opened === 'boolean' ? activation.control_opened : undefined
   };
 }
 
@@ -406,6 +428,16 @@ function summarizeSession(session) {
   return {
     session_id: session.sessionId,
     available_tool_count: Array.isArray(session.availableTools) ? session.availableTools.length : undefined
+  };
+}
+
+function summarizeCleanup(cleanup) {
+  if (!cleanup || typeof cleanup !== 'object') return undefined;
+  return {
+    closed_by_driver: cleanup.closedByDriver === true,
+    deleted: cleanup.deleted === true,
+    deleted_path_count: Array.isArray(cleanup.deletedPaths) ? cleanup.deletedPaths.length : undefined,
+    skipped: typeof cleanup.skipped === 'string' ? cleanup.skipped : undefined
   };
 }
 

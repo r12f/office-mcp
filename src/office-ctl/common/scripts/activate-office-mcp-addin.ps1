@@ -132,26 +132,69 @@ function Activate-DriverDocument {
     }
   }
   if ($HostKey -eq "excel") {
+    $targetName = [System.IO.Path]::GetFileName($Path)
     foreach ($workbook in @($Application.Workbooks)) {
-      if ((Get-CanonicalPath -Path $workbook.FullName) -eq $target) {
-        Write-ActivatorLog "activated excel workbook=$($workbook.FullName)"
+      $workbookFullName = ""
+      $workbookName = ""
+      try { $workbookFullName = [string]$workbook.FullName } catch {}
+      try { $workbookName = [string]$workbook.Name } catch {}
+      if ((-not [string]::IsNullOrWhiteSpace($workbookFullName) -and (Get-CanonicalPath -Path $workbookFullName) -eq $target) -or $workbookName -eq $targetName) {
+        Write-ActivatorLog "activated excel workbook=$workbookFullName name=$workbookName"
         $workbook.Activate()
         $Application.Visible = $true
         return [IntPtr]$Application.Hwnd
       }
     }
+    return Get-ExcelMainWindowHandle -Path $Path
   }
   if ($HostKey -eq "powerpoint") {
     foreach ($presentation in @($Application.Presentations)) {
       if ((Get-CanonicalPath -Path $presentation.FullName) -eq $target) {
         Write-ActivatorLog "activated powerpoint presentation=$($presentation.FullName)"
-        $window = $presentation.Windows.Item(1)
-        $window.Activate()
-        return [IntPtr]$window.HWND
+        try {
+          $window = $presentation.Windows.Item(1)
+          $window.Activate()
+          if ($window.HWND) { return [IntPtr]$window.HWND }
+        } catch {
+          Write-ActivatorLog "powerpoint presentation window handle unavailable: $($_.Exception.Message)"
+        }
+        return Get-PowerPointMainWindowHandle -Path $presentation.FullName
       }
     }
   }
   throw "Could not find driver-owned $HostKey document: $target"
+}
+
+function Get-ExcelMainWindowHandle {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  $name = [System.IO.Path]::GetFileName($Path)
+  $processes = @(Get-Process -Name "EXCEL" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })
+  foreach ($process in $processes) {
+    if ($process.MainWindowTitle -like "*$name*") {
+      Write-ActivatorLog "using excel main window fallback pid=$($process.Id) title=$($process.MainWindowTitle)"
+      return [IntPtr]$process.MainWindowHandle
+    }
+  }
+  throw "Could not find Excel main window for $name."
+}
+
+function Get-PowerPointMainWindowHandle {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  $name = [System.IO.Path]::GetFileName($Path)
+  $processes = @(Get-Process -Name "POWERPNT" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })
+  foreach ($process in $processes) {
+    if ($process.MainWindowTitle -like "*$name*") {
+      Write-ActivatorLog "using powerpoint main window fallback pid=$($process.Id) title=$($process.MainWindowTitle)"
+      return [IntPtr]$process.MainWindowHandle
+    }
+  }
+  if ($processes.Count -eq 1) {
+    Write-ActivatorLog "using sole powerpoint main window fallback pid=$($processes[0].Id) title=$($processes[0].MainWindowTitle)"
+    return [IntPtr]$processes[0].MainWindowHandle
+  }
+  throw "Could not find PowerPoint main window for $name."
 }
 
 function Get-OfficeStateSnapshot {
@@ -214,6 +257,114 @@ function Wait-ForDriverDocument {
     }
   } while ((Get-Date) -lt $Deadline)
   throw $lastError
+}
+
+function Close-DriverDocumentIfDifferent {
+  param(
+    [Parameter(Mandatory = $true)]$Application,
+    [Parameter(Mandatory = $true)][string]$HostKey,
+    [Parameter(Mandatory = $true)][string]$OriginalPath,
+    [Parameter(Mandatory = $true)][string]$ActivePath
+  )
+
+  if ((Get-CanonicalPath -Path $OriginalPath) -eq (Get-CanonicalPath -Path $ActivePath)) { return }
+  $target = Get-CanonicalPath -Path $OriginalPath
+  try {
+    if ($HostKey -eq "word") {
+      foreach ($document in @($Application.Documents)) {
+        if ((Get-CanonicalPath -Path $document.FullName) -eq $target) {
+          Write-ActivatorLog "closing original word document after sideload copy=$($document.FullName)"
+          $document.Close($false)
+        }
+      }
+    }
+    if ($HostKey -eq "excel") {
+      foreach ($workbook in @($Application.Workbooks)) {
+        if ((Get-CanonicalPath -Path $workbook.FullName) -eq $target) {
+          Write-ActivatorLog "closing original excel workbook after sideload copy=$($workbook.FullName)"
+          $workbook.Close($false)
+        }
+      }
+    }
+    if ($HostKey -eq "powerpoint") {
+      foreach ($presentation in @($Application.Presentations)) {
+        if ((Get-CanonicalPath -Path $presentation.FullName) -eq $target) {
+          Write-ActivatorLog "closing original powerpoint presentation after sideload copy=$($presentation.FullName)"
+          $presentation.Close()
+        }
+      }
+    }
+  } catch {
+    Write-ActivatorLog "failed to close original document after sideload copy: $($_.Exception.Message)"
+  }
+}
+
+function Write-ActivationResult {
+  param(
+    [Parameter(Mandatory = $true)][string]$DocumentPath,
+    [string]$ControlName = "",
+    [string]$TabName = "",
+    [string]$ActivationPath = "",
+    [bool]$ControlOpened = $false
+  )
+
+  $result = @{
+    activated = $true
+    host = $hostKey
+    document_path = $DocumentPath
+    control_opened = $ControlOpened
+  }
+  if (-not [string]::IsNullOrWhiteSpace($ControlName)) { $result.control_name = $ControlName }
+  if (-not [string]::IsNullOrWhiteSpace($TabName)) { $result.tab_name = $TabName }
+  if (-not [string]::IsNullOrWhiteSpace($ActivationPath)) { $result.activation_path = $ActivationPath }
+  Write-Output ($result | ConvertTo-Json -Compress)
+}
+
+function Test-ActivatorDeadline {
+  param([Parameter(Mandatory = $true)]$Deadline)
+  if ((Get-Date) -ge $Deadline) {
+    Write-ActivatorLog "activator deadline reached"
+    return $false
+  }
+  return $true
+}
+
+function Try-OpenControlPanelForDriverDocument {
+  param(
+    [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
+    [Parameter(Mandatory = $true)]$Deadline
+  )
+
+  do {
+    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
+    Start-Sleep -Milliseconds 500
+    $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
+    if ($hostKey -ne "excel" -and (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(1) -Source "initial")) {
+      return @{ opened = $true; control_name = "Open Control Panel"; tab_name = ""; activation_path = "" }
+    }
+    $tabNames = if ($hostKey -eq "excel") { @("Insert", "Add-ins", "My Add-ins", "Home") } else { @("Home", "Insert", "Add-ins", "My Add-ins") }
+    foreach ($tabName in $tabNames) {
+      if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
+      if (Try-InvokeNamedControl -Root $window -Name $tabName) {
+        if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "tab:$tabName") {
+          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+        }
+        $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
+        if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "tab:$tabName") {
+          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+        }
+        $window = $nextWindow
+      }
+    }
+    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
+    if (Try-OpenAddinFromCatalog -Window (Get-OfficeWindowFromHandle -Handle $WindowHandle) -Deadline $Deadline) {
+      return @{ opened = $true; control_name = "Open Control Panel"; tab_name = ""; activation_path = "catalog-fallback" }
+    }
+  } while ((Get-Date) -lt $Deadline)
+
+  $sample = Get-VisibleControlNameSample -Root (Get-OfficeWindowFromHandle -Handle $WindowHandle)
+  Write-ActivatorLog "control panel best-effort timed out; visible control sample=$($sample -join ' | ')"
+  return @{ opened = $false; control_name = ""; tab_name = ""; activation_path = "" }
 }
 
 function Find-DescendantByName {
@@ -458,6 +609,7 @@ function Try-OpenAddinFromCatalog {
   )
 
   foreach ($automationId in @("OfficeExtensionsShowAddinFlyout")) {
+    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
     if (Try-InvokeAutomationIdControl -Root $Window -AutomationId $automationId) {
       Write-ActivatorLog "catalog fallback invoked automation_id=$automationId"
       Start-Sleep -Milliseconds 800
@@ -473,6 +625,7 @@ function Try-OpenAddinFromCatalog {
   }
 
   foreach ($name in @("Insert", "Add-ins", "My Add-ins", "Shared Folder", "Office MCP Control", "Add")) {
+    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
     if (Try-InvokeNamedControl -Root $Window -Name $name) {
       Write-ActivatorLog "catalog fallback invoked name=$name"
       Start-Sleep -Milliseconds 800
@@ -496,8 +649,15 @@ $activeDocumentPath = if ([string]::IsNullOrWhiteSpace($script:officialDocumentP
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 if (-not [string]::IsNullOrWhiteSpace($script:officialDocumentPath)) {
   try {
-    $copyDeadline = (Get-Date).AddSeconds([Math]::Min(5, [Math]::Max(1, $TimeoutSeconds / 4)))
+    $copyWaitSeconds = if ($hostKey -eq "excel") { 2 } else { [Math]::Min(5, [Math]::Max(1, $TimeoutSeconds / 4)) }
+    $copyDeadline = (Get-Date).AddSeconds($copyWaitSeconds)
     $driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath -Deadline $copyDeadline
+    Close-DriverDocumentIfDifferent -Application $app -HostKey $hostKey -OriginalPath $DocumentPath -ActivePath $activeDocumentPath
+    Write-ActivatorLog "official sideload copy is active; attempting to open control panel document=$activeDocumentPath"
+    $panel = Try-OpenControlPanelForDriverDocument -WindowHandle $driverWindowHandle -Deadline (Get-Date).AddSeconds([Math]::Min(12, [Math]::Max(3, $TimeoutSeconds / 2)))
+    $activationPath = if ([string]::IsNullOrWhiteSpace($panel.activation_path)) { "official-sideload" } else { "official-sideload:$($panel.activation_path)" }
+    Write-ActivationResult -DocumentPath $activeDocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath $activationPath -ControlOpened $panel.opened
+    exit 0
   } catch {
     Write-ActivatorLog "official sideload copy was not visible; falling back to original document path=$DocumentPath error=$($_.Exception.Message)"
     $activeDocumentPath = $DocumentPath
@@ -507,56 +667,10 @@ if (-not [string]::IsNullOrWhiteSpace($script:officialDocumentPath)) {
   $driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath -Deadline $deadline
 }
 
-do {
-  Start-Sleep -Milliseconds 500
-  $window = Get-OfficeWindowFromHandle -Handle $driverWindowHandle
-  if (Wait-ForOpenControlPanel -WindowHandle $driverWindowHandle -Deadline (Get-Date).AddSeconds(1) -Source "initial") {
-    Write-Output (@{
-        activated = $true
-        host = $hostKey
-        document_path = $activeDocumentPath
-        control_name = "Open Control Panel"
-      } | ConvertTo-Json -Compress)
-    exit 0
-  }
-  foreach ($tabName in @("Home", "Insert", "Add-ins", "My Add-ins")) {
-    if (Try-InvokeNamedControl -Root $window -Name $tabName) {
-      if (Wait-ForOpenControlPanel -WindowHandle $driverWindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "tab:$tabName") {
-        Write-Output (@{
-            activated = $true
-            host = $hostKey
-            document_path = $activeDocumentPath
-            control_name = "Open Control Panel"
-            tab_name = $tabName
-          } | ConvertTo-Json -Compress)
-        exit 0
-      }
-      $nextWindow = Get-OfficeWindowFromHandle -Handle $driverWindowHandle
-      if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $driverWindowHandle -Deadline $deadline -Source "tab:$tabName") {
-        Write-Output (@{
-            activated = $true
-            host = $hostKey
-            document_path = $activeDocumentPath
-            control_name = "Open Control Panel"
-            tab_name = $tabName
-          } | ConvertTo-Json -Compress)
-        exit 0
-      }
-    }
-  }
-  if (Try-OpenAddinFromCatalog -Window (Get-OfficeWindowFromHandle -Handle $driverWindowHandle) -Deadline $deadline) {
-    Write-Output (@{
-        activated = $true
-        host = $hostKey
-        document_path = $activeDocumentPath
-        control_name = "Open Control Panel"
-        activation_path = "catalog-fallback"
-      } | ConvertTo-Json -Compress)
-    exit 0
-  }
-} while ((Get-Date) -lt $deadline)
-
-$sample = Get-VisibleControlNameSample -Root (Get-OfficeWindowFromHandle -Handle $driverWindowHandle)
-Write-ActivatorLog "timed out; visible control sample=$($sample -join ' | ')"
+$panel = Try-OpenControlPanelForDriverDocument -WindowHandle $driverWindowHandle -Deadline $deadline
+if ($panel.opened) {
+  Write-ActivationResult -DocumentPath $activeDocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath $panel.activation_path -ControlOpened $true
+  exit 0
+}
 
 throw "Timed out waiting for the Office MCP Control ribbon button."
