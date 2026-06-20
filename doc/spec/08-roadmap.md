@@ -1631,11 +1631,14 @@ Initial catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
       export behavior or an explicit host-capability rejection when the current
       Office.js host cannot support export. Automated support now exists via
       `npm run evidence:powerpoint`, which writes
-      `artifacts/runtime-evidence-powerpoint.json`, and validator gate
+      `artifacts/runtime-evidence-powerpoint.json`, owns a self-contained live
+      PowerPoint presentation lifecycle, and validator gate
       `npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-powerpoint.json --require-powerpoint-smoke`.
       Current evidence: `artifacts/runtime-evidence-powerpoint.json` records a
-      passed `powerpoint.runtime_smoke` gate against a connected live PowerPoint
-      presentation, and the validator passes `--require-powerpoint-smoke` with
+      passed `powerpoint.e2e_session` gate and a passed
+      `powerpoint.runtime_smoke` gate against that self-contained live
+      PowerPoint presentation, and the validator passes
+      `--require-powerpoint-smoke` with
       the refined 25-tool catalog, category proofs, mutation/readback, and
       export success or explicit host-capability rejection checks.
 
@@ -1736,9 +1739,9 @@ PowerPoint Designer, and macros.
       `npm run check` in `src/office-mcp/daemon/evidence`,
       `cargo test -p office-mcp-daemon`, `cargo fmt --check`, and
       `git diff --check`; the generated PowerPoint runtime evidence records a
-      passed `powerpoint.runtime_smoke` gate with all 25 tools advertised and
-      category proofs for Presentation, Slides, Layout, Shapes, Text, and
-      Tables.
+      self-contained `powerpoint.e2e_session` gate plus a passed
+      `powerpoint.runtime_smoke` gate with all 25 tools advertised and category
+      proofs for Presentation, Slides, Layout, Shapes, Text, and Tables.
 
 ### M9 — Outlook (cautious)
 

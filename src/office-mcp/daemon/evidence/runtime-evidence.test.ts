@@ -159,6 +159,8 @@ test('PowerPoint runtime evidence harness proves session, tools, mutation, and h
   assert.match(source, /selectHostSessionId\(sessions, 'powerpoint'\)/);
   assert.match(source, /No connected PowerPoint add-in session/);
   assert.match(packageJson, /"evidence:powerpoint"[^\n]+--powerpoint-e2e-session/);
+  assert.match(spec, /self-contained live\s+PowerPoint presentation/);
+  assert.match(spec, /powerpoint\.e2e_session/);
 
   for (const tool of [
     'office.get_session_info',
