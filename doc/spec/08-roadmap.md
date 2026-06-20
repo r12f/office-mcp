@@ -1254,10 +1254,16 @@ channel, and MCP `tools/call` dispatch.
       create fixed setup content, invoke the MCP tool against that content, and
       verify the result directly for reads or through readback for mutations and
       deletes.
-- [ ] Add readback verifier helpers for common Office objects so tool cases do
+- [x] Add readback verifier helpers for common Office objects so tool cases do
       not duplicate boilerplate: Word document text/paragraph/table/content
       control/comment state, Excel workbook/sheet/range/table/chart/pivot state,
-      and PowerPoint presentation/slide/shape/text/table/chart state.
+      and PowerPoint presentation/slide/shape/text/table state. Current helper
+      coverage is enforced by common E2E contract tests and used by the Word
+      tool case table for document text, tables, content controls, comments,
+      and tracked changes; `npm run e2e:tools` passes for Word, Excel, and
+      PowerPoint after the helper slice. PowerPoint chart helpers remain out of
+      v1 scope because the refined PowerPoint catalog explicitly excludes
+      charts.
 - [ ] Make exact advertised-tool coverage part of the Office E2E gate, not only
       the synthetic driver contract. A host-specific `npm run e2e:tools` command
       must fail when `tools/list` or session `available_tools` exposes a tool

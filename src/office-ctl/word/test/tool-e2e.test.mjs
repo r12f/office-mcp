@@ -4,7 +4,8 @@ import {
   e2eCase,
   officeE2eEnabled,
   requireOfficeE2eDriver,
-  runOfficeToolE2e
+  runOfficeToolE2e,
+  wordReadback
 } from '../../common/test/tool-e2e-contract.mjs';
 
 const ADDIN_ROOT = process.cwd();
@@ -23,12 +24,7 @@ const WORD_E2E_CASES = Object.fromEntries([
       ]
     },
     args: { anchor: { kind: 'after_text', text: 'insert anchor marker' }, text: 'E2E paragraph' },
-    verify: {
-      kind: 'readback',
-      readbackTool: 'word.get_text',
-      readbackArguments: { limit: 20 },
-      expect: { contains: ['insert anchor marker', 'E2E paragraph'] }
-    }
+    verify: wordReadback.documentText({ contains: ['insert anchor marker', 'E2E paragraph'] })
   }],
   ['word.insert_image', {
     setup: {
@@ -54,12 +50,7 @@ const WORD_E2E_CASES = Object.fromEntries([
       ]
     },
     args: { anchor: { kind: 'after_text', text: 'table anchor marker' }, rows: [['E2E-A', 'E2E-B']] },
-    verify: {
-      kind: 'readback',
-      readbackTool: 'word.read_table',
-      readbackArguments: { table_index: 0 },
-      expect: { contains: ['E2E-A', 'E2E-B'] }
-    }
+    verify: wordReadback.table(0, { contains: ['E2E-A', 'E2E-B'] })
   }],
   ['word.insert_page_break', {
     setup: {
@@ -80,12 +71,7 @@ const WORD_E2E_CASES = Object.fromEntries([
       ]
     },
     args: { anchor: { kind: 'after_text', text: 'list anchor marker' }, items: ['E2E One', 'E2E Two'] },
-    verify: {
-      kind: 'readback',
-      readbackTool: 'word.get_text',
-      readbackArguments: { limit: 20 },
-      expect: { contains: ['E2E One', 'E2E Two'] }
-    }
+    verify: wordReadback.documentText({ contains: ['E2E One', 'E2E Two'] })
   }],
   ['word.replace_text', {
     setup: {
@@ -94,12 +80,7 @@ const WORD_E2E_CASES = Object.fromEntries([
       ]
     },
     args: { find: 'baseline marker', replace: 'updated marker' },
-    verify: {
-      kind: 'readback',
-      readbackTool: 'word.get_text',
-      readbackArguments: { limit: 20 },
-      expect: { contains: ['updated marker'], notContains: ['baseline marker'] }
-    }
+    verify: wordReadback.documentText({ contains: ['updated marker'], notContains: ['baseline marker'] })
   }],
   ['word.update_paragraph', {
     setup: {
@@ -192,12 +173,7 @@ const WORD_E2E_CASES = Object.fromEntries([
       ]
     },
     args: { content_control_id: '${controlResult.content_control.content_control_id}', mode: 'keep_content' },
-    verify: {
-      kind: 'readback',
-      readbackTool: 'word.list_content_controls',
-      readbackArguments: { tag: 'e2e-delete-control' },
-      expect: { notContains: ['e2e-delete-control', 'Delete Control'] }
-    }
+    verify: wordReadback.contentControls('e2e-delete-control', { notContains: ['e2e-delete-control', 'Delete Control'] })
   }],
   ['word.apply_style', {
     setup: {
@@ -220,11 +196,7 @@ const WORD_E2E_CASES = Object.fromEntries([
       ]
     },
     args: { anchor: { kind: 'after_text', text: 'Comment target paragraph' }, text: 'E2E comment' },
-    verify: {
-      kind: 'readback',
-      resource: 'office://word/${session_id}/comments',
-      expect: { contains: ['E2E comment'] }
-    }
+    verify: wordReadback.comments({ contains: ['E2E comment'] })
   }],
   ['word.resolve_comment', {
     setup: {
@@ -234,11 +206,7 @@ const WORD_E2E_CASES = Object.fromEntries([
       ]
     },
     args: { comment_id: '${commentResult.comment_id}' },
-    verify: {
-      kind: 'readback',
-      resource: 'office://word/${session_id}/comments',
-      expect: { contains: ['Resolve me E2E', 'true'] }
-    }
+    verify: wordReadback.comments({ contains: ['Resolve me E2E', 'true'] })
   }],
   ['word.update_tracked_change', {
     setup: {
@@ -248,11 +216,7 @@ const WORD_E2E_CASES = Object.fromEntries([
       ]
     },
     args: { change_index: '${trackChanges.changes.0.index}', action: 'accept', expected_fingerprint: '${trackChanges.changes.0.fingerprint}' },
-    verify: {
-      kind: 'readback',
-      resource: 'office://word/${session_id}/track_changes',
-      expect: { notContains: ['Tracked change E2E paragraph'] }
-    }
+    verify: wordReadback.trackChanges({ notContains: ['Tracked change E2E paragraph'] })
   }],
   ['word.save', {
     setup: {

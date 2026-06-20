@@ -3,7 +3,19 @@ import { mkdtempSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { assertE2eCaseCoverage, daemonCatalogTools, e2eCase, requireOfficeE2eDriver, runOfficeToolE2e } from './tool-e2e-contract.mjs';
+import {
+  assertE2eCaseCoverage,
+  daemonCatalogTools,
+  directResult,
+  e2eCase,
+  excelReadback,
+  powerpointReadback,
+  readbackByResource,
+  readbackByTool,
+  requireOfficeE2eDriver,
+  runOfficeToolE2e,
+  wordReadback
+} from './tool-e2e-contract.mjs';
 
 test('shared Office tool E2E loop drives daemon, document, setup, calls, verification, and cleanup', async () => {
   const events = [];
@@ -217,6 +229,46 @@ test('E2E case coverage accepts resource readback verifiers with explicit expect
     cases: { 'word.add_comment': toolCase }
   });
   assert.equal(toolCase.verify.resource, 'office://word/${session_id}/comments');
+});
+
+test('E2E readback helpers create standard direct, tool, and resource verifiers', () => {
+  assert.deepEqual(directResult({ pathEquals: [{ path: 'ok', value: true }] }), {
+    kind: 'direct-result',
+    expect: { pathEquals: [{ path: 'ok', value: true }] }
+  });
+  assert.deepEqual(readbackByTool('word.get_text', { arguments: { limit: 20 }, expect: { contains: ['updated'] } }), {
+    kind: 'readback',
+    readbackTool: 'word.get_text',
+    readbackArguments: { limit: 20 },
+    expect: { contains: ['updated'] }
+  });
+  assert.deepEqual(readbackByResource('office://word/${session_id}/comments', { expect: { contains: ['E2E comment'] } }), {
+    kind: 'readback',
+    resource: 'office://word/${session_id}/comments',
+    expect: { contains: ['E2E comment'] }
+  });
+});
+
+test('E2E readback helpers cover current Word, Excel, and PowerPoint object owners', () => {
+  assert.deepEqual(wordReadback.documentText({ contains: ['paragraph'] }), readbackByTool('word.get_text', { arguments: { limit: 20 }, expect: { contains: ['paragraph'] } }));
+  assert.deepEqual(wordReadback.paragraph(0, { contains: ['paragraph'] }), readbackByTool('word.get_paragraph', { arguments: { index: 0 }, expect: { contains: ['paragraph'] } }));
+  assert.deepEqual(wordReadback.table(0, { contains: ['cell'] }), readbackByTool('word.read_table', { arguments: { table_index: 0 }, expect: { contains: ['cell'] } }));
+  assert.deepEqual(wordReadback.contentControls('tag', { contains: ['title'] }), readbackByTool('word.list_content_controls', { arguments: { tag: 'tag' }, expect: { contains: ['title'] } }));
+  assert.deepEqual(wordReadback.comments({ contains: ['comment'] }), readbackByResource('office://word/${session_id}/comments', { expect: { contains: ['comment'] } }));
+  assert.deepEqual(wordReadback.trackChanges({ notContains: ['deleted'] }), readbackByResource('office://word/${session_id}/track_changes', { expect: { notContains: ['deleted'] } }));
+
+  assert.deepEqual(excelReadback.workbook({ contains: ['Sheet1'] }), readbackByTool('excel.get_workbook_info', { arguments: {}, expect: { contains: ['Sheet1'] } }));
+  assert.deepEqual(excelReadback.sheets({ contains: ['Sheet1'] }), readbackByTool('excel.list_sheets', { arguments: {}, expect: { contains: ['Sheet1'] } }));
+  assert.deepEqual(excelReadback.range('Sheet1', 'A1:B2', { contains: ['value'] }), readbackByTool('excel.read_range', { arguments: { sheet: 'Sheet1', address: 'A1:B2' }, expect: { contains: ['value'] } }));
+  assert.deepEqual(excelReadback.table('Table1', { contains: ['Table1'] }), readbackByTool('excel.update_table', { arguments: { table: 'Table1', action: 'metadata' }, expect: { contains: ['Table1'] } }));
+  assert.deepEqual(excelReadback.chart('Sheet1', 'Chart 1', { contains: ['Chart 1'] }), readbackByTool('excel.update_chart', { arguments: { sheet: 'Sheet1', chart: 'Chart 1', action: 'metadata' }, expect: { contains: ['Chart 1'] } }));
+  assert.deepEqual(excelReadback.pivotTable('Pivot1', { contains: ['Pivot1'] }), readbackByTool('excel.update_pivot_table', { arguments: { pivot_table: 'Pivot1', action: 'metadata' }, expect: { contains: ['Pivot1'] } }));
+
+  assert.deepEqual(powerpointReadback.presentation({ contains: ['slides'] }), readbackByTool('powerpoint.get_presentation_info', { arguments: {}, expect: { contains: ['slides'] } }));
+  assert.deepEqual(powerpointReadback.slides({ contains: ['Title'] }), readbackByTool('powerpoint.list_slides', { arguments: {}, expect: { contains: ['Title'] } }));
+  assert.deepEqual(powerpointReadback.shapes(0, { contains: ['rectangle'] }), readbackByTool('powerpoint.list_shapes', { arguments: { slide_index: 0 }, expect: { contains: ['rectangle'] } }));
+  assert.deepEqual(powerpointReadback.text(0, { contains: ['text'] }), readbackByTool('powerpoint.read_text', { arguments: { slide_index: 0 }, expect: { contains: ['text'] } }));
+  assert.deepEqual(powerpointReadback.table(0, '${table.shape_id}', { contains: ['cell'] }), readbackByTool('powerpoint.read_table', { arguments: { slide_index: 0, shape_id: '${table.shape_id}' }, expect: { contains: ['cell'] } }));
 });
 
 test('E2E case coverage checks daemon catalog tools as well as task pane tools', () => {

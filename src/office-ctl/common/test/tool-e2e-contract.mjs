@@ -72,6 +72,102 @@ export function e2eCase(tool, { setup = 'fixed baseline content', args = {}, ver
   };
 }
 
+export function directResult(expect = {}) {
+  return { kind: 'direct-result', expect };
+}
+
+export function readbackByTool(tool, { arguments: readbackArguments = {}, expect = {} } = {}) {
+  return {
+    kind: 'readback',
+    readbackTool: tool,
+    readbackArguments,
+    expect
+  };
+}
+
+export function readbackByResource(resource, { expect = {} } = {}) {
+  return {
+    kind: 'readback',
+    resource,
+    expect
+  };
+}
+
+export const wordReadback = Object.freeze({
+  documentText(expect, args = {}) {
+    return readbackByTool('word.get_text', { arguments: { limit: 20, ...args }, expect });
+  },
+  outline(expect, args = {}) {
+    return readbackByTool('word.get_outline', { arguments: args, expect });
+  },
+  paragraph(index, expect, args = {}) {
+    return readbackByTool('word.get_paragraph', { arguments: { index, ...args }, expect });
+  },
+  table(tableIndex, expect, args = {}) {
+    return readbackByTool('word.read_table', { arguments: { table_index: tableIndex, ...args }, expect });
+  },
+  contentControls(tag, expect, args = {}) {
+    return readbackByTool('word.list_content_controls', { arguments: { tag, ...args }, expect });
+  },
+  comments(expect) {
+    return readbackByResource('office://word/${session_id}/comments', { expect });
+  },
+  trackChanges(expect) {
+    return readbackByResource('office://word/${session_id}/track_changes', { expect });
+  }
+});
+
+export const excelReadback = Object.freeze({
+  workbook(expect, args = {}) {
+    return readbackByTool('excel.get_workbook_info', { arguments: args, expect });
+  },
+  sheets(expect, args = {}) {
+    return readbackByTool('excel.list_sheets', { arguments: args, expect });
+  },
+  range(sheet, address, expect, args = {}) {
+    return readbackByTool('excel.read_range', { arguments: { sheet, address, ...args }, expect });
+  },
+  table(table, expect, args = {}) {
+    return readbackByTool('excel.update_table', { arguments: { table, action: 'metadata', ...args }, expect });
+  },
+  chart(sheet, chart, expect, args = {}) {
+    return readbackByTool('excel.update_chart', { arguments: { sheet, chart, action: 'metadata', ...args }, expect });
+  },
+  pivotTable(pivotTable, expect, args = {}) {
+    return readbackByTool('excel.update_pivot_table', { arguments: { pivot_table: pivotTable, action: 'metadata', ...args }, expect });
+  }
+});
+
+export const powerpointReadback = Object.freeze({
+  presentation(expect, args = {}) {
+    return readbackByTool('powerpoint.get_presentation_info', { arguments: args, expect });
+  },
+  slides(expect, args = {}) {
+    return readbackByTool('powerpoint.list_slides', { arguments: args, expect });
+  },
+  shapes(slideIndex, expect, args = {}) {
+    return readbackByTool('powerpoint.list_shapes', { arguments: { slide_index: slideIndex, ...args }, expect });
+  },
+  text(slideIndex, expect, args = {}) {
+    return readbackByTool('powerpoint.read_text', { arguments: { slide_index: slideIndex, ...args }, expect });
+  },
+  table(slideIndex, shapeId, expect, args = {}) {
+    return readbackByTool('powerpoint.read_table', { arguments: { slide_index: slideIndex, shape_id: shapeId, ...args }, expect });
+  },
+  activeView(expect, args = {}) {
+    return readbackByTool('powerpoint.get_active_view', { arguments: args, expect });
+  },
+  selection(expect, args = {}) {
+    return readbackByTool('powerpoint.get_selection', { arguments: args, expect });
+  },
+  tags(expect, args = {}) {
+    return readbackByTool('powerpoint.update_tags', { arguments: { action: 'list', ...args }, expect });
+  },
+  layouts(expect, args = {}) {
+    return readbackByTool('powerpoint.list_layouts', { arguments: args, expect });
+  }
+});
+
 function normalizeVerifier(verify) {
   if (typeof verify === 'string') return { kind: verify };
   assert.equal(typeof verify, 'object', 'E2E verifier must be a string or object');
