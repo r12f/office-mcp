@@ -31,6 +31,8 @@ type OfficeE2eSessionContext = {
   document?: OfficeE2eDriverContext;
 };
 
+type OfficeE2eHost = 'Excel' | 'PowerPoint';
+
 const evidenceRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(evidenceRoot, '../../../..');
 const tsxCli = resolve(evidenceRoot, 'node_modules/tsx/dist/cli.mjs');
@@ -44,6 +46,7 @@ const includeFullWordSmoke = hasFlag('--include-full-word-smoke');
 const includeExcelSmoke = hasFlag('--include-excel-smoke');
 const useExcelE2eSession = hasFlag('--excel-e2e-session');
 const includePowerPointSmoke = hasFlag('--include-powerpoint-smoke');
+const usePowerPointE2eSession = hasFlag('--powerpoint-e2e-session');
 const includeComTrackedChanges = hasFlag('--include-com-tracked-changes');
 const includeTrackedChanges = hasFlag('--include-tracked-changes');
 const irmMode = readOption('--irm-mode') ?? 'none';
@@ -85,7 +88,7 @@ try {
     const waitResult = await runWaitForHostSessionGate('excel', waitForSessionMs);
     sessions = Array.isArray(waitResult.sessions) ? waitResult.sessions as Array<Record<string, unknown>> : sessions;
   }
-  if (includePowerPointSmoke && waitForSessionMs > 0 && !selectHostSessionId(sessions, 'powerpoint')) {
+  if (includePowerPointSmoke && !usePowerPointE2eSession && waitForSessionMs > 0 && !selectHostSessionId(sessions, 'powerpoint')) {
     const waitResult = await runWaitForHostSessionGate('powerpoint', waitForSessionMs);
     sessions = Array.isArray(waitResult.sessions) ? waitResult.sessions as Array<Record<string, unknown>> : sessions;
   }
@@ -127,7 +130,8 @@ try {
     });
   }
   if (includePowerPointSmoke) {
-    if (powerPointSessionId) await runPowerPointSmokeGate(powerPointSessionId);
+    if (usePowerPointE2eSession) await runPowerPointE2eSessionSmoke();
+    else if (powerPointSessionId) await runPowerPointSmokeGate(powerPointSessionId);
     else addGate('powerpoint.runtime_smoke', 'blocked_by_runtime', {
       reason: 'No connected PowerPoint add-in session. Open PowerPoint, open Office MCP Control, then rerun this script.'
     });
@@ -435,6 +439,41 @@ async function runExcelE2eSessionSmoke(): Promise<void> {
     });
     if (context.daemon) await runOfficeE2eDriverStep('Excel', 'stopDaemon', context).catch((error) => {
       addGate('excel.e2e_stop_daemon', 'failed', { error: errorMessage(error) });
+      return {};
+    });
+  }
+}
+
+async function runPowerPointE2eSessionSmoke(): Promise<void> {
+  const context: OfficeE2eSessionContext = {};
+  let sessionId = '';
+  try {
+    await runGate('powerpoint.e2e_session', async () => {
+      const daemon = await runOfficeE2eDriverStep('PowerPoint', 'startDaemon', context);
+      context.daemon = daemon;
+      const document = await runOfficeE2eDriverStep('PowerPoint', 'createDocument', context);
+      context.document = document;
+      await runOfficeE2eDriverStep('PowerPoint', 'activateAddin', context);
+      const session = await runOfficeE2eDriverStep('PowerPoint', 'waitForSession', context);
+      sessionId = String(session.sessionId ?? '');
+      if (!sessionId) throw new Error('PowerPoint E2E driver did not return a sessionId.');
+      report.session_id = sessionId;
+      return {
+        session_id: sessionId,
+        driver: officeE2eDriverPath,
+        daemon_started_by_driver: daemon.startedByDriver,
+        document_path: document.path,
+        available_tool_count: Array.isArray(session.availableTools) ? session.availableTools.length : undefined
+      };
+    });
+    if (sessionId) await runPowerPointSmokeGate(sessionId);
+  } finally {
+    if (context.document) await runOfficeE2eDriverStep('PowerPoint', 'cleanupDocument', context).catch((error) => {
+      addGate('powerpoint.e2e_cleanup', 'failed', { error: errorMessage(error) });
+      return {};
+    });
+    if (context.daemon) await runOfficeE2eDriverStep('PowerPoint', 'stopDaemon', context).catch((error) => {
+      addGate('powerpoint.e2e_stop_daemon', 'failed', { error: errorMessage(error) });
       return {};
     });
   }
@@ -775,7 +814,7 @@ function runSmokeMode(mode: string, sessionId: string, extraArg?: string): strin
   return raw.slice(jsonStart);
 }
 
-async function runOfficeE2eDriverStep(host: 'Excel', step: string, context: OfficeE2eSessionContext): Promise<OfficeE2eDriverContext> {
+async function runOfficeE2eDriverStep(host: OfficeE2eHost, step: string, context: OfficeE2eSessionContext): Promise<OfficeE2eDriverContext> {
   const result = spawnSync(process.execPath, [officeE2eDriverPath], {
     cwd: repoRoot,
     input: JSON.stringify({ host, step, context }),

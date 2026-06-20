@@ -140,14 +140,25 @@ test('Excel runtime smoke uses worksheet names within Excel limits', () => {
 test('PowerPoint runtime evidence harness proves session, tools, mutation, and host rejections', () => {
   const spec = readFileSync(resolve(process.cwd(), '../../../../doc/spec/08-roadmap.md'), 'utf8');
   const source = readFileSync(evidencePath('runtime-evidence.ts'), 'utf8');
+  const packageJson = readFileSync(evidencePath('package.json'), 'utf8');
 
   assert.match(spec, /Add live PowerPoint runtime smoke evidence against a real presentation/);
   assert.match(source, /--include-powerpoint-smoke/);
+  assert.match(source, /--powerpoint-e2e-session/);
+  assert.match(source, /runPowerPointE2eSessionSmoke/);
+  assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'startDaemon'/);
+  assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'createDocument'/);
+  assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'activateAddin'/);
+  assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'waitForSession'/);
+  assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'cleanupDocument'/);
+  assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'stopDaemon'/);
+  assert.match(source, /powerpoint\.e2e_session/);
   assert.match(source, /runWaitForHostSessionGate\('powerpoint', waitForSessionMs\)/);
   assert.match(source, /runGate\(`\$\{hostApp\}\.wait_for_session`/);
   assert.match(source, /powerpoint\.runtime_smoke/);
   assert.match(source, /selectHostSessionId\(sessions, 'powerpoint'\)/);
   assert.match(source, /No connected PowerPoint add-in session/);
+  assert.match(packageJson, /"evidence:powerpoint"[^\n]+--powerpoint-e2e-session/);
 
   for (const tool of [
     'office.get_session_info',
