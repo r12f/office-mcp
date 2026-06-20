@@ -942,7 +942,7 @@
     const headerRange = table.showHeaders ? table.getHeaderRowRange() : null;
     const totalRange = table.showTotals ? table.getTotalRowRange() : null;
     range.load('address,rowCount,columnCount');
-    bodyRange.load('address,rowCount,columnCount');
+    if (bodyRange) bodyRange.load('address,rowCount,columnCount');
     if (headerRange) headerRange.load('address,rowCount,columnCount');
     if (totalRange) totalRange.load('address,rowCount,columnCount');
     await context.sync();
@@ -966,6 +966,7 @@
   }
 
   function rangeInfo(range) {
+    if (!range) return { address: null, row_count: null, column_count: null };
     return {
       address: range.address || null,
       row_count: Number.isInteger(range.rowCount) ? range.rowCount : null,

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import {
   assertConcreteE2eCases,
@@ -220,10 +221,10 @@ const EXCEL_E2E_CASES = Object.fromEntries([
   ['excel.create_table', {
     setup: {
       actions: [
-        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B3', values: [['Name', 'Value'], ['Alpha', '1'], ['Beta', '2']] } }
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'AA1:AB3', values: [['Name', 'Value'], ['Alpha', '1'], ['Beta', '2']] } }
       ]
     },
-    args: { sheet: 'Sheet1', address: 'A1:B3', has_headers: true, name: 'E2ETable' },
+    args: { sheet: 'Sheet1', address: 'AA1:AB3', has_headers: true, name: 'E2ETable' },
     verify: {
       kind: 'readback',
       readbackTool: 'excel.update_table',
@@ -257,7 +258,7 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       kind: 'readback',
       readbackTool: 'excel.update_chart',
       readbackArguments: { sheet: 'Sheet1', chart: '${result.chart}', action: 'metadata' },
-      expect: { contains: ['E2E Chart', 'columnClustered'] }
+      expect: { contains: ['E2E Chart', 'ColumnClustered'] }
     }
   }],
   ['excel.update_chart', {
@@ -312,6 +313,14 @@ test('Excel E2E case table covers every advertised tool', () => {
 
 test('Excel mutating E2E cases define concrete setup and readback checks', () => {
   assertConcreteE2eCases({ host: 'Excel', cases: EXCEL_E2E_CASES });
+});
+
+test('Excel E2E range filter does not overlap create_table fixture', () => {
+  assert.notEqual(
+    EXCEL_E2E_CASES['excel.apply_filter'].call.arguments.address,
+    EXCEL_E2E_CASES['excel.create_table'].call.arguments.address,
+    'range filters persist on the worksheet and must not share the create_table fixture range'
+  );
 });
 
 test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

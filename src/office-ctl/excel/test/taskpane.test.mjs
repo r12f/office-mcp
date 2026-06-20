@@ -259,6 +259,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /function tableMetadata\(table, range, bodyRange, headerRange, totalRange\)/);
   assert.match(js, /const headerRange = table\.showHeaders \? table\.getHeaderRowRange\(\) : null/);
   assert.match(js, /const totalRange = table\.showTotals \? table\.getTotalRowRange\(\) : null/);
+  assert.match(js, /if \(bodyRange\) bodyRange\.load\('address,rowCount,columnCount'\)/);
+  assert.match(js, /if \(!range\) return \{ address: null, row_count: null, column_count: null \}/);
   assert.match(js, /function applyTableOptions\(table, args\)/);
   assert.match(js, /function tableValuesFrom\(values, label\)/);
   assert.match(js, /function optionalIndex\(value\)/);
