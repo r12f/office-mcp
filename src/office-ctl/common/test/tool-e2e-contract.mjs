@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
@@ -243,7 +243,7 @@ export function officeE2eEnabled() {
   return process.env.OFFICE_MCP_RUN_E2E === '1';
 }
 
-export async function runOfficeToolE2e({ host, cases, driver }) {
+export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
   assert.ok(host, 'E2E host name is required');
   assert.ok(driver, `${host} E2E driver is required`);
   assertDriverMethod(driver, 'startDaemon', host);
@@ -255,33 +255,161 @@ export async function runOfficeToolE2e({ host, cases, driver }) {
   assertDriverMethod(driver, 'callTool', host);
   assertDriverMethod(driver, 'verifyResult', host);
 
+  const report = createE2eReport(host);
   let daemon;
   let document;
   let session;
   try {
+    report.lifecycle_counts.start_daemon += 1;
     daemon = await driver.startDaemon({ host });
+    report.daemon = summarizeDaemon(daemon);
+    report.lifecycle_counts.list_tools += 1;
     const daemonTools = await driver.listTools({ host, daemon });
     assertDaemonToolsCaseCoverage({ host, tools: daemonTools, cases });
+    report.advertised_tools = hostNamedTools(host, daemonTools);
+    report.lifecycle_counts.create_document += 1;
     document = await driver.createDocument({ host, daemon });
+    report.document = summarizeDocument(document);
+    report.lifecycle_counts.wait_for_session += 1;
     session = await driver.waitForSession(document, { host, daemon });
     assertSessionCaseCoverage({ host, session, cases });
+    report.session = summarizeSession(session);
+    report.session_available_tools = [...session.availableTools];
 
     for (const toolCase of orderedCases(cases, session.availableTools)) {
       const run = e2eRunMetadata(toolCase);
+      const toolRun = createToolRunReport(toolCase, run);
+      report.tool_runs.push(toolRun);
       const runSession = { ...session, bindings: { ...(session.bindings || {}) } };
-      mergeBindings(runSession, await driver.resetContent(toolCase, runSession, { host, daemon, document, run }));
-      mergeBindings(runSession, await driver.setupContent(toolCase, runSession, { host, daemon, document, run }));
-      const result = await driver.callTool(toolCase, runSession, { host, daemon, document, run });
-      await driver.verifyResult(toolCase, result, runSession, { host, daemon, document, run });
+      try {
+        mergeBindings(runSession, await driver.resetContent(toolCase, runSession, { host, daemon, document, run }));
+        mergeBindings(runSession, await driver.setupContent(toolCase, runSession, { host, daemon, document, run }));
+        const result = await driver.callTool(toolCase, runSession, { host, daemon, document, run });
+        toolRun.result = summarizeToolResult(result);
+        await driver.verifyResult(toolCase, result, runSession, { host, daemon, document, run });
+        toolRun.passed = true;
+      } catch (error) {
+        toolRun.passed = false;
+        toolRun.error = serializeError(error);
+        throw error;
+      } finally {
+        toolRun.finished_at = new Date().toISOString();
+      }
     }
+    report.passed = true;
   } finally {
-    if (document && typeof driver.cleanupDocument === 'function') {
-      await driver.cleanupDocument(document, { host, daemon, session });
-    }
-    if (typeof driver.stopDaemon === 'function') {
-      await driver.stopDaemon(daemon, { host, document, session });
+    try {
+      if (document && typeof driver.cleanupDocument === 'function') {
+        report.lifecycle_counts.cleanup_document += 1;
+        await driver.cleanupDocument(document, { host, daemon, session });
+      }
+      if (typeof driver.stopDaemon === 'function') {
+        report.lifecycle_counts.stop_daemon += 1;
+        await driver.stopDaemon(daemon, { host, document, session });
+      }
+    } catch (error) {
+      report.passed = false;
+      report.error = serializeError(error);
+      throw error;
+    } finally {
+      report.finished_at = new Date().toISOString();
+      report.executed_tools = report.tool_runs.map((run) => run.tool);
+      if (report.passed !== true) {
+        report.passed = false;
+        report.error ??= firstToolRunError(report);
+      }
+      writeE2eReport(reportPath, report);
     }
   }
+}
+
+function createE2eReport(host) {
+  return {
+    schema_version: 1,
+    kind: 'office_tool_e2e_report',
+    host,
+    started_at: new Date().toISOString(),
+    finished_at: undefined,
+    passed: false,
+    lifecycle_counts: {
+      start_daemon: 0,
+      list_tools: 0,
+      create_document: 0,
+      wait_for_session: 0,
+      cleanup_document: 0,
+      stop_daemon: 0
+    },
+    advertised_tools: [],
+    session_available_tools: [],
+    executed_tools: [],
+    tool_runs: []
+  };
+}
+
+function createToolRunReport(toolCase, run) {
+  return {
+    id: run.requestId,
+    tool: toolCase.tool,
+    started_at: new Date().toISOString(),
+    finished_at: undefined,
+    setup_action_count: Array.isArray(toolCase.setup?.actions) ? toolCase.setup.actions.length : 0,
+    verifier: summarizeVerifier(toolCase.verify),
+    passed: false
+  };
+}
+
+function summarizeVerifier(verifier) {
+  return {
+    kind: verifier?.kind,
+    readback_tool: verifier?.readbackTool,
+    resource: verifier?.resource,
+    expectation_keys: verifier?.expect && typeof verifier.expect === 'object' ? Object.keys(verifier.expect).sort() : []
+  };
+}
+
+function summarizeDaemon(daemon) {
+  if (!daemon || typeof daemon !== 'object') return undefined;
+  return typeof daemon.endpoint === 'string' ? { endpoint: daemon.endpoint } : {};
+}
+
+function summarizeDocument(document) {
+  if (!document || typeof document !== 'object') return undefined;
+  return typeof document.path === 'string' ? { path: document.path } : {};
+}
+
+function summarizeSession(session) {
+  if (!session || typeof session !== 'object') return undefined;
+  return {
+    session_id: session.sessionId,
+    available_tool_count: Array.isArray(session.availableTools) ? session.availableTools.length : undefined
+  };
+}
+
+function summarizeToolResult(result) {
+  if (!result || typeof result !== 'object') return undefined;
+  return {
+    ok: result.ok,
+    has_structured_content: Object.hasOwn(result, 'structuredContent'),
+    has_content: Object.hasOwn(result, 'content'),
+    error_code: result.error?.code
+  };
+}
+
+function serializeError(error) {
+  if (error instanceof Error) {
+    return { name: error.name, message: error.message };
+  }
+  return { name: 'Error', message: String(error) };
+}
+
+function firstToolRunError(report) {
+  return report.tool_runs.find((run) => run.error)?.error;
+}
+
+function writeE2eReport(reportPath, report) {
+  if (!reportPath) return;
+  mkdirSync(dirname(reportPath), { recursive: true });
+  writeFileSync(reportPath, JSON.stringify(report, null, 2));
 }
 
 function mergeBindings(session, stepResult) {

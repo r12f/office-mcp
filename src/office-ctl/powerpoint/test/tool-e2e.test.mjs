@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { resolve } from 'node:path';
 import {
   assertConcreteE2eCases,
   assertE2eCaseCoverage,
@@ -9,6 +10,7 @@ import {
 } from '../../common/test/tool-e2e-contract.mjs';
 
 const ADDIN_ROOT = process.cwd();
+const REPORT_PATH = resolve(ADDIN_ROOT, '../../../artifacts/office-tool-e2e-powerpoint.json');
 const PNG_1X1_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
 const POWERPOINT_E2E_CASES = Object.fromEntries([
@@ -361,6 +363,7 @@ test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => 
   await runOfficeToolE2e({
     host: 'PowerPoint',
     cases: POWERPOINT_E2E_CASES,
-    driver: requireOfficeE2eDriver('PowerPoint')
+    driver: requireOfficeE2eDriver('PowerPoint'),
+    reportPath: REPORT_PATH
   });
 });

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { resolve } from 'node:path';
 import {
   assertConcreteE2eCases,
   assertE2eCaseCoverage,
@@ -9,6 +10,7 @@ import {
 } from '../../common/test/tool-e2e-contract.mjs';
 
 const ADDIN_ROOT = process.cwd();
+const REPORT_PATH = resolve(ADDIN_ROOT, '../../../artifacts/office-tool-e2e-excel.json');
 
 const EXCEL_E2E_CASES = Object.fromEntries([
   ['excel.get_workbook_info', {
@@ -316,6 +318,7 @@ test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
   await runOfficeToolE2e({
     host: 'Excel',
     cases: EXCEL_E2E_CASES,
-    driver: requireOfficeE2eDriver('Excel')
+    driver: requireOfficeE2eDriver('Excel'),
+    reportPath: REPORT_PATH
   });
 });

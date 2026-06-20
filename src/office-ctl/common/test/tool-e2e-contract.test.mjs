@@ -150,6 +150,103 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
   assert.equal(events.filter((event) => event.startsWith('call:')).length, 2);
 });
 
+test('shared Office tool E2E loop writes lifecycle and per-tool report evidence', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-e2e-report-'));
+  const reportPath = join(dir, 'word-tools-report.json');
+  const driver = {
+    async startDaemon() {
+      return { endpoint: 'http://127.0.0.1:8765/mcp' };
+    },
+    async listTools() {
+      return ['word.read', 'word.write'];
+    },
+    async createDocument() {
+      return { path: 'fixture.docx' };
+    },
+    async waitForSession() {
+      return { sessionId: 'session-1', availableTools: ['word.read', 'word.write'] };
+    },
+    async resetContent() {},
+    async setupContent() {},
+    async callTool(toolCase) {
+      return { ok: true, tool: toolCase.tool };
+    },
+    async verifyResult() {}
+  };
+  const cases = {
+    'word.read': e2eCase('word.read', { setup: { actions: [{ tool: 'word.insert_paragraph', arguments: {} }] }, verify: directResult({ pathEquals: [{ path: 'ok', value: true }] }) }),
+    'word.write': e2eCase('word.write', { setup: { actions: [{ tool: 'word.insert_paragraph', arguments: {} }] }, verify: readbackByTool('word.get_text', { arguments: {}, expect: { contains: ['updated'] } }) })
+  };
+
+  await runOfficeToolE2e({ host: 'Word', cases, driver, reportPath });
+
+  const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+  assert.equal(report.schema_version, 1);
+  assert.equal(report.kind, 'office_tool_e2e_report');
+  assert.equal(report.host, 'Word');
+  assert.equal(report.passed, true);
+  assert.deepEqual(report.lifecycle_counts, {
+    start_daemon: 1,
+    list_tools: 1,
+    create_document: 1,
+    wait_for_session: 1,
+    cleanup_document: 0,
+    stop_daemon: 0
+  });
+  assert.deepEqual(report.advertised_tools, ['word.read', 'word.write']);
+  assert.deepEqual(report.session_available_tools, ['word.read', 'word.write']);
+  assert.deepEqual(report.executed_tools, ['word.read', 'word.write']);
+  assert.equal(report.tool_runs.length, 2);
+  assert.equal(report.tool_runs[0].tool, 'word.read');
+  assert.equal(report.tool_runs[0].verifier.kind, 'direct-result');
+  assert.equal(report.tool_runs[0].passed, true);
+  assert.equal(report.tool_runs[1].verifier.kind, 'readback');
+  assert.equal(report.tool_runs[1].passed, true);
+});
+
+test('shared Office tool E2E loop writes failed report evidence before rethrowing', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-e2e-report-fail-'));
+  const reportPath = join(dir, 'word-tools-report.json');
+  const driver = {
+    async startDaemon() {},
+    async listTools() {
+      return ['word.read'];
+    },
+    async createDocument() {
+      return { path: 'fixture.docx' };
+    },
+    async waitForSession() {
+      return { sessionId: 'session-1', availableTools: ['word.read'] };
+    },
+    async resetContent() {},
+    async setupContent() {},
+    async callTool() {
+      return { ok: true };
+    },
+    async verifyResult() {
+      throw new Error('verification failed');
+    }
+  };
+
+  await assert.rejects(
+    () => runOfficeToolE2e({
+      host: 'Word',
+      cases: { 'word.read': e2eCase('word.read', { setup: { actions: [{ tool: 'word.insert_paragraph', arguments: {} }] }, verify: directResult({ contains: ['read'] }) }) },
+      driver,
+      reportPath
+    }),
+    /verification failed/
+  );
+
+  const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+  assert.equal(report.passed, false);
+  assert.equal(report.error.message, 'verification failed');
+  assert.equal(report.tool_runs.length, 1);
+  assert.equal(report.tool_runs[0].tool, 'word.read');
+  assert.equal(report.tool_runs[0].passed, false);
+  assert.equal(report.tool_runs[0].error.message, 'verification failed');
+});
+
 test('shared Office tool E2E loop records per-tool run metadata without body text', async () => {
   const records = [];
   const driver = {
@@ -500,6 +597,7 @@ test('external Office E2E driver adapter exchanges one JSON request per step', a
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-e2e-driver-'));
   const logPath = join(dir, 'calls.jsonl');
   const driverPath = join(dir, 'mock-driver.mjs');
+  const reportPath = join(dir, 'report.json');
   writeFileSync(driverPath, `
 import { appendFileSync } from 'node:fs';
 const input = await new Promise((resolve) => {
@@ -532,7 +630,8 @@ process.stdout.write(JSON.stringify(responses[request.step] || {}));
     await runOfficeToolE2e({
       host: 'Word',
       cases: { 'word.read': e2eCase('word.read', { verify: 'direct-result' }) },
-      driver: requireOfficeE2eDriver('Word')
+      driver: requireOfficeE2eDriver('Word'),
+      reportPath
     });
   } finally {
     restoreEnv('OFFICE_MCP_RUN_E2E', previousRun);
@@ -555,6 +654,17 @@ process.stdout.write(JSON.stringify(responses[request.step] || {}));
   assert.equal(calls[0].host, 'Word');
   assert.equal(calls[4].context.toolCase.tool, 'word.read');
   assert.equal(calls[6].context.session.sessionId, 'session-1');
+  const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+  assert.equal(report.passed, true);
+  assert.deepEqual(report.lifecycle_counts, {
+    start_daemon: 1,
+    list_tools: 1,
+    create_document: 1,
+    wait_for_session: 1,
+    cleanup_document: 1,
+    stop_daemon: 1
+  });
+  assert.deepEqual(report.executed_tools, ['word.read']);
 });
 
 test('external Office E2E driver adapter reports failed step stderr', async () => {

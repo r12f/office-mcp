@@ -1319,7 +1319,13 @@ task pane `AVAILABLE_TOOLS` but misses a tool exposed by MCP `tools/list`.
 Full add-in activation and live Office execution remain open. Each host exposes
 `npm run e2e:tools` as the non-evidence tool E2E command; live Office execution
 is still opt-in through `OFFICE_MCP_RUN_E2E=1` until the activation driver is
-implemented.
+implemented. When enabled, the Word, Excel, and PowerPoint commands write
+`artifacts/office-tool-e2e-word.json`,
+`artifacts/office-tool-e2e-excel.json`, and
+`artifacts/office-tool-e2e-powerpoint.json`. Those reports record the ordered
+tool loop, per-tool verifier results, and lifecycle counters so the release
+evidence can prove each host opened one driver-owned file/session and tested all
+tools in that single lifecycle.
 
 **Exit criterion**: A developer can run one command per Office host and see the
 daemon start, a blank document connect, every MCP tool execute against fixed

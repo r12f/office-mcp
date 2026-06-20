@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { resolve } from 'node:path';
 import {
   assertConcreteE2eCases,
   assertE2eCaseCoverage,
@@ -10,6 +11,7 @@ import {
 } from '../../common/test/tool-e2e-contract.mjs';
 
 const ADDIN_ROOT = process.cwd();
+const REPORT_PATH = resolve(ADDIN_ROOT, '../../../artifacts/office-tool-e2e-word.json');
 const PNG_1X1_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
 const WORD_E2E_CASES = Object.fromEntries([
@@ -321,6 +323,7 @@ test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
   await runOfficeToolE2e({
     host: 'Word',
     cases: WORD_E2E_CASES,
-    driver: requireOfficeE2eDriver('Word')
+    driver: requireOfficeE2eDriver('Word'),
+    reportPath: REPORT_PATH
   });
 });

@@ -229,6 +229,14 @@ once. Restarting Office or recreating the file per tool is only a diagnostic
 fallback because it hides session-lifecycle bugs and makes Office automation
 less stable.
 
+When the live Office driver runs, it MUST write a structured JSON report under
+`artifacts/office-tool-e2e-<host>.json`. The report records the host, daemon
+endpoint, driver-owned document path, session ID, advertised tool list, session
+`available_tools`, the ordered executed tool list, per-tool verifier kind and
+pass/fail result, and lifecycle counters. A passing report must show exactly
+one daemon start, one `tools/list`, one document creation, one session wait,
+one document cleanup, and one daemon stop for the host run.
+
 Each tool case supplies only the tool-specific pieces:
 
 - Fixed setup content to add before the tool call.
