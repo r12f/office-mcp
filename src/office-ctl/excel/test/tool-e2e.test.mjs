@@ -112,8 +112,34 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['7'] }
     }
   }],
-  ['excel.format_range', { args: { sheet: 'Sheet1', address: 'A1:B2', format: { bold: true } } }],
-  ['excel.sort_range', { args: { sheet: 'Sheet1', address: 'A1:B3', key_column: 0 } }],
+  ['excel.format_range', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B2', values: [[12.5, 20], [3, 4]] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'A1:B2', number_format: '0.00' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'A1:B2' },
+      expect: { contains: ['0.00'] }
+    }
+  }],
+  ['excel.sort_range', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B4', values: [['Name', 'Score'], ['Charlie', 3], ['Alpha', 1], ['Bravo', 2]] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'A1:B4', fields: [{ key: 0, ascending: true }], has_headers: true },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'A1:B4' },
+      expect: { orderedContains: ['Alpha', 'Bravo', 'Charlie'] }
+    }
+  }],
   ['excel.apply_filter', { args: { sheet: 'Sheet1', address: 'A1:B3', column: 0, criterion: 'A' } }],
   ['excel.create_table', {
     setup: {
@@ -129,7 +155,21 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['E2ETable'] }
     }
   }],
-  ['excel.update_table', { args: { table: 'E2ETable', action: 'rename', name: 'E2ETableRenamed' } }],
+  ['excel.update_table', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'D1:E3', values: [['Name', 'Value'], ['Alpha', '1'], ['Beta', '2']] } },
+        { tool: 'excel.create_table', arguments: { sheet: 'Sheet1', address: 'D1:E3', has_headers: true, name: 'E2ETableToRename' } }
+      ]
+    },
+    args: { table: 'E2ETableToRename', action: 'rename', name: 'E2ETableRenamed' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.update_table',
+      readbackArguments: { table: 'E2ETableRenamed', action: 'metadata' },
+      expect: { contains: ['E2ETableRenamed'], notContains: ['E2ETableToRename'] }
+    }
+  }],
   ['excel.create_chart', { args: { sheet: 'Sheet1', source_range: 'A1:B3', chart_type: 'columnClustered' } }],
   ['excel.update_chart', { args: { chart: 'E2EChart', title: 'Updated chart' } }],
   ['excel.create_pivot_table', { args: { sheet: 'Sheet1', source_range: 'A1:B4', destination: 'D1' } }],
@@ -149,6 +189,9 @@ test('Excel mutating E2E cases define concrete setup and readback checks', () =>
   assertConcreteReadback('excel.delete_sheet');
   assertConcreteReadback('excel.create_table');
   assertConcreteReadback('excel.set_formula');
+  assertConcreteReadback('excel.format_range');
+  assertConcreteReadback('excel.sort_range');
+  assertConcreteReadback('excel.update_table');
 });
 
 test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

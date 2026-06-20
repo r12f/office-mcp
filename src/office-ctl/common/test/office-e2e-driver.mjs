@@ -287,6 +287,14 @@ function assertReadbackExpectations(tool, readback, expect) {
       throw new Error(`${tool} readback still contained forbidden text ${JSON.stringify(marker)}.`);
     }
   }
+  let previousIndex = -1;
+  for (const marker of arrayOf(expect.orderedContains)) {
+    const index = text.indexOf(marker, previousIndex + 1);
+    if (index === -1) {
+      throw new Error(`${tool} readback did not contain expected ordered text ${JSON.stringify(marker)}.`);
+    }
+    previousIndex = index;
+  }
 }
 
 function readbackText(value) {
