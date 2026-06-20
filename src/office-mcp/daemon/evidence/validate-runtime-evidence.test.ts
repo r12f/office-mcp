@@ -299,9 +299,13 @@ test('runtime evidence validator can require Office tool E2E reports', () => {
 
 test('README documents Office tool E2E report validation command', () => {
   const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
-  const commandLine = readme.split('\n').find((line) => line.includes('--require-office-tool-e2e')) ?? '';
+  const commandLine = readme.split('\n').find((line) => line.includes('--require-office-tool-e2e') && line.includes('--word-tool-e2e-report-path')) ?? '';
 
   assert.match(readme, /OFFICE_MCP_RUN_E2E = '1'/);
+  assert.match(readme, /OFFICE_MCP_E2E_ACTIVATOR/);
+  assert.match(readme, /no-activator-configured/);
+  assert.match(readme, /must not restart Office, recreate the document, or reconnect/);
+  assert.match(readme, /one table-driven\s+loop across the host's complete tool catalog/);
   assert.match(readme, /office-tool-e2e-<host>\.json/);
   assert.match(commandLine, /npm run evidence:validate/);
   assert.match(commandLine, /--require-office-tool-e2e/);

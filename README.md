@@ -214,9 +214,23 @@ file/session for that host, connects the add-in once, loops all advertised
 tools in that session, cleans up once, and writes
 `artifacts/office-tool-e2e-<host>.json`:
 
+The release gate must not restart Office, recreate the document, or reconnect
+the add-in per tool. Per-tool Office launches are diagnostic only; the stable
+path is one opened host program, one connected session, and one table-driven
+loop across the host's complete tool catalog.
+
+Release-ready tool E2E reports must prove the add-in activation step. Set
+`OFFICE_MCP_E2E_ACTIVATOR` to a command that opens the Office MCP Control task
+pane for the driver-owned document. The driver passes `OFFICE_MCP_E2E_HOST`,
+`OFFICE_MCP_E2E_DOCUMENT_PATH`, `OFFICE_MCP_E2E_ADDIN_ORIGIN`, and
+`OFFICE_MCP_E2E_ADDIN_ENDPOINT` to that command. Reports with
+`no-activator-configured` are useful for local manual debugging, but
+`npm run evidence:validate -- --require-office-tool-e2e` rejects them.
+
 ```powershell
 cd ..\..\office-ctl\word
 $env:OFFICE_MCP_RUN_E2E = '1'
+$env:OFFICE_MCP_E2E_ACTIVATOR = 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\path\to\activate-office-mcp-addin.ps1'
 npm run e2e:tools
 cd ..\excel
 npm run e2e:tools
