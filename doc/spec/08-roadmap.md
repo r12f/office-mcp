@@ -1283,9 +1283,14 @@ PowerPoint each provide host case tables. The shared loop contract is covered by
 `src/office-ctl/common/test/tool-e2e-contract.test.mjs`. The Office host
 automation driver now provides daemon startup, Word/Excel COM document creation
 and cleanup, MCP `tools/call`, and explicit session waiting through the
-`OFFICE_MCP_E2E_DRIVER` JSON step protocol. Add-in activation and full live
-tool verification remain open, especially PowerPoint's visible-window COM path.
-Each host exposes `npm run e2e:tools` as the non-evidence tool E2E command.
+`OFFICE_MCP_E2E_DRIVER` JSON step protocol. The driver also supports generic
+readback verification metadata: a mutating case can call a follow-up read tool
+and assert expected `contains`/`notContains` markers. Word `replace_text`, Excel
+`write_range`, and PowerPoint `replace_text` are the first concrete readback
+cases. Full add-in activation, live Office execution, and concrete readback
+verifiers for every mutating/destructive tool remain open, especially
+PowerPoint's visible-window COM path. Each host exposes `npm run e2e:tools` as
+the non-evidence tool E2E command.
 
 **Exit criterion**: A developer can run one command per Office host and see the
 daemon start, a blank document connect, every MCP tool execute against fixed

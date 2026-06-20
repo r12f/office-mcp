@@ -17,7 +17,16 @@ const EXCEL_E2E_CASES = Object.fromEntries([
   ['excel.delete_sheet', { args: { sheet: 'Delete Me' } }],
   ['excel.get_used_range', { verify: 'direct-result' }],
   ['excel.read_range', { verify: 'direct-result' }],
-  ['excel.write_range', { args: { sheet: 'Sheet1', address: 'A1:B2', values: [['A', 'B'], ['C', 'D']] } }],
+  ['excel.write_range', {
+    setup: { kind: 'range-values', sheet: 'Sheet1', address: 'A1:B2', values: [['baseline', 'marker'], ['1', '2']] },
+    args: { sheet: 'Sheet1', address: 'A1:B2', values: [['updated', 'marker'], ['3', '4']] },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'A1:B2' },
+      expect: { contains: ['updated', 'marker', '3', '4'], notContains: ['baseline'] }
+    }
+  }],
   ['excel.clear_range', { args: { sheet: 'Sheet1', address: 'A1:B2' } }],
   ['excel.find_replace_cells', { args: { sheet: 'Sheet1', find: 'baseline', replace: 'updated' } }],
   ['excel.set_formula', { args: { sheet: 'Sheet1', address: 'C1', formula: '=SUM(A1:B1)' } }],

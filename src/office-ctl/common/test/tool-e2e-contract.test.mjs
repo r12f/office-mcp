@@ -105,6 +105,63 @@ test('shared Office tool E2E loop records per-tool run metadata without body tex
   assert.match(records.find((record) => record.phase === 'call').requestId, /^e2e-word-read-/);
 });
 
+test('shared Office tool E2E loop preserves concrete readback verifier metadata', async () => {
+  const verifiers = [];
+  const driver = {
+    async startDaemon() {},
+    async createDocument() {
+      return {};
+    },
+    async waitForSession() {
+      return { sessionId: 'session-1', availableTools: ['word.write'] };
+    },
+    async resetContent() {},
+    async setupContent() {},
+    async callTool() {
+      return { ok: true };
+    },
+    async verifyResult(toolCase) {
+      verifiers.push(toolCase.verify);
+    }
+  };
+  const cases = {
+    'word.write': e2eCase('word.write', {
+      setup: { kind: 'document-text', text: 'baseline marker' },
+      args: { text: 'updated marker' },
+      verify: {
+        kind: 'readback',
+        readbackTool: 'word.get_text',
+        readbackArguments: { limit: 20 },
+        expect: { contains: ['updated marker'], notContains: ['baseline marker'] }
+      }
+    })
+  };
+
+  await runOfficeToolE2e({ host: 'Word', cases, driver });
+
+  assert.deepEqual(verifiers, [{
+    kind: 'readback',
+    readbackTool: 'word.get_text',
+    readbackArguments: { limit: 20 },
+    expect: { contains: ['updated marker'], notContains: ['baseline marker'] }
+  }]);
+});
+
+test('E2E case coverage accepts concrete readback verifiers with explicit expectations', () => {
+  const toolCase = e2eCase('word.replace_text', {
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_text',
+      readbackArguments: { limit: 20 },
+      expect: { contains: ['updated'], notContains: ['baseline'] }
+    }
+  });
+
+  assert.equal(toolCase.verify.kind, 'readback');
+  assert.equal(toolCase.verify.readbackTool, 'word.get_text');
+  assert.deepEqual(toolCase.verify.expect, { contains: ['updated'], notContains: ['baseline'] });
+});
+
 test('shared Office tool E2E loop fails when session tools and case table differ', async () => {
   const driver = {
     async startDaemon() {},

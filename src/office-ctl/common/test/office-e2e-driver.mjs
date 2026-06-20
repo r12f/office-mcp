@@ -210,7 +210,44 @@ async function verifyResult(context) {
   if (result.error || result.structuredContent?.error) {
     throw new Error(`${toolCase.tool || 'tool'} returned MCP error: ${JSON.stringify(result.error || result.structuredContent.error)}`);
   }
-  return { verified: true, kind: toolCase.verify?.kind || 'readback' };
+  const verifier = toolCase.verify || { kind: 'readback' };
+  if (verifier.kind !== 'readback') return { verified: true, kind: verifier.kind };
+  if (!verifier.readbackTool) return { verified: true, kind: verifier.kind, readback: 'not-configured' };
+
+  const daemon = context.daemon || {};
+  const session = context.session || {};
+  const readbackArguments = { ...(verifier.readbackArguments || {}), session_id: session.sessionId };
+  const readback = await mcpToolCall(daemon.endpoint, verifier.readbackTool, readbackArguments);
+  assertReadbackExpectations(toolCase.tool || 'tool', readback, verifier.expect || {});
+  return { verified: true, kind: verifier.kind, readbackTool: verifier.readbackTool };
+}
+
+function assertReadbackExpectations(tool, readback, expect) {
+  const text = readbackText(readback);
+  for (const marker of arrayOf(expect.contains)) {
+    if (!text.includes(marker)) {
+      throw new Error(`${tool} readback did not contain expected text ${JSON.stringify(marker)}.`);
+    }
+  }
+  for (const marker of arrayOf(expect.notContains)) {
+    if (text.includes(marker)) {
+      throw new Error(`${tool} readback still contained forbidden text ${JSON.stringify(marker)}.`);
+    }
+  }
+}
+
+function readbackText(value) {
+  if (typeof value === 'string') return value;
+  if (value?.structuredContent) return readbackText(value.structuredContent);
+  if (Array.isArray(value?.content)) return value.content.map((item) => readbackText(item)).join('\n');
+  if (typeof value?.text === 'string') return value.text;
+  if (typeof value?.value === 'string') return value.value;
+  return JSON.stringify(value ?? '');
+}
+
+function arrayOf(value) {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
 }
 
 async function cleanupDocument(context) {

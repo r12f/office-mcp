@@ -20,7 +20,16 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.insert_table', { args: { anchor: { kind: 'end_of_document' }, rows: [['A', 'B']] } }],
   ['word.insert_page_break', { args: { anchor: { kind: 'end_of_document' } } }],
   ['word.insert_list', { args: { anchor: { kind: 'end_of_document' }, items: ['One', 'Two'] } }],
-  ['word.replace_text', { args: { find: 'baseline', replace: 'updated' } }],
+  ['word.replace_text', {
+    setup: { kind: 'document-text', text: 'baseline marker' },
+    args: { find: 'baseline marker', replace: 'updated marker' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_text',
+      readbackArguments: { limit: 20 },
+      expect: { contains: ['updated marker'], notContains: ['baseline marker'] }
+    }
+  }],
   ['word.update_paragraph', { args: { index: 0, text: 'Updated paragraph' } }],
   ['word.delete_range', { args: { anchor: { kind: 'paragraph_index', index: 0 }, extent: 'paragraph' } }],
   ['word.apply_formatting', { args: { anchor: { kind: 'paragraph_index', index: 0 }, formatting: { bold: true } } }],

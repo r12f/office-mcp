@@ -30,7 +30,16 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
   ['powerpoint.insert_image', { args: { slide_index: 0, image: { base64: 'fixture' } } }],
   ['powerpoint.update_shape', { args: { slide_index: 0, shape_id: 'fixture', text: 'Updated shape' } }],
   ['powerpoint.read_text', { verify: 'direct-result' }],
-  ['powerpoint.replace_text', { args: { find: 'baseline', replace: 'updated' } }],
+  ['powerpoint.replace_text', {
+    setup: { kind: 'slide-text', slide_index: 0, text: 'baseline marker' },
+    args: { find: 'baseline marker', replace: 'updated marker' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.read_text',
+      readbackArguments: { slide_index: 0 },
+      expect: { contains: ['updated marker'], notContains: ['baseline marker'] }
+    }
+  }],
   ['powerpoint.format_text', { args: { slide_index: 0, shape_id: 'fixture', formatting: { bold: true } } }],
   ['powerpoint.add_table', { args: { slide_index: 0, rows: [['A', 'B']] } }],
   ['powerpoint.read_table', { verify: 'direct-result' }],

@@ -138,6 +138,67 @@ server.listen(0, '127.0.0.1', () => {
   }
 });
 
+test('Office E2E driver verifies readback expectations through an MCP read tool', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-readback-'));
+  const logPath = join(dir, 'mcp-requests.jsonl');
+  const serverPath = join(dir, 'mcp-server.mjs');
+  writeFileSync(serverPath, `
+import { appendFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+const logPath = ${JSON.stringify(logPath)};
+const server = createServer((request, response) => {
+  let body = '';
+  request.setEncoding('utf8');
+  request.on('data', (chunk) => { body += chunk; });
+  request.on('end', () => {
+    const parsed = JSON.parse(body);
+    appendFileSync(logPath, JSON.stringify({ session: request.headers['mcp-session-id'] || null, body: parsed }) + '\\n');
+    response.setHeader('Content-Type', 'application/json');
+    if (!request.headers['mcp-session-id']) {
+      response.setHeader('MCP-Session-Id', 'mcp-session-test');
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: {} }));
+    } else {
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { structuredContent: { text: 'updated marker remains' } } }));
+    }
+  });
+});
+server.listen(0, '127.0.0.1', () => {
+  const address = server.address();
+  console.log(JSON.stringify({ endpoint: 'http://127.0.0.1:' + address.port + '/mcp' }));
+});
+`);
+  const server = spawn(process.execPath, [serverPath], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  try {
+    const { endpoint } = JSON.parse(await firstStdoutLine(server));
+    const result = runDriver({
+      host: 'Word',
+      step: 'verifyResult',
+      context: {
+        daemon: { endpoint },
+        session: { sessionId: 'session-1' },
+        result: { structuredContent: { ok: true } },
+        toolCase: {
+          tool: 'word.replace_text',
+          verify: {
+            kind: 'readback',
+            readbackTool: 'word.get_text',
+            readbackArguments: { limit: 20 },
+            expect: { contains: ['updated marker'], notContains: ['baseline marker'] }
+          }
+        }
+      }
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).verified, true);
+    const requests = readFileSync(logPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    assert.equal(requests[1].body.params.name, 'word.get_text');
+    assert.equal(requests[1].body.params.arguments.session_id, 'session-1');
+    assert.equal(requests[1].body.params.arguments.limit, 20);
+  } finally {
+    server.kill();
+  }
+});
+
 test('Office E2E driver cleanup ignores documents it did not create', () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-cleanup-'));
   const path = join(dir, 'user-owned.docx');

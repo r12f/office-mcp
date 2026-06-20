@@ -25,6 +25,9 @@ export function assertE2eCaseCoverage({ addinRoot, host, cases }) {
     assert.ok(toolCase.call, `${tool} case must define an MCP tool call`);
     assert.ok(toolCase.verify, `${tool} case must define a verifier`);
     assert.match(toolCase.verify.kind, /^(direct-result|readback)$/);
+    if (toolCase.verify.kind === 'readback' && toolCase.verify.expect) {
+      assert.ok(toolCase.verify.readbackTool, `${tool} readback verifier must define readbackTool`);
+    }
   }
 }
 
@@ -33,8 +36,15 @@ export function e2eCase(tool, { setup = 'fixed baseline content', args = {}, ver
     tool,
     setup,
     call: { name: tool, arguments: args },
-    verify: { kind: verify }
+    verify: normalizeVerifier(verify)
   };
+}
+
+function normalizeVerifier(verify) {
+  if (typeof verify === 'string') return { kind: verify };
+  assert.equal(typeof verify, 'object', 'E2E verifier must be a string or object');
+  assert.ok(verify, 'E2E verifier object is required');
+  return { ...verify };
 }
 
 export function officeE2eEnabled() {
