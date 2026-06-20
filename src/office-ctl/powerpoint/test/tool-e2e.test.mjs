@@ -71,7 +71,7 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
         { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank' } }
       ]
     },
-    args: { slide_index: 0, shape_type: 'rectangle' },
+    args: { slide_index: 0, type: 'rectangle' },
     verify: {
       kind: 'readback',
       readbackTool: 'powerpoint.list_shapes',
@@ -80,7 +80,20 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
     }
   }],
   ['powerpoint.insert_image', { args: { slide_index: 0, image: { base64: 'fixture' } } }],
-  ['powerpoint.update_shape', { args: { slide_index: 0, shape_id: 'fixture', text: 'Updated shape' } }],
+  ['powerpoint.update_shape', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_shape', saveAs: 'shapeResult', arguments: { slide_index: 0, type: 'rectangle', name: 'Shape Before Update' } }
+      ]
+    },
+    args: { slide_index: 0, shape_id: '${shapeResult.shape.id}', name: 'Updated shape' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.list_shapes',
+      readbackArguments: { slide_index: 0 },
+      expect: { contains: ['Updated shape'], notContains: ['Shape Before Update'] }
+    }
+  }],
   ['powerpoint.read_text', { verify: 'direct-result' }],
   ['powerpoint.replace_text', {
     setup: {
@@ -140,6 +153,7 @@ test('PowerPoint mutating E2E cases define concrete setup and readback checks', 
   assertConcreteReadback('powerpoint.update_slide');
   assertConcreteReadback('powerpoint.add_table');
   assertConcreteReadback('powerpoint.update_table');
+  assertConcreteReadback('powerpoint.update_shape');
 });
 
 test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

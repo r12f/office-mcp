@@ -222,6 +222,13 @@ The host E2E harness owns the common lifecycle:
 5. Run one table-driven loop over the exact advertised tools.
 6. Close the driver-owned Office file and delete it during cleanup.
 
+The normal E2E gate MUST use one Office application/document lifecycle per host
+run: open the host program and driver-owned test file once, connect one add-in
+session, run every advertised tool for that session, and then perform cleanup
+once. Restarting Office or recreating the file per tool is only a diagnostic
+fallback because it hides session-lifecycle bugs and makes Office automation
+less stable.
+
 Each tool case supplies only the tool-specific pieces:
 
 - Fixed setup content to add before the tool call.

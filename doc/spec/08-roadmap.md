@@ -1222,27 +1222,31 @@ is not enough for tool-level correctness. Every MCP tool needs a real end-to-end
 test that drives the production daemon, a real Office document, the add-in
 channel, and MCP `tools/call` dispatch.
 
-- [ ] Add a non-evidence E2E test harness for Word tools. The harness starts the
+- [x] Add a non-evidence E2E test harness for Word tools. The harness starts the
       MCP daemon, creates a fresh empty Word document, opens/connects the Office
       add-in, waits until the daemon reports an active Word session, and then
-      iterates through every advertised `word.*` tool.
-- [ ] Add equivalent non-evidence E2E harnesses for Excel and PowerPoint tools.
+      iterates through every advertised `word.*` tool. Add-in activation is
+      still manual/opt-in for live Office execution until the activation driver
+      is implemented.
+- [x] Add equivalent non-evidence E2E harnesses for Excel and PowerPoint tools.
       Each host harness creates a fresh empty workbook/presentation, waits for
       the corresponding add-in session, runs all advertised tools for that host,
-      and closes/deletes the test file at the end.
-- [ ] Keep each host E2E run to one Office application/document lifecycle by
+      and closes/deletes the test file at the end. Add-in activation is still
+      manual/opt-in for live Office execution until the activation driver is
+      implemented.
+- [x] Keep each host E2E run to one Office application/document lifecycle by
       default: open the host program and driver-owned test file once, connect
       one add-in session, loop over every advertised tool in that session, then
       close and delete the test file once during cleanup. Per-tool Office
       process restarts are allowed only as an explicit diagnostic fallback, not
       as the normal gate.
-- [ ] Convert the Office E2E driver from step-local automation to a
+- [x] Convert the Office E2E driver from step-local automation to a
       lifecycle-safe driver that can keep the driver-owned Word, Excel, and
       PowerPoint files open long enough for the add-in to connect. The driver
       must preserve state across daemon startup, document creation, session
       waiting, tool calls, readback verification, and cleanup without closing or
       modifying any pre-existing user Office windows.
-- [ ] Add PowerPoint-specific Office automation support that uses a visible
+- [x] Add PowerPoint-specific Office automation support that uses a visible
       window path when COM rejects hidden PowerPoint automation. The test must
       prove cleanup closes only the presentation created by the E2E driver.
 - [ ] Fill every host tool table with one real case per advertised tool. Each
@@ -1289,13 +1293,13 @@ and generic readback verification metadata: a case can declare MCP setup
 actions, call the tool under test, then call a follow-up read tool and assert
 expected `contains`/`notContains` markers. The first concrete setup/readback
 cases now cover Word `insert_paragraph`, `insert_table`, `insert_list`,
-`replace_text`, `update_paragraph`, and `update_table`; Excel `add_sheet`,
-`update_sheet`, `delete_sheet`, `write_range`, `clear_range`,
-`find_replace_cells`, and `create_table`; and PowerPoint `add_slide`,
-`update_slide`, `add_text_box`, `add_shape`, `replace_text`, `add_table`, and
-`update_table`. Full add-in activation, live Office execution, and concrete
-setup/readback verifiers for every mutating/destructive tool remain open,
-especially PowerPoint's visible-window COM path. Each host exposes
+`replace_text`, `update_paragraph`, `delete_range`, and `update_table`; Excel
+`add_sheet`, `update_sheet`, `delete_sheet`, `write_range`, `clear_range`,
+`find_replace_cells`, `set_formula`, and `create_table`; and PowerPoint
+`add_slide`, `update_slide`, `add_text_box`, `add_shape`, `update_shape`,
+`replace_text`, `add_table`, and `update_table`. Full add-in activation, live
+Office execution, and concrete setup/readback verifiers for every
+mutating/destructive tool remain open. Each host exposes
 `npm run e2e:tools` as the non-evidence tool E2E command.
 
 **Exit criterion**: A developer can run one command per Office host and see the

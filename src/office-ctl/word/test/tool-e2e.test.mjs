@@ -87,7 +87,20 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { contains: ['Updated paragraph'], notContains: ['Paragraph before update'] }
     }
   }],
-  ['word.delete_range', { args: { anchor: { kind: 'paragraph_index', index: 0 }, extent: 'paragraph' } }],
+  ['word.delete_range', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Delete this E2E paragraph' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'Delete this E2E paragraph' }, extent: 'paragraph' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_text',
+      readbackArguments: { limit: 20 },
+      expect: { notContains: ['Delete this E2E paragraph'] }
+    }
+  }],
   ['word.apply_formatting', { args: { anchor: { kind: 'paragraph_index', index: 0 }, formatting: { bold: true } } }],
   ['word.read_table', { verify: 'direct-result' }],
   ['word.update_table', {
@@ -126,6 +139,7 @@ test('Word mutating E2E cases define concrete setup and readback checks', () => 
   assertConcreteReadback('word.insert_table');
   assertConcreteReadback('word.insert_list');
   assertConcreteReadback('word.update_table');
+  assertConcreteReadback('word.delete_range');
 });
 
 test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

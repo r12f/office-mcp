@@ -98,7 +98,20 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['updated', 'marker'], notContains: ['baseline'] }
     }
   }],
-  ['excel.set_formula', { args: { sheet: 'Sheet1', address: 'C1', formula: '=SUM(A1:B1)' } }],
+  ['excel.set_formula', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B1', values: [[2, 5]] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'C1', formula: '=SUM(A1:B1)' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'C1' },
+      expect: { contains: ['7'] }
+    }
+  }],
   ['excel.format_range', { args: { sheet: 'Sheet1', address: 'A1:B2', format: { bold: true } } }],
   ['excel.sort_range', { args: { sheet: 'Sheet1', address: 'A1:B3', key_column: 0 } }],
   ['excel.apply_filter', { args: { sheet: 'Sheet1', address: 'A1:B3', column: 0, criterion: 'A' } }],
@@ -135,6 +148,7 @@ test('Excel mutating E2E cases define concrete setup and readback checks', () =>
   assertConcreteReadback('excel.update_sheet');
   assertConcreteReadback('excel.delete_sheet');
   assertConcreteReadback('excel.create_table');
+  assertConcreteReadback('excel.set_formula');
 });
 
 test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
