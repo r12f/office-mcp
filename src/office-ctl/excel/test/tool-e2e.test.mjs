@@ -10,8 +10,34 @@ import {
 const ADDIN_ROOT = process.cwd();
 
 const EXCEL_E2E_CASES = Object.fromEntries([
-  ['excel.get_workbook_info', { verify: 'direct-result' }],
-  ['excel.list_sheets', { verify: 'direct-result' }],
+  ['excel.get_workbook_info', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1', values: [['Workbook info marker']] } }
+      ]
+    },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        pathEquals: [
+          { path: 'active_sheet.name', value: 'Sheet1' },
+          { path: 'is_read_only', value: false },
+          { path: 'is_protected', value: false }
+        ]
+      }
+    }
+  }],
+  ['excel.list_sheets', {
+    setup: {
+      actions: [
+        { tool: 'excel.add_sheet', arguments: { name: 'E2E List Sheet' } }
+      ]
+    },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E List Sheet'], pathEquals: [{ path: 'sheets.1.name', value: 'E2E List Sheet' }] }
+    }
+  }],
   ['excel.add_sheet', {
     setup: {
       actions: [
@@ -54,8 +80,37 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { notContains: ['Delete Me'] }
     }
   }],
-  ['excel.get_used_range', { verify: 'direct-result' }],
-  ['excel.read_range', { verify: 'direct-result' }],
+  ['excel.get_used_range', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'C3:D4', values: [['Used', 'Range'], ['E2E', 'Marker']] } }
+      ]
+    },
+    args: { sheet: 'Sheet1' },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'row_count', value: 4 }, { path: 'column_count', value: 4 }, { path: 'is_empty', value: false }] }
+    }
+  }],
+  ['excel.read_range', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B2', values: [['Read', 'Range'], ['E2E', 'Marker']] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'A1:B2' },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        contains: ['Read', 'Range', 'E2E', 'Marker'],
+        pathEquals: [
+          { path: 'row_count', value: 2 },
+          { path: 'column_count', value: 2 },
+          { path: 'untrusted_source', value: true }
+        ]
+      }
+    }
+  }],
   ['excel.write_range', {
     setup: {
       actions: [
@@ -253,6 +308,10 @@ test('Excel E2E case table covers every advertised tool', () => {
 });
 
 test('Excel mutating E2E cases define concrete setup and readback checks', () => {
+  assertDirectResult('excel.get_workbook_info');
+  assertDirectResult('excel.list_sheets');
+  assertDirectResult('excel.get_used_range');
+  assertDirectResult('excel.read_range');
   assertConcreteReadback('excel.write_range');
   assertConcreteReadback('excel.clear_range');
   assertConcreteReadback('excel.find_replace_cells');
