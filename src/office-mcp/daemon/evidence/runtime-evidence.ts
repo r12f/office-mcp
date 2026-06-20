@@ -398,6 +398,9 @@ async function runPowerPointSmokeGate(sessionId: string): Promise<void> {
     const replacement = `${marker} updated`;
     const info = await callToolData('office.get_session_info', { session_id: sessionId });
     const availableTools = Array.isArray(info.available_tools) ? info.available_tools.map(String) : [];
+    if (!availableTools.includes('powerpoint.export_file') || availableTools.includes('powerpoint.export_pdf')) {
+      throw new Error('PowerPoint runtime smoke session tools are not aligned with the v1 catalog.');
+    }
     const presentationInfo = await callToolData('powerpoint.get_presentation_info', { session_id: sessionId, include_selection: true });
     const activeView = await callToolData('powerpoint.get_active_view', { session_id: sessionId });
     const slidesBefore = await callToolData('powerpoint.list_slides', { session_id: sessionId, include_tags: true });

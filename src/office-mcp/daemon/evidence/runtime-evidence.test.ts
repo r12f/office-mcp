@@ -103,6 +103,55 @@ test('Excel capability spec exists and tracks the v1 tool catalog', () => {
   assert.match(source, /pivot_table/);
 });
 
+test('PowerPoint runtime evidence harness proves session, tools, mutation, and host rejections', () => {
+  const spec = readFileSync(resolve(process.cwd(), '../../../../doc/spec/08-roadmap.md'), 'utf8');
+  const source = readFileSync(evidencePath('runtime-evidence.ts'), 'utf8');
+
+  assert.match(spec, /Add live PowerPoint runtime smoke evidence against a real presentation/);
+  assert.match(source, /--include-powerpoint-smoke/);
+  assert.match(source, /runWaitForHostSessionGate\('powerpoint', waitForSessionMs\)/);
+  assert.match(source, /runGate\(`\$\{hostApp\}\.wait_for_session`/);
+  assert.match(source, /powerpoint\.runtime_smoke/);
+  assert.match(source, /selectHostSessionId\(sessions, 'powerpoint'\)/);
+  assert.match(source, /No connected PowerPoint add-in session/);
+
+  for (const tool of [
+    'office.get_session_info',
+    'powerpoint.get_presentation_info',
+    'powerpoint.get_active_view',
+    'powerpoint.list_slides',
+    'powerpoint.list_layouts',
+    'powerpoint.add_slide',
+    'powerpoint.add_text_box',
+    'powerpoint.list_shapes',
+    'powerpoint.read_text',
+    'powerpoint.replace_text',
+    'powerpoint.format_text',
+    'powerpoint.apply_layout',
+    'powerpoint.add_table',
+    'powerpoint.read_table',
+    'powerpoint.export_file'
+  ]) {
+    assert.match(source, new RegExp(tool.replace('.', '\\.')));
+  }
+
+  assert.match(source, /availableTools\.length/);
+  assert.match(source, /available_tools: availableTools/);
+  assert.match(source, /availableTools\.includes\('powerpoint\.export_file'\)/);
+  assert.match(source, /availableTools\.includes\('powerpoint\.export_pdf'\)/);
+  assert.match(source, /mutation_proved: typeof addSlide\.slide_id === 'string' && Number\(replaceText\.replacements \?\? 0\) >= 1/);
+  assert.match(source, /exportSupported/);
+  assert.match(source, /exportHostRejection/);
+  assert.match(source, /tableSupported/);
+  assert.match(source, /tableHostRejection/);
+  assert.match(source, /PowerPoint file export failed without explicit host-capability rejection/);
+  assert.match(source, /PowerPoint table creation failed without explicit host-capability rejection/);
+
+  for (const category of ['presentation', 'slides', 'layout', 'shapes', 'text', 'tables']) {
+    assert.match(source, new RegExp(`${category}:`));
+  }
+});
+
 test('add-in communication specs stay metadata-only at the local boundary', () => {
   const specPaths = [
     '../../../../doc/spec/02-registration-protocol.md',
