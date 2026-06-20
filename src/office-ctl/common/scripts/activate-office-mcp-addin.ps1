@@ -28,6 +28,7 @@ function Write-ActivatorLog {
 
 function Get-CanonicalPath {
   param([Parameter(Mandatory = $true)][string]$Path)
+  if ($Path -match '^https?://') { return $Path.Trim().ToLowerInvariant() }
   try { return (Get-Item -LiteralPath $Path -ErrorAction Stop).FullName.ToLowerInvariant() }
   catch { return [System.IO.Path]::GetFullPath($Path).ToLowerInvariant() }
 }
@@ -294,6 +295,7 @@ function Wait-ForDriverDocument {
       return Activate-DriverDocument -Application $Application -HostKey $HostKey -Path $Path
     } catch {
       $lastError = $_.Exception.Message
+      if ($HostKey -eq "excel") { return Get-ExcelMainWindowHandle -Path $Path }
       Write-ActivatorLog "waiting for driver document path=$Path error=$lastError state=$(Get-OfficeStateSnapshot -Application $Application -HostKey $HostKey)"
       Start-Sleep -Milliseconds 500
     }
@@ -361,6 +363,7 @@ function Open-OfficialSideloadDocument {
       $Application.Presentations.Open($Path, $false, $false, $true) | Out-Null
     }
     Write-ActivatorLog "official sideload document opened path=$Path"
+    return $Application
   } catch {
     Write-ActivatorLog "official sideload document open failed path=$Path error=$($_.Exception.Message)"
     if ($HostKey -eq "excel") {
@@ -370,7 +373,7 @@ function Open-OfficialSideloadDocument {
         $excel.DisplayAlerts = $false
         $excel.Workbooks.Open($Path) | Out-Null
         Write-ActivatorLog "official sideload excel document opened via new application path=$Path"
-        return
+        return $excel
       } catch {
         Write-ActivatorLog "official sideload excel document new application open failed path=$Path error=$($_.Exception.Message)"
       }
@@ -381,6 +384,103 @@ function Open-OfficialSideloadDocument {
     } catch {
       Write-ActivatorLog "official sideload document shell open failed path=$Path error=$($_.Exception.Message)"
     }
+  }
+  return $null
+}
+
+function Get-ExcelApplicationForWorkbookOpen {
+  param($Application)
+
+  foreach ($candidate in @($Application)) {
+    if (-not $candidate) { continue }
+    try {
+      $null = $candidate.Workbooks
+      $candidate.Visible = $true
+      $candidate.DisplayAlerts = $false
+      return $candidate
+    } catch {
+      Write-ActivatorLog "excel application handle was stale before workbook reopen: $($_.Exception.Message)"
+    }
+  }
+
+  try {
+    $active = [Runtime.InteropServices.Marshal]::GetActiveObject("Excel.Application")
+    $null = $active.Workbooks
+    $active.Visible = $true
+    $active.DisplayAlerts = $false
+    Write-ActivatorLog "excel application reacquired before workbook reopen"
+    return $active
+  } catch {
+    Write-ActivatorLog "excel active application unavailable before workbook reopen: $($_.Exception.Message)"
+  }
+
+  $excel = New-Object -ComObject Excel.Application
+  $excel.Visible = $true
+  $excel.DisplayAlerts = $false
+  Write-ActivatorLog "excel application created before workbook reopen"
+  return $excel
+}
+
+function Open-ExcelWorkbookAfterWebExtensionPatch {
+  param(
+    $Application,
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Source
+  )
+
+  $target = Get-CanonicalPath -Path $Path
+  try {
+    foreach ($workbook in @($Application.Workbooks)) {
+      $workbookPath = ""
+      try { $workbookPath = [string]$workbook.FullName } catch {}
+      if (-not [string]::IsNullOrWhiteSpace($workbookPath) -and (Get-CanonicalPath -Path $workbookPath) -eq $target) {
+        Write-ActivatorLog "excel $Source workbook closed before webextension patch path=$Path"
+        $workbook.Close($false)
+      }
+    }
+  } catch {
+    Write-ActivatorLog "excel $Source workbook close before webextension patch skipped: $($_.Exception.Message)"
+  }
+
+  Ensure-ExcelSideloadWebExtension -WorkbookPath $Path
+  $excel = Get-ExcelApplicationForWorkbookOpen -Application $Application
+  try {
+    $excel.Workbooks.Open($Path) | Out-Null
+  } catch {
+    Write-ActivatorLog "excel $Source workbook reopen failed on current application; creating replacement application path=$Path error=$($_.Exception.Message)"
+    $excel = New-Object -ComObject Excel.Application
+    $excel.Visible = $true
+    $excel.DisplayAlerts = $false
+    $excel.Workbooks.Open($Path) | Out-Null
+  }
+  $excel.Visible = $true
+  Write-ActivatorLog "excel $Source workbook reopened after webextension patch path=$Path"
+  return $excel
+}
+
+function Reopen-ExcelSideloadDocumentAfterWebExtensionPatch {
+  param(
+    [Parameter(Mandatory = $true)]$Application,
+    [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  return Open-ExcelWorkbookAfterWebExtensionPatch -Application $Application -Path $Path -Source "sideload"
+}
+
+function Try-OpenExcelPatchedDriverWorkbook {
+  param(
+    [Parameter(Mandatory = $true)]$Application,
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)]$Deadline
+  )
+
+  if ($hostKey -ne "excel") { return $null }
+  try {
+    $Application = Open-ExcelWorkbookAfterWebExtensionPatch -Application $Application -Path $Path -Source "driver"
+    return Wait-ForDriverDocument -Application $Application -HostKey "excel" -Path $Path -Deadline $Deadline
+  } catch {
+    Write-ActivatorLog "excel driver workbook patch/reopen failed path=$Path error=$($_.Exception.Message)"
+    return $null
   }
 }
 
@@ -555,14 +655,36 @@ function Try-OpenControlPanelForDriverDocument {
 
   do {
     if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds 200
     $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
     if ($hostKey -ne "excel" -and (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(1) -Source "initial")) {
       return @{ opened = $true; control_name = "Open Control Panel"; tab_name = ""; activation_path = "" }
     }
-    $tabNames = if ($hostKey -eq "excel") { @("Insert", "Add-ins", "My Add-ins", "Home") } else { @("Home", "Insert", "Add-ins", "My Add-ins") }
+    $tabNames = @("Add-ins", "Home", "Insert", "My Add-ins")
+    if ($hostKey -eq "excel" -and -not $AllowCatalogFallback) {
+      $tabNames = @("Add-ins")
+    }
     foreach ($tabName in $tabNames) {
       if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
+      if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(1) -Source "current:$tabName") {
+        return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+      }
+      if (Try-EnableOfficeMcpAddin -Root $window -WindowHandle $WindowHandle -Deadline $Deadline -Source "current:$tabName") {
+        return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+      }
+      if (Try-InvokeOfficeAddinsRibbon -WindowHandle $WindowHandle -Window $window -Deadline $Deadline -Source "current:$tabName") {
+        $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
+        if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "ribbon:$tabName") {
+          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+        }
+        if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "ribbon:$tabName") {
+          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+        }
+        if ($AllowCatalogFallback -and (Try-OpenAddinFromCatalog -WindowHandle $WindowHandle -Window $nextWindow -Deadline $Deadline)) {
+          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "catalog-fallback" }
+        }
+        $window = $nextWindow
+      }
       if (Try-InvokeNamedControl -Root $window -Name $tabName) {
         if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "tab:$tabName") {
           return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
@@ -571,22 +693,26 @@ function Try-OpenControlPanelForDriverDocument {
         if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "tab:$tabName") {
           return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
         }
+        if ($AllowCatalogFallback -and (Try-OpenAddinFromCatalog -WindowHandle $WindowHandle -Window $nextWindow -Deadline $Deadline)) {
+          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "catalog-fallback" }
+        }
         $window = $nextWindow
       }
     }
     if ($AllowCatalogFallback) {
-      if ($hostKey -eq "excel") {
-        Write-ActivatorLog "catalog fallback skipped for excel"
-      } else {
-        if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
-        if (Try-OpenAddinFromCatalog -Window (Get-OfficeWindowFromHandle -Handle $WindowHandle) -Deadline $Deadline) {
-          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = ""; activation_path = "catalog-fallback" }
-        }
+      if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
+      if (Try-OpenAddinFromCatalog -WindowHandle $WindowHandle -Window (Get-OfficeWindowFromHandle -Handle $WindowHandle) -Deadline $Deadline) {
+        return @{ opened = $true; control_name = "Open Control Panel"; tab_name = ""; activation_path = "catalog-fallback" }
       }
     }
   } while ((Get-Date) -lt $Deadline)
 
-  $sample = Get-VisibleControlNameSample -Root (Get-OfficeWindowFromHandle -Handle $WindowHandle)
+  $sample = @()
+  try {
+    $sample = Get-VisibleControlNameSample -Root (Get-OfficeWindowFromHandle -Handle $WindowHandle)
+  } catch {
+    Write-ActivatorLog "control panel visible control sample failed: $($_.Exception.Message)"
+  }
   Write-ActivatorLog "control panel best-effort timed out; visible control sample=$($sample -join ' | ')"
   return @{ opened = $false; control_name = ""; tab_name = ""; activation_path = "" }
 }
@@ -607,14 +733,18 @@ function Find-DescendantByName {
 function Find-DescendantByAutomationId {
   param(
     [Parameter(Mandatory = $true)]$Root,
-    [Parameter(Mandatory = $true)][string]$AutomationId
+    [Parameter(Mandatory = $true)][string]$AutomationId,
+    [int]$ProcessId = 0
   )
 
   $condition = New-Object System.Windows.Automation.PropertyCondition(
     [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
     $AutomationId
   )
-  return $Root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+  foreach ($element in @($Root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition))) {
+    if (Test-AutomationElementCandidate -Element $element -ProcessId $ProcessId) { return $element }
+  }
+  return $null
 }
 
 function Test-AutomationElementCandidate {
@@ -633,7 +763,8 @@ function Test-AutomationElementCandidate {
       "ControlType.MenuItem",
       "ControlType.ListItem",
       "ControlType.Hyperlink",
-      "ControlType.SplitButton"
+      "ControlType.SplitButton",
+      "ControlType.TabItem"
     )
   } catch {
     return $false
@@ -666,6 +797,14 @@ function Find-GlobalControlByName {
     [Parameter(Mandatory = $true)][int]$ProcessId
   )
   return Find-DescendantByNameLike -Root ([System.Windows.Automation.AutomationElement]::RootElement) -Name $Name -ProcessId $ProcessId
+}
+
+function Find-GlobalControlByAutomationId {
+  param(
+    [Parameter(Mandatory = $true)][string]$AutomationId,
+    [Parameter(Mandatory = $true)][int]$ProcessId
+  )
+  return Find-DescendantByAutomationId -Root ([System.Windows.Automation.AutomationElement]::RootElement) -AutomationId $AutomationId -ProcessId $ProcessId
 }
 
 function Find-OfficeWindow {
@@ -785,6 +924,9 @@ function Try-InvokeNamedControl {
   $processId = 0
   try { $processId = [int]$Root.Current.ProcessId } catch {}
   $control = Find-DescendantByNameLike -Root $Root -Name $Name -ProcessId $processId
+  if (-not $control) {
+    $control = Find-DescendantByNameLike -Root $Root -Name $Name
+  }
   if (-not $control) { return $false }
   Write-ActivatorLog "invoking control name=$Name"
   Invoke-Control -Element $control
@@ -795,14 +937,53 @@ function Try-InvokeNamedControl {
 function Try-InvokeAutomationIdControl {
   param(
     [Parameter(Mandatory = $true)]$Root,
-    [Parameter(Mandatory = $true)][string]$AutomationId
+    [Parameter(Mandatory = $true)][string]$AutomationId,
+    [int]$ProcessId = 0
   )
-  $control = Find-DescendantByAutomationId -Root $Root -AutomationId $AutomationId
+  $control = Find-DescendantByAutomationId -Root $Root -AutomationId $AutomationId -ProcessId $ProcessId
   if (-not $control) { return $false }
   Write-ActivatorLog "invoking control automation_id=$AutomationId name=$($control.Current.Name)"
   Invoke-Control -Element $control
   Start-Sleep -Milliseconds 800
   return $true
+}
+
+function Try-InvokeOfficeAddinsRibbon {
+  param(
+    [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
+    [Parameter(Mandatory = $true)]$Window,
+    [Parameter(Mandatory = $true)]$Deadline,
+    [Parameter(Mandatory = $true)][string]$Source
+  )
+
+  $processId = Get-OfficeProcessIdFromHandle -Handle $WindowHandle
+  foreach ($automationId in @("OfficeExtensionsShowAddinFlyout")) {
+    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { return $false }
+    $control = Find-DescendantByAutomationId -Root $Window -AutomationId $automationId -ProcessId $processId
+    if (-not $control) {
+      $control = Find-GlobalControlByAutomationId -AutomationId $automationId -ProcessId $processId
+    }
+    if (-not $control) { continue }
+    Write-ActivatorLog "invoking Office Add-ins ribbon automation_id=$automationId name=$($control.Current.Name) source=$Source"
+    Invoke-Control -Element $control
+    Start-Sleep -Milliseconds 800
+    return $true
+  }
+
+  foreach ($name in @("Add-ins", "My Add-ins")) {
+    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { return $false }
+    $control = Find-DescendantByNameLike -Root $Window -Name $name -ProcessId $processId
+    if (-not $control) {
+      $control = Find-GlobalControlByName -Name $name -ProcessId $processId
+    }
+    if (-not $control) { continue }
+    Write-ActivatorLog "invoking Office Add-ins ribbon name=$name actual_name=$($control.Current.Name) source=$Source"
+    Invoke-Control -Element $control
+    Start-Sleep -Milliseconds 800
+    return $true
+  }
+
+  return $false
 }
 
 function Wait-ForOpenControlPanel {
@@ -820,7 +1001,7 @@ function Wait-ForOpenControlPanel {
       Invoke-Control -Element $button
       return $true
     }
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds 200
   } while ((Get-Date) -lt $Deadline)
 
   Write-ActivatorLog "Open Control Panel did not appear yet source=$Source"
@@ -838,6 +1019,9 @@ function Try-EnableOfficeMcpAddin {
   $officeProcessId = Get-OfficeProcessIdFromHandle -Handle $WindowHandle
   $addin = Find-DescendantByNameLike -Root $Root -Name "Office MCP Control" -ProcessId $officeProcessId
   if (-not $addin) {
+    $addin = Find-DescendantByNameLike -Root $Root -Name "Office MCP Control"
+  }
+  if (-not $addin) {
     $addin = Find-GlobalControlByName -Name "Office MCP Control" -ProcessId $officeProcessId
   }
   if (-not $addin) { return $false }
@@ -845,8 +1029,13 @@ function Try-EnableOfficeMcpAddin {
   Write-ActivatorLog "found Office MCP Control source=$Source name=$($addin.Current.Name)"
   Invoke-Control -Element $addin
   Start-Sleep -Milliseconds 800
-  if (Try-ConfirmCatalogAddinInstall -WindowHandle $WindowHandle -Deadline $Deadline -Source $Source) { return $true }
-  if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline $Deadline -Source $Source) { return $true }
+  $shortPanelDeadline = (Get-Date).AddSeconds(4)
+  if ($shortPanelDeadline -gt $Deadline) { $shortPanelDeadline = $Deadline }
+  if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline $shortPanelDeadline -Source $Source) { return $true }
+  Write-ActivatorLog "Office MCP Control direct click did not show Open Control Panel; trying catalog confirmation source=$Source"
+  $confirmDeadline = (Get-Date).AddSeconds(12)
+  if ($confirmDeadline -gt $Deadline) { $confirmDeadline = $Deadline }
+  if (Try-ConfirmCatalogAddinInstall -WindowHandle $WindowHandle -Deadline $confirmDeadline -Source $Source) { return $true }
   Write-ActivatorLog "Office MCP Control was clicked but Open Control Panel did not appear yet source=$Source"
   return $false
 }
@@ -864,6 +1053,9 @@ function Try-ConfirmCatalogAddinInstall {
     $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
     $control = Find-DescendantByNameLike -Root $window -Name $name -ProcessId $officeProcessId
     if (-not $control) {
+      $control = Find-DescendantByNameLike -Root $window -Name $name
+    }
+    if (-not $control) {
       $control = Find-GlobalControlByName -Name $name -ProcessId $officeProcessId
     }
     if (-not $control) { continue }
@@ -871,8 +1063,33 @@ function Try-ConfirmCatalogAddinInstall {
     Invoke-Control -Element $control
     Start-Sleep -Milliseconds 1000
     if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(4) -Source "catalog-confirm:$name") { return $true }
+    Try-DismissOfficeModalDialog -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-confirm:$name" | Out-Null
     Try-DismissCatalogOverlay -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-confirm:$name" | Out-Null
     if (Try-OpenControlPanelFromRibbonTabs -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-confirm:$name") { return $true }
+  }
+  return $false
+}
+
+function Try-DismissOfficeModalDialog {
+  param(
+    [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
+    [Parameter(Mandatory = $true)]$Deadline,
+    [Parameter(Mandatory = $true)][string]$Source
+  )
+
+  $root = [System.Windows.Automation.AutomationElement]::RootElement
+  foreach ($message in @("You cannot close Microsoft Excel because a dialog box is open", "You cannot close Microsoft Word because a dialog box is open", "You cannot close Microsoft PowerPoint because a dialog box is open")) {
+    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { return $false }
+    $dialogText = Find-DescendantByNameLike -Root $root -Name $message
+    if (-not $dialogText) { continue }
+    foreach ($name in @("OK", "Close")) {
+      $control = Find-DescendantByNameLike -Root $root -Name $name
+      if (-not $control) { continue }
+      Write-ActivatorLog "office modal dialog dismissed name=$name source=$Source"
+      Invoke-Control -Element $control
+      Start-Sleep -Milliseconds 800
+      return $true
+    }
   }
   return $false
 }
@@ -887,11 +1104,16 @@ function Try-DismissCatalogOverlay {
   Write-ActivatorLog "catalog overlay dismiss sending escape source=$Source"
   Send-ActivatorKey -WindowHandle $WindowHandle -Key "{ESC}"
   Write-ActivatorLog "catalog overlay dismiss sent escape source=$Source"
+  Send-ActivatorKey -WindowHandle $WindowHandle -Key "{ESC}"
+  Write-ActivatorLog "catalog overlay dismiss sent second escape source=$Source"
   $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
   $officeProcessId = [int]$window.Current.ProcessId
-  foreach ($name in @("Close", "Back", "Cancel", "Done")) {
+  foreach ($name in @("Back", "Cancel", "Done")) {
     if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { return $false }
     $control = Find-DescendantByNameLike -Root $window -Name $name -ProcessId $officeProcessId
+    if (-not $control) {
+      $control = Find-DescendantByNameLike -Root $window -Name $name
+    }
     if (-not $control) { continue }
     Write-ActivatorLog "catalog overlay dismiss invoked name=$name source=$Source"
     Invoke-Control -Element $control
@@ -908,10 +1130,14 @@ function Try-OpenControlPanelFromRibbonTabs {
     [Parameter(Mandatory = $true)][string]$Source
   )
 
-  $tabNames = if ($hostKey -eq "excel") { @("Home", "Add-ins", "Insert", "My Add-ins") } else { @("Home", "Insert", "Add-ins", "My Add-ins") }
-  foreach ($tabName in $tabNames) {
+  $postCatalogTabNames = @("Home", "Insert", "Add-ins", "My Add-ins")
+  foreach ($tabName in $postCatalogTabNames) {
     if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
     $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
+    if (Try-InvokeOfficeAddinsRibbon -WindowHandle $WindowHandle -Window $window -Deadline $Deadline -Source "$Source:ribbon:$tabName") {
+      Write-ActivatorLog "post-catalog ribbon scan invoked name=$tabName source=$Source"
+      if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(3) -Source "$Source:ribbon:$tabName") { return $true }
+    }
     if (-not (Try-InvokeNamedControl -Root $window -Name $tabName)) { continue }
     Write-ActivatorLog "post-catalog tab scan invoked name=$tabName source=$Source"
     if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(3) -Source "$Source:tab:$tabName") { return $true }
@@ -921,20 +1147,27 @@ function Try-OpenControlPanelFromRibbonTabs {
 
 function Try-OpenAddinFromCatalog {
   param(
+    [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
     [Parameter(Mandatory = $true)]$Window,
     [Parameter(Mandatory = $true)]$Deadline
   )
 
   foreach ($automationId in @("OfficeExtensionsShowAddinFlyout")) {
     if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
-    if (Try-InvokeAutomationIdControl -Root $Window -AutomationId $automationId) {
+    $processId = Get-OfficeProcessIdFromHandle -Handle $WindowHandle
+    $control = Find-DescendantByAutomationId -Root $Window -AutomationId $automationId -ProcessId $processId
+    if (-not $control) {
+      $control = Find-GlobalControlByAutomationId -AutomationId $automationId -ProcessId $processId
+    }
+    if ($control) {
       Write-ActivatorLog "catalog fallback invoked automation_id=$automationId"
+      Invoke-Control -Element $control
       Start-Sleep -Milliseconds 800
-      $nextWindow = Get-OfficeWindowFromHandle -Handle $driverWindowHandle
-      if (Wait-ForOpenControlPanel -WindowHandle $driverWindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "catalog-fallback:$automationId") {
+      $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
+      if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "catalog-fallback:$automationId") {
         return $true
       }
-      if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $driverWindowHandle -Deadline $Deadline -Source "catalog-fallback:$automationId") {
+      if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-fallback:$automationId") {
         return $true
       }
       $Window = $nextWindow
@@ -946,11 +1179,11 @@ function Try-OpenAddinFromCatalog {
     if (Try-InvokeNamedControl -Root $Window -Name $name) {
       Write-ActivatorLog "catalog fallback invoked name=$name"
       Start-Sleep -Milliseconds 800
-      $nextWindow = Get-OfficeWindowFromHandle -Handle $driverWindowHandle
-      if (Wait-ForOpenControlPanel -WindowHandle $driverWindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "catalog-fallback:$name") {
+      $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
+      if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "catalog-fallback:$name") {
         return $true
       }
-      if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $driverWindowHandle -Deadline $Deadline -Source "catalog-fallback:$name") {
+      if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-fallback:$name") {
         return $true
       }
       $Window = $nextWindow
@@ -976,22 +1209,49 @@ if ($registered) {
   }
 }
 
+if ($hostKey -eq "excel") {
+  $patchedDriverWindowHandle = Try-OpenExcelPatchedDriverWorkbook -Application $app -Path $DocumentPath -Deadline $deadline
+  if ($patchedDriverWindowHandle) {
+    Write-ActivatorLog "excel patched driver workbook active; attempting to open control panel document=$DocumentPath"
+    $panel = Try-OpenControlPanelForDriverDocument -WindowHandle $patchedDriverWindowHandle -Deadline $deadline -AllowCatalogFallback:$false
+    if ($panel.opened) {
+      Write-ActivationResult -DocumentPath $DocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath "patched-driver-workbook" -ControlOpened $true
+      exit 0
+    }
+    Write-ActivatorLog "excel patched driver workbook control panel did not open; skipping official sideload fallback to avoid duplicate Excel windows document=$DocumentPath"
+    throw "Excel patched driver workbook did not open Office MCP Control."
+  }
+}
+
 Invoke-OfficialSideload
 
 $activeDocumentPath = if ([string]::IsNullOrWhiteSpace($script:officialDocumentPath)) { $DocumentPath } else { $script:officialDocumentPath }
 if (-not [string]::IsNullOrWhiteSpace($script:officialDocumentPath)) {
   try {
     $copyWaitSeconds = [Math]::Min(8, [Math]::Max(3, $TimeoutSeconds / 3))
-    Ensure-ExcelSideloadWebExtension -WorkbookPath $activeDocumentPath
-    Open-OfficialSideloadDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath
+    if ($hostKey -eq "excel") {
+      $app = Reopen-ExcelSideloadDocumentAfterWebExtensionPatch -Application $app -Path $activeDocumentPath
+    } else {
+      Ensure-ExcelSideloadWebExtension -WorkbookPath $activeDocumentPath
+    }
     $copyDeadline = (Get-Date).AddSeconds($copyWaitSeconds)
-    $driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath -Deadline $copyDeadline
+    try {
+      $driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath -Deadline $copyDeadline
+    } catch {
+      Write-ActivatorLog "official sideload copy not active yet; opening document path=$activeDocumentPath error=$($_.Exception.Message)"
+      $openedApplication = Open-OfficialSideloadDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath
+      if ($openedApplication) { $app = $openedApplication }
+      $driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath -Deadline $copyDeadline
+    }
     Close-DriverDocumentIfDifferent -Application $app -HostKey $hostKey -OriginalPath $DocumentPath -ActivePath $activeDocumentPath
     Write-ActivatorLog "official sideload copy is active; attempting to open control panel document=$activeDocumentPath"
-    $panel = Try-OpenControlPanelForDriverDocument -WindowHandle $driverWindowHandle -Deadline (Get-Date).AddSeconds([Math]::Min(12, [Math]::Max(3, $TimeoutSeconds / 2))) -AllowCatalogFallback
+    $panel = Try-OpenControlPanelForDriverDocument -WindowHandle $driverWindowHandle -Deadline $deadline -AllowCatalogFallback
     $activationPath = if ([string]::IsNullOrWhiteSpace($panel.activation_path)) { "official-sideload" } else { "official-sideload:$($panel.activation_path)" }
-    Write-ActivationResult -DocumentPath $activeDocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath $activationPath -ControlOpened $panel.opened
-    exit 0
+    if ($panel.opened) {
+      Write-ActivationResult -DocumentPath $activeDocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath $activationPath -ControlOpened $true
+      exit 0
+    }
+    Write-ActivatorLog "official sideload control panel did not open; continuing activation fallback document=$activeDocumentPath"
   } catch {
     Write-ActivatorLog "official sideload copy was not visible; falling back to original document path=$DocumentPath error=$($_.Exception.Message)"
     $activeDocumentPath = $DocumentPath

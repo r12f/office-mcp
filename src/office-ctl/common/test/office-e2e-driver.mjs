@@ -78,6 +78,7 @@ function describeDocumentLifecycle(host, context) {
     path,
     createdByDriver: true,
     officeWindowMode: officeWindowMode(normalizedHost),
+    officeProcessIdsBefore: [],
     activationLogPath,
     keeper: { closePath, readyPath, startedPath, errorPath, stdoutPath, stderrPath, pidPath, scriptPath: `${path}.office-mcp-keeper.ps1` },
     script: officeKeeperScript(normalizedHost, path, closePath, readyPath, startedPath, errorPath),
@@ -140,6 +141,7 @@ function daemonStatusCommand() {
 
 async function createDocument(host, context) {
   const normalizedHost = normalizeHost(host);
+  const officeProcessIdsBefore = officeProcessIds(normalizedHost);
   const workDir = resolve(context.workDir || process.env.OFFICE_MCP_E2E_WORK_DIR || tmpdir());
   mkdirSync(workDir, { recursive: true });
   const extension = normalizedHost === 'word' ? 'docx' : normalizedHost === 'excel' ? 'xlsx' : 'pptx';
@@ -159,6 +161,7 @@ async function createDocument(host, context) {
     path,
     createdByDriver: true,
     officeWindowMode: officeWindowMode(normalizedHost),
+    officeProcessIdsBefore,
     activationLogPath: activationLogPathForDocument(path, normalizedHost),
     keeper
   };
@@ -327,14 +330,53 @@ async function activateAddin(host, context) {
       OFFICE_MCP_E2E_ACTIVATOR_LOG: activatorLogPath
     }
   });
-  const result = await waitForChildExit(child, Number(context.timeoutMs || process.env.OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS || 90000), () => activatorLogDetail(activatorLogPath));
-  if (result.exitCode !== 0) throw new Error(`Office add-in activator exited with code ${result.exitCode}.${activatorLogDetail(activatorLogPath)}`);
+  let result;
+  try {
+    result = await waitForChildExit(child, Number(context.timeoutMs || process.env.OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS || 95000), () => activatorLogDetail(activatorLogPath));
+  } catch (error) {
+    const session = await registeredSessionAfterActivatorFailure(host, document, daemon);
+    if (session) return activationFromDetectedSession(command, activation.kind, activatorLogPath, document.path, normalizedHost, 'session-detected-after-activator-timeout');
+    throw error;
+  }
+  if (result.exitCode !== 0) {
+    const session = await registeredSessionAfterActivatorFailure(host, document, daemon);
+    if (session) return activationFromDetectedSession(command, activation.kind, activatorLogPath, document.path, normalizedHost, 'session-detected-after-activator-failure');
+    throw new Error(`Office add-in activator exited with code ${result.exitCode}.${activatorLogDetail(activatorLogPath)}`);
+  }
   return {
     activated: true,
     ...parseActivatorResult(result.stdout),
     activator: command,
     activator_kind: activation.kind,
     log_path: activatorLogPath
+  };
+}
+
+async function registeredSessionAfterActivatorFailure(host, document, daemon) {
+  if (!daemon.endpoint || !document.path) return null;
+  const timeoutMs = Number(process.env.OFFICE_MCP_E2E_ACTIVATION_SESSION_TIMEOUT_MS || 10000);
+  const started = Date.now();
+  while (Date.now() - started <= timeoutMs) {
+    try {
+      const sessions = await listSessions(daemon.endpoint);
+      const match = sessions.find((session) => sessionMatches(session, host, document.path));
+      if (match) return match;
+    } catch {}
+    await sleep(500);
+  }
+  return null;
+}
+
+function activationFromDetectedSession(command, kind, logPath, documentPath, host, activationPath) {
+  return {
+    activated: true,
+    host: normalizeHost(host),
+    document_path: documentPath,
+    control_opened: false,
+    activation_path: activationPath,
+    activator: command,
+    activator_kind: kind,
+    log_path: logPath
   };
 }
 
@@ -372,7 +414,7 @@ function activationCommand() {
     return { command: '', kind: 'unavailable' };
   }
   return {
-    command: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${DEFAULT_WINDOWS_ACTIVATOR}" -TimeoutSeconds 45`,
+    command: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${DEFAULT_WINDOWS_ACTIVATOR}" -TimeoutSeconds 90`,
     kind: 'default-windows-taskpane'
   };
 }
@@ -561,19 +603,19 @@ function assertReadbackExpectations(tool, readback, expect) {
   const text = readbackText(readback);
   for (const marker of arrayOf(expect.contains)) {
     if (!text.includes(marker)) {
-      throw new Error(`${tool} readback did not contain expected text ${JSON.stringify(marker)}.`);
+      throw new Error(`${tool} readback did not contain expected text ${JSON.stringify(marker)}; actual readback: ${truncateText(text)}.`);
     }
   }
   for (const marker of arrayOf(expect.notContains)) {
     if (text.includes(marker)) {
-      throw new Error(`${tool} readback still contained forbidden text ${JSON.stringify(marker)}.`);
+      throw new Error(`${tool} readback still contained forbidden text ${JSON.stringify(marker)}; actual readback: ${truncateText(text)}.`);
     }
   }
   let previousIndex = -1;
   for (const marker of arrayOf(expect.orderedContains)) {
     const index = text.indexOf(marker, previousIndex + 1);
     if (index === -1) {
-      throw new Error(`${tool} readback did not contain expected ordered text ${JSON.stringify(marker)}.`);
+      throw new Error(`${tool} readback did not contain expected ordered text ${JSON.stringify(marker)}; actual readback: ${truncateText(text)}.`);
     }
     previousIndex = index;
   }
@@ -588,6 +630,11 @@ function assertReadbackExpectations(tool, readback, expect) {
       throw new Error(`${tool} readback path ${path} was expected to be missing.`);
     }
   }
+}
+
+function truncateText(text, maxLength = 1200) {
+  const value = String(text ?? '');
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
 }
 
 function readbackPath(value, path) {
@@ -651,7 +698,38 @@ function driverOwnedProcessIds(document) {
   const ids = new Set();
   const pid = Number(document.keeper?.officeProcessId || (document.keeper?.pidPath && existsSync(document.keeper.pidPath) ? readText(document.keeper.pidPath) : 0));
   if (Number.isInteger(pid) && pid > 0) ids.add(pid);
+  for (const id of driverOwnedEmptyOfficeProcessIds(document)) ids.add(id);
   return [...ids];
+}
+
+function driverOwnedEmptyOfficeProcessIds(document) {
+  const host = normalizeHost(document.host || '');
+  if (host !== 'excel') return [];
+  const before = new Set(Array.isArray(document.officeProcessIdsBefore) ? document.officeProcessIdsBefore.map(Number) : []);
+  return officeProcesses(host)
+    .filter(({ id, title }) => !before.has(id) && (title === '' || title === officeAppName(host)))
+    .map(({ id }) => id);
+}
+
+function officeProcessIds(host) {
+  return officeProcesses(host).map(({ id }) => id);
+}
+
+function officeProcesses(host) {
+  const processName = host === 'word' ? 'WINWORD' : host === 'powerpoint' ? 'POWERPNT' : 'EXCEL';
+  const script = `Get-Process -Name '${processName}' -ErrorAction SilentlyContinue | Select-Object Id,MainWindowTitle | ConvertTo-Json -Compress`;
+  let output = '';
+  try {
+    output = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim();
+  } catch {
+    return [];
+  }
+  if (!output) return [];
+  const parsed = JSON.parse(output);
+  return (Array.isArray(parsed) ? parsed : [parsed]).map((process) => ({ id: Number(process.Id), title: String(process.MainWindowTitle || '') })).filter(({ id }) => Number.isInteger(id));
 }
 
 function officeSideloadCopyCandidates(host) {
@@ -720,12 +798,12 @@ function officeCleanupScript(host, paths, processIds = []) {
   const targets = paths.map((path) => `@{ Path='${psSingle(resolve(path))}'; Name='${psSingle(basename(resolve(path)))}' }`).join(',');
   const processIdList = processIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0).join(',');
   const canonical = `function Canonical($value) { if ([string]::IsNullOrWhiteSpace($value)) { return '' }; try { return (Get-Item -LiteralPath $value -ErrorAction Stop).FullName.ToLowerInvariant() } catch { try { return [System.IO.Path]::GetFullPath($value).ToLowerInvariant() } catch { return '' } } }; $targets=@(${targets}); foreach ($targetSpec in $targets) { $targetSpec.Path = Canonical $targetSpec.Path };`;
-  const helpers = `function Target-Matches($candidate,$caption) { $canonicalCandidate = Canonical $candidate; foreach ($targetSpec in $targets) { if ($canonicalCandidate -and $canonicalCandidate -eq $targetSpec.Path) { return $true }; if (-not [string]::IsNullOrWhiteSpace($caption) -and $caption -like ('*' + $targetSpec.Name + '*')) { return $true } }; return $false }; $processIds=@(${processIdList}); function Close-DriverOwnedDocuments([scriptblock]$CloseDocuments) { & $CloseDocuments }; function Close-DriverOwnedProcessIds { foreach ($processId in $processIds) { try { $process=Get-Process -Id $processId -ErrorAction Stop; $process.CloseMainWindow() | Out-Null; if (-not $process.WaitForExit(5000)) { Stop-Process -Id $processId -Force } } catch {} } }; function Maybe-QuitEmptyOfficeApplication($app,[int]$count) { if ($count -eq 0) { $app.Quit() } };`;
+  const helpers = `function Target-Matches($candidate,$caption) { $canonicalCandidate = Canonical $candidate; foreach ($targetSpec in $targets) { if ($canonicalCandidate -and $canonicalCandidate -eq $targetSpec.Path) { return $true }; if (-not [string]::IsNullOrWhiteSpace($caption) -and $caption -like ('*' + $targetSpec.Name + '*')) { return $true } }; return $false }; $processIds=@(${processIdList}); function Close-DriverOwnedDocuments([scriptblock]$CloseDocuments) { & $CloseDocuments }; function Close-DriverOwnedProcessIds { foreach ($processId in $processIds) { try { $process=Get-Process -Id $processId -ErrorAction Stop; $process.CloseMainWindow() | Out-Null; if (-not $process.WaitForExit(5000)) { Stop-Process -Id $processId -Force } } catch {} } }; function Ensure-DriverOwnedProcessIdsExited { foreach ($processId in $processIds) { try { $process=Get-Process -Id $processId -ErrorAction Stop; if (-not $process.WaitForExit(1000)) { Stop-Process -Id $processId -Force } } catch {} } }; function Maybe-QuitEmptyOfficeApplication($app,[int]$count) { if ($count -eq 0) { $app.Quit() } };`;
   if (host === 'word') {
     return `$ErrorActionPreference='Stop'; ${canonical} ${helpers} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application'); $app.DisplayAlerts=0; Close-DriverOwnedDocuments { foreach ($doc in @($app.Documents)) { if (Target-Matches $doc.FullName $doc.Name) { $doc.Close($false) } }; foreach ($win in @($app.Windows)) { if (Target-Matches $win.Document.FullName $win.Caption) { $win.Document.Close($false) } } }; Maybe-QuitEmptyOfficeApplication $app $app.Documents.Count`;
   }
   if (host === 'excel') {
-    return `$ErrorActionPreference='Stop'; ${canonical} ${helpers} function Close-ExcelByWindowTitle { foreach ($process in @(Get-Process -Name 'EXCEL' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })) { foreach ($targetSpec in $targets) { if (-not [string]::IsNullOrWhiteSpace($process.MainWindowTitle) -and $process.MainWindowTitle -like ('*' + $targetSpec.Name + '*')) { try { $process.CloseMainWindow() | Out-Null; if (-not $process.WaitForExit(5000)) { Stop-Process -Id $process.Id -Force } } catch {} } } } }; try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application'); $app.DisplayAlerts=$false; Close-DriverOwnedDocuments { foreach ($wb in @($app.Workbooks)) { if (Target-Matches $wb.FullName $wb.Name) { $wb.Close($false) } } }; Maybe-QuitEmptyOfficeApplication $app $app.Workbooks.Count } catch { if ($_.Exception.Message -notmatch 'MK_E_UNAVAILABLE|Operation unavailable|GetActiveObject') { Write-Output $_.Exception.Message } }; Close-ExcelByWindowTitle; Close-DriverOwnedProcessIds`;
+    return `$ErrorActionPreference='Stop'; ${canonical} ${helpers} function Close-ExcelByWindowTitle { foreach ($process in @(Get-Process -Name 'EXCEL' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })) { foreach ($targetSpec in $targets) { if (-not [string]::IsNullOrWhiteSpace($process.MainWindowTitle) -and $process.MainWindowTitle -like ('*' + $targetSpec.Name + '*')) { try { $process.CloseMainWindow() | Out-Null; if (-not $process.WaitForExit(5000)) { Stop-Process -Id $process.Id -Force } } catch {} } } } }; try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application'); $app.DisplayAlerts=$false; Close-DriverOwnedDocuments { foreach ($wb in @($app.Workbooks)) { if (Target-Matches $wb.FullName $wb.Name) { $wb.Close($false) } } }; Maybe-QuitEmptyOfficeApplication $app $app.Workbooks.Count } catch { if ($_.Exception.Message -notmatch 'MK_E_UNAVAILABLE|Operation unavailable|GetActiveObject') { Write-Output $_.Exception.Message } }; Close-ExcelByWindowTitle; Close-DriverOwnedProcessIds; Ensure-DriverOwnedProcessIdsExited`;
   }
   return `$ErrorActionPreference='Stop'; ${canonical} ${helpers} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application'); Close-DriverOwnedDocuments { foreach ($pres in @($app.Presentations)) { if (Target-Matches $pres.FullName $pres.Name) { $pres.Close() } } }; Maybe-QuitEmptyOfficeApplication $app $app.Presentations.Count`;
 }
