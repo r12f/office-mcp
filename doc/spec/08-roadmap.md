@@ -1388,10 +1388,13 @@ Microsoft workbook -> worksheet -> range -> table/chart/pivot object workflow.
       `excel.create_chart`, including daemon catalog entries, capability-gated
       forwarding, Excel task pane handlers, and static/unit evidence.
 - [x] Add real Excel runtime smoke evidence against a live workbook.
-      Current evidence: `npm run evidence:excel` writes
-      `artifacts/runtime-evidence-excel.json`; validation passes with
+      Current evidence: `npm run evidence:excel` now owns a self-contained live
+      Excel workbook lifecycle: it starts or reuses the daemon, creates a
+      driver-owned workbook, activates the add-in, records an `excel.e2e_session`
+      gate, runs the full 20-tool `excel.runtime_smoke`, cleans up the workbook,
+      and writes `artifacts/runtime-evidence-excel.json`. Validation passes with
       `npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-excel.json --require-excel-smoke`
-      against a connected live Excel workbook.
+      against that self-contained live Excel workbook.
 
 #### M7.1 — Excel Core Tool Surface Refinement
 
@@ -1570,9 +1573,11 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       and representative live Excel smoke evidence covering all implemented
       categories. Current automated evidence covers the full daemon catalog,
       MCP forwarding/listing, Excel task pane contract, and a 20-tool runtime
-      evidence harness. A fresh live Excel run is still required before release
-      to regenerate `artifacts/runtime-evidence-excel.json` against a connected
-      workbook under the expanded 20-tool smoke.
+      evidence harness. Current live evidence is self-contained: `npm run
+      evidence:excel` records `excel.e2e_session` plus a passed 20-tool
+      `excel.runtime_smoke`, and `npm run evidence:validate -- --input
+      ..\..\..\..\artifacts\runtime-evidence-excel.json --require-excel-smoke`
+      passes against the regenerated artifact.
 
 ### M8 — PowerPoint
 

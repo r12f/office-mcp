@@ -106,6 +106,7 @@ test('Excel capability spec exists and tracks the v1 tool catalog', () => {
 test('Excel runtime evidence can own the live Office E2E lifecycle', () => {
   const source = readFileSync(evidencePath('runtime-evidence.ts'), 'utf8');
   const packageJson = readFileSync(evidencePath('package.json'), 'utf8');
+  const roadmap = readFileSync(resolve(process.cwd(), '../../../../doc/spec/08-roadmap.md'), 'utf8');
 
   assert.match(source, /--excel-e2e-session/);
   assert.match(source, /OFFICE_MCP_E2E_DRIVER/);
@@ -122,6 +123,9 @@ test('Excel runtime evidence can own the live Office E2E lifecycle', () => {
   assert.match(source, /excel\.e2e_session/);
   assert.match(source, /available_tools: availableTools/);
   assert.match(packageJson, /"evidence:excel"[^\n]+--excel-e2e-session/);
+  assert.match(roadmap, /self-contained live Excel workbook/);
+  assert.match(roadmap, /excel\.e2e_session/);
+  assert.doesNotMatch(roadmap, /fresh live Excel run is still required/i);
 });
 
 test('Excel runtime smoke uses worksheet names within Excel limits', () => {
