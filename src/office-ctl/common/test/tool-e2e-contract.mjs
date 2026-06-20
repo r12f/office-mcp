@@ -270,6 +270,10 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
     report.lifecycle_counts.create_document += 1;
     document = await driver.createDocument({ host, daemon });
     report.document = summarizeDocument(document);
+    if (typeof driver.activateAddin === 'function') {
+      report.lifecycle_counts.activate_addin += 1;
+      report.addin_activation = summarizeActivation(await driver.activateAddin(document, { host, daemon }));
+    }
     report.lifecycle_counts.wait_for_session += 1;
     session = await driver.waitForSession(document, { host, daemon });
     assertSessionCaseCoverage({ host, session, cases });
@@ -335,6 +339,7 @@ function createE2eReport(host) {
       start_daemon: 0,
       list_tools: 0,
       create_document: 0,
+      activate_addin: 0,
       wait_for_session: 0,
       cleanup_document: 0,
       stop_daemon: 0
@@ -375,6 +380,15 @@ function summarizeDaemon(daemon) {
 function summarizeDocument(document) {
   if (!document || typeof document !== 'object') return undefined;
   return typeof document.path === 'string' ? { path: document.path } : {};
+}
+
+function summarizeActivation(activation) {
+  if (!activation || typeof activation !== 'object') return undefined;
+  return {
+    activated: activation.activated === true,
+    skipped: typeof activation.skipped === 'string' ? activation.skipped : undefined,
+    activator: typeof activation.activator === 'string' ? activation.activator : undefined
+  };
 }
 
 function summarizeSession(session) {
@@ -477,6 +491,9 @@ function createExternalOfficeE2eDriver(host, script) {
     },
     async createDocument(context) {
       return runExternalDriverStep(script, host, 'createDocument', context);
+    },
+    async activateAddin(document, context) {
+      return runExternalDriverStep(script, host, 'activateAddin', { ...context, document });
     },
     async waitForSession(document, context) {
       return runExternalDriverStep(script, host, 'waitForSession', { ...context, document });

@@ -236,7 +236,7 @@ function validateOfficeToolE2eLifecycle(label: string, lifecycle: unknown): void
     failures.push(`${label} missing lifecycle counts.`);
     return;
   }
-  for (const key of ['start_daemon', 'list_tools', 'create_document', 'wait_for_session', 'cleanup_document', 'stop_daemon']) {
+  for (const key of ['start_daemon', 'list_tools', 'create_document', 'activate_addin', 'wait_for_session', 'cleanup_document', 'stop_daemon']) {
     if (lifecycle[key] !== 1) failures.push(`${label} lifecycle ${key} is ${String(lifecycle[key])}, expected 1.`);
   }
 }

@@ -86,6 +86,48 @@ test('Office E2E driver uses a visible PowerPoint window and safe cleanup', { sk
   assert.equal(result.deleted, true);
 });
 
+test('Office E2E driver activation step is explicit and configurable', () => {
+  const skipped = runDriver({ host: 'Word', step: 'activateAddin', context: { document: { path: 'fixture.docx' }, daemon: { addinEndpoint: 'wss://localhost:8765/addin' } } });
+  assert.equal(skipped.status, 0, skipped.stderr);
+  assert.equal(JSON.parse(skipped.stdout).skipped, 'no-activator-configured');
+
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-activator-'));
+  const logPath = join(dir, 'activator-env.json');
+  const activatorPath = join(dir, 'activator.mjs');
+  writeFileSync(activatorPath, `
+import { writeFileSync } from 'node:fs';
+writeFileSync(${JSON.stringify(logPath)}, JSON.stringify({
+  host: process.env.OFFICE_MCP_E2E_HOST,
+  documentPath: process.env.OFFICE_MCP_E2E_DOCUMENT_PATH,
+  addinOrigin: process.env.OFFICE_MCP_E2E_ADDIN_ORIGIN,
+  addinEndpoint: process.env.OFFICE_MCP_E2E_ADDIN_ENDPOINT
+}));
+`);
+  const previous = process.env.OFFICE_MCP_E2E_ACTIVATOR;
+  process.env.OFFICE_MCP_E2E_ACTIVATOR = `${process.execPath} ${activatorPath}`;
+  try {
+    const activated = runDriver({
+      host: 'PowerPoint',
+      step: 'activateAddin',
+      context: {
+        document: { path: 'deck.pptx' },
+        daemon: { addinOrigin: 'https://localhost:8765', addinEndpoint: 'wss://localhost:8765/addin' },
+        timeoutMs: 5000
+      }
+    });
+    assert.equal(activated.status, 0, activated.stderr);
+    assert.equal(JSON.parse(activated.stdout).activated, true);
+  } finally {
+    restoreEnv('OFFICE_MCP_E2E_ACTIVATOR', previous);
+  }
+
+  const env = JSON.parse(readFileSync(logPath, 'utf8'));
+  assert.equal(env.host, 'powerpoint');
+  assert.equal(env.documentPath, 'deck.pptx');
+  assert.equal(env.addinOrigin, 'https://localhost:8765');
+  assert.equal(env.addinEndpoint, 'wss://localhost:8765/addin');
+});
+
 test('Office E2E driver callTool posts MCP requests through an injectable endpoint', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-mcp-'));
   const logPath = join(dir, 'mcp-requests.jsonl');
@@ -690,6 +732,11 @@ function runDriver(payload) {
     encoding: 'utf8',
     timeout: 90000
   });
+}
+
+function restoreEnv(name, value) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
 }
 
 function firstStdoutLine(child) {

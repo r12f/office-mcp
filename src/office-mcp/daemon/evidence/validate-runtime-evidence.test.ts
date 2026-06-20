@@ -1052,6 +1052,7 @@ function officeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tools: strin
       start_daemon: 1,
       list_tools: 1,
       create_document: 1,
+      activate_addin: 1,
       wait_for_session: 1,
       cleanup_document: 1,
       stop_daemon: 1
@@ -1434,6 +1435,7 @@ function embeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tool
       start_daemon: 1,
       list_tools: 1,
       create_document: 1,
+      activate_addin: 1,
       wait_for_session: 1,
       cleanup_document: 1,
       stop_daemon: 1

@@ -1154,6 +1154,7 @@ function writeOfficeToolE2eReport(dir: string, host: 'Word' | 'Excel' | 'PowerPo
       start_daemon: 1,
       list_tools: 1,
       create_document: 1,
+      activate_addin: 1,
       wait_for_session: 1,
       cleanup_document: 1,
       stop_daemon: 1

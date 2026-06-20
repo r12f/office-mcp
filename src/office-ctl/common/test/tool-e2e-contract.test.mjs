@@ -98,6 +98,10 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
       events.push('createDocument');
       return { path: 'fixture.docx' };
     },
+    async activateAddin(document) {
+      events.push(`activateAddin:${document.path}`);
+      return { activated: true };
+    },
     async waitForSession(document) {
       events.push(`waitForSession:${document.path}`);
       return { sessionId: 'session-1', availableTools: ['word.read', 'word.write'] };
@@ -133,6 +137,7 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
     'startDaemon',
     'listTools',
     'createDocument',
+    'activateAddin:fixture.docx',
     'waitForSession:fixture.docx',
     'reset:word.read:session-1',
     'setup:word.read:read baseline',
@@ -146,6 +151,7 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
     'stopDaemon'
   ]);
   assert.equal(events.filter((event) => event === 'createDocument').length, 1);
+  assert.equal(events.filter((event) => event.startsWith('activateAddin:')).length, 1);
   assert.equal(events.filter((event) => event.startsWith('waitForSession:')).length, 1);
   assert.equal(events.filter((event) => event.startsWith('call:')).length, 2);
 });
@@ -189,6 +195,7 @@ test('shared Office tool E2E loop writes lifecycle and per-tool report evidence'
     start_daemon: 1,
     list_tools: 1,
     create_document: 1,
+    activate_addin: 0,
     wait_for_session: 1,
     cleanup_document: 0,
     stop_daemon: 0
@@ -612,6 +619,7 @@ const responses = {
   startDaemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
   listTools: ['word.read'],
   createDocument: { path: 'external.docx' },
+  activateAddin: { activated: true },
   waitForSession: { sessionId: 'session-1', availableTools: ['word.read'] },
   resetContent: { reset: true },
   setupContent: { setup: true },
@@ -643,6 +651,7 @@ process.stdout.write(JSON.stringify(responses[request.step] || {}));
     'startDaemon',
     'listTools',
     'createDocument',
+    'activateAddin',
     'waitForSession',
     'resetContent',
     'setupContent',
@@ -652,14 +661,15 @@ process.stdout.write(JSON.stringify(responses[request.step] || {}));
     'stopDaemon'
   ]);
   assert.equal(calls[0].host, 'Word');
-  assert.equal(calls[4].context.toolCase.tool, 'word.read');
-  assert.equal(calls[6].context.session.sessionId, 'session-1');
+  assert.equal(calls[5].context.toolCase.tool, 'word.read');
+  assert.equal(calls[7].context.session.sessionId, 'session-1');
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
   assert.equal(report.passed, true);
   assert.deepEqual(report.lifecycle_counts, {
     start_daemon: 1,
     list_tools: 1,
     create_document: 1,
+    activate_addin: 1,
     wait_for_session: 1,
     cleanup_document: 1,
     stop_daemon: 1

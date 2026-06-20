@@ -27,6 +27,8 @@ async function dispatch({ host, step, context = {} }) {
       return listTools(context);
     case 'createDocument':
       return createDocument(host, context);
+    case 'activateAddin':
+      return activateAddin(host, context);
     case 'waitForSession':
       return waitForSession(host, context);
     case 'resetContent':
@@ -192,6 +194,29 @@ async function waitForSession(host, context) {
     await sleep(1000);
   }
   throw new Error(`Timed out waiting ${timeoutMs} ms for ${host} add-in session for ${document.path || 'test document'}. Open MCP Control in ${host}, ensure it connects to the daemon, then rerun npm run e2e:tools with OFFICE_MCP_RUN_E2E=1.`);
+}
+
+async function activateAddin(host, context) {
+  const command = process.env.OFFICE_MCP_E2E_ACTIVATOR;
+  if (!command) return { activated: false, skipped: 'no-activator-configured' };
+  const normalizedHost = normalizeHost(host);
+  const document = context.document || {};
+  const daemon = context.daemon || {};
+  const child = spawn(command, [], {
+    shell: true,
+    windowsHide: true,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      OFFICE_MCP_E2E_HOST: normalizedHost,
+      OFFICE_MCP_E2E_DOCUMENT_PATH: document.path || '',
+      OFFICE_MCP_E2E_ADDIN_ORIGIN: daemon.addinOrigin || '',
+      OFFICE_MCP_E2E_ADDIN_ENDPOINT: daemon.addinEndpoint || ''
+    }
+  });
+  const exitCode = await waitForChildExit(child, Number(context.timeoutMs || 30000));
+  if (exitCode !== 0) throw new Error(`Office add-in activator exited with code ${exitCode}.`);
+  return { activated: true, activator: command };
 }
 
 async function resetContent(_host, context) {
@@ -513,6 +538,23 @@ async function waitForProcessExit(pid, timeoutMs) {
     await sleep(100);
   }
   throw new Error(`Timed out waiting ${timeoutMs} ms for Office keeper process ${pid} to exit.`);
+}
+
+function waitForChildExit(child, timeoutMs) {
+  return new Promise((resolvePromise, reject) => {
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`Timed out waiting ${timeoutMs} ms for Office add-in activator to exit.`));
+    }, timeoutMs);
+    child.once('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once('exit', (code) => {
+      clearTimeout(timer);
+      resolvePromise(code ?? 0);
+    });
+  });
 }
 
 function processExists(pid) {

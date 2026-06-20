@@ -234,8 +234,9 @@ When the live Office driver runs, it MUST write a structured JSON report under
 endpoint, driver-owned document path, session ID, advertised tool list, session
 `available_tools`, the ordered executed tool list, per-tool verifier kind and
 pass/fail result, and lifecycle counters. A passing report must show exactly
-one daemon start, one `tools/list`, one document creation, one session wait,
-one document cleanup, and one daemon stop for the host run.
+one daemon start, one `tools/list`, one document creation, one add-in activation
+attempt, one session wait, one document cleanup, and one daemon stop for the
+host run.
 Release validation consumes these reports through
 `npm run evidence:validate -- --require-office-tool-e2e` with explicit Word,
 Excel, and PowerPoint report paths. The validator fails if any report is

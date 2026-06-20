@@ -603,7 +603,7 @@ function officeToolE2eDetailsLookReady(host: 'Word' | 'Excel' | 'PowerPoint', re
 
 function officeToolE2eLifecycleLooksReady(lifecycle: unknown): boolean {
   if (!isRecord(lifecycle)) return false;
-  return ['start_daemon', 'list_tools', 'create_document', 'wait_for_session', 'cleanup_document', 'stop_daemon']
+  return ['start_daemon', 'list_tools', 'create_document', 'activate_addin', 'wait_for_session', 'cleanup_document', 'stop_daemon']
     .every((key) => lifecycle[key] === 1);
 }
 
