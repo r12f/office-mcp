@@ -139,7 +139,7 @@ test('Office catalog registration script stages Office host manifests without re
     assert.match(excelManifest, /<SupportUrl DefaultValue="https:\/\/github\.com\/office-mcp\/office-mcp" \/>/);
     assert.match(excelManifest, /DefaultValue="Open Control Panel"/);
     assert.match(excelManifest, /Open the control panel to connect this Excel workbook/);
-    assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.10/);
+    assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.11/);
     assert.match(excelManifest, /<IconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-32\.png" \/>/);
     assert.match(excelManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
@@ -152,7 +152,7 @@ test('Office catalog registration script stages Office host manifests without re
     assert.match(powerpointManifest, /<SupportUrl DefaultValue="https:\/\/github\.com\/office-mcp\/office-mcp" \/>/);
     assert.match(powerpointManifest, /DefaultValue="Open Control Panel"/);
     assert.match(powerpointManifest, /Open the control panel to connect this PowerPoint presentation/);
-    assert.match(powerpointManifest, /https:\/\/localhost:8766\/powerpoint\/taskpane\.html\?v=0\.1\.3/);
+    assert.match(powerpointManifest, /https:\/\/localhost:8766\/powerpoint\/taskpane\.html\?v=0\.1\.4/);
     assert.match(powerpointManifest, /<IconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-32\.png" \/>/);
     assert.match(powerpointManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
     assert.match(powerpointManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
@@ -279,10 +279,10 @@ test('Office catalog registration can sync its origin from running daemon status
     assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.18/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
-    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.10/);
+    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.11/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
-    assert.match(powerpointManifest, /https:\/\/localhost:8777\/powerpoint\/taskpane\.html\?v=0\.1\.3/);
+    assert.match(powerpointManifest, /https:\/\/localhost:8777\/powerpoint\/taskpane\.html\?v=0\.1\.4/);
     assert.match(powerpointManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(powerpointManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
     assert.doesNotMatch(wordManifest, /https:\/\/localhost:8765/);

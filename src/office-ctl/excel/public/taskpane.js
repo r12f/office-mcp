@@ -1,5 +1,5 @@
 (() => {
-  const ADDIN_VERSION = '0.1.10';
+  const ADDIN_VERSION = '0.1.11';
   const PROTOCOL_VERSION = '1.0';
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
   const {
@@ -172,7 +172,15 @@
     endpointInputEl.value = endpoint;
     endpointDirty = false;
     setConnectionState('connecting', 'Connecting…');
-    socket = new WebSocket(endpoint);
+    try {
+      socket = new WebSocket(endpoint);
+    } catch (error) {
+      logger.error('websocket.create.failed', error);
+      if (tryCurrentOriginEndpointFallback(endpoint)) return;
+      connectionDetailEl.textContent = error.message || 'Connection failed before the daemon socket could open.';
+      setConnectionState('failed', 'Failed');
+      return;
+    }
     socket.addEventListener('open', () => register());
     socket.addEventListener('message', (event) => handleMessage(event.data));
     socket.addEventListener('close', () => {

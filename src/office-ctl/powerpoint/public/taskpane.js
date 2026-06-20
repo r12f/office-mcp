@@ -1,5 +1,5 @@
 (() => {
-  const ADDIN_VERSION = '0.1.3';
+  const ADDIN_VERSION = '0.1.4';
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
@@ -177,7 +177,15 @@
     endpointInputEl.value = endpoint;
     endpointDirty = false;
     setConnectionState('connecting', 'Connecting\u2026');
-    socket = new WebSocket(endpoint);
+    try {
+      socket = new WebSocket(endpoint);
+    } catch (error) {
+      logger.error('websocket.create.failed', error);
+      if (tryCurrentOriginEndpointFallback(endpoint)) return;
+      connectionDetailEl.textContent = error.message || 'Connection failed before the daemon socket could open.';
+      setConnectionState('failed', 'Failed');
+      return;
+    }
     socket.addEventListener('open', () => register());
     socket.addEventListener('message', (event) => handleMessage(event.data));
     socket.addEventListener('close', () => {

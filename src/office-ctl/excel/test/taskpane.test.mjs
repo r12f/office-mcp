@@ -12,14 +12,14 @@ test('Excel add-in manifest targets workbook host and versioned task pane', () =
 
   assert.match(manifest, /<Host Name="Workbook" \/>/);
   assert.match(manifest, /<Set Name="ExcelApi" MinVersion="1\.1" \/>/);
-  assert.match(manifest, /<Version>1\.0\.0\.10<\/Version>/);
-  assert.match(manifest, /excel\/taskpane\.html\?v=0\.1\.10/);
-  assert.match(html, /common\/taskpane\.css\?v=0\.1\.10/);
-  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.10/);
-  assert.match(html, /excel\/taskpane\.js\?v=0\.1\.10/);
+  assert.match(manifest, /<Version>1\.0\.0\.11<\/Version>/);
+  assert.match(manifest, /excel\/taskpane\.html\?v=0\.1\.11/);
+  assert.match(html, /common\/taskpane\.css\?v=0\.1\.11/);
+  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.11/);
+  assert.match(html, /excel\/taskpane\.js\?v=0\.1\.11/);
   assert.match(html, /<script src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
   assert.doesNotMatch(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
-  assert.match(js, /ADDIN_VERSION = '0\.1\.10'/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.11'/);
 });
 
 test('Excel add-in uses product identity metadata and generated icon URLs', () => {

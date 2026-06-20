@@ -45,7 +45,7 @@ test('PowerPoint add-in manifest targets presentation host and product identity'
   assert.match(manifest, /<Host Name="Presentation" \/>/);
   assert.match(manifest, /<Set Name="PowerPointApi" MinVersion="1\.1" \/>/);
   assert.match(manifest, /<Version>1\.0\.0\.4<\/Version>/);
-  assert.match(manifest, /powerpoint\/taskpane\.html\?v=0\.1\.3/);
+  assert.match(manifest, /powerpoint\/taskpane\.html\?v=0\.1\.4/);
   assert.match(manifest, /<ProviderName>Office MCP Control<\/ProviderName>/);
   assert.match(manifest, /<DisplayName DefaultValue="Office MCP Control" \/>/);
   assert.match(manifest, /Control live PowerPoint presentations through a local productivity automation control utility\./);
@@ -66,14 +66,14 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
 
-  assert.match(html, /powerpoint\/taskpane\.css\?v=0\.1\.3/);
-  assert.match(html, /common\/taskpane\.css\?v=0\.1\.3/);
-  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.3/);
-  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.3/);
-  assert.match(html, /common\/logger\.js\?v=0\.1\.3/);
-  assert.match(html, /common\/task-history\.js\?v=0\.1\.3/);
-  assert.match(html, /common\/main-ui\.js\?v=0\.1\.3/);
-  assert.match(html, /powerpoint\/taskpane\.js\?v=0\.1\.3/);
+  assert.match(html, /powerpoint\/taskpane\.css\?v=0\.1\.4/);
+  assert.match(html, /common\/taskpane\.css\?v=0\.1\.4/);
+  assert.match(html, /common\/browser-ui\.js\?v=0\.1\.4/);
+  assert.match(html, /common\/addin-channel\.js\?v=0\.1\.4/);
+  assert.match(html, /common\/logger\.js\?v=0\.1\.4/);
+  assert.match(html, /common\/task-history\.js\?v=0\.1\.4/);
+  assert.match(html, /common\/main-ui\.js\?v=0\.1\.4/);
+  assert.match(html, /powerpoint\/taskpane\.js\?v=0\.1\.4/);
   assert.match(html, /<script src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
   assert.doesNotMatch(html, /<script async src="https:\/\/appsforoffice\.microsoft\.com\/lib\/1\/hosted\/office\.js"><\/script>/);
   assert.match(html, /id="runtimeVersions"/);
@@ -108,7 +108,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(commonCss, /overflow-x:\s*(auto|scroll)/);
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
 
-  assert.match(js, /ADDIN_VERSION = '0\.1\.3'/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.4'/);
   assert.match(js, /Connecting\\u2026/);
   assert.match(js, /Reconnecting\\u2026/);
   assert.match(js, /Registering\\u2026/);
@@ -181,7 +181,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(js, /validation\.ok/);
   assert.match(js, /Office\.AutoShowTaskpaneWithDocument/);
   assert.match(js, /window\.__OFFICE_MCP_TASKPANE_READY__ = true/);
-  assert.match(js, /ADDIN_VERSION = '0\.1\.3'/);
+  assert.match(js, /ADDIN_VERSION = '0\.1\.4'/);
   assert.doesNotMatch(js, /console\.(log|warn|error)/);
 });
 
