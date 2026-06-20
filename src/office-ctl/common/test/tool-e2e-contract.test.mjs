@@ -106,18 +106,18 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
       events.push(`waitForSession:${document.path}`);
       return { sessionId: 'session-1', availableTools: ['word.read', 'word.write'] };
     },
-    async resetContent(toolCase, session) {
-      events.push(`reset:${toolCase.tool}:${session.sessionId}`);
+    async resetContent(toolCase, session, context) {
+      events.push(`reset:${toolCase.tool}:${session.sessionId}:${context.document.path}:${context.daemon.endpoint}`);
     },
-    async setupContent(toolCase) {
-      events.push(`setup:${toolCase.tool}:${toolCase.setup}`);
+    async setupContent(toolCase, session, context) {
+      events.push(`setup:${toolCase.tool}:${toolCase.setup}:${session.sessionId}:${context.document.path}`);
     },
-    async callTool(toolCase, session) {
-      events.push(`call:${toolCase.call.name}:${session.sessionId}`);
+    async callTool(toolCase, session, context) {
+      events.push(`call:${toolCase.call.name}:${session.sessionId}:${context.document.path}`);
       return { ok: true, tool: toolCase.tool };
     },
-    async verifyResult(toolCase, result) {
-      events.push(`verify:${toolCase.tool}:${toolCase.verify.kind}:${result.ok}`);
+    async verifyResult(toolCase, result, session, context) {
+      events.push(`verify:${toolCase.tool}:${toolCase.verify.kind}:${result.ok}:${session.sessionId}:${context.document.path}`);
     },
     async cleanupDocument(document) {
       events.push(`cleanupDocument:${document.path}`);
@@ -139,14 +139,14 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
     'createDocument',
     'activateAddin:fixture.docx',
     'waitForSession:fixture.docx',
-    'reset:word.read:session-1',
-    'setup:word.read:read baseline',
-    'call:word.read:session-1',
-    'verify:word.read:direct-result:true',
-    'reset:word.write:session-1',
-    'setup:word.write:write baseline',
-    'call:word.write:session-1',
-    'verify:word.write:readback:true',
+    'reset:word.read:session-1:fixture.docx:http://127.0.0.1:0/mcp',
+    'setup:word.read:read baseline:session-1:fixture.docx',
+    'call:word.read:session-1:fixture.docx',
+    'verify:word.read:direct-result:true:session-1:fixture.docx',
+    'reset:word.write:session-1:fixture.docx:http://127.0.0.1:0/mcp',
+    'setup:word.write:write baseline:session-1:fixture.docx',
+    'call:word.write:session-1:fixture.docx',
+    'verify:word.write:readback:true:session-1:fixture.docx',
     'cleanupDocument:fixture.docx',
     'stopDaemon'
   ]);

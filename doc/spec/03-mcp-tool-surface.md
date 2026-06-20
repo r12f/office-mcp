@@ -225,9 +225,12 @@ The host E2E harness owns the common lifecycle:
 The normal E2E gate MUST use one Office application/document lifecycle per host
 run: open the host program and driver-owned test file once, connect one add-in
 session, run every advertised tool for that session, and then perform cleanup
-once. Restarting Office or recreating the file per tool is only a diagnostic
-fallback because it hides session-lifecycle bugs and makes Office automation
-less stable.
+once. The per-tool loop may only reset/setup deterministic content, call the
+tool, and verify the result. It MUST NOT start another daemon, open another
+Office program instance, create another test file, activate the add-in again,
+or wait for a new session for each tool. Restarting Office or recreating the
+file per tool is only a diagnostic fallback because it hides session-lifecycle
+bugs and makes Office automation less stable.
 
 When the live Office driver runs, it MUST write a structured JSON report under
 `artifacts/office-tool-e2e-<host>.json`. The report records the host, daemon

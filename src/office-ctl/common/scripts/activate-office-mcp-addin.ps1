@@ -1,6 +1,7 @@
 param(
   [string]$HostName = $env:OFFICE_MCP_E2E_HOST,
   [string]$DocumentPath = $env:OFFICE_MCP_E2E_DOCUMENT_PATH,
+  [string]$ManifestPath = $env:OFFICE_MCP_E2E_MANIFEST_PATH,
   [int]$TimeoutSeconds = 30,
   [string]$LogPath = $env:OFFICE_MCP_E2E_ACTIVATOR_LOG,
   [switch]$DryRun = ($env:OFFICE_MCP_E2E_ACTIVATOR_DRY_RUN -eq "1")
@@ -46,6 +47,25 @@ if ($DryRun) {
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+
+function Invoke-OfficialSideload {
+  if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
+    Write-ActivatorLog "official sideload skipped: manifest path missing"
+    return
+  }
+  if (-not (Test-Path -LiteralPath $ManifestPath)) {
+    Write-ActivatorLog "official sideload skipped: manifest not found path=$ManifestPath"
+    return
+  }
+  $appName = switch ($hostKey) {
+    "word" { "Word" }
+    "excel" { "Excel" }
+    "powerpoint" { "PowerPoint" }
+  }
+  Write-ActivatorLog "official sideload start app=$appName manifest=$ManifestPath document=$DocumentPath"
+  $output = & npx --yes office-addin-dev-settings sideload $ManifestPath desktop --app $appName --document $DocumentPath 2>&1
+  Write-ActivatorLog "official sideload exit=$LASTEXITCODE output=$($output -join ' | ')"
+}
 
 function Get-OfficeApplication {
   param([Parameter(Mandatory = $true)][string]$HostKey)
@@ -207,6 +227,8 @@ function Try-OpenAddinFromCatalog {
   }
   return $false
 }
+
+Invoke-OfficialSideload
 
 $app = Get-OfficeApplication -HostKey $hostKey
 $driverWindowHandle = Activate-DriverDocument -Application $app -HostKey $hostKey -Path $DocumentPath

@@ -182,7 +182,7 @@ function officeKeeperScript(host, path, closePath, readyPath, startedPath, error
   const ready = psSingle(readyPath);
   const started = psSingle(startedPath);
   const error = psSingle(errorPath);
-  const retry = `function Invoke-Retry([scriptblock]$Action) { for ($i=0; $i -lt 30; $i++) { try { return & $Action } catch { if ($_.Exception.Message -notmatch 'RPC_E_CALL_REJECTED|Call was rejected by callee' -or $i -eq 29) { throw }; Start-Sleep -Milliseconds 500 } } }; `;
+  const retry = `function Invoke-Retry([scriptblock]$Action) { for ($i=0; $i -lt 30; $i++) { try { return & $Action } catch { if ($i -eq 29) { throw }; Start-Sleep -Milliseconds 500 } } }; # retries RPC_E_CALL_REJECTED and transient Office COM busy states. `;
   const prelude = `${retry}Set-Content -LiteralPath '${started}' -Value 'office-mcp-keeper:start:${host}'; Write-Output 'office-mcp-keeper:start:${host}'; `;
   if (host === 'word') {
     return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $doc=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application') } catch { $app=New-Object -ComObject Word.Application }; $app.Visible=$true; $doc=Invoke-Retry { $app.Documents.Add() }; Invoke-Retry { $doc.SaveAs2('${file}') }; New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
@@ -253,12 +253,17 @@ async function activateAddin(host, context) {
       OFFICE_MCP_E2E_DOCUMENT_PATH: document.path || '',
       OFFICE_MCP_E2E_ADDIN_ORIGIN: daemon.addinOrigin || '',
       OFFICE_MCP_E2E_ADDIN_ENDPOINT: daemon.addinEndpoint || '',
+      OFFICE_MCP_E2E_MANIFEST_PATH: manifestPathForHost(normalizedHost),
       OFFICE_MCP_E2E_ACTIVATOR_LOG: activatorLogPath
     }
   });
   const exitCode = await waitForChildExit(child, Number(context.timeoutMs || 30000), () => activatorLogDetail(activatorLogPath));
   if (exitCode !== 0) throw new Error(`Office add-in activator exited with code ${exitCode}.${activatorLogDetail(activatorLogPath)}`);
   return { activated: true, activator: command, activator_kind: activation.kind, log_path: activatorLogPath };
+}
+
+function manifestPathForHost(host) {
+  return resolve(REPO_ROOT, `addin-catalog/office-mcp-${host}.xml`);
 }
 
 function activatorLogDetail(path) {

@@ -208,6 +208,9 @@ test('Office E2E driver provides a default Windows add-in activator', () => {
 
 test('default Windows add-in activator can fall back through My Add-ins catalog UI', () => {
   const script = readFileSync(DEFAULT_ACTIVATOR, 'utf8');
+  assert.match(script, /office-addin-dev-settings/);
+  assert.match(script, /sideload/);
+  assert.match(script, /OFFICE_MCP_E2E_MANIFEST_PATH/);
   assert.match(script, /My Add-ins/);
   assert.match(script, /Office MCP Control/);
   assert.match(script, /Shared Folder/);
