@@ -15,6 +15,9 @@ const daemonBin = readOption('--daemon-bin');
 const renderedLogoReviewPath = readOption('--rendered-logo-review-path') ?? process.env.OFFICE_MCP_RENDERED_LOGO_REVIEW_PATH;
 const excelRuntimeEvidencePath = readOption('--excel-runtime-evidence-path') ?? process.env.OFFICE_MCP_EXCEL_RUNTIME_EVIDENCE_PATH;
 const powerPointRuntimeEvidencePath = readOption('--powerpoint-runtime-evidence-path') ?? process.env.OFFICE_MCP_POWERPOINT_RUNTIME_EVIDENCE_PATH;
+const wordToolE2eReportPath = readOption('--word-tool-e2e-report-path') ?? process.env.OFFICE_MCP_WORD_TOOL_E2E_REPORT_PATH;
+const excelToolE2eReportPath = readOption('--excel-tool-e2e-report-path') ?? process.env.OFFICE_MCP_EXCEL_TOOL_E2E_REPORT_PATH;
+const powerPointToolE2eReportPath = readOption('--powerpoint-tool-e2e-report-path') ?? process.env.OFFICE_MCP_POWERPOINT_TOOL_E2E_REPORT_PATH;
 const manualTrayEvidencePath = readOption('--manual-tray-evidence-path') ?? process.env.OFFICE_MCP_TRAY_MANUAL_EVIDENCE_PATH;
 const catalogIdentityReviewPath = readOption('--catalog-identity-review-path') ?? process.env.OFFICE_MCP_CATALOG_IDENTITY_REVIEW_PATH;
 const wordManifestPath = resolve(readOption('--word-manifest-path') ?? join(repoRoot, 'src/office-ctl/word/manifest.xml'));
@@ -114,6 +117,12 @@ const excelRuntimeEvidence = excelRuntimeEvidencePath ? readExcelRuntimeEvidence
 const excelRuntimeEvidenceReady = excelRuntimeEvidenceLooksReady(excelRuntimeEvidence);
 const powerPointRuntimeEvidence = powerPointRuntimeEvidencePath ? readPowerPointRuntimeEvidence(resolve(powerPointRuntimeEvidencePath)) : undefined;
 const powerPointRuntimeEvidenceReady = powerPointRuntimeEvidenceLooksReady(powerPointRuntimeEvidence);
+const officeToolE2e = {
+  word: wordToolE2eReportPath ? readOfficeToolE2eReport('Word', resolve(wordToolE2eReportPath)) : undefined,
+  excel: excelToolE2eReportPath ? readOfficeToolE2eReport('Excel', resolve(excelToolE2eReportPath)) : undefined,
+  powerpoint: powerPointToolE2eReportPath ? readOfficeToolE2eReport('PowerPoint', resolve(powerPointToolE2eReportPath)) : undefined
+};
+const officeToolE2eReady = officeToolE2eReportLooksReady(officeToolE2e.word) && officeToolE2eReportLooksReady(officeToolE2e.excel) && officeToolE2eReportLooksReady(officeToolE2e.powerpoint);
 const wordManifestIdentity = readManifestIdentity(wordManifestPath);
 const excelManifestIdentity = readManifestIdentity(excelManifestPath);
 const powerPointManifestIdentity = readManifestIdentity(powerPointManifestPath);
@@ -141,7 +150,7 @@ const powerPointTaskpaneDensityReady = powerPointCompactTopBlock && powerPointTo
 const currentScreenshotFeedbackReady = currentLogoScreenshotFeedbackReviewed && currentAddinScreenshotFeedbackReviewed && currentTrayScreenshotFeedbackReviewed;
 const daemonMainWindowReady = daemonMainWindowReviewed && daemonMainWindowCompactReviewed && daemonMainWindowThreeColumnReviewed;
 const productIdentityReviewReady = logoQualityReviewed && logoFutureOfficeControlReviewed && finalLogoUserSurfaceReviewed && currentLogoScreenshotFeedbackReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinTitleIconTypeReviewed && addinInstallableSurfaceReviewed && currentAddinScreenshotFeedbackReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNativeFirstImpressionReviewed && trayNormalWindowsLaunchReviewed && currentTrayScreenshotFeedbackReviewed;
-const passed = productTextReady && allScreenshotsExist && allScreenshotsFresh && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && daemonMainWindowReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
+const passed = productTextReady && allScreenshotsExist && allScreenshotsFresh && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && officeToolE2eReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && daemonMainWindowReady && productIdentityReviewReady && renderedLogoReviewReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -224,6 +233,8 @@ const evidence = {
   rendered_logo_review_ready: renderedLogoReviewReady,
   powerpoint_runtime_evidence: powerPointRuntimeEvidence,
   powerpoint_runtime_evidence_ready: powerPointRuntimeEvidenceReady,
+  office_tool_e2e: officeToolE2e,
+  office_tool_e2e_ready: officeToolE2eReady,
   word_taskpane: {
     compact_top_block: wordCompactTopBlock,
     tools_permissions_merged: wordToolsPermissionsMerged,
@@ -548,6 +559,77 @@ function powerPointSessionFromDiscovery(discovery: Record<string, unknown> | und
 function powerPointRuntimeEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
   if (!evidence) return false;
   return evidence.ok === true && evidence.schema_version === 1 && evidence.smoke_passed === true && evidence.ready === true;
+}
+
+function readOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path: string): Record<string, unknown> {
+  try {
+    const report = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    return {
+      path,
+      ok: true,
+      host,
+      schema_version: report.schema_version,
+      kind: report.kind,
+      report_host: report.host,
+      passed: report.passed,
+      lifecycle_counts: report.lifecycle_counts,
+      advertised_tools: report.advertised_tools,
+      session_available_tools: report.session_available_tools,
+      executed_tools: report.executed_tools,
+      tool_runs: report.tool_runs,
+      ready: officeToolE2eDetailsLookReady(host, report)
+    };
+  } catch (error) {
+    return { path, ok: false, host, error: error instanceof Error ? error.message : String(error), ready: false };
+  }
+}
+
+function officeToolE2eReportLooksReady(report: Record<string, unknown> | undefined): boolean {
+  return Boolean(report && report.ok === true && report.ready === true);
+}
+
+function officeToolE2eDetailsLookReady(host: 'Word' | 'Excel' | 'PowerPoint', report: Record<string, unknown>): boolean {
+  if (report.schema_version !== 1 || report.kind !== 'office_tool_e2e_report' || report.host !== host || report.passed !== true) return false;
+  if (!officeToolE2eLifecycleLooksReady(report.lifecycle_counts)) return false;
+  const advertisedTools = stringArray(report.advertised_tools);
+  const sessionTools = stringArray(report.session_available_tools);
+  const executedTools = stringArray(report.executed_tools);
+  if (advertisedTools.length === 0 || !sameStrings(advertisedTools, sessionTools) || !sameStrings(advertisedTools, executedTools)) return false;
+  if (!isRecord(report.daemon) || typeof report.daemon.endpoint !== 'string') return false;
+  if (!isRecord(report.document) || typeof report.document.path !== 'string') return false;
+  if (!isRecord(report.session) || typeof report.session.session_id !== 'string') return false;
+  return officeToolRunsLookReady(advertisedTools, report.tool_runs);
+}
+
+function officeToolE2eLifecycleLooksReady(lifecycle: unknown): boolean {
+  if (!isRecord(lifecycle)) return false;
+  return ['start_daemon', 'list_tools', 'create_document', 'wait_for_session', 'cleanup_document', 'stop_daemon']
+    .every((key) => lifecycle[key] === 1);
+}
+
+function officeToolRunsLookReady(advertisedTools: string[], runs: unknown): boolean {
+  if (!Array.isArray(runs)) return false;
+  const runRecords = runs.filter(isRecord);
+  const runTools = runRecords.map((run) => run.tool).filter((tool): tool is string => typeof tool === 'string');
+  return sameStrings(advertisedTools, runTools) && runRecords.every((run) => {
+    const verifier = run.verifier;
+    const expectationKeys = isRecord(verifier) && Array.isArray(verifier.expectation_keys) ? verifier.expectation_keys : [];
+    return run.passed === true
+      && typeof run.id === 'string'
+      && typeof run.setup_action_count === 'number'
+      && run.setup_action_count >= 1
+      && isRecord(verifier)
+      && (verifier.kind === 'direct-result' || verifier.kind === 'readback')
+      && expectationKeys.length > 0;
+  });
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function sameStrings(left: string[], right: string[]): boolean {
+  return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 }
 
 function powerPointRuntimeDetailsLookReady(session: Record<string, unknown> | undefined, details: Record<string, unknown> | undefined): boolean {

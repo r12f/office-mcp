@@ -216,7 +216,7 @@ function validateOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path
   if (e2e.kind !== 'office_tool_e2e_report') failures.push(`${host} Office tool E2E report has unsupported kind: ${e2e.kind ?? 'missing'}`);
   if (e2e.host !== host) failures.push(`${host} Office tool E2E report host is ${String(e2e.host)}, expected ${host}.`);
   if (e2e.passed !== true) failures.push(`${host} Office tool E2E report did not pass.`);
-  validateOfficeToolE2eLifecycle(host, e2e.lifecycle_counts);
+  validateOfficeToolE2eLifecycle(`${host} Office tool E2E report`, e2e.lifecycle_counts);
 
   const advertisedTools = stringArray(e2e.advertised_tools);
   const sessionTools = stringArray(e2e.session_available_tools);
@@ -224,41 +224,41 @@ function validateOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path
   if (advertisedTools.length === 0) failures.push(`${host} Office tool E2E report missing advertised tools.`);
   if (!sameStrings(advertisedTools, sessionTools)) failures.push(`${host} Office tool E2E report session tools do not match advertised tools.`);
   if (!sameStrings(advertisedTools, executedTools)) failures.push(`${host} Office tool E2E report executed tools do not match advertised tools.`);
-  validateOfficeToolRuns(host, advertisedTools, e2e.tool_runs);
+  validateOfficeToolRuns(`${host} Office tool E2E report`, advertisedTools, e2e.tool_runs);
 
   if (!isRecord(e2e.daemon) || typeof e2e.daemon.endpoint !== 'string') failures.push(`${host} Office tool E2E report missing daemon endpoint.`);
   if (!isRecord(e2e.document) || typeof e2e.document.path !== 'string') failures.push(`${host} Office tool E2E report missing driver-owned document path.`);
   if (!isRecord(e2e.session) || typeof e2e.session.session_id !== 'string') failures.push(`${host} Office tool E2E report missing session ID.`);
 }
 
-function validateOfficeToolE2eLifecycle(host: string, lifecycle: unknown): void {
+function validateOfficeToolE2eLifecycle(label: string, lifecycle: unknown): void {
   if (!isRecord(lifecycle)) {
-    failures.push(`${host} Office tool E2E report missing lifecycle counts.`);
+    failures.push(`${label} missing lifecycle counts.`);
     return;
   }
   for (const key of ['start_daemon', 'list_tools', 'create_document', 'wait_for_session', 'cleanup_document', 'stop_daemon']) {
-    if (lifecycle[key] !== 1) failures.push(`${host} Office tool E2E report lifecycle ${key} is ${String(lifecycle[key])}, expected 1.`);
+    if (lifecycle[key] !== 1) failures.push(`${label} lifecycle ${key} is ${String(lifecycle[key])}, expected 1.`);
   }
 }
 
-function validateOfficeToolRuns(host: string, advertisedTools: string[], runs: unknown): void {
+function validateOfficeToolRuns(label: string, advertisedTools: string[], runs: unknown): void {
   if (!Array.isArray(runs)) {
-    failures.push(`${host} Office tool E2E report missing tool runs.`);
+    failures.push(`${label} missing tool runs.`);
     return;
   }
   const runTools = runs.filter(isRecord).map((run) => run.tool).filter((tool): tool is string => typeof tool === 'string');
-  if (!sameStrings(advertisedTools, runTools)) failures.push(`${host} Office tool E2E report tool runs do not match advertised tools.`);
+  if (!sameStrings(advertisedTools, runTools)) failures.push(`${label} tool runs do not match advertised tools.`);
   for (const run of runs.filter(isRecord)) {
     const tool = typeof run.tool === 'string' ? run.tool : '<missing>';
-    if (run.passed !== true) failures.push(`${host} Office tool E2E report tool ${tool} did not pass.`);
-    if (typeof run.id !== 'string' || run.id.length === 0) failures.push(`${host} Office tool E2E report tool ${tool} missing run ID.`);
-    if (typeof run.setup_action_count !== 'number' || run.setup_action_count < 1) failures.push(`${host} Office tool E2E report tool ${tool} missing setup action proof.`);
+    if (run.passed !== true) failures.push(`${label} tool ${tool} did not pass.`);
+    if (typeof run.id !== 'string' || run.id.length === 0) failures.push(`${label} tool ${tool} missing run ID.`);
+    if (typeof run.setup_action_count !== 'number' || run.setup_action_count < 1) failures.push(`${label} tool ${tool} missing setup action proof.`);
     const verifier = run.verifier;
     if (!isRecord(verifier) || (verifier.kind !== 'direct-result' && verifier.kind !== 'readback')) {
-      failures.push(`${host} Office tool E2E report tool ${tool} missing verifier kind.`);
+      failures.push(`${label} tool ${tool} missing verifier kind.`);
     }
     const expectationKeys = isRecord(verifier) && Array.isArray(verifier.expectation_keys) ? verifier.expectation_keys : [];
-    if (expectationKeys.length === 0) failures.push(`${host} Office tool E2E report tool ${tool} missing verifier expectations.`);
+    if (expectationKeys.length === 0) failures.push(`${label} tool ${tool} missing verifier expectations.`);
   }
 }
 
@@ -384,6 +384,7 @@ function validateProductVisualEvidence(): void {
   validateFirstRunIdentity(visual.first_run_identity);
   validateDaemonMainWindowVisualEvidence(visual.daemon_main_window);
   validatePowerPointRuntimeEvidence(visual.powerpoint_runtime_evidence, visual.powerpoint_runtime_evidence_ready);
+  validateProductVisualOfficeToolE2e(visual.office_tool_e2e, visual.office_tool_e2e_ready);
   validateWordTaskpaneVisualEvidence(visual.word_taskpane);
   validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
   validatePowerPointTaskpaneVisualEvidence(visual.powerpoint_taskpane);
@@ -797,6 +798,38 @@ function validatePowerPointRuntimeEvidence(evidence: unknown, ready: unknown): v
   const exportSupported = details.export_supported === true && details.export_mime_type === 'application/pdf' && typeof details.export_size === 'number';
   const exportHostRejection = details.export_host_rejection === true;
   if (!exportSupported && !exportHostRejection) failures.push('Product visual PowerPoint runtime evidence missing export_file success or explicit host-capability rejection.');
+}
+
+function validateProductVisualOfficeToolE2e(evidence: unknown, ready: unknown): void {
+  if (ready !== true) failures.push('Product visual evidence missing Office tool E2E ready flag.');
+  if (!isRecord(evidence)) {
+    failures.push('Product visual evidence missing Office tool E2E reports.');
+    return;
+  }
+  validateEmbeddedOfficeToolE2eReport('Word', evidence.word);
+  validateEmbeddedOfficeToolE2eReport('Excel', evidence.excel);
+  validateEmbeddedOfficeToolE2eReport('PowerPoint', evidence.powerpoint);
+}
+
+function validateEmbeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', evidence: unknown): void {
+  if (!isRecord(evidence)) {
+    failures.push(`Product visual evidence missing Office tool E2E ${host} report.`);
+    return;
+  }
+  if (evidence.ok !== true) failures.push(`Product visual Office tool E2E ${host} report was not read successfully.`);
+  if (evidence.ready !== true) failures.push(`Product visual Office tool E2E ${host} report is not ready.`);
+  if (evidence.schema_version !== 1) failures.push(`Product visual Office tool E2E ${host} report unsupported schema_version: ${evidence.schema_version}`);
+  if (evidence.kind !== 'office_tool_e2e_report') failures.push(`Product visual Office tool E2E ${host} report has unsupported kind: ${evidence.kind ?? 'missing'}`);
+  if (evidence.report_host !== host && evidence.host !== host) failures.push(`Product visual Office tool E2E ${host} report host mismatch.`);
+  if (evidence.passed !== true) failures.push(`Product visual Office tool E2E ${host} report did not pass.`);
+  validateOfficeToolE2eLifecycle(`Product visual Office tool E2E ${host} report`, evidence.lifecycle_counts);
+  const advertisedTools = stringArray(evidence.advertised_tools);
+  const sessionTools = stringArray(evidence.session_available_tools);
+  const executedTools = stringArray(evidence.executed_tools);
+  if (advertisedTools.length === 0) failures.push(`Product visual Office tool E2E ${host} report missing advertised tools.`);
+  if (!sameStrings(advertisedTools, sessionTools)) failures.push(`Product visual Office tool E2E ${host} report session tools do not match advertised tools.`);
+  if (!sameStrings(advertisedTools, executedTools)) failures.push(`Product visual Office tool E2E ${host} report executed tools do not match advertised tools.`);
+  validateOfficeToolRuns(`Product visual Office tool E2E ${host} report`, advertisedTools, evidence.tool_runs);
 }
 
 function validateWordTaskpaneVisualEvidence(taskpane: unknown): void {

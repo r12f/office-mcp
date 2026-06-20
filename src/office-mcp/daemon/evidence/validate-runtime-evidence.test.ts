@@ -606,6 +606,34 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.office_tool_e2e_ready = false;
+      broken.office_tool_e2e.word.ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual evidence missing Office tool E2E ready flag/);
+      assert.match(outputText(result.stdout), /Product visual Office tool E2E Word report is not ready/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.office_tool_e2e.excel.executed_tools = broken.office_tool_e2e.excel.executed_tools.slice(0, -1);
+      broken.office_tool_e2e.excel.ready = false;
+      broken.office_tool_e2e_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual Office tool E2E Excel report executed tools do not match advertised tools/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.daemon_context = manualTrayDaemonContext(undefined, false);
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -1198,6 +1226,12 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     },
     powerpoint_runtime_evidence: powerPointRuntimeEvidence(passed),
     powerpoint_runtime_evidence_ready: passed,
+    office_tool_e2e: {
+      word: embeddedOfficeToolE2eReport('Word', ['word.get_text', 'word.insert_paragraph'], passed),
+      excel: embeddedOfficeToolE2eReport('Excel', ['excel.get_workbook_info', 'excel.write_range'], passed),
+      powerpoint: embeddedOfficeToolE2eReport('PowerPoint', ['powerpoint.get_presentation_info', 'powerpoint.add_slide'], passed)
+    },
+    office_tool_e2e_ready: passed,
     word_taskpane: {
       compact_top_block: passed,
       tools_permissions_merged: passed,
@@ -1384,6 +1418,37 @@ function powerPointRuntimeEvidence(passed: boolean) {
       table_supported: passed,
       table_host_rejection: false
     }
+  };
+}
+
+function embeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tools: string[], passed: boolean) {
+  return {
+    path: `C:\\Code\\office-mcp\\artifacts\\office-tool-e2e-${host.toLowerCase()}.json`,
+    ok: passed,
+    host,
+    schema_version: 1,
+    kind: 'office_tool_e2e_report',
+    report_host: host,
+    passed,
+    lifecycle_counts: {
+      start_daemon: 1,
+      list_tools: 1,
+      create_document: 1,
+      wait_for_session: 1,
+      cleanup_document: 1,
+      stop_daemon: 1
+    },
+    advertised_tools: tools,
+    session_available_tools: tools,
+    executed_tools: tools,
+    tool_runs: tools.map((tool, index) => ({
+      id: `e2e-${tool.replace(/[^a-z0-9]+/gi, '-')}`,
+      tool,
+      setup_action_count: 1,
+      verifier: { kind: index === 0 ? 'direct-result' : 'readback', expectation_keys: ['contains'] },
+      passed
+    })),
+    ready: passed
   };
 }
 

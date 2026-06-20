@@ -159,6 +159,9 @@ test('README product visual evidence command matches current product visual gate
 
   for (const required of [
     '--catalog-identity-review-path',
+    '--word-tool-e2e-report-path',
+    '--excel-tool-e2e-report-path',
+    '--powerpoint-tool-e2e-report-path',
     '--powerpoint-runtime-evidence-path',
     '--powerpoint-ribbon-command',
     '--powerpoint-ribbon-command-screenshot',
@@ -634,6 +637,33 @@ test('product visual evidence recorder requires PowerPoint runtime evidence', ()
   });
 });
 
+test('product visual evidence recorder requires Office tool E2E reports', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const output = join(dir, 'missing-office-tool-e2e.json');
+    const missing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--word-tool-e2e-report-path', join(dir, 'missing-word-e2e.json'));
+    assert.notEqual(missing.status, 0);
+    let evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.office_tool_e2e_ready, false);
+    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).word.ready, false);
+
+    const broken = runRecorder(join(dir, 'broken-office-tool-e2e.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-tool-e2e-report-path', writeOfficeToolE2eReport(dir, 'Excel', false));
+    assert.notEqual(broken.status, 0);
+    evidence = JSON.parse(readFileSync(join(dir, 'broken-office-tool-e2e.json'), 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.office_tool_e2e_ready, false);
+    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).excel.ready, false);
+
+    const passing = runRecorder(join(dir, 'office-tool-e2e-ready.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
+    assert.equal(passing.status, 0, outputText(passing.stdout) + outputText(passing.stderr));
+    evidence = JSON.parse(readFileSync(join(dir, 'office-tool-e2e-ready.json'), 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.office_tool_e2e_ready, true);
+    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).word.ready, true);
+    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).excel.ready, true);
+    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).powerpoint.ready, true);
+  });
+});
+
 test('product visual evidence recorder requires Word task pane density review', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -712,6 +742,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const skipTraySurfaceArgs = extra.includes('--skip-tray-surface-args');
   const skipManualTrayEvidence = extra.includes('--skip-manual-tray-evidence');
   const skipCatalogIdentityReview = extra.includes('--skip-catalog-identity-review');
+  const skipOfficeToolE2eReports = extra.includes('--skip-office-tool-e2e-reports');
   const envRenderedLogoReviewPath = optionValue(extra, '--env-rendered-logo-review-path');
   const envExcelRuntimeEvidencePath = optionValue(extra, '--env-excel-runtime-evidence-path');
   const envPowerPointRuntimeEvidencePath = optionValue(extra, '--env-powerpoint-runtime-evidence-path');
@@ -733,6 +764,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
       && item !== '--skip-tray-surface-args'
       && item !== '--skip-manual-tray-evidence'
       && item !== '--skip-catalog-identity-review'
+      && item !== '--skip-office-tool-e2e-reports'
       && item !== '--env-rendered-logo-review-path'
       && item !== '--env-excel-runtime-evidence-path'
       && item !== '--env-powerpoint-runtime-evidence-path'
@@ -746,6 +778,9 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const hasPowerPointRuntimeEvidence = filteredExtra.includes('--powerpoint-runtime-evidence-path');
   const hasManualTrayEvidence = filteredExtra.includes('--manual-tray-evidence-path');
   const hasCatalogIdentityReview = filteredExtra.includes('--catalog-identity-review-path');
+  const hasWordToolE2eReport = filteredExtra.includes('--word-tool-e2e-report-path');
+  const hasExcelToolE2eReport = filteredExtra.includes('--excel-tool-e2e-report-path');
+  const hasPowerPointToolE2eReport = filteredExtra.includes('--powerpoint-tool-e2e-report-path');
   const outputDir = dirname(output);
   const args = [
     TSX,
@@ -793,6 +828,11 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   if (!hasPowerPointRuntimeEvidence) args.push('--powerpoint-runtime-evidence-path', writePowerPointRuntimeEvidence(outputDir));
   if (!hasManualTrayEvidence && !skipManualTrayEvidence) args.push('--manual-tray-evidence-path', writeManualTrayEvidence(outputDir));
   if (!hasCatalogIdentityReview && !skipCatalogIdentityReview) args.push('--catalog-identity-review-path', writeCatalogIdentityReview(outputDir));
+  if (!skipOfficeToolE2eReports) {
+    if (!hasWordToolE2eReport) args.push('--word-tool-e2e-report-path', writeOfficeToolE2eReport(outputDir, 'Word'));
+    if (!hasExcelToolE2eReport) args.push('--excel-tool-e2e-report-path', writeOfficeToolE2eReport(outputDir, 'Excel'));
+    if (!hasPowerPointToolE2eReport) args.push('--powerpoint-tool-e2e-report-path', writeOfficeToolE2eReport(outputDir, 'PowerPoint'));
+  }
   if (!skipProductReviewFlags) {
     args.push(
       '--logo-quality-reviewed', 'true',
@@ -1087,6 +1127,47 @@ function writePowerPointRuntimeEvidence(dir: string, ready = true): string {
       { name: 'word.session_discovery', status: 'passed', details: { sessions } },
       { name: 'powerpoint.runtime_smoke', status: ready ? 'passed' : 'failed', details: smokeDetails }
     ]
+  }, null, 2));
+  return path;
+}
+
+function writeOfficeToolE2eReport(dir: string, host: 'Word' | 'Excel' | 'PowerPoint', ready = true): string {
+  const key = host.toLowerCase();
+  const path = join(dir, `office-tool-e2e-${key}-${ready ? 'ready' : 'broken'}.json`);
+  const tools = host === 'Word'
+    ? ['word.get_text', 'word.insert_paragraph']
+    : host === 'Excel'
+      ? ['excel.get_workbook_info', 'excel.write_range']
+      : ['powerpoint.get_presentation_info', 'powerpoint.add_slide'];
+  const now = new Date().toISOString();
+  writeFileSync(path, JSON.stringify({
+    schema_version: 1,
+    kind: 'office_tool_e2e_report',
+    host,
+    started_at: now,
+    finished_at: now,
+    passed: ready,
+    daemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
+    document: { path: `${key}-fixture` },
+    session: { session_id: `${key}-session`, available_tool_count: tools.length },
+    lifecycle_counts: {
+      start_daemon: 1,
+      list_tools: 1,
+      create_document: 1,
+      wait_for_session: 1,
+      cleanup_document: 1,
+      stop_daemon: 1
+    },
+    advertised_tools: tools,
+    session_available_tools: tools,
+    executed_tools: ready ? tools : tools.slice(0, -1),
+    tool_runs: tools.map((tool, index) => ({
+      id: `e2e-${tool.replace(/[^a-z0-9]+/gi, '-')}`,
+      tool,
+      setup_action_count: 1,
+      verifier: { kind: index === 0 ? 'direct-result' : 'readback', expectation_keys: ['contains'] },
+      passed: ready
+    }))
   }, null, 2));
   return path;
 }
