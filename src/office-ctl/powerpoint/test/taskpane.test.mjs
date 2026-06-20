@@ -65,6 +65,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const css = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8');
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const mainUi = readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8');
 
   assert.match(html, /powerpoint\/taskpane\.css\?v=0\.1\.4/);
   assert.match(html, /common\/taskpane\.css\?v=0\.1\.4/);
@@ -176,15 +177,16 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
   assert.match(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
-  assert.match(js, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
+  assert.match(mainUi, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
   assert.match(js, /const target = button\.dataset\.copyTarget \? document\.getElementById\(button\.dataset\.copyTarget\) : null/);
   assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
   assert.match(js, /navigator\.clipboard\?\.writeText/);
-  assert.match(js, /function setCopyableMetadata\(element, value\)/);
-  assert.match(js, /element\.textContent = middleTruncate\(text\)/);
-  assert.match(js, /button\.dataset\.copyValue = text/);
-  assert.match(js, /function middleTruncate\(value, maxLength = 30\)/);
-  assert.match(js, /return `\$\{text\.slice\(0, head\)\}\$\{marker\}\$\{text\.slice\(text\.length - tail\)\}`/);
+  assert.match(js, /const \{ bindDetailsControl, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata \} = window\.OfficeCtlMainUi/);
+  assert.doesNotMatch(js, /function setCopyableMetadata\(element, value\)/);
+  assert.match(mainUi, /function setCopyableMetadata\(element, value\)/);
+  assert.match(mainUi, /button\.dataset\.copyValue = text/);
+  assert.doesNotMatch(js, /function middleTruncate\(value, maxLength = 30\)/);
+  assert.match(mainUi, /function middleTruncate\(value, maxLength = 30\)/);
   assert.match(js, /function fallbackCopy\(value\)/);
   assert.match(js, /clearEndpointOverride/);
   assert.match(js, /currentOriginEndpoint/);

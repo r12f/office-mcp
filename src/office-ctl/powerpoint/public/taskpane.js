@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, officeHostSummary, renderRuntimeVersions } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1634,27 +1634,6 @@
       logger.warn('metadata_copy.failed', error);
       announcerEl.textContent = 'Copy failed';
     }
-  }
-
-  function setCopyableMetadata(element, value) {
-    const text = value || '-';
-    element.textContent = middleTruncate(text);
-    element.title = text;
-    const button = element.closest('[data-copy-target]');
-    if (button) {
-      button.dataset.copyValue = text;
-      button.title = text === '-' ? button.getAttribute('aria-label') || '' : text;
-    }
-  }
-
-  function middleTruncate(value, maxLength = 30) {
-    const text = String(value || '');
-    if (text.length <= maxLength) return text;
-    const marker = '...';
-    const available = maxLength - marker.length;
-    const head = Math.ceil(available / 2);
-    const tail = Math.floor(available / 2);
-    return `${text.slice(0, head)}${marker}${text.slice(text.length - tail)}`;
   }
 
   function fallbackCopy(value) {
