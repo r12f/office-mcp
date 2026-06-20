@@ -188,6 +188,26 @@ function Try-InvokeNamedControl {
   return $true
 }
 
+function Try-OpenAddinFromCatalog {
+  param([Parameter(Mandatory = $true)]$Window)
+
+  foreach ($name in @("Insert", "Add-ins", "My Add-ins", "Shared Folder", "Office MCP Control", "Add")) {
+    if (Try-InvokeNamedControl -Root $Window -Name $name) {
+      Write-ActivatorLog "catalog fallback invoked name=$name"
+      Start-Sleep -Milliseconds 800
+      $nextWindow = Get-OfficeWindowFromHandle -Handle $driverWindowHandle
+      $button = Find-DescendantByName -Root $nextWindow -Name "Open Control Panel"
+      if ($button) {
+        Write-ActivatorLog "found Open Control Panel after catalog fallback name=$name"
+        Invoke-Control -Element $button
+        return $true
+      }
+      $Window = $nextWindow
+    }
+  }
+  return $false
+}
+
 $app = Get-OfficeApplication -HostKey $hostKey
 $driverWindowHandle = Activate-DriverDocument -Application $app -HostKey $hostKey -Path $DocumentPath
 
@@ -223,6 +243,16 @@ do {
         exit 0
       }
     }
+  }
+  if (Try-OpenAddinFromCatalog -Window (Get-OfficeWindowFromHandle -Handle $driverWindowHandle)) {
+    Write-Output (@{
+        activated = $true
+        host = $hostKey
+        document_path = $DocumentPath
+        control_name = "Open Control Panel"
+        activation_path = "catalog-fallback"
+      } | ConvertTo-Json -Compress)
+    exit 0
   }
 } while ((Get-Date) -lt $deadline)
 

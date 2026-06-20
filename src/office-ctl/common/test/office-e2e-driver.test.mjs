@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const DRIVER = fileURLToPath(new URL('./office-e2e-driver.mjs', import.meta.url));
 const REPO_ROOT = resolve(dirname(DRIVER), '../../../..');
+const DEFAULT_ACTIVATOR = resolve(REPO_ROOT, 'src/office-ctl/common/scripts/activate-office-mcp-addin.ps1');
 const RUN_OFFICE_COM = process.env.OFFICE_MCP_RUN_E2E === '1';
 
 test('Office E2E driver describes a driver-owned Word lifecycle', () => {
@@ -25,6 +26,11 @@ test('Office E2E driver describes a driver-owned Word lifecycle', () => {
   assert.ok(document.keeper?.stdoutPath, 'keeper stdout log is required');
   assert.ok(document.keeper?.stderrPath, 'keeper stderr log is required');
   assert.match(document.script, /Documents\.Add\(\)/);
+  assert.match(document.script, /Invoke-Retry/);
+  assert.match(document.script, /RPC_E_CALL_REJECTED/);
+  assert.doesNotMatch(document.script, /\.Content\.Text=/);
+  assert.doesNotMatch(document.script, /\.Content\.InsertAfter/);
+  assert.doesNotMatch(document.script, /TrackRevisions/);
   assert.match(document.script, /office-mcp-ready/);
   assert.match(document.script, /office-mcp-ready/);
   assert.doesNotMatch(document.script, /\.Quit\(\)/, 'keeper must not quit user Office applications');
@@ -198,6 +204,14 @@ test('Office E2E driver provides a default Windows add-in activator', () => {
     restoreEnv('OFFICE_MCP_E2E_ACTIVATOR_DRY_RUN', previousDryRun);
     restoreEnv('OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR', previousDefault);
   }
+});
+
+test('default Windows add-in activator can fall back through My Add-ins catalog UI', () => {
+  const script = readFileSync(DEFAULT_ACTIVATOR, 'utf8');
+  assert.match(script, /My Add-ins/);
+  assert.match(script, /Office MCP Control/);
+  assert.match(script, /Shared Folder/);
+  assert.match(script, /Add/);
 });
 
 test('Office E2E driver callTool posts MCP requests through an injectable endpoint', async () => {
