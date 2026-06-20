@@ -657,8 +657,12 @@
         table = target.insertTable(args.rows, args.cols, location, values);
       }
       if (args.style) table.style = args.style;
+      const tables = context.document.body.tables;
+      tables.load('items');
       await context.sync();
-      return { inserted: true, rows: args.rows, cols: args.cols, header_row: args.header_row ?? false };
+      const matchedIndex = tables.items.findIndex((item) => item === table);
+      const tableIndex = matchedIndex >= 0 ? matchedIndex : Math.max(0, tables.items.length - 1);
+      return { inserted: true, table_index: tableIndex, rows: args.rows, cols: args.cols, header_row: args.header_row ?? false };
     });
   }
 
@@ -1023,6 +1027,8 @@
   async function deleteContentControl(args) {
     return Word.run(async (context) => {
       const control = await targetContentControl(context, args);
+      control.load('id');
+      await context.sync();
       const id = control.id;
       const keepContent = args.mode !== 'delete_content';
       control.delete(keepContent);

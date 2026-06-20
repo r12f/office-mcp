@@ -238,6 +238,16 @@ test('Office E2E driver provides a default Windows add-in activator', () => {
   }
 });
 
+test('Office E2E driver reuses one MCP HTTP session per driver process', () => {
+  const driver = readFileSync(DRIVER, 'utf8');
+  assert.match(driver, /const mcpSessionIds = new Map\(\);/);
+  assert.match(driver, /async function mcpSessionId\(endpoint\)/);
+  assert.match(driver, /mcpSessionIds\.set\(endpoint, await initializeMcp\(endpoint\)\)/);
+  assert.match(driver, /const sessionId = await mcpSessionId\(endpoint\);/);
+  assert.match(driver, /MCP HTTP \$\{response\.statusCode\}/);
+  assert.match(driver, /MCP response was not JSON/);
+});
+
 test('default Windows add-in activator can fall back through My Add-ins catalog UI', () => {
   const script = readFileSync(DEFAULT_ACTIVATOR, 'utf8');
   assert.match(script, /office-addin-dev-settings/);
@@ -246,7 +256,19 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /OFFICE_MCP_E2E_MANIFEST_PATH/);
   assert.match(script, /officialDocumentPath/);
   assert.match(script, /Launching .* via/);
+  assert.match(script, /official sideload timed out/);
+  assert.match(script, /Start-Process/);
   assert.match(script, /Wait-ForDriverDocument/);
+  assert.match(script, /RootElement/);
+  assert.match(script, /Find-GlobalControlByName/);
+  assert.match(script, /Wait-ForOpenControlPanel/);
+  assert.match(script, /Try-EnableOfficeMcpAddin/);
+  assert.match(script, /Office MCP Control was clicked but Open Control Panel did not appear yet/);
+  assert.match(script, /found Office MCP Control source=\$Source/);
+  assert.doesNotMatch(script, /control_name\s*=\s*"Office MCP Control"/, 'clicking the add-in entry alone is not a completed activation');
+  assert.match(script, /Get-OfficeStateSnapshot/);
+  assert.match(script, /waiting for driver document/);
+  assert.match(script, /official sideload copy was not visible/);
   assert.match(script, /official sideload failed/);
   assert.match(script, /official sideload error detail/);
   assert.match(script, /try \{/);
@@ -802,6 +824,45 @@ server.listen(0, '127.0.0.1', () => {
     assert.equal(toolCall.body.params.arguments.expected_fingerprint, 'fp-123');
   } finally {
     server.kill();
+  }
+});
+
+test('Office E2E driver can seed a Word tracked change as a driver setup action', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-tracked-change-'));
+  const fakePowerShell = join(dir, 'fake-powershell.mjs');
+  const scriptLog = join(dir, 'script.txt');
+  writeFileSync(fakePowerShell, `
+import { appendFileSync } from 'node:fs';
+const script = process.argv.slice(2).join(' ');
+appendFileSync(${JSON.stringify(scriptLog)}, script);
+console.log(JSON.stringify({ document: 'C:/tmp/seed.docx', marker: 'Tracked change seed', revisions: 1 }));
+`);
+  const previous = process.env.OFFICE_MCP_E2E_POWERSHELL_INLINE;
+  process.env.OFFICE_MCP_E2E_POWERSHELL_INLINE = `${process.execPath} ${fakePowerShell}`;
+  try {
+    const result = runDriver({
+      host: 'Word',
+      step: 'setupContent',
+      context: {
+        document: { path: join(dir, 'seed.docx') },
+        session: { sessionId: 'session-1' },
+        toolCase: {
+          setup: {
+            actions: [
+              { driver: 'word.create_tracked_change', saveAs: 'trackedChangeSeed', arguments: { text: 'Tracked change seed' } }
+            ]
+          }
+        }
+      }
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.bindings.trackedChangeSeed.revisions, 1);
+    const script = readFileSync(scriptLog, 'utf8');
+    assert.match(script, /TrackRevisions = \$true/);
+    assert.match(script, /Tracked change seed/);
+  } finally {
+    restoreEnv('OFFICE_MCP_E2E_POWERSHELL_INLINE', previous);
   }
 });
 

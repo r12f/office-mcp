@@ -19,6 +19,11 @@ fn config_allows_loopback_origins_for_configured_port() {
 }
 
 #[test]
+fn default_rate_limit_supports_batched_office_tool_e2e() {
+    assert_eq!(McpHttpConfig::default().requests_per_minute, 1000);
+}
+
+#[test]
 fn request_client_key_prefers_forwarded_for_first_hop() {
     let request = McpHttpRequest {
         method: HttpMethod::Post,

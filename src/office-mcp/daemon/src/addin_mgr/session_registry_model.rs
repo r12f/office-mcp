@@ -80,6 +80,7 @@ pub struct SessionDescriptor {
     pub document: DocumentDescriptor,
     pub is_active: Option<bool>,
     pub capability_tiers: Vec<String>,
+    pub available_tools: Vec<String>,
     pub available_tool_count: usize,
     pub queue_depth: usize,
     pub registered_at: SystemTime,

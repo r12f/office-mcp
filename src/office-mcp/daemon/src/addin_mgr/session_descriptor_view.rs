@@ -39,6 +39,7 @@ impl<'a> SessionDescriptorView<'a> {
             },
             "is_active": session.is_active,
             "capability_tiers": session.capability_tiers,
+            "available_tools": session.available_tools,
             "available_tool_count": session.available_tool_count,
             "queue_depth": session.queue_depth,
             "registered_at": format_unix_time(session.registered_at),

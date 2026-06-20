@@ -115,6 +115,10 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
         sessions["result"]["structuredContent"]["sessions"][0]["document"]["title"],
         "Draft.docx"
     );
+    assert_eq!(
+        sessions["result"]["structuredContent"]["sessions"][0]["available_tools"][0],
+        "word.get_text"
+    );
 
     let info = mcp_handle_body(
         &registry,

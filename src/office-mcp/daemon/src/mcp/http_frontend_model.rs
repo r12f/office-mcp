@@ -27,7 +27,7 @@ impl Default for McpHttpConfig {
             host: "127.0.0.1".to_string(),
             port: 8800,
             max_request_bytes: 16 * 1024 * 1024,
-            requests_per_minute: 120,
+            requests_per_minute: 1000,
         }
     }
 }

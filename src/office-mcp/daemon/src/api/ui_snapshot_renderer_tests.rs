@@ -164,6 +164,7 @@ fn descriptor() -> SessionDescriptor {
         },
         is_active: Some(true),
         capability_tiers: vec!["core".to_string()],
+        available_tools: vec!["word.get_text".to_string()],
         available_tool_count: 27,
         queue_depth: 0,
         registered_at: SystemTime::UNIX_EPOCH + Duration::from_secs(3),

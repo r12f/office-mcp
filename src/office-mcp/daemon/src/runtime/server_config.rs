@@ -141,7 +141,7 @@ impl Default for RuntimeServerConfig {
             max_pending_per_session: 4,
             heartbeat_interval: Duration::from_secs(30),
             heartbeat_timeout: Duration::from_secs(10),
-            requests_per_minute: 120,
+            requests_per_minute: 1000,
             config_path: None,
             log_path: None,
             audit_log: AuditLog::new(),

@@ -247,6 +247,7 @@ impl SessionRegistry {
             document: DocumentDescriptor::from(&session.document),
             is_active: session.is_active,
             capability_tiers: infer_capability_tiers(&session.available_tools),
+            available_tools: session.available_tools.clone(),
             available_tool_count: session.available_tools.len(),
             queue_depth: connection.map_or(0, |connection| connection.pending_count),
             registered_at: session.registered_at,

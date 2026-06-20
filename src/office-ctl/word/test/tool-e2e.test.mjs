@@ -106,7 +106,7 @@ const WORD_E2E_CASES = Object.fromEntries([
         { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'table anchor marker' } }
       ]
     },
-    args: { anchor: { kind: 'after_text', text: 'table anchor marker' }, rows: [['E2E-A', 'E2E-B']] },
+    args: { anchor: { kind: 'after_text', text: 'table anchor marker' }, rows: 1, cols: 2, data: [['E2E-A', 'E2E-B']] },
     verify: wordReadback.table(0, { contains: ['E2E-A', 'E2E-B'] })
   }],
   ['word.insert_page_break', {
@@ -142,7 +142,7 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.update_paragraph', {
     setup: {
       actions: [
-        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Paragraph before update' } }
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'start_of_document' }, text: 'Paragraph before update' } }
       ]
     },
     args: { index: 0, text: 'Updated paragraph' },
@@ -182,10 +182,10 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.read_table', {
     setup: {
       actions: [
-        { tool: 'word.insert_table', arguments: { anchor: { kind: 'end_of_document' }, rows: [['ReadTable-A', 'ReadTable-B']] } }
+        { tool: 'word.insert_table', saveAs: 'table', arguments: { anchor: { kind: 'end_of_document' }, rows: 1, cols: 2, data: [['ReadTable-A', 'ReadTable-B']] } }
       ]
     },
-    args: { table_index: 0 },
+    args: { table_index: '${table.table_index}' },
     verify: {
       kind: 'direct-result',
       expect: { contains: ['ReadTable-A', 'ReadTable-B'], pathEquals: [{ path: 'rows', value: 1 }, { path: 'cols', value: 2 }] }
@@ -194,14 +194,14 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.update_table', {
     setup: {
       actions: [
-        { tool: 'word.insert_table', arguments: { anchor: { kind: 'end_of_document' }, rows: [['Old', 'Value']] } }
+        { tool: 'word.insert_table', saveAs: 'table', arguments: { anchor: { kind: 'end_of_document' }, rows: 1, cols: 2, data: [['Old', 'Value']] } }
       ]
     },
-    args: { table_index: 0, action: 'update_cell', row: 0, col: 0, text: 'Updated table cell' },
+    args: { table_index: '${table.table_index}', action: 'update_cell', row: 0, col: 0, text: 'Updated table cell' },
     verify: {
       kind: 'readback',
       readbackTool: 'word.read_table',
-      readbackArguments: { table_index: 0 },
+      readbackArguments: { table_index: '${table.table_index}' },
       expect: { contains: ['Updated table cell'], notContains: ['Old'] }
     }
   }],
@@ -290,7 +290,7 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.update_tracked_change', {
     setup: {
       actions: [
-        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Tracked change E2E paragraph' } },
+        { driver: 'word.create_tracked_change', saveAs: 'trackedChangeSeed', arguments: { text: 'Tracked change E2E paragraph' } },
         { resource: 'office://word/${session_id}/track_changes', saveAs: 'trackChanges' }
       ]
     },

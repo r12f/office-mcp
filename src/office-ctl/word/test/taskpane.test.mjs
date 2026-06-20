@@ -414,11 +414,14 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /case 'word\.update_content_control':\s*data = await updateContentControl\(args\);/);
   assert.match(js, /case 'word\.delete_content_control':\s*data = await deleteContentControl\(args\);/);
   assert.match(js, /case 'word\.update_tracked_change':\s*data = await updateTrackedChange\(args\);/);
+  assert.match(js, /async function insertTable\(args\)/);
+  assert.match(js, /table_index: tableIndex/);
   assert.match(js, /async function updateTable\(args\)/);
   assert.match(js, /async function listContentControls\(args\)/);
   assert.match(js, /async function insertContentControl\(args\)/);
   assert.match(js, /async function updateContentControl\(args\)/);
   assert.match(js, /async function deleteContentControl\(args\)/);
+  assert.match(js, /control\.load\('id'\);\s*await context\.sync\(\);\s*const id = control\.id;/);
   assert.match(js, /async function updateTrackedChange\(args\)/);
   assert.match(js, /return mutateTrackedChange\(args, action\);/);
   assert.match(js, /function targetContentControl\(context, args\)/);

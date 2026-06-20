@@ -63,9 +63,9 @@ function assertConcreteSetup(tool, toolCase) {
   for (const [index, action] of toolCase.setup.actions.entries()) {
     assert.equal(typeof action, 'object', `${tool} setup action ${index} must be an object`);
     assert.ok(action, `${tool} setup action ${index} is required`);
-    const target = action.tool || action.resource;
-    assert.equal(typeof target, 'string', `${tool} setup action ${index} must define tool or resource`);
-    assert.ok(target.length > 0, `${tool} setup action ${index} must define a non-empty tool or resource`);
+    const target = action.tool || action.resource || action.driver;
+    assert.equal(typeof target, 'string', `${tool} setup action ${index} must define tool, resource, or driver`);
+    assert.ok(target.length > 0, `${tool} setup action ${index} must define a non-empty tool, resource, or driver`);
     if (action.tool) {
       assert.equal(typeof action.arguments, 'object', `${tool} setup action ${index} must define arguments`);
       assert.ok(action.arguments, `${tool} setup action ${index} arguments are required`);

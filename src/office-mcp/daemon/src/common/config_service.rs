@@ -168,7 +168,7 @@ impl DaemonConfigService {
                         "OFFICE_MCP_LIMITS__REQUESTS_PER_MINUTE",
                         "OFFICE_MCP_REQUESTS_PER_MINUTE",
                     ],
-                    limits.int_value("requests_per_minute", 120)?,
+                    limits.int_value("requests_per_minute", 1000)?,
                 )?,
             },
             audit: AuditConfig {

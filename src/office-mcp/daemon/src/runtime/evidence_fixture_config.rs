@@ -78,7 +78,7 @@ pub(crate) fn fixture_config(
             max_request_bytes: 16 * 1024 * 1024,
             max_ws_frame_bytes: 16 * 1024 * 1024,
             default_tool_timeout_ms: 30_000,
-            requests_per_minute: 120,
+            requests_per_minute: 1000,
         },
         audit: AuditConfig {
             enabled: false,

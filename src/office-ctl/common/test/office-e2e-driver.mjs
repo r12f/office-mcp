@@ -10,6 +10,7 @@ const REPO_ROOT = resolve(DRIVER_DIR, '../../../..');
 const DAEMON_EXE = resolve(REPO_ROOT, 'target/debug/office-mcp-daemon.exe');
 const DEFAULT_WINDOWS_ACTIVATOR = resolve(REPO_ROOT, 'src/office-ctl/common/scripts/activate-office-mcp-addin.ps1');
 const DEFAULT_TIMEOUT_MS = 120000;
+const mcpSessionIds = new Map();
 
 const request = await readRequest();
 
@@ -354,18 +355,67 @@ async function setupContent(_host, context) {
 async function runToolActions(context, actions) {
   const daemon = context.daemon || {};
   const session = context.session || {};
+  const document = context.document || {};
   const bindings = { session_id: session.sessionId, ...(session.bindings || {}) };
   for (const action of actions) {
-    if (!action?.tool && !action?.resource) throw new Error('Office E2E setup/reset action must define a tool or resource.');
-    const result = action.resource
-      ? await mcpResourceRead(daemon.endpoint, resolveBindings(action.resource, bindings))
-      : await mcpToolCall(daemon.endpoint, action.tool, { ...resolveBindings(action.arguments || {}, bindings), session_id: session.sessionId });
+    if (!action?.tool && !action?.resource && !action?.driver) throw new Error('Office E2E setup/reset action must define a tool, resource, or driver action.');
+    const result = await runSetupAction({ action, bindings, daemon, document, session });
     if (result.error || result.structuredContent?.error) {
-      throw new Error(`Office E2E setup/reset action ${action.tool || action.resource} failed: ${JSON.stringify(result.error || result.structuredContent.error)}`);
+      throw new Error(`Office E2E setup/reset action ${action.tool || action.resource || action.driver} failed: ${JSON.stringify(result.error || result.structuredContent.error)}`);
     }
     if (action.saveAs) bindings[action.saveAs] = action.resource ? resourceResultData(result) : actionResultData(result);
   }
   return bindings;
+}
+
+async function runSetupAction({ action, bindings, daemon, document, session }) {
+  if (action.resource) return mcpResourceRead(daemon.endpoint, resolveBindings(action.resource, bindings));
+  if (action.tool) return mcpToolCall(daemon.endpoint, action.tool, { ...resolveBindings(action.arguments || {}, bindings), session_id: session.sessionId });
+  return runDriverSetupAction(action.driver, { action, bindings, document });
+}
+
+function runDriverSetupAction(name, { action, bindings, document }) {
+  if (name === 'word.create_tracked_change') {
+    const args = resolveBindings(action.arguments || {}, bindings);
+    return createWordTrackedChange(document.path, args);
+  }
+  throw new Error(`Unsupported Office E2E driver setup action: ${name}`);
+}
+
+function createWordTrackedChange(documentPath, args = {}) {
+  if (process.platform !== 'win32') throw new Error('word.create_tracked_change requires Windows Word COM automation.');
+  if (!documentPath) throw new Error('word.create_tracked_change requires a driver-owned document path.');
+  const marker = String(args.text || `Tracked change E2E paragraph ${Date.now()}`);
+  const script = [
+    '$target = ' + psQuoted(resolve(documentPath)),
+    '$marker = ' + psQuoted(marker),
+    '$word = [Runtime.InteropServices.Marshal]::GetActiveObject("Word.Application")',
+    '$doc = $null',
+    'foreach ($candidate in @($word.Documents)) { if ([System.IO.Path]::GetFullPath($candidate.FullName).ToLowerInvariant() -eq [System.IO.Path]::GetFullPath($target).ToLowerInvariant()) { $doc = $candidate; break } }',
+    'if ($null -eq $doc) { throw "Target Word document not open: $target" }',
+    '$doc.Activate()',
+    '$doc.TrackRevisions = $true',
+    '$range = $doc.Range($doc.Content.End - 1, $doc.Content.End - 1)',
+    '$range.InsertAfter([Environment]::NewLine + $marker)',
+    '$doc.TrackRevisions = $false',
+    '[pscustomobject]@{ document = $doc.FullName; marker = $marker; revisions = $doc.Revisions.Count } | ConvertTo-Json -Depth 4'
+  ].join('; ');
+  const shell = powerShellInlineCommand(script);
+  const output = execFileSync(shell.command, shell.args, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 30000
+  });
+  return JSON.parse(output);
+}
+
+function powerShellInlineCommand(script) {
+  const override = process.env.OFFICE_MCP_E2E_POWERSHELL_INLINE;
+  if (override) {
+    const parts = splitCommand(override);
+    return { command: parts[0], args: [...parts.slice(1), '-Command', script] };
+  }
+  return { command: 'powershell.exe', args: ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script] };
 }
 
 async function callTool(context) {
@@ -594,21 +644,28 @@ async function listSessions(endpoint) {
 }
 
 async function mcpToolCall(endpoint = 'http://127.0.0.1:8800/mcp', name, args) {
-  const sessionId = await initializeMcp(endpoint);
+  const sessionId = await mcpSessionId(endpoint);
   const response = await postJson(endpoint, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: args } }, sessionId);
   return response.body.result || response.body;
 }
 
 async function mcpResourceRead(endpoint = 'http://127.0.0.1:8800/mcp', uri) {
-  const sessionId = await initializeMcp(endpoint);
+  const sessionId = await mcpSessionId(endpoint);
   const response = await postJson(endpoint, { jsonrpc: '2.0', id: 3, method: 'resources/read', params: { uri } }, sessionId);
   return response.body.result || response.body;
 }
 
 async function mcpToolsList(endpoint = 'http://127.0.0.1:8800/mcp') {
-  const sessionId = await initializeMcp(endpoint);
+  const sessionId = await mcpSessionId(endpoint);
   const response = await postJson(endpoint, { jsonrpc: '2.0', id: 4, method: 'tools/list', params: {} }, sessionId);
   return response.body.result || response.body;
+}
+
+async function mcpSessionId(endpoint) {
+  if (!mcpSessionIds.has(endpoint)) {
+    mcpSessionIds.set(endpoint, await initializeMcp(endpoint));
+  }
+  return mcpSessionIds.get(endpoint);
 }
 
 async function initializeMcp(endpoint) {
@@ -638,10 +695,14 @@ function postJson(endpoint, body, sessionId) {
       response.setEncoding('utf8');
       response.on('data', (chunk) => { responseText += chunk; });
       response.on('end', () => {
+        if (response.statusCode && response.statusCode >= 400) {
+          reject(new Error(`MCP HTTP ${response.statusCode}: ${responseText || response.statusMessage || 'request failed'}`));
+          return;
+        }
         try {
           resolvePromise({ headers: response.headers, body: JSON.parse(responseText || '{}') });
         } catch (error) {
-          reject(error);
+          reject(new Error(`MCP response was not JSON: ${responseText || error.message}`));
         }
       });
     });
@@ -787,6 +848,10 @@ function processExists(pid) {
 
 function psSingle(value) {
   return String(value).replace(/'/g, "''");
+}
+
+function psQuoted(value) {
+  return `'${psSingle(value)}'`;
 }
 
 function sleep(ms) {

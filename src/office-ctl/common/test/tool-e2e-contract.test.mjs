@@ -44,6 +44,18 @@ test('concrete E2E case gate accepts setup actions, calls, and verifiers', () =>
         verify: readbackByResource('office://word/${session_id}/comments', {
           expect: { contains: ['E2E comment'] }
         })
+      }),
+      'word.update_tracked_change': e2eCase('word.update_tracked_change', {
+        setup: {
+          actions: [
+            { driver: 'word.create_tracked_change', arguments: { text: 'tracked seed' } },
+            { resource: 'office://word/${session_id}/track_changes', saveAs: 'trackChanges' }
+          ]
+        },
+        args: { change_index: '${trackChanges.changes.0.index}', action: 'accept', expected_fingerprint: '${trackChanges.changes.0.fingerprint}' },
+        verify: readbackByResource('office://word/${session_id}/track_changes', {
+          expect: { notContains: ['tracked seed'] }
+        })
       })
     }
   });
