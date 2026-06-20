@@ -191,9 +191,14 @@ function Activate-DriverDocument {
     return Get-ExcelMainWindowHandle -Path $Path
   }
   if ($HostKey -eq "powerpoint") {
+    $targetName = [System.IO.Path]::GetFileName($Path)
     foreach ($presentation in @($Application.Presentations)) {
-      if ((Get-CanonicalPath -Path $presentation.FullName) -eq $target) {
-        Write-ActivatorLog "activated powerpoint presentation=$($presentation.FullName)"
+      $presentationFullName = ""
+      $presentationName = ""
+      try { $presentationFullName = [string]$presentation.FullName } catch {}
+      try { $presentationName = [string]$presentation.Name } catch {}
+      if ((-not [string]::IsNullOrWhiteSpace($presentationFullName) -and (Get-CanonicalPath -Path $presentationFullName) -eq $target) -or $presentationName -eq $targetName) {
+        Write-ActivatorLog "activated powerpoint presentation=$presentationFullName name=$presentationName"
         try {
           $window = $presentation.Windows.Item(1)
           $window.Activate()
@@ -201,7 +206,7 @@ function Activate-DriverDocument {
         } catch {
           Write-ActivatorLog "powerpoint presentation window handle unavailable: $($_.Exception.Message)"
         }
-        return Get-PowerPointMainWindowHandle -Path $presentation.FullName
+        return Get-PowerPointMainWindowHandle -Path $presentationFullName
       }
     }
   }

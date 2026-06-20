@@ -159,6 +159,7 @@ test('Office E2E driver cleanup covers activated sideload copies and original fi
   assert.match(document.cleanupScript, /office-mcp-e2e-powerpoint-fixture\.pptx/);
   assert.match(document.cleanupScript, /Close-DriverOwnedDocuments/);
   assert.match(document.cleanupScript, /Maybe-QuitEmptyOfficeApplication/);
+  assert.match(document.cleanupScript, /PowerPoint\.Application[\s\S]*Close-DriverOwnedProcessIds; Ensure-DriverOwnedProcessIdsExited/);
   const driver = readFileSync(DRIVER, 'utf8');
   assert.match(driver, /officeSideloadCopyCandidates/);
   assert.match(driver, /Office add-in \$\{spec\.id\}\*\.\$\{spec\.extension\}/);
@@ -516,6 +517,7 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /if \(\$HostKey -eq "excel"\) \{ return Get-ExcelMainWindowHandle -Path \$Path \}/);
   assert.match(script, /using excel main window fallback/);
   assert.match(script, /workbookName -eq \$targetName/);
+  assert.match(script, /presentationName -eq \$targetName/);
   assert.match(script, /powerpoint presentation window handle unavailable/);
   assert.match(script, /using powerpoint main window fallback/);
   assert.match(script, /function Test-ActivatorDeadline/);
