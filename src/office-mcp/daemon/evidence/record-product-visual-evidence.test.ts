@@ -48,6 +48,57 @@ const SURFACES = [
   'tray-quit-confirmation'
 ];
 
+const EXCEL_V1_TOOLS = [
+  'excel.get_workbook_info',
+  'excel.list_sheets',
+  'excel.add_sheet',
+  'excel.update_sheet',
+  'excel.delete_sheet',
+  'excel.get_used_range',
+  'excel.read_range',
+  'excel.write_range',
+  'excel.clear_range',
+  'excel.find_replace_cells',
+  'excel.set_formula',
+  'excel.format_range',
+  'excel.sort_range',
+  'excel.apply_filter',
+  'excel.create_table',
+  'excel.update_table',
+  'excel.create_chart',
+  'excel.update_chart',
+  'excel.create_pivot_table',
+  'excel.update_pivot_table'
+];
+
+const POWERPOINT_V1_TOOLS = [
+  'powerpoint.get_presentation_info',
+  'powerpoint.get_active_view',
+  'powerpoint.export_file',
+  'powerpoint.update_tags',
+  'powerpoint.list_slides',
+  'powerpoint.add_slide',
+  'powerpoint.update_slide',
+  'powerpoint.delete_slide',
+  'powerpoint.move_slide',
+  'powerpoint.export_slide',
+  'powerpoint.list_layouts',
+  'powerpoint.apply_layout',
+  'powerpoint.get_selection',
+  'powerpoint.set_selection',
+  'powerpoint.list_shapes',
+  'powerpoint.add_text_box',
+  'powerpoint.add_shape',
+  'powerpoint.insert_image',
+  'powerpoint.update_shape',
+  'powerpoint.read_text',
+  'powerpoint.replace_text',
+  'powerpoint.format_text',
+  'powerpoint.add_table',
+  'powerpoint.read_table',
+  'powerpoint.update_table'
+];
+
 const WORD_V1_TOOLS = [
   'word.get_text',
   'word.get_outline',
@@ -709,6 +760,48 @@ test('product visual evidence recorder requires PowerPoint runtime evidence', ()
   });
 });
 
+test('product visual evidence recorder rejects runtime evidence with non-exact host catalogs', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+
+    const wordPath = writeWordRuntimeEvidence(dir);
+    const word = JSON.parse(readFileSync(wordPath, 'utf8')) as Record<string, unknown>;
+    const wordRead = ((word.gates as Array<Record<string, unknown>>).find((gate) => gate.name === 'word.runtime_read_smoke')?.details ?? {}) as Record<string, unknown>;
+    wordRead.available_tool_count = 26;
+    wordRead.available_tools = [...WORD_V1_TOOLS, 'word.accept_change'];
+    writeFileSync(wordPath, JSON.stringify(word, null, 2));
+    const wordResult = runRecorder(join(dir, 'legacy-word-runtime.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--word-runtime-evidence-path', wordPath);
+    assert.notEqual(wordResult.status, 0);
+    let evidence = JSON.parse(outputText(wordResult.stdout)) as Record<string, unknown>;
+    assert.equal(evidence.word_runtime_evidence_ready, false);
+    assert.equal((evidence.word_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
+
+    const excelPath = writeExcelRuntimeEvidence(dir);
+    const excel = JSON.parse(readFileSync(excelPath, 'utf8')) as Record<string, unknown>;
+    const excelSmoke = ((excel.gates as Array<Record<string, unknown>>).find((gate) => gate.name === 'excel.runtime_smoke')?.details ?? {}) as Record<string, unknown>;
+    excelSmoke.available_tool_count = 21;
+    excelSmoke.available_tools = [...EXCEL_V1_TOOLS, 'excel.legacy_macro'];
+    writeFileSync(excelPath, JSON.stringify(excel, null, 2));
+    const excelResult = runRecorder(join(dir, 'legacy-excel-runtime.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-runtime-evidence-path', excelPath);
+    assert.notEqual(excelResult.status, 0);
+    evidence = JSON.parse(outputText(excelResult.stdout)) as Record<string, unknown>;
+    assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
+
+    const powerPointPath = writePowerPointRuntimeEvidence(dir);
+    const powerpoint = JSON.parse(readFileSync(powerPointPath, 'utf8')) as Record<string, unknown>;
+    const powerpointSmoke = ((powerpoint.gates as Array<Record<string, unknown>>).find((gate) => gate.name === 'powerpoint.runtime_smoke')?.details ?? {}) as Record<string, unknown>;
+    powerpointSmoke.available_tool_count = 26;
+    powerpointSmoke.available_tools = [...POWERPOINT_V1_TOOLS, 'powerpoint.export_pdf'];
+    writeFileSync(powerPointPath, JSON.stringify(powerpoint, null, 2));
+    const powerpointResult = runRecorder(join(dir, 'legacy-powerpoint-runtime.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--powerpoint-runtime-evidence-path', powerPointPath);
+    assert.notEqual(powerpointResult.status, 0);
+    evidence = JSON.parse(outputText(powerpointResult.stdout)) as Record<string, unknown>;
+    assert.equal(evidence.powerpoint_runtime_evidence_ready, false);
+    assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
+  });
+});
+
 test('product visual evidence recorder requires Office tool E2E reports', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -1109,6 +1202,8 @@ function writeExcelRuntimeEvidence(dir: string, ready = true): string {
   }] : [];
   const smokeDetails = {
     session_id: sessionId,
+    available_tool_count: ready ? 20 : 0,
+    available_tools: ready ? EXCEL_V1_TOOLS : [],
     marker_found: ready,
     workbook_info: ready ? { sheet_count: 2, table_count: 1 } : {},
     sheet_list_count: ready ? 1 : undefined,

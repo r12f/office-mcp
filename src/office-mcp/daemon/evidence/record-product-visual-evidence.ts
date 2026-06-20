@@ -54,6 +54,85 @@ const requiredSurfaces = [
   'tray_quit_confirmation'
 ];
 
+const excelV1Tools = [
+  'excel.get_workbook_info',
+  'excel.list_sheets',
+  'excel.add_sheet',
+  'excel.update_sheet',
+  'excel.delete_sheet',
+  'excel.get_used_range',
+  'excel.read_range',
+  'excel.write_range',
+  'excel.clear_range',
+  'excel.find_replace_cells',
+  'excel.set_formula',
+  'excel.format_range',
+  'excel.sort_range',
+  'excel.apply_filter',
+  'excel.create_table',
+  'excel.update_table',
+  'excel.create_chart',
+  'excel.update_chart',
+  'excel.create_pivot_table',
+  'excel.update_pivot_table'
+];
+
+const powerPointV1Tools = [
+  'powerpoint.get_presentation_info',
+  'powerpoint.get_active_view',
+  'powerpoint.export_file',
+  'powerpoint.update_tags',
+  'powerpoint.list_slides',
+  'powerpoint.add_slide',
+  'powerpoint.update_slide',
+  'powerpoint.delete_slide',
+  'powerpoint.move_slide',
+  'powerpoint.export_slide',
+  'powerpoint.list_layouts',
+  'powerpoint.apply_layout',
+  'powerpoint.get_selection',
+  'powerpoint.set_selection',
+  'powerpoint.list_shapes',
+  'powerpoint.add_text_box',
+  'powerpoint.add_shape',
+  'powerpoint.insert_image',
+  'powerpoint.update_shape',
+  'powerpoint.read_text',
+  'powerpoint.replace_text',
+  'powerpoint.format_text',
+  'powerpoint.add_table',
+  'powerpoint.read_table',
+  'powerpoint.update_table'
+];
+
+const wordV1Tools = [
+  'word.get_text',
+  'word.get_outline',
+  'word.get_paragraph',
+  'word.find_text',
+  'word.get_selection',
+  'word.insert_paragraph',
+  'word.insert_table',
+  'word.insert_image',
+  'word.insert_page_break',
+  'word.insert_list',
+  'word.replace_text',
+  'word.update_paragraph',
+  'word.delete_range',
+  'word.apply_formatting',
+  'word.apply_style',
+  'word.read_table',
+  'word.update_table',
+  'word.list_content_controls',
+  'word.insert_content_control',
+  'word.update_content_control',
+  'word.delete_content_control',
+  'word.add_comment',
+  'word.resolve_comment',
+  'word.update_tracked_change',
+  'word.save'
+];
+
 const observations = Object.fromEntries(requiredSurfaces.map((surface) => [surface, observationFor(surface)]));
 const screenshotPaths = Object.fromEntries(requiredSurfaces.map((surface) => [surface, screenshotPathFor(surface)]));
 const screenshotsExist = Object.fromEntries(
@@ -696,6 +775,10 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
+function exactToolCatalogReady(count: unknown, tools: unknown, expected: string[]): boolean {
+  return count === expected.length && sameStrings(stringArray(tools), expected);
+}
+
 function sameStrings(left: string[], right: string[]): boolean {
   return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 }
@@ -717,11 +800,7 @@ function powerPointRuntimeDetailsLookReady(session: Record<string, unknown> | un
     && typeof document?.title === 'string'
     && document.title.length > 0
     && host?.app === 'powerpoint'
-    && typeof session.available_tool_count === 'number'
-    && session.available_tool_count >= 25
-    && Array.isArray(details.available_tools)
-    && details.available_tools.includes('powerpoint.export_file')
-    && !details.available_tools.includes('powerpoint.export_pdf')
+    && exactToolCatalogReady(session.available_tool_count, details.available_tools, powerPointV1Tools)
     && details.mutation_proved === true
     && categoryProofs?.presentation === true
     && categoryProofs?.slides === true
@@ -764,8 +843,7 @@ function excelRuntimeDetailsLookReady(session: Record<string, unknown> | undefin
     && typeof document?.title === 'string'
     && document.title.length > 0
     && host?.app === 'excel'
-    && typeof session.available_tool_count === 'number'
-    && session.available_tool_count >= 20
+    && exactToolCatalogReady(session.available_tool_count, details.available_tools, excelV1Tools)
     && details.marker_found === true
     && isRecord(details.workbook_info)
     && typeof details.sheet_list_count === 'number'
@@ -798,10 +876,8 @@ function wordRuntimeDetailsLookReady(session: Record<string, unknown> | undefine
     && typeof document?.title === 'string'
     && document.title.length > 0
     && host?.app === 'word'
-    && typeof session.available_tool_count === 'number'
-    && session.available_tool_count >= 25
-    && typeof details.available_tool_count === 'number'
-    && details.available_tool_count >= 25
+    && exactToolCatalogReady(session.available_tool_count, details.available_tools, wordV1Tools)
+    && details.available_tool_count === wordV1Tools.length
     && Number(details.paragraph_0_text_length ?? 0) > 0
     && Number(details.document_text_length ?? 0) > 0
     && Number(details.find_count ?? 0) >= 1
