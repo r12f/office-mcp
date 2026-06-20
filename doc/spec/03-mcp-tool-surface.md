@@ -236,6 +236,11 @@ endpoint, driver-owned document path, session ID, advertised tool list, session
 pass/fail result, and lifecycle counters. A passing report must show exactly
 one daemon start, one `tools/list`, one document creation, one session wait,
 one document cleanup, and one daemon stop for the host run.
+Release validation consumes these reports through
+`npm run evidence:validate -- --require-office-tool-e2e` with explicit Word,
+Excel, and PowerPoint report paths. The validator fails if any report is
+missing, does not pass, has more than one lifecycle for the host run, omits a
+tool, or records a failed per-tool verifier.
 
 Each tool case supplies only the tool-specific pieces:
 

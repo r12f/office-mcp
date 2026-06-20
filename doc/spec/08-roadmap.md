@@ -1325,7 +1325,10 @@ implemented. When enabled, the Word, Excel, and PowerPoint commands write
 `artifacts/office-tool-e2e-powerpoint.json`. Those reports record the ordered
 tool loop, per-tool verifier results, and lifecycle counters so the release
 evidence can prove each host opened one driver-owned file/session and tested all
-tools in that single lifecycle.
+tools in that single lifecycle. The runtime evidence validator now exposes
+`--require-office-tool-e2e` with explicit Word, Excel, and PowerPoint report
+paths, and rejects missing reports, non-passing reports, non-single lifecycle
+counts, incomplete executed tool lists, or failed per-tool verifiers.
 
 **Exit criterion**: A developer can run one command per Office host and see the
 daemon start, a blank document connect, every MCP tool execute against fixed

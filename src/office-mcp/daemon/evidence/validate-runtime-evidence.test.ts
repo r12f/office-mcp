@@ -227,6 +227,78 @@ test('runtime evidence validator can require mutation evidence', () => {
   });
 });
 
+test('runtime evidence validator can require Office tool E2E reports', () => {
+  withEvidenceFile(report('passed'), (path) => {
+    const result = runValidator(path, '--require-office-tool-e2e');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /Missing --word-tool-e2e-report-path/);
+    assert.match(outputText(result.stdout), /Missing --excel-tool-e2e-report-path/);
+    assert.match(outputText(result.stdout), /Missing --powerpoint-tool-e2e-report-path/);
+  });
+
+  withEvidenceFile(report('passed'), (path) => {
+    withOfficeToolE2eReports(true, (reports) => {
+      const result = runValidator(
+        path,
+        '--require-office-tool-e2e',
+        '--word-tool-e2e-report-path', reports.word,
+        '--excel-tool-e2e-report-path', reports.excel,
+        '--powerpoint-tool-e2e-report-path', reports.powerpoint
+      );
+      assert.equal(result.status, 0, outputText(result.stdout) + outputText(result.stderr));
+      const summary = JSON.parse(outputText(result.stdout)) as { ok: boolean; require_office_tool_e2e?: boolean };
+      assert.equal(summary.ok, true);
+      assert.equal(summary.require_office_tool_e2e, true);
+    });
+  });
+
+  withEvidenceFile(report('passed'), (path) => {
+    withOfficeToolE2eReports(true, (reports) => {
+      const broken = JSON.parse(readFileSync(reports.word, 'utf8')) as ReturnType<typeof officeToolE2eReport>;
+      broken.lifecycle_counts.create_document = 2;
+      writeFileSync(reports.word, JSON.stringify(broken, null, 2));
+      const result = runValidator(path, '--require-office-tool-e2e', '--word-tool-e2e-report-path', reports.word, '--excel-tool-e2e-report-path', reports.excel, '--powerpoint-tool-e2e-report-path', reports.powerpoint);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report lifecycle create_document is 2, expected 1/);
+    });
+  });
+
+  withEvidenceFile(report('passed'), (path) => {
+    withOfficeToolE2eReports(true, (reports) => {
+      const broken = JSON.parse(readFileSync(reports.excel, 'utf8')) as ReturnType<typeof officeToolE2eReport>;
+      broken.executed_tools = broken.executed_tools.slice(0, -1);
+      writeFileSync(reports.excel, JSON.stringify(broken, null, 2));
+      const result = runValidator(path, '--require-office-tool-e2e', '--word-tool-e2e-report-path', reports.word, '--excel-tool-e2e-report-path', reports.excel, '--powerpoint-tool-e2e-report-path', reports.powerpoint);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Excel Office tool E2E report executed tools do not match advertised tools/);
+    });
+  });
+
+  withEvidenceFile(report('passed'), (path) => {
+    withOfficeToolE2eReports(true, (reports) => {
+      const broken = JSON.parse(readFileSync(reports.powerpoint, 'utf8')) as ReturnType<typeof officeToolE2eReport>;
+      broken.tool_runs[1].passed = false;
+      writeFileSync(reports.powerpoint, JSON.stringify(broken, null, 2));
+      const result = runValidator(path, '--require-office-tool-e2e', '--word-tool-e2e-report-path', reports.word, '--excel-tool-e2e-report-path', reports.excel, '--powerpoint-tool-e2e-report-path', reports.powerpoint);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /PowerPoint Office tool E2E report tool powerpoint\.add_slide did not pass/);
+    });
+  });
+});
+
+test('README documents Office tool E2E report validation command', () => {
+  const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
+  const commandLine = readme.split('\n').find((line) => line.includes('--require-office-tool-e2e')) ?? '';
+
+  assert.match(readme, /OFFICE_MCP_RUN_E2E = '1'/);
+  assert.match(readme, /office-tool-e2e-<host>\.json/);
+  assert.match(commandLine, /npm run evidence:validate/);
+  assert.match(commandLine, /--require-office-tool-e2e/);
+  assert.match(commandLine, /--word-tool-e2e-report-path .*office-tool-e2e-word\.json/);
+  assert.match(commandLine, /--excel-tool-e2e-report-path .*office-tool-e2e-excel\.json/);
+  assert.match(commandLine, /--powerpoint-tool-e2e-report-path .*office-tool-e2e-powerpoint\.json/);
+});
+
 test('runtime evidence validator accepts UI runtime evidence gates', () => {
   const ui = uiReport();
   withEvidenceFile(ui, (path) => {
@@ -917,6 +989,58 @@ function withManualTrayEvidence(passed: boolean, callback: (path: string) => voi
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+function withOfficeToolE2eReports(passed: boolean, callback: (reports: Record<'word' | 'excel' | 'powerpoint', string>) => void): void {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-tool-e2e-reports-'));
+  try {
+    const reports = {
+      word: join(dir, 'office-tool-e2e-word.json'),
+      excel: join(dir, 'office-tool-e2e-excel.json'),
+      powerpoint: join(dir, 'office-tool-e2e-powerpoint.json')
+    };
+    writeFileSync(reports.word, JSON.stringify(officeToolE2eReport('Word', ['word.get_text', 'word.insert_paragraph'], passed), null, 2));
+    writeFileSync(reports.excel, JSON.stringify(officeToolE2eReport('Excel', ['excel.get_workbook_info', 'excel.write_range'], passed), null, 2));
+    writeFileSync(reports.powerpoint, JSON.stringify(officeToolE2eReport('PowerPoint', ['powerpoint.get_presentation_info', 'powerpoint.add_slide'], passed), null, 2));
+    callback(reports);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function officeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tools: string[], passed: boolean) {
+  const now = new Date().toISOString();
+  return {
+    schema_version: 1,
+    kind: 'office_tool_e2e_report',
+    host,
+    started_at: now,
+    finished_at: now,
+    passed,
+    daemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
+    document: { path: `${host.toLowerCase()}-fixture` },
+    session: { session_id: `${host.toLowerCase()}-session`, available_tool_count: tools.length },
+    lifecycle_counts: {
+      start_daemon: 1,
+      list_tools: 1,
+      create_document: 1,
+      wait_for_session: 1,
+      cleanup_document: 1,
+      stop_daemon: 1
+    },
+    advertised_tools: tools,
+    session_available_tools: tools,
+    executed_tools: tools,
+    tool_runs: tools.map((tool, index) => ({
+      id: `e2e-${tool.replace(/[^a-z0-9]+/gi, '-')}`,
+      tool,
+      started_at: now,
+      finished_at: now,
+      setup_action_count: 1,
+      verifier: { kind: index === 0 ? 'direct-result' : 'readback', expectation_keys: ['contains'] },
+      passed
+    }))
+  };
 }
 
 function report(irmStatus: 'passed' | 'skipped') {

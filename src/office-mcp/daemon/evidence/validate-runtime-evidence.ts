@@ -39,6 +39,10 @@ const requireIrmPreflight = hasFlag('--require-irm-preflight');
 const requireClaudeDesktopInstallation = hasFlag('--require-claude-desktop-installation');
 const requireAgentClientPrompt = hasFlag('--require-agent-client-prompt');
 const requireMutation = hasFlag('--require-mutation');
+const requireOfficeToolE2e = hasFlag('--require-office-tool-e2e');
+const wordToolE2eReportPath = readOption('--word-tool-e2e-report-path') ?? process.env.OFFICE_MCP_WORD_TOOL_E2E_REPORT_PATH;
+const excelToolE2eReportPath = readOption('--excel-tool-e2e-report-path') ?? process.env.OFFICE_MCP_EXCEL_TOOL_E2E_REPORT_PATH;
+const powerPointToolE2eReportPath = readOption('--powerpoint-tool-e2e-report-path') ?? process.env.OFFICE_MCP_POWERPOINT_TOOL_E2E_REPORT_PATH;
 const report = JSON.parse(readFileSync(evidencePath, 'utf8')) as EvidenceReport;
 const requiresWordBaseline = !(requireExcelSmoke || requirePowerPointSmoke) ||
   requireIrm ||
@@ -113,6 +117,8 @@ if (requireClaudeDesktopInstallation) {
 
 if (requireAgentClientPrompt) requirePassedGate('agent_client_prompt');
 
+if (requireOfficeToolE2e) validateOfficeToolE2eReports();
+
 const irmGate = gateByName('irm_rights_matrix');
 if (requireIrm) {
   if (!irmGate) {
@@ -136,7 +142,13 @@ const summary = {
   require_claude_desktop_installation: requireClaudeDesktopInstallation,
   require_agent_client_prompt: requireAgentClientPrompt,
   require_mutation: requireMutation,
+  require_office_tool_e2e: requireOfficeToolE2e,
   require_manual_tray: requireManualTray,
+  office_tool_e2e_report_paths: requireOfficeToolE2e ? {
+    word: wordToolE2eReportPath ? resolve(wordToolE2eReportPath) : undefined,
+    excel: excelToolE2eReportPath ? resolve(excelToolE2eReportPath) : undefined,
+    powerpoint: powerPointToolE2eReportPath ? resolve(powerPointToolE2eReportPath) : undefined
+  } : undefined,
   generated_at: report.generated_at,
   endpoint: report.endpoint,
   session_id: report.session_id,
@@ -179,6 +191,89 @@ function validatePowerPointSmokeGate(gate: EvidenceGate | undefined): void {
   const exportSupported = details.export_supported === true && details.export_mime_type === 'application/pdf' && typeof details.export_size === 'number';
   const exportHostRejection = details.export_host_rejection === true;
   if (!exportSupported && !exportHostRejection) failures.push('PowerPoint smoke gate missing export_file success or explicit host-capability rejection.');
+}
+
+function validateOfficeToolE2eReports(): void {
+  validateOfficeToolE2eReport('Word', wordToolE2eReportPath);
+  validateOfficeToolE2eReport('Excel', excelToolE2eReportPath);
+  validateOfficeToolE2eReport('PowerPoint', powerPointToolE2eReportPath);
+}
+
+function validateOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path: string | undefined): void {
+  if (!path) {
+    failures.push(`Missing --${hostToolE2ePathOption(host)} for required Office tool E2E report.`);
+    return;
+  }
+  let e2e: Record<string, unknown>;
+  try {
+    e2e = JSON.parse(readFileSync(resolve(path), 'utf8')) as Record<string, unknown>;
+  } catch (error) {
+    failures.push(`${host} Office tool E2E report could not be read: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+
+  if (e2e.schema_version !== 1) failures.push(`${host} Office tool E2E report unsupported schema_version: ${e2e.schema_version}`);
+  if (e2e.kind !== 'office_tool_e2e_report') failures.push(`${host} Office tool E2E report has unsupported kind: ${e2e.kind ?? 'missing'}`);
+  if (e2e.host !== host) failures.push(`${host} Office tool E2E report host is ${String(e2e.host)}, expected ${host}.`);
+  if (e2e.passed !== true) failures.push(`${host} Office tool E2E report did not pass.`);
+  validateOfficeToolE2eLifecycle(host, e2e.lifecycle_counts);
+
+  const advertisedTools = stringArray(e2e.advertised_tools);
+  const sessionTools = stringArray(e2e.session_available_tools);
+  const executedTools = stringArray(e2e.executed_tools);
+  if (advertisedTools.length === 0) failures.push(`${host} Office tool E2E report missing advertised tools.`);
+  if (!sameStrings(advertisedTools, sessionTools)) failures.push(`${host} Office tool E2E report session tools do not match advertised tools.`);
+  if (!sameStrings(advertisedTools, executedTools)) failures.push(`${host} Office tool E2E report executed tools do not match advertised tools.`);
+  validateOfficeToolRuns(host, advertisedTools, e2e.tool_runs);
+
+  if (!isRecord(e2e.daemon) || typeof e2e.daemon.endpoint !== 'string') failures.push(`${host} Office tool E2E report missing daemon endpoint.`);
+  if (!isRecord(e2e.document) || typeof e2e.document.path !== 'string') failures.push(`${host} Office tool E2E report missing driver-owned document path.`);
+  if (!isRecord(e2e.session) || typeof e2e.session.session_id !== 'string') failures.push(`${host} Office tool E2E report missing session ID.`);
+}
+
+function validateOfficeToolE2eLifecycle(host: string, lifecycle: unknown): void {
+  if (!isRecord(lifecycle)) {
+    failures.push(`${host} Office tool E2E report missing lifecycle counts.`);
+    return;
+  }
+  for (const key of ['start_daemon', 'list_tools', 'create_document', 'wait_for_session', 'cleanup_document', 'stop_daemon']) {
+    if (lifecycle[key] !== 1) failures.push(`${host} Office tool E2E report lifecycle ${key} is ${String(lifecycle[key])}, expected 1.`);
+  }
+}
+
+function validateOfficeToolRuns(host: string, advertisedTools: string[], runs: unknown): void {
+  if (!Array.isArray(runs)) {
+    failures.push(`${host} Office tool E2E report missing tool runs.`);
+    return;
+  }
+  const runTools = runs.filter(isRecord).map((run) => run.tool).filter((tool): tool is string => typeof tool === 'string');
+  if (!sameStrings(advertisedTools, runTools)) failures.push(`${host} Office tool E2E report tool runs do not match advertised tools.`);
+  for (const run of runs.filter(isRecord)) {
+    const tool = typeof run.tool === 'string' ? run.tool : '<missing>';
+    if (run.passed !== true) failures.push(`${host} Office tool E2E report tool ${tool} did not pass.`);
+    if (typeof run.id !== 'string' || run.id.length === 0) failures.push(`${host} Office tool E2E report tool ${tool} missing run ID.`);
+    if (typeof run.setup_action_count !== 'number' || run.setup_action_count < 1) failures.push(`${host} Office tool E2E report tool ${tool} missing setup action proof.`);
+    const verifier = run.verifier;
+    if (!isRecord(verifier) || (verifier.kind !== 'direct-result' && verifier.kind !== 'readback')) {
+      failures.push(`${host} Office tool E2E report tool ${tool} missing verifier kind.`);
+    }
+    const expectationKeys = isRecord(verifier) && Array.isArray(verifier.expectation_keys) ? verifier.expectation_keys : [];
+    if (expectationKeys.length === 0) failures.push(`${host} Office tool E2E report tool ${tool} missing verifier expectations.`);
+  }
+}
+
+function hostToolE2ePathOption(host: 'Word' | 'Excel' | 'PowerPoint'): string {
+  if (host === 'Word') return 'word-tool-e2e-report-path';
+  if (host === 'Excel') return 'excel-tool-e2e-report-path';
+  return 'powerpoint-tool-e2e-report-path';
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function sameStrings(left: string[], right: string[]): boolean {
+  return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 }
 
 function validatePowerPointCategoryProofs(value: unknown, label: string): void {

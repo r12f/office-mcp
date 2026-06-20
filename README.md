@@ -208,6 +208,23 @@ npm run evidence:runtime -- --endpoint http://127.0.0.1:8800/mcp --output ..\..\
 npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-full.json --require-mutation --require-full-word-smoke --require-com-tracked-changes
 ```
 
+For live tool-level E2E evidence, keep the daemon running, open/connect the
+add-in once per host, and run each host loop with the live driver enabled. Each
+command opens one driver-owned file/session for that host, loops the advertised
+tools, and writes `artifacts/office-tool-e2e-<host>.json`:
+
+```powershell
+cd ..\..\office-ctl\word
+$env:OFFICE_MCP_RUN_E2E = '1'
+npm run e2e:tools
+cd ..\excel
+npm run e2e:tools
+cd ..\powerpoint
+npm run e2e:tools
+cd ..\..\office-mcp\daemon\evidence
+npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-full.json --require-office-tool-e2e --word-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-word.json --excel-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-excel.json --powerpoint-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-powerpoint.json
+```
+
 For a connected Excel workbook, run:
 
 ```powershell
