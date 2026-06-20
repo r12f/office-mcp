@@ -1289,23 +1289,19 @@ automation driver now provides daemon startup, Word/Excel COM document creation
 and cleanup, MCP `tools/call`, and explicit session waiting through the
 `OFFICE_MCP_E2E_DRIVER` JSON step protocol. The driver also supports generic
 setup/reset action metadata, setup-result bindings such as `${table.shape_id}`,
-and generic readback verification metadata: a case can declare MCP setup
-actions, call the tool under test, then call a follow-up read tool and assert
-expected `contains`/`notContains` markers. The first concrete setup/readback
-cases now cover Word `insert_paragraph`, `insert_table`, `insert_list`,
-`replace_text`, `update_paragraph`, `delete_range`, `update_table`,
-`apply_style`, `insert_content_control`, `update_content_control`, and
-`delete_content_control`; Excel `add_sheet`, `update_sheet`, `delete_sheet`,
-`write_range`, `clear_range`, `find_replace_cells`, `set_formula`, and
-`format_range`, `sort_range`, `create_table`, `update_table`, `create_chart`,
-and `update_chart`; and
-PowerPoint `add_slide`, `update_slide`, `add_text_box`, `add_shape`,
-`update_shape`, `replace_text`, `delete_slide`, `move_slide`, `apply_layout`,
-`update_tags`, `format_text`, `add_table`, and `update_table`.
-Full add-in activation, live Office execution, and concrete setup/readback
-verifiers for every
-mutating/destructive tool remain open. Each host exposes
-`npm run e2e:tools` as the non-evidence tool E2E command.
+resource-read bindings such as `${trackChanges.changes.0.fingerprint}`, generic
+direct-result assertions, and generic readback verification metadata. A case can
+declare MCP setup actions, read MCP resources, call the tool under test, then
+assert direct result fields or call a follow-up read tool and assert expected
+`contains`/`notContains`/ordered/path markers. The host case tables now cover
+all currently advertised Word, Excel, and PowerPoint tools with deterministic
+setup and a direct-result or readback verifier. The shared coverage gate also
+parses the daemon Rust runtime catalog and fails if a host E2E table covers the
+task pane `AVAILABLE_TOOLS` but misses a tool exposed by MCP `tools/list`.
+Full add-in activation and live Office execution remain open. Each host exposes
+`npm run e2e:tools` as the non-evidence tool E2E command; live Office execution
+is still opt-in through `OFFICE_MCP_RUN_E2E=1` until the activation driver is
+implemented.
 
 **Exit criterion**: A developer can run one command per Office host and see the
 daemon start, a blank document connect, every MCP tool execute against fixed
