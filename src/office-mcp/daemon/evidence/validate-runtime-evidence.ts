@@ -95,7 +95,10 @@ if (requireFullWordSmoke) {
   for (const name of fullWordSmokeGates) requirePassedGate(name);
 }
 
-if (requireExcelSmoke) requirePassedGate('excel.runtime_smoke');
+if (requireExcelSmoke) {
+  const gate = requirePassedGate('excel.runtime_smoke');
+  validateExcelSmokeGate(gate);
+}
 if (requirePowerPointSmoke) {
   const gate = requirePassedGate('powerpoint.runtime_smoke');
   validatePowerPointSmokeGate(gate);
@@ -191,6 +194,66 @@ function validatePowerPointSmokeGate(gate: EvidenceGate | undefined): void {
   const exportSupported = details.export_supported === true && details.export_mime_type === 'application/pdf' && typeof details.export_size === 'number';
   const exportHostRejection = details.export_host_rejection === true;
   if (!exportSupported && !exportHostRejection) failures.push('PowerPoint smoke gate missing export_file success or explicit host-capability rejection.');
+}
+
+function validateExcelSmokeGate(gate: EvidenceGate | undefined): void {
+  if (!gate || gate.status !== 'passed') return;
+  const details = gate.details;
+  if (!isRecord(details)) {
+    failures.push('Excel smoke gate missing details.');
+    return;
+  }
+  if (typeof details.session_id !== 'string' || details.session_id.length === 0) failures.push('Excel smoke gate missing session_id.');
+  if (typeof details.available_tool_count !== 'number' || details.available_tool_count < 20) failures.push('Excel smoke gate missing 20-tool available tool count.');
+  const availableTools = stringArray(details.available_tools);
+  if (!excelV1Tools().every((tool) => availableTools.includes(tool))) {
+    failures.push('Excel smoke gate available tools are not aligned with v1 catalog.');
+  }
+  if (details.marker_found !== true) failures.push('Excel smoke gate missing marker readback.');
+  if (!isRecord(details.workbook_info)) failures.push('Excel smoke gate missing get_workbook_info proof.');
+  if (typeof details.sheet_list_count !== 'number') failures.push('Excel smoke gate missing list_sheets proof.');
+  if (!isRecord(details.updated_sheet)) failures.push('Excel smoke gate missing update_sheet proof.');
+  if (!isRecord(details.deleted_sheet) || details.deleted_sheet.deleted !== true) failures.push('Excel smoke gate missing delete_sheet proof.');
+  if (!isRecord(details.used_range)) failures.push('Excel smoke gate missing get_used_range proof.');
+  if (!isRecord(details.find_replace)) failures.push('Excel smoke gate missing find_replace_cells proof.');
+  if (!isRecord(details.clear)) failures.push('Excel smoke gate missing clear_range proof.');
+  if (!isRecord(details.write) || details.write.wrote_values !== true) failures.push('Excel smoke gate missing write_range proof.');
+  if (!isRecord(details.formula) || details.formula.wrote_formula !== true) failures.push('Excel smoke gate missing set_formula proof.');
+  if (!isRecord(details.format) || details.format.formatted !== true) failures.push('Excel smoke gate missing format_range proof.');
+  if (!isRecord(details.table) || typeof details.table.table !== 'string') failures.push('Excel smoke gate missing create_table proof.');
+  if (!isRecord(details.table_update)) failures.push('Excel smoke gate missing update_table proof.');
+  if (!isRecord(details.sort) || details.sort.sorted !== true) failures.push('Excel smoke gate missing sort_range proof.');
+  if (!isRecord(details.filter) || details.filter.filtered !== true) failures.push('Excel smoke gate missing apply_filter proof.');
+  if (!isRecord(details.chart) || typeof details.chart.chart !== 'string') failures.push('Excel smoke gate missing create_chart proof.');
+  if (!isRecord(details.chart_update) || details.chart_update.updated !== true) failures.push('Excel smoke gate missing update_chart proof.');
+  if (!isRecord(details.pivot_table) || typeof details.pivot_table.pivot_table !== 'string') failures.push('Excel smoke gate missing create_pivot_table proof.');
+  if (!isRecord(details.pivot_update) || details.pivot_update.refreshed !== true) failures.push('Excel smoke gate missing update_pivot_table proof.');
+  if (!isRecord(details.sheet) || details.sheet.activated !== true) failures.push('Excel smoke gate missing add_sheet activation proof.');
+}
+
+function excelV1Tools(): string[] {
+  return [
+    'excel.get_workbook_info',
+    'excel.list_sheets',
+    'excel.add_sheet',
+    'excel.update_sheet',
+    'excel.delete_sheet',
+    'excel.get_used_range',
+    'excel.read_range',
+    'excel.write_range',
+    'excel.clear_range',
+    'excel.find_replace_cells',
+    'excel.set_formula',
+    'excel.format_range',
+    'excel.sort_range',
+    'excel.apply_filter',
+    'excel.create_table',
+    'excel.update_table',
+    'excel.create_chart',
+    'excel.update_chart',
+    'excel.create_pivot_table',
+    'excel.update_pivot_table'
+  ];
 }
 
 function validateOfficeToolE2eReports(): void {

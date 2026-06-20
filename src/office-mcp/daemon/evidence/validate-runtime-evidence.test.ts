@@ -38,6 +38,29 @@ const POWERPOINT_V1_TOOLS = [
   'powerpoint.update_table'
 ];
 
+const EXCEL_V1_TOOLS = [
+  'excel.get_workbook_info',
+  'excel.list_sheets',
+  'excel.add_sheet',
+  'excel.update_sheet',
+  'excel.delete_sheet',
+  'excel.get_used_range',
+  'excel.read_range',
+  'excel.write_range',
+  'excel.clear_range',
+  'excel.find_replace_cells',
+  'excel.set_formula',
+  'excel.format_range',
+  'excel.sort_range',
+  'excel.apply_filter',
+  'excel.create_table',
+  'excel.update_table',
+  'excel.create_chart',
+  'excel.update_chart',
+  'excel.create_pivot_table',
+  'excel.update_pivot_table'
+];
+
 test('runtime evidence validator accepts required runtime gates and optional IRM skip', () => {
   withEvidenceFile(report('skipped'), (path) => {
     const result = runValidator(path);
@@ -87,11 +110,39 @@ test('runtime evidence validator can require Excel smoke evidence', () => {
     assert.match(outputText(result.stdout), /Missing required gate: excel\.runtime_smoke/);
   });
 
-  const full = report('skipped');
-  full.gates.push(gate('excel.runtime_smoke', 'passed'));
+  const full = excelOnlyReport();
   withEvidenceFile(full, (path) => {
     const result = runValidator(path, '--require-excel-smoke');
     assert.equal(result.status, 0, outputText(result.stderr));
+  });
+
+  const weak = excelOnlyReport();
+  const weakDiscovery = weak.gates[0].details as { sessions: Array<{ available_tool_count: number }> };
+  const weakSmoke = weak.gates[1].details as Record<string, unknown>;
+  weakDiscovery.sessions[0].available_tool_count = 7;
+  weakSmoke.available_tool_count = 7;
+  weakSmoke.available_tools = EXCEL_V1_TOOLS.slice(0, 7);
+  delete weakSmoke.sort;
+  delete weakSmoke.pivot_table;
+  withEvidenceFile(weak, (path) => {
+    const result = runValidator(path, '--require-excel-smoke');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /Excel smoke gate missing 20-tool available tool count/);
+    assert.match(outputText(result.stdout), /Excel smoke gate available tools are not aligned with v1 catalog/);
+    assert.match(outputText(result.stdout), /Excel smoke gate missing sort_range proof/);
+    assert.match(outputText(result.stdout), /Excel smoke gate missing create_pivot_table proof/);
+  });
+});
+
+test('runtime evidence validator rejects passed Excel smoke gates without v1 proof details', () => {
+  const weak = report('skipped');
+  weak.gates.push(gate('excel.runtime_smoke', 'passed'));
+  withEvidenceFile(weak, (path) => {
+    const result = runValidator(path, '--require-excel-smoke');
+    assert.notEqual(result.status, 0);
+    assert.match(outputText(result.stdout), /Excel smoke gate missing session_id/);
+    assert.match(outputText(result.stdout), /Excel smoke gate missing 20-tool available tool count/);
+    assert.match(outputText(result.stdout), /Excel smoke gate missing marker readback/);
   });
 });
 
@@ -1687,14 +1738,54 @@ function powerpointOnlyReport() {
 }
 function excelOnlyReport() {
   const now = new Date().toISOString();
+  const sessionId = 'excel-session-1';
   return {
     schema_version: 1,
     generated_at: now,
     endpoint: 'http://127.0.0.1:8800/mcp',
     gates: [
-      gate('word.session_discovery', 'passed'),
-      gate('excel.runtime_smoke', 'passed')
+      gate('word.session_discovery', 'passed', {
+        sessions: [{
+          app: 'excel',
+          status: 'active',
+          session_id: sessionId,
+          available_tool_count: 20,
+          document: { title: 'E2E workbook.xlsx' },
+          host: { app: 'excel', platform: 'pc', version: '16.0' }
+        }]
+      }),
+      gate('excel.runtime_smoke', 'passed', excelSmokeDetails(sessionId))
     ]
+  };
+}
+
+function excelSmokeDetails(sessionId: string) {
+  return {
+    session_id: sessionId,
+    document_title: 'E2E workbook.xlsx',
+    available_tool_count: 20,
+    available_tools: EXCEL_V1_TOOLS,
+    marker_found: true,
+    workbook_info: { active_sheet: 'Sheet1', sheet_count: 1, table_count: 0 },
+    sheet_list_count: 1,
+    read_before_address: 'Sheet1!A1:B2',
+    updated_sheet: { name: 'Renamed Sheet' },
+    deleted_sheet: { deleted: true },
+    used_range: { address: 'Renamed Sheet!A1:C5' },
+    find_replace: { replaced: 1 },
+    clear: { cleared: true },
+    write: { wrote_values: true },
+    formula: { wrote_formula: true },
+    format: { formatted: true },
+    table: { table: 'E2ETable' },
+    table_update: { updated: true },
+    sort: { sorted: true },
+    filter: { filtered: true },
+    chart: { chart: 'E2E Chart' },
+    chart_update: { updated: true },
+    pivot_table: { pivot_table: 'E2EPivot' },
+    pivot_update: { refreshed: true },
+    sheet: { activated: true }
   };
 }
 
