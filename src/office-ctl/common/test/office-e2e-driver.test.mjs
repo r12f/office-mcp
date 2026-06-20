@@ -351,6 +351,12 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /Find-GlobalControlByName/);
   assert.match(script, /Wait-ForOpenControlPanel/);
   assert.match(script, /Try-EnableOfficeMcpAddin/);
+  assert.match(script, /function Try-ConfirmCatalogAddinInstall/);
+  assert.match(script, /Try-ConfirmCatalogAddinInstall -WindowHandle \$WindowHandle -Deadline \$Deadline -Source \$Source/);
+  assert.match(script, /catalog install confirm invoked name=\$name source=\$Source/);
+  assert.match(script, /function Try-OpenControlPanelFromRibbonTabs/);
+  assert.match(script, /Try-OpenControlPanelFromRibbonTabs -WindowHandle \$WindowHandle -Deadline \$Deadline -Source "catalog-confirm:\$name"/);
+  assert.match(script, /post-catalog tab scan invoked name=\$tabName source=\$Source/);
   assert.match(script, /Office MCP Control was clicked but Open Control Panel did not appear yet/);
   assert.match(script, /found Office MCP Control source=\$Source/);
   assert.doesNotMatch(script, /control_name\s*=\s*"Office MCP Control"/, 'clicking the add-in entry alone is not a completed activation');

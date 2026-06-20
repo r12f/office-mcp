@@ -597,8 +597,52 @@ function Try-EnableOfficeMcpAddin {
   Write-ActivatorLog "found Office MCP Control source=$Source name=$($addin.Current.Name)"
   Invoke-Control -Element $addin
   Start-Sleep -Milliseconds 800
+  if (Try-ConfirmCatalogAddinInstall -WindowHandle $WindowHandle -Deadline $Deadline -Source $Source) { return $true }
   if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline $Deadline -Source $Source) { return $true }
   Write-ActivatorLog "Office MCP Control was clicked but Open Control Panel did not appear yet source=$Source"
+  return $false
+}
+
+function Try-ConfirmCatalogAddinInstall {
+  param(
+    [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
+    [Parameter(Mandatory = $true)]$Deadline,
+    [Parameter(Mandatory = $true)][string]$Source
+  )
+
+  $officeProcessId = Get-OfficeProcessIdFromHandle -Handle $WindowHandle
+  foreach ($name in @("Add", "Continue", "Trust this add-in", "Open", "Office MCP Control", "Open Control Panel")) {
+    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
+    $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
+    $control = Find-DescendantByNameLike -Root $window -Name $name -ProcessId $officeProcessId
+    if (-not $control) {
+      $control = Find-GlobalControlByName -Name $name -ProcessId $officeProcessId
+    }
+    if (-not $control) { continue }
+    Write-ActivatorLog "catalog install confirm invoked name=$name source=$Source"
+    Invoke-Control -Element $control
+    Start-Sleep -Milliseconds 1000
+    if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(4) -Source "catalog-confirm:$name") { return $true }
+    if (Try-OpenControlPanelFromRibbonTabs -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-confirm:$name") { return $true }
+  }
+  return $false
+}
+
+function Try-OpenControlPanelFromRibbonTabs {
+  param(
+    [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
+    [Parameter(Mandatory = $true)]$Deadline,
+    [Parameter(Mandatory = $true)][string]$Source
+  )
+
+  $tabNames = if ($hostKey -eq "excel") { @("Home", "Add-ins", "Insert", "My Add-ins") } else { @("Home", "Insert", "Add-ins", "My Add-ins") }
+  foreach ($tabName in $tabNames) {
+    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
+    $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
+    if (-not (Try-InvokeNamedControl -Root $window -Name $tabName)) { continue }
+    Write-ActivatorLog "post-catalog tab scan invoked name=$tabName source=$Source"
+    if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(3) -Source "$Source:tab:$tabName") { return $true }
+  }
   return $false
 }
 
