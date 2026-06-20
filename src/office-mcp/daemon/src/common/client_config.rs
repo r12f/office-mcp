@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClaudeDesktopConfigBuilder {
@@ -64,7 +64,7 @@ impl ClaudeDesktopConfigBuilder {
                     .install_root
                     .clone()
                     .unwrap_or_else(|| default_windows_install_root(&self.env));
-                let launcher = root.join("office-mcp.ps1");
+                let launcher = windows_child_path(&root, "office-mcp.ps1");
                 format!(
                     concat!(
                         "{{\n",
@@ -83,7 +83,7 @@ impl ClaudeDesktopConfigBuilder {
                         "  }}\n",
                         "}}"
                     ),
-                    json_escape(&launcher.display().to_string())
+                    json_escape(&launcher)
                 )
             }
         }
@@ -94,6 +94,11 @@ impl ClaudeDesktopConfigBuilder {
 enum ClaudeDesktopMode {
     Development,
     Installed,
+}
+
+fn windows_child_path(root: &Path, leaf: &str) -> String {
+    let root = root.display().to_string().replace('/', "\\");
+    format!("{}\\{}", root.trim_end_matches('\\'), leaf)
 }
 
 fn default_windows_install_root(env: &BTreeMap<String, String>) -> PathBuf {

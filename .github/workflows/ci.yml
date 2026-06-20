@@ -35,6 +35,12 @@ jobs:
       - name: Lint daemon
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      - name: Generate test HTTPS certificate
+        shell: bash
+        run: |
+          openssl req -x509 -newkey rsa:2048 -nodes -subj "/CN=localhost" -keyout "$RUNNER_TEMP/office-mcp-localhost.key" -out "$RUNNER_TEMP/office-mcp-localhost.crt" -days 1
+          openssl pkcs12 -export -out .office-mcp-localhost.pfx -inkey "$RUNNER_TEMP/office-mcp-localhost.key" -in "$RUNNER_TEMP/office-mcp-localhost.crt" -passout pass:office-mcp-localhost
+
       - name: Test daemon
         run: cargo test --workspace
 
