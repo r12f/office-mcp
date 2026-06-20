@@ -194,6 +194,31 @@ test('E2E case coverage accepts concrete readback verifiers with explicit expect
   assert.deepEqual(toolCase.verify.expect, { contains: ['updated'], notContains: ['baseline'] });
 });
 
+test('E2E case coverage accepts resource readback verifiers with explicit expectations', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-e2e-resource-verifier-'));
+  const addinRoot = join(dir, 'word');
+  const publicRoot = join(addinRoot, 'public');
+  mkdirSync(publicRoot, { recursive: true });
+  writeFileSync(join(publicRoot, 'taskpane.js'), "const AVAILABLE_TOOLS = ['word.add_comment'];\n");
+  const catalogPath = join(dir, 'catalog.rs');
+  writeFileSync(catalogPath, 'pub const WORD_V1_TOOLS: &[&str] = &["word.add_comment"];\n');
+  const toolCase = e2eCase('word.add_comment', {
+    verify: {
+      kind: 'readback',
+      resource: 'office://word/${session_id}/comments',
+      expect: { contains: ['E2E comment'] }
+    }
+  });
+
+  assertE2eCaseCoverage({
+    addinRoot,
+    host: 'Word',
+    catalogPath,
+    cases: { 'word.add_comment': toolCase }
+  });
+  assert.equal(toolCase.verify.resource, 'office://word/${session_id}/comments');
+});
+
 test('E2E case coverage checks daemon catalog tools as well as task pane tools', () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-e2e-catalog-'));
   const addinRoot = join(dir, 'word');

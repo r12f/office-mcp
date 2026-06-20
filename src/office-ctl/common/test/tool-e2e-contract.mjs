@@ -39,7 +39,7 @@ export function assertE2eCaseCoverage({ addinRoot, host, cases, catalogPath }) {
     assert.ok(toolCase.verify, `${tool} case must define a verifier`);
     assert.match(toolCase.verify.kind, /^(direct-result|readback)$/);
     if (toolCase.verify.kind === 'readback' && toolCase.verify.expect) {
-      assert.ok(toolCase.verify.readbackTool, `${tool} readback verifier must define readbackTool`);
+      assert.ok(toolCase.verify.readbackTool || toolCase.verify.resource, `${tool} readback verifier must define readbackTool or resource`);
     }
   }
 }

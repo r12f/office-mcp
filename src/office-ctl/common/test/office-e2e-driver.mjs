@@ -237,11 +237,18 @@ async function verifyResult(context) {
     return { verified: true, kind: verifier.kind };
   }
   if (verifier.kind !== 'readback') return { verified: true, kind: verifier.kind };
-  if (!verifier.readbackTool) return { verified: true, kind: verifier.kind, readback: 'not-configured' };
 
   const daemon = context.daemon || {};
   const session = context.session || {};
-  const bindings = { ...(session.bindings || {}), result: actionResultData(result) };
+  const bindings = { session_id: session.sessionId, ...(session.bindings || {}), result: actionResultData(result) };
+  if (verifier.resource) {
+    const resource = resolveBindings(verifier.resource, bindings);
+    const readback = await mcpResourceRead(daemon.endpoint, resource);
+    assertReadbackExpectations(toolCase.tool || 'tool', resourceResultData(readback), verifier.expect || {});
+    return { verified: true, kind: verifier.kind, readbackResource: resource };
+  }
+  if (!verifier.readbackTool) return { verified: true, kind: verifier.kind, readback: 'not-configured' };
+
   const readbackArguments = { ...resolveBindings(verifier.readbackArguments || {}, bindings), session_id: session.sessionId };
   const readback = await mcpToolCall(daemon.endpoint, verifier.readbackTool, readbackArguments);
   assertReadbackExpectations(toolCase.tool || 'tool', readback, verifier.expect || {});

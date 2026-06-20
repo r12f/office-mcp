@@ -221,8 +221,9 @@ const WORD_E2E_CASES = Object.fromEntries([
     },
     args: { anchor: { kind: 'after_text', text: 'Comment target paragraph' }, text: 'E2E comment' },
     verify: {
-      kind: 'direct-result',
-      expect: { pathEquals: [{ path: 'content', value: 'E2E comment' }, { path: 'resolved', value: false }] }
+      kind: 'readback',
+      resource: 'office://word/${session_id}/comments',
+      expect: { contains: ['E2E comment'] }
     }
   }],
   ['word.resolve_comment', {
@@ -234,8 +235,9 @@ const WORD_E2E_CASES = Object.fromEntries([
     },
     args: { comment_id: '${commentResult.comment_id}' },
     verify: {
-      kind: 'direct-result',
-      expect: { pathEquals: [{ path: 'resolved', value: true }] }
+      kind: 'readback',
+      resource: 'office://word/${session_id}/comments',
+      expect: { contains: ['Resolve me E2E', 'true'] }
     }
   }],
   ['word.update_tracked_change', {
@@ -247,8 +249,9 @@ const WORD_E2E_CASES = Object.fromEntries([
     },
     args: { change_index: '${trackChanges.changes.0.index}', action: 'accept', expected_fingerprint: '${trackChanges.changes.0.fingerprint}' },
     verify: {
-      kind: 'direct-result',
-      expect: { pathEquals: [{ path: 'action', value: 'accept' }] }
+      kind: 'readback',
+      resource: 'office://word/${session_id}/track_changes',
+      expect: { notContains: ['Tracked change E2E paragraph'] }
     }
   }],
   ['word.save', {
@@ -284,9 +287,9 @@ test('Word mutating E2E cases define concrete setup and readback checks', () => 
   assertDirectResult('word.insert_image');
   assertDirectResult('word.insert_page_break');
   assertDirectResult('word.apply_formatting');
-  assertDirectResult('word.add_comment');
-  assertDirectResult('word.resolve_comment');
-  assertDirectResult('word.update_tracked_change');
+  assertConcreteResourceReadback('word.add_comment');
+  assertConcreteResourceReadback('word.resolve_comment');
+  assertConcreteResourceReadback('word.update_tracked_change');
   assertDirectResult('word.save');
 });
 
@@ -311,4 +314,12 @@ function assertDirectResult(tool) {
   if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
   if (toolCase.verify?.kind !== 'direct-result') throw new Error(`${tool} must use direct-result verification`);
   if (!toolCase.verify.expect) throw new Error(`${tool} must define direct-result expectations`);
+}
+
+function assertConcreteResourceReadback(tool) {
+  const toolCase = WORD_E2E_CASES[tool];
+  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
+  if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
+  if (!toolCase.verify.resource) throw new Error(`${tool} must define a readback resource`);
+  if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
 }
