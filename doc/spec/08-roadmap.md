@@ -1620,16 +1620,19 @@ Initial catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
       layout application, and PDF export through `getFileAsync(Pdf)`, while
       preserving per-tool permission toggles and `session.updated` available
       tool updates.
-- [ ] Add live PowerPoint runtime smoke evidence against a real presentation.
+- [x] Add live PowerPoint runtime smoke evidence against a real presentation.
       The evidence must prove session registration, tool visibility after
       handler implementation, at least one read/write mutation path, and PDF
       export behavior or an explicit host-capability rejection when the current
       Office.js host cannot support export. Automated support now exists via
       `npm run evidence:powerpoint`, which writes
       `artifacts/runtime-evidence-powerpoint.json`, and validator gate
-      `npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-powerpoint.json --require-powerpoint-smoke`;
-      this item remains open until that command passes against a connected live
-      PowerPoint presentation.
+      `npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-powerpoint.json --require-powerpoint-smoke`.
+      Current evidence: `artifacts/runtime-evidence-powerpoint.json` records a
+      passed `powerpoint.runtime_smoke` gate against a connected live PowerPoint
+      presentation, and the validator passes `--require-powerpoint-smoke` with
+      the refined 25-tool catalog, category proofs, mutation/readback, and
+      export success or explicit host-capability rejection checks.
 
 #### M8.1 — PowerPoint Core Tool Surface Refinement
 
