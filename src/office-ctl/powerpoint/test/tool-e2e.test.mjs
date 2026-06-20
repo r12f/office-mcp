@@ -8,6 +8,7 @@ import {
 } from '../../common/test/tool-e2e-contract.mjs';
 
 const ADDIN_ROOT = process.cwd();
+const PNG_1X1_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
 const POWERPOINT_E2E_CASES = Object.fromEntries([
   ['powerpoint.get_presentation_info', { verify: 'direct-result' }],
@@ -146,7 +147,24 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { contains: ['rectangle'] }
     }
   }],
-  ['powerpoint.insert_image', { args: { slide_index: 0, image: { base64: 'fixture' } } }],
+  ['powerpoint.insert_image', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Image target slide' } },
+        { tool: 'powerpoint.set_selection', arguments: { slide_index: 1 } }
+      ]
+    },
+    args: { slide_index: 1, image: { base64: PNG_1X1_BASE64 }, width: 24, height: 24 },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        pathEquals: [
+          { path: 'inserted_image', value: true },
+          { path: 'mime_type', value: 'image/png' }
+        ]
+      }
+    }
+  }],
   ['powerpoint.update_shape', {
     setup: {
       actions: [
@@ -240,6 +258,7 @@ test('PowerPoint mutating E2E cases define concrete setup and readback checks', 
   assertConcreteReadback('powerpoint.update_tags');
   assertConcreteReadback('powerpoint.format_text');
   assertConcreteReadback('powerpoint.set_selection');
+  assertDirectResult('powerpoint.insert_image');
 });
 
 test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
@@ -256,4 +275,11 @@ function assertConcreteReadback(tool) {
   if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
   if (!toolCase.verify.readbackTool) throw new Error(`${tool} must define a readback tool`);
   if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
+}
+
+function assertDirectResult(tool) {
+  const toolCase = POWERPOINT_E2E_CASES[tool];
+  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
+  if (toolCase.verify?.kind !== 'direct-result') throw new Error(`${tool} must use direct-result verification`);
+  if (!toolCase.verify.expect) throw new Error(`${tool} must define direct-result expectations`);
 }

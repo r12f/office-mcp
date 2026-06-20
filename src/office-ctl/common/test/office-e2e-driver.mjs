@@ -231,6 +231,10 @@ async function verifyResult(context) {
     throw new Error(`${toolCase.tool || 'tool'} returned MCP error: ${JSON.stringify(result.error || result.structuredContent.error)}`);
   }
   const verifier = toolCase.verify || { kind: 'readback' };
+  if (verifier.kind === 'direct-result') {
+    assertReadbackExpectations(toolCase.tool || 'tool', result, verifier.expect || {});
+    return { verified: true, kind: verifier.kind };
+  }
   if (verifier.kind !== 'readback') return { verified: true, kind: verifier.kind };
   if (!verifier.readbackTool) return { verified: true, kind: verifier.kind, readback: 'not-configured' };
 

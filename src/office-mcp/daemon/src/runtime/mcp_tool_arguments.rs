@@ -10,7 +10,7 @@ impl McpToolArgumentPreprocessor {
         tool: &str,
         arguments: &Value,
     ) -> Result<Value, CommandFailure> {
-        if tool != "word.insert_image" {
+        if !is_insert_image_tool(tool) {
             return Ok(arguments.clone());
         }
         let Some(image) = arguments.get("image") else {
@@ -43,6 +43,10 @@ impl McpToolArgumentPreprocessor {
         }
         Ok(updated)
     }
+}
+
+fn is_insert_image_tool(tool: &str) -> bool {
+    matches!(tool, "word.insert_image" | "powerpoint.insert_image")
 }
 
 #[cfg(test)]

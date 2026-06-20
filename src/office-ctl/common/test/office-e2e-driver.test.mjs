@@ -206,6 +206,56 @@ server.listen(0, '127.0.0.1', () => {
   }
 });
 
+test('Office E2E driver verifies direct-result expectations', async () => {
+  const result = runDriver({
+    host: 'PowerPoint',
+    step: 'verifyResult',
+    context: {
+      toolCase: {
+        tool: 'powerpoint.insert_image',
+        verify: {
+          kind: 'direct-result',
+          expect: {
+            pathEquals: [
+              { path: 'inserted_image', value: true },
+              { path: 'mime_type', value: 'image/png' }
+            ]
+          }
+        }
+      },
+      result: {
+        structuredContent: {
+          inserted_image: true,
+          mime_type: 'image/png'
+        }
+      }
+    }
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).verified, true);
+});
+
+test('Office E2E driver fails direct-result expectation mismatches', async () => {
+  const result = runDriver({
+    host: 'PowerPoint',
+    step: 'verifyResult',
+    context: {
+      toolCase: {
+        tool: 'powerpoint.insert_image',
+        verify: {
+          kind: 'direct-result',
+          expect: { pathEquals: [{ path: 'inserted_image', value: true }] }
+        }
+      },
+      result: { structuredContent: { inserted_image: false } }
+    }
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /inserted_image/);
+});
+
 test('Office E2E driver setupContent runs declared MCP setup actions', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-setup-'));
   const logPath = join(dir, 'mcp-requests.jsonl');

@@ -627,7 +627,14 @@
   async function insertImage(args) {
     const base64 = imageBase64(args);
     await officeAsync((callback) => Office.context.document.setSelectedDataAsync(base64, imageInsertOptions(args), callback));
-    return { inserted_image: true, placement: 'selection', width: numberOrNull(args.width), height: numberOrNull(args.height) };
+    return {
+      inserted_image: true,
+      placement: 'selection',
+      width: numberOrNull(args.width),
+      height: numberOrNull(args.height),
+      mime_type: args.image?.mime_type || null,
+      byte_length: Number.isInteger(args.image?.byte_length) ? args.image.byte_length : null
+    };
   }
 
   async function getSelection(_args) {
@@ -954,7 +961,7 @@
   }
 
   function imageBase64(args) {
-    const raw = requiredString(args, 'base64', 'powerpoint.insert_image requires base64 image data.');
+    const raw = args.image?.base64 || requiredString(args, 'base64', 'powerpoint.insert_image requires base64 image data.');
     const value = raw.includes(',') ? raw.split(',').pop() : raw;
     if (!/^[A-Za-z0-9+/=\s]+$/.test(value)) {
       throw Object.assign(new Error('powerpoint.insert_image base64 data is invalid.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
