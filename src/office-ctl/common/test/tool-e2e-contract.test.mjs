@@ -147,6 +147,38 @@ test('shared Office tool E2E loop preserves concrete readback verifier metadata'
   }]);
 });
 
+test('shared Office tool E2E loop carries setup bindings into call and verify steps', async () => {
+  const observed = [];
+  const driver = {
+    async startDaemon() {},
+    async createDocument() {
+      return {};
+    },
+    async waitForSession() {
+      return { sessionId: 'session-1', availableTools: ['powerpoint.update_table'] };
+    },
+    async resetContent() {},
+    async setupContent() {
+      return { bindings: { table: { shape_id: 'shape-123' } } };
+    },
+    async callTool(_toolCase, session) {
+      observed.push(['call', session.bindings.table.shape_id]);
+      return { structuredContent: { ok: true } };
+    },
+    async verifyResult(_toolCase, _result, session) {
+      observed.push(['verify', session.bindings.table.shape_id]);
+    }
+  };
+
+  await runOfficeToolE2e({
+    host: 'PowerPoint',
+    cases: { 'powerpoint.update_table': e2eCase('powerpoint.update_table') },
+    driver
+  });
+
+  assert.deepEqual(observed, [['call', 'shape-123'], ['verify', 'shape-123']]);
+});
+
 test('E2E case coverage accepts concrete readback verifiers with explicit expectations', () => {
   const toolCase = e2eCase('word.replace_text', {
     verify: {

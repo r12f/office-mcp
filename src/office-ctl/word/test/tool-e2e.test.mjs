@@ -90,7 +90,20 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.delete_range', { args: { anchor: { kind: 'paragraph_index', index: 0 }, extent: 'paragraph' } }],
   ['word.apply_formatting', { args: { anchor: { kind: 'paragraph_index', index: 0 }, formatting: { bold: true } } }],
   ['word.read_table', { verify: 'direct-result' }],
-  ['word.update_table', { args: { table_index: 0, action: 'update_cell', row: 0, column: 0, text: 'Updated' } }],
+  ['word.update_table', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_table', arguments: { anchor: { kind: 'end_of_document' }, rows: [['Old', 'Value']] } }
+      ]
+    },
+    args: { table_index: 0, action: 'update_cell', row: 0, col: 0, text: 'Updated table cell' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.read_table',
+      readbackArguments: { table_index: 0 },
+      expect: { contains: ['Updated table cell'], notContains: ['Old'] }
+    }
+  }],
   ['word.list_content_controls', { verify: 'direct-result' }],
   ['word.insert_content_control', { args: { anchor: { kind: 'paragraph_index', index: 0 }, tag: 'e2e' } }],
   ['word.update_content_control', { args: { tag: 'e2e', text: 'Updated control' } }],
@@ -112,6 +125,7 @@ test('Word mutating E2E cases define concrete setup and readback checks', () => 
   assertConcreteReadback('word.update_paragraph');
   assertConcreteReadback('word.insert_table');
   assertConcreteReadback('word.insert_list');
+  assertConcreteReadback('word.update_table');
 });
 
 test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

@@ -188,27 +188,30 @@ async function waitForSession(host, context) {
 
 async function resetContent(_host, context) {
   const actions = context.toolCase?.reset?.actions || [];
-  await runToolActions(context, actions);
-  return { reset: actions.length ? 'mcp-actions' : 'external-driver-delegated', actions: actions.length };
+  const bindings = await runToolActions(context, actions);
+  return { reset: actions.length ? 'mcp-actions' : 'external-driver-delegated', actions: actions.length, bindings };
 }
 
 async function setupContent(_host, context) {
   const actions = context.toolCase?.setup?.actions || [];
-  await runToolActions(context, actions);
-  return { setup: actions.length ? 'mcp-actions' : 'external-driver-delegated', actions: actions.length };
+  const bindings = await runToolActions(context, actions);
+  return { setup: actions.length ? 'mcp-actions' : 'external-driver-delegated', actions: actions.length, bindings };
 }
 
 async function runToolActions(context, actions) {
   const daemon = context.daemon || {};
   const session = context.session || {};
+  const bindings = { ...(session.bindings || {}) };
   for (const action of actions) {
     if (!action?.tool) throw new Error('Office E2E setup/reset action must define a tool.');
-    const args = { ...(action.arguments || {}), session_id: session.sessionId };
+    const args = { ...resolveBindings(action.arguments || {}, bindings), session_id: session.sessionId };
     const result = await mcpToolCall(daemon.endpoint, action.tool, args);
     if (result.error || result.structuredContent?.error) {
       throw new Error(`Office E2E setup/reset action ${action.tool} failed: ${JSON.stringify(result.error || result.structuredContent.error)}`);
     }
+    if (action.saveAs) bindings[action.saveAs] = actionResultData(result);
   }
+  return bindings;
 }
 
 async function callTool(context) {
@@ -216,7 +219,7 @@ async function callTool(context) {
   const session = context.session || {};
   const toolCase = context.toolCase || {};
   const call = toolCase.call || {};
-  const args = { ...(call.arguments || {}), session_id: session.sessionId };
+  const args = { ...resolveBindings(call.arguments || {}, session.bindings || {}), session_id: session.sessionId };
   const result = await mcpToolCall(daemon.endpoint, call.name, args);
   return result;
 }
@@ -233,10 +236,43 @@ async function verifyResult(context) {
 
   const daemon = context.daemon || {};
   const session = context.session || {};
-  const readbackArguments = { ...(verifier.readbackArguments || {}), session_id: session.sessionId };
+  const bindings = { ...(session.bindings || {}), result: actionResultData(result) };
+  const readbackArguments = { ...resolveBindings(verifier.readbackArguments || {}, bindings), session_id: session.sessionId };
   const readback = await mcpToolCall(daemon.endpoint, verifier.readbackTool, readbackArguments);
   assertReadbackExpectations(toolCase.tool || 'tool', readback, verifier.expect || {});
   return { verified: true, kind: verifier.kind, readbackTool: verifier.readbackTool };
+}
+
+function actionResultData(result) {
+  if (result?.structuredContent?.data) return result.structuredContent.data;
+  if (result?.structuredContent) return result.structuredContent;
+  if (result?.data) return result.data;
+  return result || {};
+}
+
+function resolveBindings(value, bindings) {
+  if (typeof value === 'string') return resolveBindingString(value, bindings);
+  if (Array.isArray(value)) return value.map((item) => resolveBindings(item, bindings));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolveBindings(item, bindings)]));
+  }
+  return value;
+}
+
+function resolveBindingString(value, bindings) {
+  const exact = value.match(/^\$\{([^}]+)\}$/);
+  if (exact) return bindingValue(exact[1], bindings);
+  return value.replace(/\$\{([^}]+)\}/g, (_match, path) => String(bindingValue(path, bindings)));
+}
+
+function bindingValue(path, bindings) {
+  const parts = String(path).split('.').filter(Boolean);
+  let current = bindings;
+  for (const part of parts) {
+    if (current && Object.hasOwn(current, part)) current = current[part];
+    else throw new Error(`Office E2E binding ${path} was not found.`);
+  }
+  return current;
 }
 
 function assertReadbackExpectations(tool, readback, expect) {

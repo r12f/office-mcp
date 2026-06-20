@@ -176,13 +176,13 @@ server.listen(0, '127.0.0.1', () => {
       context: {
         daemon: { endpoint },
         session: { sessionId: 'session-1' },
-        result: { structuredContent: { ok: true } },
+        result: { structuredContent: { shape_id: 'shape-999' } },
         toolCase: {
-          tool: 'word.replace_text',
+          tool: 'powerpoint.add_table',
           verify: {
             kind: 'readback',
-            readbackTool: 'word.get_text',
-            readbackArguments: { limit: 20 },
+            readbackTool: 'powerpoint.read_table',
+            readbackArguments: { slide_index: 0, shape_id: '${result.shape_id}' },
             expect: { contains: ['updated marker'], notContains: ['baseline marker'] }
           }
         }
@@ -191,9 +191,9 @@ server.listen(0, '127.0.0.1', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).verified, true);
     const requests = readFileSync(logPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
-    assert.equal(requests[1].body.params.name, 'word.get_text');
+    assert.equal(requests[1].body.params.name, 'powerpoint.read_table');
     assert.equal(requests[1].body.params.arguments.session_id, 'session-1');
-    assert.equal(requests[1].body.params.arguments.limit, 20);
+    assert.equal(requests[1].body.params.arguments.shape_id, 'shape-999');
   } finally {
     server.kill();
   }
@@ -253,6 +253,78 @@ server.listen(0, '127.0.0.1', () => {
     assert.equal(requests[1].body.params.name, 'word.replace_text');
     assert.equal(requests[1].body.params.arguments.session_id, 'session-1');
     assert.equal(requests[1].body.params.arguments.replace, 'baseline marker');
+  } finally {
+    server.kill();
+  }
+});
+
+test('Office E2E driver resolves setup action result references in later calls', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-bindings-'));
+  const logPath = join(dir, 'mcp-requests.jsonl');
+  const serverPath = join(dir, 'mcp-server.mjs');
+  writeFileSync(serverPath, `
+import { appendFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+const logPath = ${JSON.stringify(logPath)};
+const server = createServer((request, response) => {
+  let body = '';
+  request.setEncoding('utf8');
+  request.on('data', (chunk) => { body += chunk; });
+  request.on('end', () => {
+    const parsed = JSON.parse(body);
+    appendFileSync(logPath, JSON.stringify({ session: request.headers['mcp-session-id'] || null, body: parsed }) + '\\n');
+    response.setHeader('Content-Type', 'application/json');
+    if (!request.headers['mcp-session-id']) {
+      response.setHeader('MCP-Session-Id', 'mcp-session-test');
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: {} }));
+    } else if (parsed.params?.name === 'powerpoint.add_table') {
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { structuredContent: { shape_id: 'shape-123' } } }));
+    } else {
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { structuredContent: { text: 'Updated table cell' } } }));
+    }
+  });
+});
+server.listen(0, '127.0.0.1', () => {
+  const address = server.address();
+  console.log(JSON.stringify({ endpoint: 'http://127.0.0.1:' + address.port + '/mcp' }));
+});
+`);
+  const server = spawn(process.execPath, [serverPath], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  try {
+    const { endpoint } = JSON.parse(await firstStdoutLine(server));
+    const setup = {
+      actions: [
+        { tool: 'powerpoint.add_table', saveAs: 'table', arguments: { slide_index: 0, values: [['Old']] } }
+      ]
+    };
+    const setupResult = runDriver({
+      host: 'PowerPoint',
+      step: 'setupContent',
+      context: { daemon: { endpoint }, session: { sessionId: 'session-1' }, toolCase: { setup } }
+    });
+    assert.equal(setupResult.status, 0, setupResult.stderr);
+    const bindings = JSON.parse(setupResult.stdout).bindings;
+    assert.equal(bindings.table.shape_id, 'shape-123');
+
+    const callResult = runDriver({
+      host: 'PowerPoint',
+      step: 'callTool',
+      context: {
+        daemon: { endpoint },
+        session: { sessionId: 'session-1', bindings },
+        toolCase: {
+          call: {
+            name: 'powerpoint.update_table',
+            arguments: { slide_index: 0, shape_id: '${table.shape_id}', action: 'set_cell', row_index: 0, column_index: 0, value: 'Updated table cell' }
+          }
+        }
+      }
+    });
+    assert.equal(callResult.status, 0, callResult.stderr);
+
+    const requests = readFileSync(logPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    assert.equal(requests[3].body.params.name, 'powerpoint.update_table');
+    assert.equal(requests[3].body.params.arguments.shape_id, 'shape-123');
   } finally {
     server.kill();
   }

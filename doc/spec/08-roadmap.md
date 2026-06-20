@@ -1284,18 +1284,19 @@ PowerPoint each provide host case tables. The shared loop contract is covered by
 automation driver now provides daemon startup, Word/Excel COM document creation
 and cleanup, MCP `tools/call`, and explicit session waiting through the
 `OFFICE_MCP_E2E_DRIVER` JSON step protocol. The driver also supports generic
-setup/reset action metadata plus generic readback verification metadata: a case
-can declare MCP setup actions, call the tool under test, then call a follow-up
-read tool and assert expected `contains`/`notContains` markers. The first
-concrete setup/readback cases now cover Word `insert_paragraph`,
-`insert_table`, `insert_list`, `replace_text`, and `update_paragraph`; Excel
-`add_sheet`, `update_sheet`, `write_range`, `clear_range`, and
-`find_replace_cells`; and PowerPoint `add_slide`, `update_slide`,
-`add_text_box`, `add_shape`, and `replace_text`. Full add-in activation, live
-Office execution, and concrete setup/readback verifiers for every
-mutating/destructive tool remain open, especially PowerPoint's visible-window
-COM path. Each host exposes `npm run e2e:tools` as the non-evidence tool E2E
-command.
+setup/reset action metadata, setup-result bindings such as `${table.shape_id}`,
+and generic readback verification metadata: a case can declare MCP setup
+actions, call the tool under test, then call a follow-up read tool and assert
+expected `contains`/`notContains` markers. The first concrete setup/readback
+cases now cover Word `insert_paragraph`, `insert_table`, `insert_list`,
+`replace_text`, `update_paragraph`, and `update_table`; Excel `add_sheet`,
+`update_sheet`, `delete_sheet`, `write_range`, `clear_range`,
+`find_replace_cells`, and `create_table`; and PowerPoint `add_slide`,
+`update_slide`, `add_text_box`, `add_shape`, `replace_text`, `add_table`, and
+`update_table`. Full add-in activation, live Office execution, and concrete
+setup/readback verifiers for every mutating/destructive tool remain open,
+especially PowerPoint's visible-window COM path. Each host exposes
+`npm run e2e:tools` as the non-evidence tool E2E command.
 
 **Exit criterion**: A developer can run one command per Office host and see the
 daemon start, a blank document connect, every MCP tool execute against fixed

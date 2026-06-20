@@ -40,7 +40,20 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['Renamed Sheet'], notContains: ['Sheet To Rename'] }
     }
   }],
-  ['excel.delete_sheet', { args: { sheet: 'Delete Me' } }],
+  ['excel.delete_sheet', {
+    setup: {
+      actions: [
+        { tool: 'excel.add_sheet', arguments: { name: 'Delete Me' } }
+      ]
+    },
+    args: { sheet: 'Delete Me' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.list_sheets',
+      readbackArguments: {},
+      expect: { notContains: ['Delete Me'] }
+    }
+  }],
   ['excel.get_used_range', { verify: 'direct-result' }],
   ['excel.read_range', { verify: 'direct-result' }],
   ['excel.write_range', {
@@ -77,7 +90,7 @@ const EXCEL_E2E_CASES = Object.fromEntries([
         { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B1', values: [['baseline', 'marker']] } }
       ]
     },
-    args: { sheet: 'Sheet1', find: 'baseline', replace: 'updated' },
+    args: { sheet: 'Sheet1', address: 'A1:B1', query: 'baseline', replacement: 'updated' },
     verify: {
       kind: 'readback',
       readbackTool: 'excel.read_range',
@@ -89,7 +102,20 @@ const EXCEL_E2E_CASES = Object.fromEntries([
   ['excel.format_range', { args: { sheet: 'Sheet1', address: 'A1:B2', format: { bold: true } } }],
   ['excel.sort_range', { args: { sheet: 'Sheet1', address: 'A1:B3', key_column: 0 } }],
   ['excel.apply_filter', { args: { sheet: 'Sheet1', address: 'A1:B3', column: 0, criterion: 'A' } }],
-  ['excel.create_table', { args: { sheet: 'Sheet1', address: 'A1:B3', has_headers: true } }],
+  ['excel.create_table', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B3', values: [['Name', 'Value'], ['Alpha', '1'], ['Beta', '2']] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'A1:B3', has_headers: true, name: 'E2ETable' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.update_table',
+      readbackArguments: { table: 'E2ETable', action: 'metadata' },
+      expect: { contains: ['E2ETable'] }
+    }
+  }],
   ['excel.update_table', { args: { table: 'E2ETable', action: 'rename', name: 'E2ETableRenamed' } }],
   ['excel.create_chart', { args: { sheet: 'Sheet1', source_range: 'A1:B3', chart_type: 'columnClustered' } }],
   ['excel.update_chart', { args: { chart: 'E2EChart', title: 'Updated chart' } }],
@@ -107,6 +133,8 @@ test('Excel mutating E2E cases define concrete setup and readback checks', () =>
   assertConcreteReadback('excel.find_replace_cells');
   assertConcreteReadback('excel.add_sheet');
   assertConcreteReadback('excel.update_sheet');
+  assertConcreteReadback('excel.delete_sheet');
+  assertConcreteReadback('excel.create_table');
 });
 
 test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

@@ -73,10 +73,11 @@ export async function runOfficeToolE2e({ host, cases, driver }) {
 
     for (const toolCase of orderedCases(cases, session.availableTools)) {
       const run = e2eRunMetadata(toolCase);
-      await driver.resetContent(toolCase, session, { host, daemon, document, run });
-      await driver.setupContent(toolCase, session, { host, daemon, document, run });
-      const result = await driver.callTool(toolCase, session, { host, daemon, document, run });
-      await driver.verifyResult(toolCase, result, session, { host, daemon, document, run });
+      const runSession = { ...session, bindings: { ...(session.bindings || {}) } };
+      mergeBindings(runSession, await driver.resetContent(toolCase, runSession, { host, daemon, document, run }));
+      mergeBindings(runSession, await driver.setupContent(toolCase, runSession, { host, daemon, document, run }));
+      const result = await driver.callTool(toolCase, runSession, { host, daemon, document, run });
+      await driver.verifyResult(toolCase, result, runSession, { host, daemon, document, run });
     }
   } finally {
     if (document && typeof driver.cleanupDocument === 'function') {
@@ -86,6 +87,11 @@ export async function runOfficeToolE2e({ host, cases, driver }) {
       await driver.stopDaemon(daemon, { host, document, session });
     }
   }
+}
+
+function mergeBindings(session, stepResult) {
+  if (!stepResult?.bindings) return;
+  session.bindings = { ...(session.bindings || {}), ...stepResult.bindings };
 }
 
 export function requireOfficeE2eDriver(host) {

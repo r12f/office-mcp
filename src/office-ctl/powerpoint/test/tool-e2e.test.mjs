@@ -97,9 +97,35 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
     }
   }],
   ['powerpoint.format_text', { args: { slide_index: 0, shape_id: 'fixture', formatting: { bold: true } } }],
-  ['powerpoint.add_table', { args: { slide_index: 0, rows: [['A', 'B']] } }],
+  ['powerpoint.add_table', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank' } }
+      ]
+    },
+    args: { slide_index: 0, values: [['A', 'B']] },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.read_table',
+      readbackArguments: { slide_index: 0, shape_id: '${result.shape_id}' },
+      expect: { contains: ['A', 'B'] }
+    }
+  }],
   ['powerpoint.read_table', { verify: 'direct-result' }],
-  ['powerpoint.update_table', { args: { slide_index: 0, table_id: 'fixture', row: 0, column: 0, text: 'Updated' } }]
+  ['powerpoint.update_table', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_table', saveAs: 'table', arguments: { slide_index: 0, values: [['Old', 'Value']] } }
+      ]
+    },
+    args: { slide_index: 0, shape_id: '${table.shape_id}', action: 'set_cell', row_index: 0, column_index: 0, value: 'Updated table cell' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.read_table',
+      readbackArguments: { slide_index: 0, shape_id: '${table.shape_id}' },
+      expect: { contains: ['Updated table cell'], notContains: ['Old'] }
+    }
+  }]
 ].map(([tool, options]) => [tool, e2eCase(tool, options)]));
 
 test('PowerPoint E2E case table covers every advertised tool', () => {
@@ -112,6 +138,8 @@ test('PowerPoint mutating E2E cases define concrete setup and readback checks', 
   assertConcreteReadback('powerpoint.add_shape');
   assertConcreteReadback('powerpoint.add_slide');
   assertConcreteReadback('powerpoint.update_slide');
+  assertConcreteReadback('powerpoint.add_table');
+  assertConcreteReadback('powerpoint.update_table');
 });
 
 test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
