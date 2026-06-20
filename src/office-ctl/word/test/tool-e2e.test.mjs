@@ -118,9 +118,48 @@ const WORD_E2E_CASES = Object.fromEntries([
     }
   }],
   ['word.list_content_controls', { verify: 'direct-result' }],
-  ['word.insert_content_control', { args: { anchor: { kind: 'paragraph_index', index: 0 }, tag: 'e2e' } }],
-  ['word.update_content_control', { args: { tag: 'e2e', text: 'Updated control' } }],
-  ['word.delete_content_control', { args: { tag: 'e2e', keep_content: true } }],
+  ['word.insert_content_control', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'content control anchor marker' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'content control anchor marker' }, text: 'E2E controlled text', tag: 'e2e-insert-control', title: 'E2E Insert Control' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_content_controls',
+      readbackArguments: { tag: 'e2e-insert-control' },
+      expect: { contains: ['e2e-insert-control', 'E2E Insert Control'] }
+    }
+  }],
+  ['word.update_content_control', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_content_control', saveAs: 'controlResult', arguments: { anchor: { kind: 'end_of_document' }, text: 'Before control update', tag: 'e2e-update-control', title: 'Before Control Update' } }
+      ]
+    },
+    args: { content_control_id: '${controlResult.content_control.content_control_id}', text: 'Updated control', tag: 'e2e-updated-control', title: 'Updated Control' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_content_controls',
+      readbackArguments: { tag: 'e2e-updated-control' },
+      expect: { contains: ['e2e-updated-control', 'Updated Control'], notContains: ['Before Control Update'] }
+    }
+  }],
+  ['word.delete_content_control', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_content_control', saveAs: 'controlResult', arguments: { anchor: { kind: 'end_of_document' }, text: 'Delete control payload', tag: 'e2e-delete-control', title: 'Delete Control' } }
+      ]
+    },
+    args: { content_control_id: '${controlResult.content_control.content_control_id}', mode: 'keep_content' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_content_controls',
+      readbackArguments: { tag: 'e2e-delete-control' },
+      expect: { notContains: ['e2e-delete-control', 'Delete Control'] }
+    }
+  }],
   ['word.apply_style', { args: { anchor: { kind: 'paragraph_index', index: 0 }, style: 'Heading 1' } }],
   ['word.add_comment', { args: { anchor: { kind: 'paragraph_index', index: 0 }, text: 'E2E comment' } }],
   ['word.resolve_comment', { args: { comment_index: 0 } }],
@@ -140,6 +179,9 @@ test('Word mutating E2E cases define concrete setup and readback checks', () => 
   assertConcreteReadback('word.insert_list');
   assertConcreteReadback('word.update_table');
   assertConcreteReadback('word.delete_range');
+  assertConcreteReadback('word.insert_content_control');
+  assertConcreteReadback('word.update_content_control');
+  assertConcreteReadback('word.delete_content_control');
 });
 
 test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

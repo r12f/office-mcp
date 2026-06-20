@@ -1293,12 +1293,14 @@ and generic readback verification metadata: a case can declare MCP setup
 actions, call the tool under test, then call a follow-up read tool and assert
 expected `contains`/`notContains` markers. The first concrete setup/readback
 cases now cover Word `insert_paragraph`, `insert_table`, `insert_list`,
-`replace_text`, `update_paragraph`, `delete_range`, and `update_table`; Excel
-`add_sheet`, `update_sheet`, `delete_sheet`, `write_range`, `clear_range`,
-`find_replace_cells`, `set_formula`, and `create_table`; and PowerPoint
-`add_slide`, `update_slide`, `add_text_box`, `add_shape`, `update_shape`,
-`replace_text`, `add_table`, and `update_table`. Full add-in activation, live
-Office execution, and concrete setup/readback verifiers for every
+`replace_text`, `update_paragraph`, `delete_range`, `update_table`,
+`insert_content_control`, `update_content_control`, and
+`delete_content_control`; Excel `add_sheet`, `update_sheet`, `delete_sheet`,
+`write_range`, `clear_range`, `find_replace_cells`, `set_formula`, and
+`create_table`; and PowerPoint `add_slide`, `update_slide`, `add_text_box`,
+`add_shape`, `update_shape`, `replace_text`, `add_table`, and `update_table`.
+Full add-in activation, live Office execution, and concrete setup/readback
+verifiers for every
 mutating/destructive tool remain open. Each host exposes
 `npm run e2e:tools` as the non-evidence tool E2E command.
 

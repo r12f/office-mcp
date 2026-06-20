@@ -279,6 +279,8 @@ const server = createServer((request, response) => {
       response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: {} }));
     } else if (parsed.params?.name === 'powerpoint.add_table') {
       response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { structuredContent: { shape_id: 'shape-123' } } }));
+    } else if (parsed.params?.name === 'word.insert_content_control') {
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { structuredContent: { content_control: { content_control_id: 42 } } } }));
     } else {
       response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { structuredContent: { text: 'Updated table cell' } } }));
     }
@@ -325,6 +327,45 @@ server.listen(0, '127.0.0.1', () => {
     const requests = readFileSync(logPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
     assert.equal(requests[3].body.params.name, 'powerpoint.update_table');
     assert.equal(requests[3].body.params.arguments.shape_id, 'shape-123');
+
+    const nestedSetupResult = runDriver({
+      host: 'Word',
+      step: 'setupContent',
+      context: {
+        daemon: { endpoint },
+        session: { sessionId: 'session-1' },
+        toolCase: {
+          setup: {
+            actions: [
+              { tool: 'word.insert_content_control', saveAs: 'controlResult', arguments: { tag: 'e2e' } }
+            ]
+          }
+        }
+      }
+    });
+    assert.equal(nestedSetupResult.status, 0, nestedSetupResult.stderr);
+    const nestedBindings = JSON.parse(nestedSetupResult.stdout).bindings;
+    assert.equal(nestedBindings.controlResult.content_control.content_control_id, 42);
+
+    const nestedCallResult = runDriver({
+      host: 'Word',
+      step: 'callTool',
+      context: {
+        daemon: { endpoint },
+        session: { sessionId: 'session-1', bindings: nestedBindings },
+        toolCase: {
+          call: {
+            name: 'word.update_content_control',
+            arguments: { content_control_id: '${controlResult.content_control.content_control_id}', text: 'Updated control' }
+          }
+        }
+      }
+    });
+    assert.equal(nestedCallResult.status, 0, nestedCallResult.stderr);
+
+    const updatedRequests = readFileSync(logPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    assert.equal(updatedRequests[7].body.params.name, 'word.update_content_control');
+    assert.equal(updatedRequests[7].body.params.arguments.content_control_id, 42);
   } finally {
     server.kill();
   }
