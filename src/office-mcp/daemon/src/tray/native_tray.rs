@@ -206,7 +206,7 @@ fn confirm_quit(confirmation: &QuitConfirmation) -> bool {
             cancel = applescript_string(&confirmation.secondary_action),
             confirm = applescript_string(&confirmation.primary_action)
         );
-        return command_succeeds("osascript", &["-e", script.as_str()]);
+        command_succeeds("osascript", &["-e", script.as_str()])
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
