@@ -11,8 +11,28 @@ const ADDIN_ROOT = process.cwd();
 const PNG_1X1_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
 const POWERPOINT_E2E_CASES = Object.fromEntries([
-  ['powerpoint.get_presentation_info', { verify: 'direct-result' }],
-  ['powerpoint.get_active_view', { verify: 'direct-result' }],
+  ['powerpoint.get_presentation_info', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Presentation info baseline' } }
+      ]
+    },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'host.app', value: 'powerpoint' }, { path: 'is_read_only', value: false }, { path: 'protection.kind', value: 'none' }] }
+    }
+  }],
+  ['powerpoint.get_active_view', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Active view baseline' } }
+      ]
+    },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'editable', value: true }] }
+    }
+  }],
   ['powerpoint.export_file', { verify: 'direct-result' }],
   ['powerpoint.update_tags', {
     setup: {
@@ -28,7 +48,17 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { contains: ['e2e-metadata', 'true'] }
     }
   }],
-  ['powerpoint.list_slides', { verify: 'direct-result' }],
+  ['powerpoint.list_slides', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Title and Content', title: 'E2E Listed Slide' } }
+      ]
+    },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E Listed Slide'], pathEquals: [{ path: 'slides.0.slide_index', value: 0 }] }
+    }
+  }],
   ['powerpoint.add_slide', {
     setup: {
       actions: [
@@ -88,7 +118,17 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
     }
   }],
   ['powerpoint.export_slide', { verify: 'direct-result' }],
-  ['powerpoint.list_layouts', { verify: 'direct-result' }],
+  ['powerpoint.list_layouts', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Layout list baseline' } }
+      ]
+    },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathMissing: ['masters.0.missing'] }
+    }
+  }],
   ['powerpoint.apply_layout', {
     setup: {
       actions: [
@@ -103,7 +143,18 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { contains: ['title'] }
     }
   }],
-  ['powerpoint.get_selection', { verify: 'direct-result' }],
+  ['powerpoint.get_selection', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Selection read target' } },
+        { tool: 'powerpoint.set_selection', arguments: { slide_index: 1 } }
+      ]
+    },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'slides.0.slide_index', value: 1 }] }
+    }
+  }],
   ['powerpoint.set_selection', {
     setup: {
       actions: [
@@ -118,7 +169,19 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'slides.0.slide_index', value: 1 }] }
     }
   }],
-  ['powerpoint.list_shapes', { verify: 'direct-result' }],
+  ['powerpoint.list_shapes', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank' } },
+        { tool: 'powerpoint.add_shape', arguments: { slide_index: 0, type: 'rectangle', name: 'E2E Listed Shape' } }
+      ]
+    },
+    args: { slide_index: 0 },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E Listed Shape'], pathEquals: [{ path: 'slide_index', value: 0 }] }
+    }
+  }],
   ['powerpoint.add_text_box', {
     setup: {
       actions: [
@@ -179,7 +242,18 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { contains: ['Updated shape'], notContains: ['Shape Before Update'] }
     }
   }],
-  ['powerpoint.read_text', { verify: 'direct-result' }],
+  ['powerpoint.read_text', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_text_box', arguments: { slide_index: 0, text: 'E2E read text baseline' } }
+      ]
+    },
+    args: { slide_index: 0 },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E read text baseline'], pathEquals: [{ path: 'count', value: 1 }] }
+    }
+  }],
   ['powerpoint.replace_text', {
     setup: {
       actions: [
@@ -222,7 +296,18 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { contains: ['A', 'B'] }
     }
   }],
-  ['powerpoint.read_table', { verify: 'direct-result' }],
+  ['powerpoint.read_table', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_table', saveAs: 'readTable', arguments: { slide_index: 0, values: [['Read', 'Table']] } }
+      ]
+    },
+    args: { slide_index: 0, shape_id: '${readTable.shape_id}' },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['Read', 'Table'], pathEquals: [{ path: 'rows', value: 1 }, { path: 'columns', value: 2 }] }
+    }
+  }],
   ['powerpoint.update_table', {
     setup: {
       actions: [
@@ -244,6 +329,14 @@ test('PowerPoint E2E case table covers every advertised tool', () => {
 });
 
 test('PowerPoint mutating E2E cases define concrete setup and readback checks', () => {
+  assertDirectResult('powerpoint.get_presentation_info');
+  assertDirectResult('powerpoint.get_active_view');
+  assertDirectResult('powerpoint.list_slides');
+  assertDirectResult('powerpoint.list_layouts');
+  assertDirectResult('powerpoint.get_selection');
+  assertDirectResult('powerpoint.list_shapes');
+  assertDirectResult('powerpoint.read_text');
+  assertDirectResult('powerpoint.read_table');
   assertConcreteReadback('powerpoint.replace_text');
   assertConcreteReadback('powerpoint.add_text_box');
   assertConcreteReadback('powerpoint.add_shape');
