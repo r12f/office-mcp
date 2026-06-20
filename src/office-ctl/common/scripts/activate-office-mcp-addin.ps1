@@ -35,6 +35,14 @@ function Get-CanonicalPath {
 Write-ActivatorLog "start host=$hostKey document=$DocumentPath"
 $script:officialDocumentPath = $null
 
+function Get-OfficeAppName {
+  switch ($hostKey) {
+    "word" { return "Word" }
+    "excel" { return "Excel" }
+    "powerpoint" { return "PowerPoint" }
+  }
+}
+
 if ($DryRun) {
   Write-Output (@{
       activated = $true
@@ -49,6 +57,44 @@ if ($DryRun) {
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 
+function Invoke-OfficialRegistration {
+  if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
+    Write-ActivatorLog "official registration skipped: manifest path missing"
+    return $false
+  }
+  if (-not (Test-Path -LiteralPath $ManifestPath)) {
+    Write-ActivatorLog "official registration skipped: manifest not found path=$ManifestPath"
+    return $false
+  }
+  $appName = Get-OfficeAppName
+  Write-ActivatorLog "official registration start app=$appName manifest=$ManifestPath"
+  try {
+    $manifestArg = '"' + $ManifestPath.Replace('"', '\"') + '"'
+    $command = "npx --yes office-addin-dev-settings register $manifestArg"
+    $stdoutPath = Join-Path $env:TEMP "office-mcp-register-$hostKey-$([guid]::NewGuid().ToString('N')).out.log"
+    $stderrPath = Join-Path $env:TEMP "office-mcp-register-$hostKey-$([guid]::NewGuid().ToString('N')).err.log"
+    $process = Start-Process -FilePath "cmd.exe" -ArgumentList @('/d', '/s', '/c', $command) -NoNewWindow -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru
+    if (-not $process.WaitForExit(15000)) {
+      $output = @()
+      if (Test-Path -LiteralPath $stdoutPath) { $output += Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue }
+      if (Test-Path -LiteralPath $stderrPath) { $output += Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue }
+      Write-ActivatorLog "official registration timed out; killing process pid=$($process.Id) output=$($output -join ' | ')"
+      Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+      return $false
+    }
+    $exitCode = $process.ExitCode
+    $output = @()
+    if (Test-Path -LiteralPath $stdoutPath) { $output += Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $stderrPath) { $output += Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue }
+    Write-ActivatorLog "official registration exit=$exitCode output=$($output -join ' | ')"
+    return ($exitCode -eq 0)
+  } catch {
+    Write-ActivatorLog "official registration failed: $($_.Exception.Message)"
+    Write-ActivatorLog "official registration error detail: $($_ | Out-String)"
+    return $false
+  }
+}
+
 function Invoke-OfficialSideload {
   if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
     Write-ActivatorLog "official sideload skipped: manifest path missing"
@@ -58,11 +104,7 @@ function Invoke-OfficialSideload {
     Write-ActivatorLog "official sideload skipped: manifest not found path=$ManifestPath"
     return
   }
-  $appName = switch ($hostKey) {
-    "word" { "Word" }
-    "excel" { "Excel" }
-    "powerpoint" { "PowerPoint" }
-  }
+  $appName = Get-OfficeAppName
   Write-ActivatorLog "official sideload start app=$appName manifest=$ManifestPath document=$DocumentPath"
   try {
     $manifestArg = '"' + $ManifestPath.Replace('"', '\"') + '"'
@@ -321,6 +363,18 @@ function Open-OfficialSideloadDocument {
     Write-ActivatorLog "official sideload document opened path=$Path"
   } catch {
     Write-ActivatorLog "official sideload document open failed path=$Path error=$($_.Exception.Message)"
+    if ($HostKey -eq "excel") {
+      try {
+        $excel = New-Object -ComObject Excel.Application
+        $excel.Visible = $true
+        $excel.DisplayAlerts = $false
+        $excel.Workbooks.Open($Path) | Out-Null
+        Write-ActivatorLog "official sideload excel document opened via new application path=$Path"
+        return
+      } catch {
+        Write-ActivatorLog "official sideload excel document new application open failed path=$Path error=$($_.Exception.Message)"
+      }
+    }
     try {
       Start-Process -FilePath $Path
       Write-ActivatorLog "official sideload document opened via shell path=$Path"
@@ -363,7 +417,8 @@ function Test-ActivatorDeadline {
 function Try-OpenControlPanelForDriverDocument {
   param(
     [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
-    [Parameter(Mandatory = $true)]$Deadline
+    [Parameter(Mandatory = $true)]$Deadline,
+    [switch]$AllowCatalogFallback
   )
 
   do {
@@ -387,9 +442,15 @@ function Try-OpenControlPanelForDriverDocument {
         $window = $nextWindow
       }
     }
-    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
-    if (Try-OpenAddinFromCatalog -Window (Get-OfficeWindowFromHandle -Handle $WindowHandle) -Deadline $Deadline) {
-      return @{ opened = $true; control_name = "Open Control Panel"; tab_name = ""; activation_path = "catalog-fallback" }
+    if ($AllowCatalogFallback) {
+      if ($hostKey -eq "excel") {
+        Write-ActivatorLog "catalog fallback skipped for excel"
+      } else {
+        if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
+        if (Try-OpenAddinFromCatalog -Window (Get-OfficeWindowFromHandle -Handle $WindowHandle) -Deadline $Deadline) {
+          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = ""; activation_path = "catalog-fallback" }
+        }
+      }
     }
   } while ((Get-Date) -lt $Deadline)
 
@@ -766,11 +827,26 @@ function Try-OpenAddinFromCatalog {
   return $false
 }
 
+$app = Get-OfficeApplication -HostKey $hostKey
+$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+$registered = Invoke-OfficialRegistration
+if ($registered) {
+  try {
+    $driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $DocumentPath -Deadline $deadline
+    Write-ActivatorLog "registered ribbon path active; attempting to open control panel document=$DocumentPath"
+    $panel = Try-OpenControlPanelForDriverDocument -WindowHandle $driverWindowHandle -Deadline (Get-Date).AddSeconds([Math]::Min(12, [Math]::Max(3, $TimeoutSeconds / 2))) -AllowCatalogFallback:$false
+    if ($panel.opened) {
+      Write-ActivationResult -DocumentPath $DocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath "official-registration" -ControlOpened $true
+      exit 0
+    }
+  } catch {
+    Write-ActivatorLog "registered ribbon path failed; falling back to sideload document=$DocumentPath error=$($_.Exception.Message)"
+  }
+}
+
 Invoke-OfficialSideload
 
-$app = Get-OfficeApplication -HostKey $hostKey
 $activeDocumentPath = if ([string]::IsNullOrWhiteSpace($script:officialDocumentPath)) { $DocumentPath } else { $script:officialDocumentPath }
-$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 if (-not [string]::IsNullOrWhiteSpace($script:officialDocumentPath)) {
   try {
     $copyWaitSeconds = [Math]::Min(8, [Math]::Max(3, $TimeoutSeconds / 3))
@@ -779,7 +855,7 @@ if (-not [string]::IsNullOrWhiteSpace($script:officialDocumentPath)) {
     $driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath -Deadline $copyDeadline
     Close-DriverDocumentIfDifferent -Application $app -HostKey $hostKey -OriginalPath $DocumentPath -ActivePath $activeDocumentPath
     Write-ActivatorLog "official sideload copy is active; attempting to open control panel document=$activeDocumentPath"
-    $panel = Try-OpenControlPanelForDriverDocument -WindowHandle $driverWindowHandle -Deadline (Get-Date).AddSeconds([Math]::Min(12, [Math]::Max(3, $TimeoutSeconds / 2)))
+    $panel = Try-OpenControlPanelForDriverDocument -WindowHandle $driverWindowHandle -Deadline (Get-Date).AddSeconds([Math]::Min(12, [Math]::Max(3, $TimeoutSeconds / 2))) -AllowCatalogFallback
     $activationPath = if ([string]::IsNullOrWhiteSpace($panel.activation_path)) { "official-sideload" } else { "official-sideload:$($panel.activation_path)" }
     Write-ActivationResult -DocumentPath $activeDocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath $activationPath -ControlOpened $panel.opened
     exit 0
@@ -792,7 +868,7 @@ if (-not [string]::IsNullOrWhiteSpace($script:officialDocumentPath)) {
   $driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath -Deadline $deadline
 }
 
-$panel = Try-OpenControlPanelForDriverDocument -WindowHandle $driverWindowHandle -Deadline $deadline
+$panel = Try-OpenControlPanelForDriverDocument -WindowHandle $driverWindowHandle -Deadline $deadline -AllowCatalogFallback
 if ($panel.opened) {
   Write-ActivationResult -DocumentPath $activeDocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath $panel.activation_path -ControlOpened $true
   exit 0

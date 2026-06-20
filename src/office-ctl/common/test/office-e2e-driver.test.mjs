@@ -330,6 +330,13 @@ test('Office E2E driver reuses one MCP HTTP session per driver process', () => {
 test('default Windows add-in activator can fall back through My Add-ins catalog UI', () => {
   const script = readFileSync(DEFAULT_ACTIVATOR, 'utf8');
   assert.match(script, /office-addin-dev-settings/);
+  assert.match(script, /function Invoke-OfficialRegistration/);
+  assert.match(script, /office-addin-dev-settings register/);
+  assert.match(script, /official registration start app=\$appName manifest=\$ManifestPath/);
+  assert.match(script, /registered ribbon path active; attempting to open control panel document=\$DocumentPath/);
+  assert.match(script, /Try-OpenControlPanelForDriverDocument -WindowHandle \$driverWindowHandle -Deadline \(Get-Date\)\.AddSeconds\(\[Math\]::Min\(12, \[Math\]::Max\(3, \$TimeoutSeconds \/ 2\)\)\) -AllowCatalogFallback:\$false/);
+  assert.match(script, /-ActivationPath "official-registration"/);
+  assert.match(script, /catalog fallback skipped for excel/);
   assert.match(script, /sideload/);
   assert.match(script, /cmd\.exe/);
   assert.match(script, /OFFICE_MCP_E2E_MANIFEST_PATH/);
@@ -340,6 +347,8 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /Start-Process -FilePath \$Path/);
   assert.doesNotMatch(script, /Start-Process -FilePath \$Path -WindowStyle Hidden/, 'sideload workbooks must be opened visibly so the add-in task pane can load');
   assert.match(script, /official sideload document opened via shell path=\$Path/);
+  assert.match(script, /official sideload excel document opened via new application path=\$Path/);
+  assert.match(script, /New-Object -ComObject Excel\.Application/);
   assert.match(script, /function Try-OpenControlPanelForDriverDocument/);
   assert.match(script, /\$hostKey -ne "excel"/);
   assert.match(script, /\$tabNames = if \(\$hostKey -eq "excel"\)/);
