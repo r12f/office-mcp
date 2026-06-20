@@ -365,6 +365,38 @@ test('Office E2E driver fails direct-result expectation mismatches', async () =>
   assert.match(result.stderr, /inserted_image/);
 });
 
+test('Office E2E driver accepts declared host capability errors', async () => {
+  const result = runDriver({
+    host: 'PowerPoint',
+    step: 'verifyResult',
+    context: {
+      toolCase: {
+        tool: 'powerpoint.export_file',
+        verify: {
+          kind: 'direct-result',
+          allowErrorCodes: ['HOST_CAPABILITY_UNAVAILABLE'],
+          expect: { pathEquals: [{ path: 'format', value: 'pdf' }] }
+        }
+      },
+      result: {
+        structuredContent: {
+          error: {
+            office_mcp_code: 'HOST_CAPABILITY_UNAVAILABLE',
+            message: 'PowerPoint desktop file export is not available through Office.context.document.getFileAsync in this host.',
+            retriable: true,
+            partial_effect: 'none'
+          }
+        }
+      }
+    }
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const verified = JSON.parse(result.stdout);
+  assert.equal(verified.verified, true);
+  assert.equal(verified.acceptedErrorCode, 'HOST_CAPABILITY_UNAVAILABLE');
+});
+
 test('Office E2E driver setupContent runs declared MCP setup actions', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-setup-'));
   const logPath = join(dir, 'mcp-requests.jsonl');

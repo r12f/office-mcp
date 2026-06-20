@@ -33,7 +33,19 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'editable', value: true }] }
     }
   }],
-  ['powerpoint.export_file', { verify: 'direct-result' }],
+  ['powerpoint.export_file', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Export file baseline' } }
+      ]
+    },
+    args: { format: 'pdf' },
+    verify: {
+      kind: 'direct-result',
+      allowErrorCodes: ['HOST_CAPABILITY_UNAVAILABLE'],
+      expect: { pathEquals: [{ path: 'format', value: 'pdf' }, { path: 'mime_type', value: 'application/pdf' }] }
+    }
+  }],
   ['powerpoint.update_tags', {
     setup: {
       actions: [
@@ -117,7 +129,19 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { orderedContains: ['Move source second', 'Move source first'] }
     }
   }],
-  ['powerpoint.export_slide', { verify: 'direct-result' }],
+  ['powerpoint.export_slide', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Export slide baseline' } }
+      ]
+    },
+    args: { slide_index: 0 },
+    verify: {
+      kind: 'direct-result',
+      allowErrorCodes: ['HOST_CAPABILITY_UNAVAILABLE'],
+      expect: { pathEquals: [{ path: 'slide_index', value: 0 }, { path: 'mime_type', value: 'image/png' }] }
+    }
+  }],
   ['powerpoint.list_layouts', {
     setup: {
       actions: [
@@ -331,7 +355,9 @@ test('PowerPoint E2E case table covers every advertised tool', () => {
 test('PowerPoint mutating E2E cases define concrete setup and readback checks', () => {
   assertDirectResult('powerpoint.get_presentation_info');
   assertDirectResult('powerpoint.get_active_view');
+  assertDirectResult('powerpoint.export_file');
   assertDirectResult('powerpoint.list_slides');
+  assertDirectResult('powerpoint.export_slide');
   assertDirectResult('powerpoint.list_layouts');
   assertDirectResult('powerpoint.get_selection');
   assertDirectResult('powerpoint.list_shapes');

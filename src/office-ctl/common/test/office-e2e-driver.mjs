@@ -236,10 +236,15 @@ async function callTool(context) {
 async function verifyResult(context) {
   const toolCase = context.toolCase || {};
   const result = context.result || {};
-  if (result.error || result.structuredContent?.error) {
-    throw new Error(`${toolCase.tool || 'tool'} returned MCP error: ${JSON.stringify(result.error || result.structuredContent.error)}`);
-  }
   const verifier = toolCase.verify || { kind: 'readback' };
+  const error = resultError(result);
+  if (error) {
+    const code = error.office_mcp_code || error.code;
+    if (arrayOf(verifier.allowErrorCodes).includes(code)) {
+      return { verified: true, kind: verifier.kind, acceptedErrorCode: code };
+    }
+    throw new Error(`${toolCase.tool || 'tool'} returned MCP error: ${JSON.stringify(error)}`);
+  }
   if (verifier.kind === 'direct-result') {
     assertReadbackExpectations(toolCase.tool || 'tool', result, verifier.expect || {});
     return { verified: true, kind: verifier.kind };
@@ -261,6 +266,10 @@ async function verifyResult(context) {
   const readback = await mcpToolCall(daemon.endpoint, verifier.readbackTool, readbackArguments);
   assertReadbackExpectations(toolCase.tool || 'tool', readback, verifier.expect || {});
   return { verified: true, kind: verifier.kind, readbackTool: verifier.readbackTool };
+}
+
+function resultError(result) {
+  return result?.error || result?.structuredContent?.error || null;
 }
 
 function actionResultData(result) {
