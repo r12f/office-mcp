@@ -103,6 +103,36 @@ test('Excel capability spec exists and tracks the v1 tool catalog', () => {
   assert.match(source, /pivot_table/);
 });
 
+test('Excel runtime evidence can own the live Office E2E lifecycle', () => {
+  const source = readFileSync(evidencePath('runtime-evidence.ts'), 'utf8');
+  const packageJson = readFileSync(evidencePath('package.json'), 'utf8');
+
+  assert.match(source, /--excel-e2e-session/);
+  assert.match(source, /OFFICE_MCP_E2E_DRIVER/);
+  assert.match(source, /office-e2e-driver\.mjs/);
+  assert.match(source, /runExcelE2eSessionSmoke/);
+  assert.match(source, /runOfficeE2eDriverStep\('Excel', 'startDaemon'/);
+  assert.match(source, /runOfficeE2eDriverStep\('Excel', 'createDocument'/);
+  assert.match(source, /runOfficeE2eDriverStep\('Excel', 'activateAddin'/);
+  assert.match(source, /runOfficeE2eDriverStep\('Excel', 'waitForSession'/);
+  assert.match(source, /runOfficeE2eDriverStep\('Excel', 'cleanupDocument'/);
+  assert.match(source, /runOfficeE2eDriverStep\('Excel', 'stopDaemon'/);
+  assert.match(source, /finally \{/);
+  assert.match(source, /await runExcelSmokeGate\(sessionId\)/);
+  assert.match(source, /excel\.e2e_session/);
+  assert.match(source, /available_tools: availableTools/);
+  assert.match(packageJson, /"evidence:excel"[^\n]+--excel-e2e-session/);
+});
+
+test('Excel runtime smoke uses worksheet names within Excel limits', () => {
+  const source = readFileSync(evidencePath('runtime-evidence.ts'), 'utf8');
+
+  assert.match(source, /const sheetName = `Mcp\$\{runId\}`/);
+  assert.match(source, /const renamedSheetName = `McpR\$\{runId\}`/);
+  assert.match(source, /const cleanupSheetName = `McpC\$\{runId\}`/);
+  assert.doesNotMatch(source, /OfficeMcpSmoke\$\{Date\.now\(\)\}Renamed/);
+});
+
 test('PowerPoint runtime evidence harness proves session, tools, mutation, and host rejections', () => {
   const spec = readFileSync(resolve(process.cwd(), '../../../../doc/spec/08-roadmap.md'), 'utf8');
   const source = readFileSync(evidencePath('runtime-evidence.ts'), 'utf8');

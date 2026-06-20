@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -24,15 +24,25 @@ type EvidenceReport = {
   gates: EvidenceGate[];
 };
 
+type OfficeE2eDriverContext = Record<string, unknown>;
+
+type OfficeE2eSessionContext = {
+  daemon?: OfficeE2eDriverContext;
+  document?: OfficeE2eDriverContext;
+};
+
 const evidenceRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(evidenceRoot, '../../../..');
 const tsxCli = resolve(evidenceRoot, 'node_modules/tsx/dist/cli.mjs');
+const defaultOfficeE2eDriver = resolve(repoRoot, 'src/office-ctl/common/test/office-e2e-driver.mjs');
+const officeE2eDriverPath = resolve(readOption('--office-e2e-driver') ?? process.env.OFFICE_MCP_E2E_DRIVER ?? defaultOfficeE2eDriver);
 const endpoint = readOption('--endpoint') ?? process.env.OFFICE_MCP_MCP_ENDPOINT ?? 'http://127.0.0.1:8800/mcp';
 const outputPath = resolve(readOption('--output') ?? join(repoRoot, 'artifacts/runtime-evidence.json'));
 const requestedSessionId = readOption('--session-id');
 const includeMutation = hasFlag('--include-mutation');
 const includeFullWordSmoke = hasFlag('--include-full-word-smoke');
 const includeExcelSmoke = hasFlag('--include-excel-smoke');
+const useExcelE2eSession = hasFlag('--excel-e2e-session');
 const includePowerPointSmoke = hasFlag('--include-powerpoint-smoke');
 const includeComTrackedChanges = hasFlag('--include-com-tracked-changes');
 const includeTrackedChanges = hasFlag('--include-tracked-changes');
@@ -71,7 +81,7 @@ try {
     const waitResult = await runWaitForSessionGate(irmDocumentPath, waitForSessionMs);
     sessions = Array.isArray(waitResult.sessions) ? waitResult.sessions as Array<Record<string, unknown>> : sessions;
   }
-  if (includeExcelSmoke && waitForSessionMs > 0 && !selectHostSessionId(sessions, 'excel')) {
+  if (includeExcelSmoke && !useExcelE2eSession && waitForSessionMs > 0 && !selectHostSessionId(sessions, 'excel')) {
     const waitResult = await runWaitForHostSessionGate('excel', waitForSessionMs);
     sessions = Array.isArray(waitResult.sessions) ? waitResult.sessions as Array<Record<string, unknown>> : sessions;
   }
@@ -110,7 +120,8 @@ try {
     if (irmDocumentPath) await runIrmDocumentPreflightGate(irmDocumentPath);
   }
   if (includeExcelSmoke) {
-    if (excelSessionId) await runExcelSmokeGate(excelSessionId);
+    if (useExcelE2eSession) await runExcelE2eSessionSmoke();
+    else if (excelSessionId) await runExcelSmokeGate(excelSessionId);
     else addGate('excel.runtime_smoke', 'blocked_by_runtime', {
       reason: 'No connected Excel add-in session. Open Excel, open Office MCP Control, then rerun this script.'
     });
@@ -222,14 +233,16 @@ async function runWaitForHostSessionGate(hostApp: string, timeoutMs: number): Pr
 
 async function runExcelSmokeGate(sessionId: string): Promise<void> {
   await runGate('excel.runtime_smoke', async () => {
-    const marker = `OfficeMCP${Date.now()}`;
-    const sheetName = `OfficeMcpSmoke${Date.now()}`;
-    const renamedSheetName = `${sheetName}Renamed`;
-    const cleanupSheetName = `${sheetName}Cleanup`;
-    const tableName = `OfficeMcpTable${Date.now()}`;
+    const runId = Date.now();
+    const marker = `OfficeMCP${runId}`;
+    const sheetName = `Mcp${runId}`;
+    const renamedSheetName = `McpR${runId}`;
+    const cleanupSheetName = `McpC${runId}`;
+    const tableName = `OfficeMcpTable${runId}`;
     const chartTitle = 'Office MCP Smoke Updated';
-    const pivotName = `OfficeMcpPivot${Date.now()}`;
+    const pivotName = `OfficeMcpPivot${runId}`;
     const info = await callToolData('office.get_session_info', { session_id: sessionId });
+    const availableTools = Array.isArray(info.available_tools) ? info.available_tools.map(String) : [];
     const workbookInfo = await callToolData('excel.get_workbook_info', { session_id: sessionId });
     const sheetListBefore = await callToolData('excel.list_sheets', { session_id: sessionId });
     const sheet = await callToolData('excel.add_sheet', {
@@ -360,7 +373,8 @@ async function runExcelSmokeGate(sessionId: string): Promise<void> {
       session_id: sessionId,
       sheet_name: renamedSheetName,
       document_title: (info.document as { title?: string } | undefined)?.title,
-      available_tool_count: Array.isArray(info.available_tools) ? info.available_tools.length : undefined,
+      available_tool_count: availableTools.length,
+      available_tools: availableTools,
       workbook_info: {
         sheet_count: workbookInfo.sheet_count,
         table_count: workbookInfo.table_count,
@@ -389,6 +403,41 @@ async function runExcelSmokeGate(sessionId: string): Promise<void> {
       marker_found: true
     };
   });
+}
+
+async function runExcelE2eSessionSmoke(): Promise<void> {
+  const context: OfficeE2eSessionContext = {};
+  let sessionId = '';
+  try {
+    await runGate('excel.e2e_session', async () => {
+      const daemon = await runOfficeE2eDriverStep('Excel', 'startDaemon', context);
+      context.daemon = daemon;
+      const document = await runOfficeE2eDriverStep('Excel', 'createDocument', context);
+      context.document = document;
+      await runOfficeE2eDriverStep('Excel', 'activateAddin', context);
+      const session = await runOfficeE2eDriverStep('Excel', 'waitForSession', context);
+      sessionId = String(session.sessionId ?? '');
+      if (!sessionId) throw new Error('Excel E2E driver did not return a sessionId.');
+      report.session_id = sessionId;
+      return {
+        session_id: sessionId,
+        driver: officeE2eDriverPath,
+        daemon_started_by_driver: daemon.startedByDriver,
+        document_path: document.path,
+        available_tool_count: Array.isArray(session.availableTools) ? session.availableTools.length : undefined
+      };
+    });
+    if (sessionId) await runExcelSmokeGate(sessionId);
+  } finally {
+    if (context.document) await runOfficeE2eDriverStep('Excel', 'cleanupDocument', context).catch((error) => {
+      addGate('excel.e2e_cleanup', 'failed', { error: errorMessage(error) });
+      return {};
+    });
+    if (context.daemon) await runOfficeE2eDriverStep('Excel', 'stopDaemon', context).catch((error) => {
+      addGate('excel.e2e_stop_daemon', 'failed', { error: errorMessage(error) });
+      return {};
+    });
+  }
 }
 
 
@@ -724,6 +773,25 @@ function runSmokeMode(mode: string, sessionId: string, extraArg?: string): strin
   const jsonStart = raw.indexOf('{');
   if (jsonStart === -1) throw new Error(`Smoke mode ${mode} did not emit JSON.`);
   return raw.slice(jsonStart);
+}
+
+async function runOfficeE2eDriverStep(host: 'Excel', step: string, context: OfficeE2eSessionContext): Promise<OfficeE2eDriverContext> {
+  const result = spawnSync(process.execPath, [officeE2eDriverPath], {
+    cwd: repoRoot,
+    input: JSON.stringify({ host, step, context }),
+    encoding: 'utf8',
+    maxBuffer: 20 * 1024 * 1024,
+    env: { ...process.env, OFFICE_MCP_MCP_ENDPOINT: endpoint }
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`Office E2E driver ${host}.${step} failed with code ${result.status}: ${result.stderr || result.stdout}`);
+  }
+  const text = String(result.stdout || '').trim();
+  if (!text) return {};
+  const parsed = JSON.parse(text) as unknown;
+  if (!isRecord(parsed)) throw new Error(`Office E2E driver ${host}.${step} returned non-object JSON.`);
+  return parsed;
 }
 
 function selectWordSessionId(sessions: Array<Record<string, unknown>>, documentPath?: string): string {
