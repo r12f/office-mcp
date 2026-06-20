@@ -51,7 +51,9 @@ The Windows desktop implementation is in place for Word, Excel, and PowerPoint:
 - The current Word add-in runtime advertises and executes the refined 25-tool Word v1 surface from
   `doc/spec/04-word-capabilities.md`, with duplicate specialized compatibility tools retired from
   the advertised catalog.
-- The current Excel add-in runtime advertises and executes the implemented Excel v1 workbook tools: workbook info, sheet list/add/update/delete, used-range discovery, range read/write/clear/find-replace, formula setting, formatting, table creation, and chart creation.
+- The current Excel add-in runtime advertises and executes the refined 20-tool Excel v1 surface:
+  workbook info, sheet list/add/update/delete, used-range discovery, range read/write/clear/find-replace,
+  formula setting, formatting, sort/filter, table/chart creation and updates, and PivotTable creation and updates.
 - The current PowerPoint add-in runtime advertises and executes the 25-tool
   PowerPoint v1 presentation tools for presentation info/export, tags, slides,
   layouts, selection, shapes, text, and tables, with host-gated operations

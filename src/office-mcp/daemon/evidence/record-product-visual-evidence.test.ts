@@ -239,6 +239,8 @@ test('README describes current Word Excel and PowerPoint product surface', () =>
   assert.match(readme, /Word, Excel, and PowerPoint task pane add-ins/);
   assert.match(readme, /doc\/spec\/04-excel-capabilities\.md/);
   assert.match(readme, /current Word add-in runtime advertises and executes the refined 25-tool Word v1 surface/);
+  assert.match(readme, /current Excel add-in runtime advertises and executes the refined 20-tool Excel v1 surface/);
+  assert.match(readme, /sort\/filter, table\/chart creation and updates, and PivotTable creation and updates/);
   assert.match(readme, /PowerPoint v1 presentation tools/);
   assert.doesNotMatch(readme, /current Word add-in runtime advertises and executes the 27-tool Word v1 compatibility surface/);
   assert.match(mcpSurface, /"available_tool_count": 25/);
