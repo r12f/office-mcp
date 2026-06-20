@@ -47,19 +47,23 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 25 tools, grouped by category.
+The current advertised Word v1 tool surface has 25 tools, grouped by object-owner
+category. Categories are not permission tiers and must not be action buckets such
+as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
+tool so the UI can apply Read/Write/All permission modes without hiding the
+object model.
+
 The per-tool JSON Schemas follow in §2-§8.
 
 | Category | Tools |
 |---|---|
-| **Read** | `word.get_text`, `word.get_outline`, `word.get_paragraph`, `word.find_text`, `word.get_selection` |
-| **Insert** | `word.insert_paragraph`, `word.insert_table`, `word.insert_image`, `word.insert_page_break`, `word.insert_list` |
-| **Edit** | `word.replace_text`, `word.update_paragraph`, `word.delete_range`, `word.apply_formatting` |
-| **Tables** | `word.read_table`, `word.update_table` |
-| **Content Controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
-| **Structure** | `word.apply_style` |
+| **Document & structure** | `word.get_text`, `word.get_outline`, `word.insert_page_break`, `word.save` |
+| **Range & selection** | `word.get_selection`, `word.find_text`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
+| **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
+| **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
+| **Media** | `word.insert_image` |
+| **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_tracked_change` |
-| **Document** | `word.save` |
 
 ### 1.2 Target refined Word tool surface
 
@@ -76,31 +80,31 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 
 | Tool | Status | Category | Side effect | Minimum API | Summary |
 |---|---|---|---|---|---|
-| `word.get_text` | implemented | Read | read | `WordApi 1.3` | Read paginated document body text; paragraph metadata is optional. |
-| `word.get_outline` | implemented | Read | read | `WordApi 1.3` | Read headings and lightweight document structure without body text. |
-| `word.get_paragraph` | implemented | Read | read | `WordApi 1.3` | Read one paragraph by index. |
-| `word.find_text` | implemented | Read | read | `WordApi 1.3` | Search text with Word search options and return portable paragraph-relative matches. |
-| `word.get_selection` | implemented | Read | read | `WordApi 1.3` | Read current selection text and simple selection metadata. |
-| `word.insert_paragraph` | implemented | Insert | edit | `WordApi 1.3` | Insert a paragraph at an anchor; also owns heading insertion through style or heading-level arguments after migration. |
-| `word.insert_table` | implemented | Insert | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
-| `word.insert_image` | implemented | Insert | edit | `WordApi 1.3` | Insert a validated image from base64 or a daemon-fetched HTTPS URL. |
-| `word.insert_page_break` | implemented | Insert | edit | `WordApi 1.3` | Insert a page break at an anchor. |
-| `word.insert_list` | implemented | Insert | edit | `WordApi 1.3` | Insert a numbered or bulleted list. |
-| `word.replace_text` | implemented | Edit | edit | `WordApi 1.3` | Find and replace text, with dry-run support. |
-| `word.update_paragraph` | implemented | Edit | edit | `WordApi 1.3` | Replace one paragraph's text wholesale. |
-| `word.delete_range` | implemented | Edit | destructive | `WordApi 1.3` | Delete an anchored paragraph, sentence, or selection. |
-| `word.apply_formatting` | implemented | Format | edit | `WordApi 1.3` | Apply character/run formatting to an anchored range. |
-| `word.apply_style` | implemented | Structure | edit | `WordApi 1.3` | Apply an Office style to an anchored range; also owns heading-level changes after migration. |
+| `word.get_text` | implemented | Document & structure | read | `WordApi 1.3` | Read paginated document body text; paragraph metadata is optional. |
+| `word.get_outline` | implemented | Document & structure | read | `WordApi 1.3` | Read headings and lightweight document structure without body text. |
+| `word.get_paragraph` | implemented | Paragraphs & lists | read | `WordApi 1.3` | Read one paragraph by index. |
+| `word.find_text` | implemented | Range & selection | read | `WordApi 1.3` | Search text with Word search options and return portable paragraph-relative matches. |
+| `word.get_selection` | implemented | Range & selection | read | `WordApi 1.3` | Read current selection text and simple selection metadata. |
+| `word.insert_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a paragraph at an anchor; also owns heading insertion through style or heading-level arguments after migration. |
+| `word.insert_table` | implemented | Tables | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
+| `word.insert_image` | implemented | Media | edit | `WordApi 1.3` | Insert a validated image from base64 or a daemon-fetched HTTPS URL. |
+| `word.insert_page_break` | implemented | Document & structure | edit | `WordApi 1.3` | Insert a page break at an anchor. |
+| `word.insert_list` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a numbered or bulleted list. |
+| `word.replace_text` | implemented | Range & selection | edit | `WordApi 1.3` | Find and replace text, with dry-run support. |
+| `word.update_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Replace one paragraph's text wholesale. |
+| `word.delete_range` | implemented | Range & selection | destructive | `WordApi 1.3` | Delete an anchored paragraph, sentence, or selection. |
+| `word.apply_formatting` | implemented | Range & selection | edit | `WordApi 1.3` | Apply character/run formatting to an anchored range. |
+| `word.apply_style` | implemented | Range & selection | edit | `WordApi 1.3` | Apply an Office style to an anchored range; also owns heading-level changes after migration. |
 | `word.read_table` | implemented | Table | read | `WordApi 1.3` | Read table dimensions, header state, and cell text. |
 | `word.update_table` | implemented | Table | edit/destructive | `WordApi 1.3` | Update table cells, rows, columns, table/cell formatting, and table deletion through one table-owner tool. |
-| `word.list_content_controls` | implemented | ContentControl | read | `WordApi 1.5` | List content controls with id/tag/title/type metadata, without duplicating document text reads. |
-| `word.insert_content_control` | implemented | ContentControl | edit | `WordApi 1.5` | Create a content control around an anchored range or inserted placeholder content. |
-| `word.update_content_control` | implemented | ContentControl | edit | `WordApi 1.5` | Update content control metadata, locked state, or contained text through the content-control owner. |
-| `word.delete_content_control` | implemented | ContentControl | destructive | `WordApi 1.5` | Delete a content control, preserving or deleting contents according to an explicit mode. |
+| `word.list_content_controls` | implemented | Content controls | read | `WordApi 1.5` | List content controls with id/tag/title/type metadata, without duplicating document text reads. |
+| `word.insert_content_control` | implemented | Content controls | edit | `WordApi 1.5` | Create a content control around an anchored range or inserted placeholder content. |
+| `word.update_content_control` | implemented | Content controls | edit | `WordApi 1.5` | Update content control metadata, locked state, or contained text through the content-control owner. |
+| `word.delete_content_control` | implemented | Content controls | destructive | `WordApi 1.5` | Delete a content control, preserving or deleting contents according to an explicit mode. |
 | `word.add_comment` | implemented | Review | comment | `WordApi 1.4` | Add a comment to an anchored range as the signed-in Office user. |
 | `word.resolve_comment` | implemented | Review | comment | `WordApi 1.4` | Resolve an existing comment. |
 | `word.update_tracked_change` | implemented | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint. |
-| `word.save` | implemented | Document | edit | `WordApi 1.1` | Save the current document with the host save behavior. |
+| `word.save` | implemented | Document & structure | edit | `WordApi 1.1` | Save the current document with the host save behavior. |
 
 Superseded target-surface tools:
 

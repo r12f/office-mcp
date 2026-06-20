@@ -400,6 +400,48 @@ workbook does not show duplicated tool lists or `unknown` document state; tools
 and permissions share one categorized collapsible surface; settings edit inline;
 and server/protocol metadata fits on one row.
 
+### M6.5.4 — Task pane tools permission polish follow-up
+
+User-reported follow-up from the current Word task pane build:
+
+- [ ] Add a top-level capability mode control to the `Tools` surface with three
+      states: `Read`, `Write`, and `All`. `Read` enables only read-only tools;
+      `Write` enables read tools plus mutating non-destructive tools; `All`
+      enables every supported tool, including delete/destructive operations.
+      The selected mode updates the effective `available_tools` for the current
+      session and still allows individual per-tool toggles inside the selected
+      ceiling.
+- [ ] Simplify every tools count from `Enabled X of Y` to `X/Y`. Category rows
+      must right-align the count and place it immediately before the category
+      toggle. The aggregate tools header may also use `X/Y`.
+- [ ] Fix the `Daemon` metadata row height in Word, Excel, and PowerPoint task
+      panes. The endpoint row must vertically center with the other document
+      metadata rows; the reconnect control is an icon-only button and must not
+      make the row card-height.
+- [ ] Shorten the constrained task-pane title/category text from
+      `Office MCP Control` to `MCP Control` where it is used as the panel title
+      or local category label. Keep the full product name for catalog,
+      installer, tray tooltip, and other wider identity surfaces. Add the
+      generated product mark to visible `Open Control Panel` buttons.
+- [ ] Replace the current Word tool UI grouping by action buckets
+      (`Read`/`Insert`/`Edit`) with object-owner categories from
+      [04-word-capabilities.md](04-word-capabilities.md): Document & structure,
+      Range & selection, Paragraphs & lists, Tables, Media, Content controls,
+      and Review. Side-effect level remains separate metadata used by the
+      `Read`/`Write`/`All` permission mode.
+- [ ] Prevent category collapse when clicking category toggles or per-tool
+      toggles. Only the explicit category disclosure hit target changes expanded
+      state; toggle clicks update permissions only.
+- [ ] Add task pane contract tests for the new count placement, `Read`/`Write`/
+      `All` top-level mode, non-collapsing toggles, compact daemon row, `MCP
+      Control` local title, `Open Control Panel` icon, and object-owner Word
+      categories across Word, Excel, and PowerPoint where applicable.
+
+**Exit criterion**: At 320 px width, the tools surface shows object-owner
+categories, compact right-aligned counts, a top-level permission mode, and
+independent non-collapsing toggles; the daemon row is vertically centered and no
+long title or text-only control-panel button wastes scarce task-pane space.
+
 ### M6.5.3 — Product identity, add-in metadata, and native tray polish
 
 User-reported follow-up from live Word add-in and tray testing. This milestone
@@ -1166,6 +1208,46 @@ from the directory tree alone; the daemon has no large flat module dump under
 `src`, tests live in sibling `_tests.rs` files, tracing-backed file logs are
 available for diagnosis, the UI source is owned by the daemon `ui` module, and
 all existing Rust, evidence, packaging, and add-in checks still pass.
+
+### M6.7 — Office tool E2E coverage
+
+The evidence harness proves runtime diagnostics and selected smoke paths, but it
+is not enough for tool-level correctness. Every MCP tool needs a real end-to-end
+test that drives the production daemon, a real Office document, the add-in
+channel, and MCP `tools/call` dispatch.
+
+- [ ] Add a non-evidence E2E test harness for Word tools. The harness starts the
+      MCP daemon, creates a fresh empty Word document, opens/connects the Office
+      add-in, waits until the daemon reports an active Word session, and then
+      iterates through every advertised `word.*` tool.
+- [ ] Add equivalent non-evidence E2E harnesses for Excel and PowerPoint tools.
+      Each host harness creates a fresh empty workbook/presentation, waits for
+      the corresponding add-in session, runs all advertised tools for that host,
+      and closes/deletes the test file at the end.
+- [ ] Structure each host E2E as one table-driven loop. Every tool case supplies
+      only the tool-specific setup content, tool arguments, and verifier. The
+      shared loop owns the common steps: create fixed baseline content, call the
+      MCP tool, and verify the result. Read tools verify their direct result;
+      mutating/comment/destructive tools verify by reading the document back
+      through the most appropriate read tool or resource.
+- [ ] The shared loop must reset or recreate deterministic content before each
+      tool case so cases are independent and can be retried without relying on
+      previous side effects. The loop records the tool name, setup content,
+      MCP request id, and verifier result, but it must not write document body
+      content to default logs.
+- [ ] The harness must fail if any advertised tool lacks a case. Catalog/tool
+      list discovery is authoritative: `tools/list` or session
+      `available_tools` defines the expected set, and the test asserts exact
+      coverage for the host's current catalog.
+- [ ] The E2E suite must be runnable separately from release evidence commands.
+      Evidence recorders may consume its output later, but passing E2E is its
+      own gate and must not be implemented as `npm run evidence:*`.
+
+**Exit criterion**: A developer can run one command per Office host and see the
+daemon start, a blank document connect, every MCP tool execute against fixed
+test content, every result verified by direct result or readback, and the test
+document closed and deleted afterward. Adding a new advertised tool fails E2E
+until a corresponding table row is added.
 
 ### M7 — Excel
 
