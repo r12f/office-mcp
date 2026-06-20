@@ -12,11 +12,65 @@ const ADDIN_ROOT = process.cwd();
 const PNG_1X1_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
 const WORD_E2E_CASES = Object.fromEntries([
-  ['word.get_text', { verify: 'direct-result' }],
-  ['word.get_outline', { verify: 'direct-result' }],
-  ['word.get_paragraph', { verify: 'direct-result' }],
-  ['word.find_text', { verify: 'direct-result' }],
-  ['word.get_selection', { verify: 'direct-result' }],
+  ['word.get_text', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Read text E2E paragraph' } }
+      ]
+    },
+    args: { limit: 20 },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['Read text E2E paragraph'], pathEquals: [{ path: 'untrusted_source', value: true }] }
+    }
+  }],
+  ['word.get_outline', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'E2E Outline Heading', heading_level: 1 } }
+      ]
+    },
+    args: { max_level: 2 },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E Outline Heading'], pathEquals: [{ path: 'headings.0.level', value: 1 }] }
+    }
+  }],
+  ['word.get_paragraph', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'start_of_document' }, text: 'Paragraph read target' } }
+      ]
+    },
+    args: { index: 0 },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'index', value: 0 }, { path: 'text', value: 'Paragraph read target' }] }
+    }
+  }],
+  ['word.find_text', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Find target E2E phrase' } }
+      ]
+    },
+    args: { query: 'target E2E', limit: 10 },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['target E2E'], pathEquals: [{ path: 'count', value: 1 }] }
+    }
+  }],
+  ['word.get_selection', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Selection structure baseline' } }
+      ]
+    },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'untrusted_source', value: true }] }
+    }
+  }],
   ['word.insert_paragraph', {
     setup: {
       actions: [
@@ -122,7 +176,18 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'formatted', value: true }] }
     }
   }],
-  ['word.read_table', { verify: 'direct-result' }],
+  ['word.read_table', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_table', arguments: { anchor: { kind: 'end_of_document' }, rows: [['ReadTable-A', 'ReadTable-B']] } }
+      ]
+    },
+    args: { table_index: 0 },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['ReadTable-A', 'ReadTable-B'], pathEquals: [{ path: 'rows', value: 1 }, { path: 'cols', value: 2 }] }
+    }
+  }],
   ['word.update_table', {
     setup: {
       actions: [
@@ -137,7 +202,18 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { contains: ['Updated table cell'], notContains: ['Old'] }
     }
   }],
-  ['word.list_content_controls', { verify: 'direct-result' }],
+  ['word.list_content_controls', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_content_control', arguments: { anchor: { kind: 'end_of_document' }, text: 'List control payload', tag: 'e2e-list-control', title: 'E2E List Control' } }
+      ]
+    },
+    args: { tag: 'e2e-list-control' },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['e2e-list-control', 'E2E List Control'] }
+    }
+  }],
   ['word.insert_content_control', {
     setup: {
       actions: [
@@ -237,6 +313,13 @@ test('Word E2E case table covers every advertised tool', () => {
 });
 
 test('Word mutating E2E cases define concrete setup and readback checks', () => {
+  assertDirectResult('word.get_text');
+  assertDirectResult('word.get_outline');
+  assertDirectResult('word.get_paragraph');
+  assertDirectResult('word.find_text');
+  assertDirectResult('word.get_selection');
+  assertDirectResult('word.read_table');
+  assertDirectResult('word.list_content_controls');
   assertConcreteReadback('word.replace_text');
   assertConcreteReadback('word.insert_paragraph');
   assertConcreteReadback('word.update_paragraph');
