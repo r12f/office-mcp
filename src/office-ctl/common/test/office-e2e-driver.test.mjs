@@ -338,6 +338,7 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /function Open-OfficialSideloadDocument/);
   assert.match(script, /Open-OfficialSideloadDocument -Application \$app -HostKey \$hostKey -Path \$activeDocumentPath/);
   assert.match(script, /Start-Process -FilePath \$Path/);
+  assert.doesNotMatch(script, /Start-Process -FilePath \$Path -WindowStyle Hidden/, 'sideload workbooks must be opened visibly so the add-in task pane can load');
   assert.match(script, /official sideload document opened via shell path=\$Path/);
   assert.match(script, /function Try-OpenControlPanelForDriverDocument/);
   assert.match(script, /\$hostKey -ne "excel"/);

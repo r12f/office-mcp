@@ -322,7 +322,7 @@ function Open-OfficialSideloadDocument {
   } catch {
     Write-ActivatorLog "official sideload document open failed path=$Path error=$($_.Exception.Message)"
     try {
-      Start-Process -FilePath $Path -WindowStyle Hidden
+      Start-Process -FilePath $Path
       Write-ActivatorLog "official sideload document opened via shell path=$Path"
     } catch {
       Write-ActivatorLog "official sideload document shell open failed path=$Path error=$($_.Exception.Message)"
