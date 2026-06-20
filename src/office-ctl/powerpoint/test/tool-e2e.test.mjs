@@ -103,7 +103,20 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
     }
   }],
   ['powerpoint.get_selection', { verify: 'direct-result' }],
-  ['powerpoint.set_selection', { args: { slide_index: 0 } }],
+  ['powerpoint.set_selection', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Selection target slide' } }
+      ]
+    },
+    args: { slide_index: 1 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.get_selection',
+      readbackArguments: {},
+      expect: { pathEquals: [{ path: 'slides.0.slide_index', value: 1 }] }
+    }
+  }],
   ['powerpoint.list_shapes', { verify: 'direct-result' }],
   ['powerpoint.add_text_box', {
     setup: {
@@ -226,6 +239,7 @@ test('PowerPoint mutating E2E cases define concrete setup and readback checks', 
   assertConcreteReadback('powerpoint.apply_layout');
   assertConcreteReadback('powerpoint.update_tags');
   assertConcreteReadback('powerpoint.format_text');
+  assertConcreteReadback('powerpoint.set_selection');
 });
 
 test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
