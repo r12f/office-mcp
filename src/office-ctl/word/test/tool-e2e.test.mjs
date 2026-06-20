@@ -238,7 +238,19 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'resolved', value: true }] }
     }
   }],
-  ['word.update_tracked_change', { args: { change_index: 0, action: 'accept', expected_fingerprint: 'fixture' } }],
+  ['word.update_tracked_change', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Tracked change E2E paragraph' } },
+        { resource: 'office://word/${session_id}/track_changes', saveAs: 'trackChanges' }
+      ]
+    },
+    args: { change_index: '${trackChanges.changes.0.index}', action: 'accept', expected_fingerprint: '${trackChanges.changes.0.fingerprint}' },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'action', value: 'accept' }] }
+    }
+  }],
   ['word.save', {
     setup: {
       actions: [
@@ -274,6 +286,7 @@ test('Word mutating E2E cases define concrete setup and readback checks', () => 
   assertDirectResult('word.apply_formatting');
   assertDirectResult('word.add_comment');
   assertDirectResult('word.resolve_comment');
+  assertDirectResult('word.update_tracked_change');
   assertDirectResult('word.save');
 });
 

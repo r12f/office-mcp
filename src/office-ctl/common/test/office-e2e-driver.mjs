@@ -153,7 +153,7 @@ function officeKeeperScript(host, path, closePath, readyPath, errorPath) {
   const error = psSingle(errorPath);
   const commonFinally = `if ($null -ne $app) { try { $app.Quit() } catch {} }`;
   if (host === 'word') {
-    return `$ErrorActionPreference='Stop'; $app=$null; $doc=$null; try { $app=New-Object -ComObject Word.Application; $app.Visible=$false; $doc=$app.Documents.Add(); $doc.Content.Text='office-mcp e2e baseline'; $doc.SaveAs2('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null; while (-not (Test-Path -LiteralPath '${close}')) { Start-Sleep -Milliseconds 250 }; if ($null -ne $doc) { $doc.Close($false) } } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message } finally { ${commonFinally} }`;
+    return `$ErrorActionPreference='Stop'; $app=$null; $doc=$null; try { $app=New-Object -ComObject Word.Application; $app.Visible=$false; $doc=$app.Documents.Add(); $doc.Content.Text='office-mcp e2e baseline'; $doc.TrackRevisions=$true; $doc.SaveAs2('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null; while (-not (Test-Path -LiteralPath '${close}')) { Start-Sleep -Milliseconds 250 }; if ($null -ne $doc) { $doc.Close($false) } } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message } finally { ${commonFinally} }`;
   }
   if (host === 'excel') {
     return `$ErrorActionPreference='Stop'; $app=$null; $wb=$null; try { $app=New-Object -ComObject Excel.Application; $app.Visible=$false; $app.DisplayAlerts=$false; $wb=$app.Workbooks.Add(); $ws=$wb.Worksheets.Item(1); $ws.Cells.Item(1,1).Value2='office-mcp e2e baseline'; $wb.SaveAs('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null; while (-not (Test-Path -LiteralPath '${close}')) { Start-Sleep -Milliseconds 250 }; if ($null -ne $wb) { $wb.Close($false) } } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message } finally { ${commonFinally} }`;
@@ -201,15 +201,16 @@ async function setupContent(_host, context) {
 async function runToolActions(context, actions) {
   const daemon = context.daemon || {};
   const session = context.session || {};
-  const bindings = { ...(session.bindings || {}) };
+  const bindings = { session_id: session.sessionId, ...(session.bindings || {}) };
   for (const action of actions) {
-    if (!action?.tool) throw new Error('Office E2E setup/reset action must define a tool.');
-    const args = { ...resolveBindings(action.arguments || {}, bindings), session_id: session.sessionId };
-    const result = await mcpToolCall(daemon.endpoint, action.tool, args);
+    if (!action?.tool && !action?.resource) throw new Error('Office E2E setup/reset action must define a tool or resource.');
+    const result = action.resource
+      ? await mcpResourceRead(daemon.endpoint, resolveBindings(action.resource, bindings))
+      : await mcpToolCall(daemon.endpoint, action.tool, { ...resolveBindings(action.arguments || {}, bindings), session_id: session.sessionId });
     if (result.error || result.structuredContent?.error) {
-      throw new Error(`Office E2E setup/reset action ${action.tool} failed: ${JSON.stringify(result.error || result.structuredContent.error)}`);
+      throw new Error(`Office E2E setup/reset action ${action.tool || action.resource} failed: ${JSON.stringify(result.error || result.structuredContent.error)}`);
     }
-    if (action.saveAs) bindings[action.saveAs] = actionResultData(result);
+    if (action.saveAs) bindings[action.saveAs] = action.resource ? resourceResultData(result) : actionResultData(result);
   }
   return bindings;
 }
@@ -252,6 +253,18 @@ function actionResultData(result) {
   if (result?.structuredContent) return result.structuredContent;
   if (result?.data) return result.data;
   return result || {};
+}
+
+function resourceResultData(result) {
+  const text = result?.contents?.[0]?.text || result?.result?.contents?.[0]?.text;
+  if (typeof text === 'string') {
+    try {
+      return JSON.parse(text);
+    } catch (_error) {
+      return { text };
+    }
+  }
+  return actionResultData(result);
 }
 
 function resolveBindings(value, bindings) {
@@ -372,6 +385,12 @@ async function listSessions(endpoint) {
 async function mcpToolCall(endpoint = 'http://127.0.0.1:8800/mcp', name, args) {
   const sessionId = await initializeMcp(endpoint);
   const response = await postJson(endpoint, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: args } }, sessionId);
+  return response.body.result || response.body;
+}
+
+async function mcpResourceRead(endpoint = 'http://127.0.0.1:8800/mcp', uri) {
+  const sessionId = await initializeMcp(endpoint);
+  const response = await postJson(endpoint, { jsonrpc: '2.0', id: 3, method: 'resources/read', params: { uri } }, sessionId);
   return response.body.result || response.body;
 }
 
