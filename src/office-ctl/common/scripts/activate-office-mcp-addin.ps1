@@ -299,6 +299,37 @@ function Close-DriverDocumentIfDifferent {
   }
 }
 
+function Open-OfficialSideloadDocument {
+  param(
+    [Parameter(Mandatory = $true)]$Application,
+    [Parameter(Mandatory = $true)][string]$HostKey,
+    [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    Write-ActivatorLog "official sideload document open skipped; file not found path=$Path"
+    return
+  }
+  try {
+    if ($HostKey -eq "word") {
+      $Application.Documents.Open($Path, $false, $false, $false) | Out-Null
+    } elseif ($HostKey -eq "excel") {
+      $Application.Workbooks.Open($Path) | Out-Null
+    } elseif ($HostKey -eq "powerpoint") {
+      $Application.Presentations.Open($Path, $false, $false, $true) | Out-Null
+    }
+    Write-ActivatorLog "official sideload document opened path=$Path"
+  } catch {
+    Write-ActivatorLog "official sideload document open failed path=$Path error=$($_.Exception.Message)"
+    try {
+      Start-Process -FilePath $Path -WindowStyle Hidden
+      Write-ActivatorLog "official sideload document opened via shell path=$Path"
+    } catch {
+      Write-ActivatorLog "official sideload document shell open failed path=$Path error=$($_.Exception.Message)"
+    }
+  }
+}
+
 function Write-ActivationResult {
   param(
     [Parameter(Mandatory = $true)][string]$DocumentPath,
@@ -529,6 +560,30 @@ public static extern bool SetForegroundWindow(System.IntPtr hWnd);
   [NativeMethods.Mouse]::mouse_event(0x0004, 0, 0, 0, 0)
 }
 
+function Send-ActivatorKey {
+  param(
+    [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
+    [Parameter(Mandatory = $true)][string]$Key
+  )
+
+  Add-Type -Namespace NativeMethods -Name Window -MemberDefinition @"
+[System.Runtime.InteropServices.DllImport("user32.dll")]
+public static extern bool SetForegroundWindow(System.IntPtr hWnd);
+"@ -ErrorAction SilentlyContinue
+  Add-Type -Namespace NativeMethods -Name Keyboard -MemberDefinition @"
+[System.Runtime.InteropServices.DllImport("user32.dll")]
+public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
+"@ -ErrorAction SilentlyContinue
+  try { [NativeMethods.Window]::SetForegroundWindow($WindowHandle) | Out-Null } catch {}
+  if ($Key -eq "{ESC}") {
+    [NativeMethods.Keyboard]::keybd_event(0x1B, 0, 0, 0)
+    [NativeMethods.Keyboard]::keybd_event(0x1B, 0, 0x0002, 0)
+  } else {
+    throw "Unsupported activator key: $Key"
+  }
+  Start-Sleep -Milliseconds 800
+}
+
 function Try-InvokeNamedControl {
   param(
     [Parameter(Mandatory = $true)]$Root,
@@ -623,7 +678,32 @@ function Try-ConfirmCatalogAddinInstall {
     Invoke-Control -Element $control
     Start-Sleep -Milliseconds 1000
     if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(4) -Source "catalog-confirm:$name") { return $true }
+    Try-DismissCatalogOverlay -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-confirm:$name" | Out-Null
     if (Try-OpenControlPanelFromRibbonTabs -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-confirm:$name") { return $true }
+  }
+  return $false
+}
+
+function Try-DismissCatalogOverlay {
+  param(
+    [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
+    [Parameter(Mandatory = $true)]$Deadline,
+    [Parameter(Mandatory = $true)][string]$Source
+  )
+
+  Write-ActivatorLog "catalog overlay dismiss sending escape source=$Source"
+  Send-ActivatorKey -WindowHandle $WindowHandle -Key "{ESC}"
+  Write-ActivatorLog "catalog overlay dismiss sent escape source=$Source"
+  $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
+  $officeProcessId = [int]$window.Current.ProcessId
+  foreach ($name in @("Close", "Back", "Cancel", "Done")) {
+    if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { return $false }
+    $control = Find-DescendantByNameLike -Root $window -Name $name -ProcessId $officeProcessId
+    if (-not $control) { continue }
+    Write-ActivatorLog "catalog overlay dismiss invoked name=$name source=$Source"
+    Invoke-Control -Element $control
+    Start-Sleep -Milliseconds 800
+    return $true
   }
   return $false
 }
@@ -693,7 +773,8 @@ $activeDocumentPath = if ([string]::IsNullOrWhiteSpace($script:officialDocumentP
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 if (-not [string]::IsNullOrWhiteSpace($script:officialDocumentPath)) {
   try {
-    $copyWaitSeconds = if ($hostKey -eq "excel") { 2 } else { [Math]::Min(5, [Math]::Max(1, $TimeoutSeconds / 4)) }
+    $copyWaitSeconds = [Math]::Min(8, [Math]::Max(3, $TimeoutSeconds / 3))
+    Open-OfficialSideloadDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath
     $copyDeadline = (Get-Date).AddSeconds($copyWaitSeconds)
     $driverWindowHandle = Wait-ForDriverDocument -Application $app -HostKey $hostKey -Path $activeDocumentPath -Deadline $copyDeadline
     Close-DriverDocumentIfDifferent -Application $app -HostKey $hostKey -OriginalPath $DocumentPath -ActivePath $activeDocumentPath
