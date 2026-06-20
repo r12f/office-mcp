@@ -7,6 +7,7 @@ import http from 'node:http';
 
 const DRIVER_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(DRIVER_DIR, '../../../..');
+const DAEMON_EXE = resolve(REPO_ROOT, 'target/debug/office-mcp-daemon.exe');
 const DEFAULT_WINDOWS_ACTIVATOR = resolve(REPO_ROOT, 'src/office-ctl/common/scripts/activate-office-mcp-addin.ps1');
 const DEFAULT_TIMEOUT_MS = 120000;
 
@@ -46,9 +47,16 @@ async function dispatch({ host, step, context = {} }) {
       return stopDaemon(context);
     case 'describeDocumentLifecycle':
       return describeDocumentLifecycle(host, context);
+    case 'describeDaemonStatusCommand':
+      return describeDaemonStatusCommand();
     default:
       throw new Error(`Unsupported Office E2E driver step: ${step}`);
   }
+}
+
+function describeDaemonStatusCommand() {
+  const command = daemonStatusCommand();
+  return { command: command.command, args: command.args, cwd: command.cwd };
 }
 
 function describeDocumentLifecycle(host, context) {
@@ -58,14 +66,19 @@ function describeDocumentLifecycle(host, context) {
   const path = resolve(workDir, `office-mcp-e2e-${normalizedHost}-fixture.${extension}`);
   const closePath = `${path}.office-mcp-close`;
   const readyPath = `${path}.office-mcp-ready`;
+  const startedPath = `${path}.office-mcp-started`;
   const errorPath = `${path}.office-mcp-error`;
+  const stdoutPath = `${path}.office-mcp-stdout.log`;
+  const stderrPath = `${path}.office-mcp-stderr.log`;
+  const pidPath = `${path}.office-mcp-pid`;
   return {
     host,
     path,
     createdByDriver: true,
     officeWindowMode: officeWindowMode(normalizedHost),
-    keeper: { closePath, readyPath, errorPath, scriptPath: `${path}.office-mcp-keeper.ps1` },
-    script: officeKeeperScript(normalizedHost, path, closePath, readyPath, errorPath)
+    keeper: { closePath, readyPath, startedPath, errorPath, stdoutPath, stderrPath, pidPath, scriptPath: `${path}.office-mcp-keeper.ps1` },
+    script: officeKeeperScript(normalizedHost, path, closePath, readyPath, startedPath, errorPath),
+    cleanupScript: officeCleanupScript(normalizedHost, path)
   };
 }
 
@@ -106,12 +119,20 @@ function daemonFromStatus(status, startedByDriver) {
 }
 
 function daemonStatus() {
-  const output = execFileSync('cargo', ['run', '-q', '-p', 'office-mcp-daemon', '--', 'daemon', 'status'], {
-    cwd: REPO_ROOT,
+  const command = daemonStatusCommand();
+  const output = execFileSync(command.command, command.args, {
+    cwd: command.cwd,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe']
   });
   return JSON.parse(output);
+}
+
+function daemonStatusCommand() {
+  if (existsSync(DAEMON_EXE)) {
+    return { command: DAEMON_EXE, args: ['daemon', 'status'], cwd: REPO_ROOT };
+  }
+  return { command: 'cargo', args: ['run', '-q', '-p', 'office-mcp-daemon', '--', 'daemon', 'status'], cwd: REPO_ROOT };
 }
 
 async function createDocument(host, context) {
@@ -121,7 +142,7 @@ async function createDocument(host, context) {
   const extension = normalizedHost === 'word' ? 'docx' : normalizedHost === 'excel' ? 'xlsx' : 'pptx';
   const path = resolve(workDir, `office-mcp-e2e-${normalizedHost}-${Date.now()}.${extension}`);
   const keeper = startOfficeKeeper(normalizedHost, path);
-  await waitForFile(keeper.readyPath, Number(context.keeperTimeoutMs || 30000), keeper.errorPath);
+  await waitForFile(keeper.readyPath, Number(context.keeperTimeoutMs || 30000), keeper);
   return {
     host,
     path,
@@ -140,40 +161,55 @@ async function listTools(context) {
 function startOfficeKeeper(host, path) {
   const closePath = `${path}.office-mcp-close`;
   const readyPath = `${path}.office-mcp-ready`;
+  const startedPath = `${path}.office-mcp-started`;
   const errorPath = `${path}.office-mcp-error`;
   const scriptPath = `${path}.office-mcp-keeper.ps1`;
-  rmSync(closePath, { force: true });
-  rmSync(readyPath, { force: true });
-  rmSync(errorPath, { force: true });
-  rmSync(scriptPath, { force: true });
-  const script = officeKeeperScript(host, path, closePath, readyPath, errorPath);
+  const stdoutPath = `${path}.office-mcp-stdout.log`;
+  const stderrPath = `${path}.office-mcp-stderr.log`;
+  const pidPath = `${path}.office-mcp-pid`;
+  for (const file of [closePath, readyPath, startedPath, errorPath, scriptPath, stdoutPath, stderrPath, pidPath]) {
+    rmSync(file, { force: true });
+  }
+  const script = officeKeeperScript(host, path, closePath, readyPath, startedPath, errorPath);
   writeFileSync(scriptPath, script, 'utf8');
-  const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath], {
-    detached: true,
-    stdio: 'ignore',
-    windowsHide: host !== 'powerpoint'
-  });
-  child.unref();
-  return { pid: child.pid, closePath, readyPath, errorPath, scriptPath };
+  runOfficePowerShell(scriptPath, stdoutPath, stderrPath);
+  return { closePath, readyPath, startedPath, errorPath, stdoutPath, stderrPath, pidPath, scriptPath };
 }
 
-function officeKeeperScript(host, path, closePath, readyPath, errorPath) {
+function officeKeeperScript(host, path, closePath, readyPath, startedPath, errorPath) {
   const file = psSingle(path);
   const close = psSingle(closePath);
   const ready = psSingle(readyPath);
+  const started = psSingle(startedPath);
   const error = psSingle(errorPath);
-  const commonFinally = `if ($null -ne $app) { try { $app.Quit() } catch {} }`;
+  const prelude = `Set-Content -LiteralPath '${started}' -Value 'office-mcp-keeper:start:${host}'; Write-Output 'office-mcp-keeper:start:${host}'; `;
   if (host === 'word') {
-    return `$ErrorActionPreference='Stop'; $app=$null; $doc=$null; try { $app=New-Object -ComObject Word.Application; $app.Visible=$false; $doc=$app.Documents.Add(); $doc.Content.Text='office-mcp e2e baseline'; $doc.TrackRevisions=$true; $doc.SaveAs2('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null; while (-not (Test-Path -LiteralPath '${close}')) { Start-Sleep -Milliseconds 250 }; if ($null -ne $doc) { $doc.Close($false) } } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message } finally { ${commonFinally} }`;
+    return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $doc=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application') } catch { $app=New-Object -ComObject Word.Application }; $app.Visible=$true; $doc=$app.Documents.Add(); $doc.Content.Text='office-mcp e2e baseline'; $doc.TrackRevisions=$true; $doc.SaveAs2('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
   }
   if (host === 'excel') {
-    return `$ErrorActionPreference='Stop'; $app=$null; $wb=$null; try { $app=New-Object -ComObject Excel.Application; $app.Visible=$false; $app.DisplayAlerts=$false; $wb=$app.Workbooks.Add(); $ws=$wb.Worksheets.Item(1); $ws.Cells.Item(1,1).Value2='office-mcp e2e baseline'; $wb.SaveAs('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null; while (-not (Test-Path -LiteralPath '${close}')) { Start-Sleep -Milliseconds 250 }; if ($null -ne $wb) { $wb.Close($false) } } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message } finally { ${commonFinally} }`;
+    return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $wb=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application') } catch { $app=New-Object -ComObject Excel.Application }; $app.Visible=$true; $app.DisplayAlerts=$false; $wb=$app.Workbooks.Add(); $ws=$wb.Worksheets.Item(1); $ws.Cells.Item(1,1).Value2='office-mcp e2e baseline'; $wb.SaveAs('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
   }
-  return `$ErrorActionPreference='Stop'; $app=$null; $pres=$null; try { $app=New-Object -ComObject PowerPoint.Application; $pres=$app.Presentations.Add($true); $slide=$pres.Slides.Add(1, 1); $slide.Shapes.Title.TextFrame.TextRange.Text='office-mcp e2e baseline'; $pres.SaveAs('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null; while (-not (Test-Path -LiteralPath '${close}')) { Start-Sleep -Milliseconds 250 }; if ($null -ne $pres) { $pres.Close() } } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message } finally { ${commonFinally} }`;
+  return `$ErrorActionPreference='Stop'; ${prelude}$app=$null; $pres=$null; try { try { $app=[Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application') } catch { $app=New-Object -ComObject PowerPoint.Application }; $pres=$app.Presentations.Add($true); $slide=$pres.Slides.Add(1, 1); $slide.Shapes.Title.TextFrame.TextRange.Text='office-mcp e2e baseline'; $pres.SaveAs('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message; throw }`;
+}
+
+function runOfficePowerShell(scriptPath, stdoutPath, stderrPath) {
+  try {
+    const stdout = execFileSync('powershell.exe', ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 45000
+    });
+    writeFileSync(stdoutPath, stdout || '', 'utf8');
+    writeFileSync(stderrPath, '', 'utf8');
+  } catch (error) {
+    writeFileSync(stdoutPath, error.stdout?.toString() || '', 'utf8');
+    writeFileSync(stderrPath, error.stderr?.toString() || error.message || String(error), 'utf8');
+    throw error;
+  }
 }
 
 function officeWindowMode(host) {
-  return host === 'powerpoint' ? 'visible' : 'hidden';
+  return 'visible';
 }
 
 async function waitForSession(host, context) {
@@ -204,6 +240,8 @@ async function activateAddin(host, context) {
   const normalizedHost = normalizeHost(host);
   const document = context.document || {};
   const daemon = context.daemon || {};
+  const activatorLogPath = `${document.path || resolve(tmpdir(), `office-mcp-e2e-${normalizedHost}`)}.office-mcp-activator.log`;
+  rmSync(activatorLogPath, { force: true });
   const child = spawn(command, [], {
     shell: true,
     windowsHide: true,
@@ -213,12 +251,19 @@ async function activateAddin(host, context) {
       OFFICE_MCP_E2E_HOST: normalizedHost,
       OFFICE_MCP_E2E_DOCUMENT_PATH: document.path || '',
       OFFICE_MCP_E2E_ADDIN_ORIGIN: daemon.addinOrigin || '',
-      OFFICE_MCP_E2E_ADDIN_ENDPOINT: daemon.addinEndpoint || ''
+      OFFICE_MCP_E2E_ADDIN_ENDPOINT: daemon.addinEndpoint || '',
+      OFFICE_MCP_E2E_ACTIVATOR_LOG: activatorLogPath
     }
   });
-  const exitCode = await waitForChildExit(child, Number(context.timeoutMs || 30000));
-  if (exitCode !== 0) throw new Error(`Office add-in activator exited with code ${exitCode}.`);
-  return { activated: true, activator: command, activator_kind: activation.kind };
+  const exitCode = await waitForChildExit(child, Number(context.timeoutMs || 30000), () => activatorLogDetail(activatorLogPath));
+  if (exitCode !== 0) throw new Error(`Office add-in activator exited with code ${exitCode}.${activatorLogDetail(activatorLogPath)}`);
+  return { activated: true, activator: command, activator_kind: activation.kind, log_path: activatorLogPath };
+}
+
+function activatorLogDetail(path) {
+  if (!path || !existsSync(path)) return '';
+  const text = readText(path);
+  return text ? ` activator log: ${text.slice(-2000)}` : '';
 }
 
 function activationCommand() {
@@ -232,7 +277,7 @@ function activationCommand() {
     return { command: '', kind: 'unavailable' };
   }
   return {
-    command: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${DEFAULT_WINDOWS_ACTIVATOR}"`,
+    command: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${DEFAULT_WINDOWS_ACTIVATOR}" -TimeoutSeconds 20`,
     kind: 'default-windows-taskpane'
   };
 }
@@ -424,14 +469,39 @@ async function cleanupDocument(context) {
     return { deleted: false, skipped: 'not-driver-owned' };
   }
   const resolved = resolve(document.path);
-  writeFileSync(document.keeper.closePath, 'close');
-  await waitForProcessExit(document.keeper.pid, Number(context.timeoutMs || 30000));
+  runOfficeCleanup(document.host, resolved, Number(context.timeoutMs || 30000));
   if (existsSync(resolved)) rmSync(resolved, { force: true });
-  rmSync(document.keeper.closePath, { force: true });
+  if (document.keeper.closePath) rmSync(document.keeper.closePath, { force: true });
   if (document.keeper.readyPath) rmSync(document.keeper.readyPath, { force: true });
+  if (document.keeper.startedPath) rmSync(document.keeper.startedPath, { force: true });
   if (document.keeper.errorPath) rmSync(document.keeper.errorPath, { force: true });
+  if (document.keeper.stdoutPath) rmSync(document.keeper.stdoutPath, { force: true });
+  if (document.keeper.stderrPath) rmSync(document.keeper.stderrPath, { force: true });
+  if (document.keeper.pidPath) rmSync(document.keeper.pidPath, { force: true });
   if (document.keeper.scriptPath) rmSync(document.keeper.scriptPath, { force: true });
   return { closedByDriver: true, deleted: !existsSync(resolved), path: resolved };
+}
+
+function runOfficeCleanup(host, path, timeoutMs) {
+  const normalizedHost = normalizeHost(host);
+  const script = officeCleanupScript(normalizedHost, path);
+  execFileSync('powershell.exe', ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: timeoutMs
+  });
+}
+
+function officeCleanupScript(host, path) {
+  const target = psSingle(resolve(path));
+  const canonical = `function Canonical($value) { try { return (Get-Item -LiteralPath $value -ErrorAction Stop).FullName.ToLowerInvariant() } catch { return [System.IO.Path]::GetFullPath($value).ToLowerInvariant() } }; $target=Canonical '${target}';`;
+  if (host === 'word') {
+    return `$ErrorActionPreference='Stop'; ${canonical} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application'); foreach ($doc in @($app.Documents)) { if ((Canonical $doc.FullName) -eq $target) { $doc.Close($false); break } }`;
+  }
+  if (host === 'excel') {
+    return `$ErrorActionPreference='Stop'; ${canonical} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application'); foreach ($wb in @($app.Workbooks)) { if ((Canonical $wb.FullName) -eq $target) { $wb.Close($false); break } }`;
+  }
+  return `$ErrorActionPreference='Stop'; ${canonical} $app=[Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application'); foreach ($pres in @($app.Presentations)) { if ((Canonical $pres.FullName) -eq $target) { $pres.Close(); break } }`;
 }
 
 async function stopDaemon(context) {
@@ -525,16 +595,49 @@ function runPowerShell(command) {
   });
 }
 
-async function waitForFile(path, timeoutMs, errorPath) {
+async function waitForFile(path, timeoutMs, keeper) {
   const started = Date.now();
+  let missingProcessChecks = 0;
   while (Date.now() - started <= timeoutMs) {
     if (existsSync(path)) return;
+    const errorPath = keeper?.errorPath;
     if (errorPath && existsSync(errorPath)) {
-      throw new Error(`Office keeper failed before creating ${path}: ${readText(errorPath)}`);
+      throw new Error(`Office keeper failed before creating ${path}: ${readText(errorPath)}${keeperLogDetail(keeper)}`);
+    }
+    const pid = keeperPid(keeper);
+    if (pid && !processExists(pid)) {
+      missingProcessChecks += 1;
+    } else {
+      missingProcessChecks = 0;
+    }
+    if (missingProcessChecks >= 10) {
+      throw new Error(`Office keeper exited before creating ${path}.${keeperLogDetail(keeper)}`);
     }
     await sleep(100);
   }
-  throw new Error(`Timed out waiting ${timeoutMs} ms for ${path}.`);
+  throw new Error(`Timed out waiting ${timeoutMs} ms for ${path}.${keeperLogDetail(keeper)}`);
+}
+
+function keeperPid(keeper) {
+  if (!keeper) return undefined;
+  if (Number.isInteger(keeper.pid) && keeper.pid > 0) return keeper.pid;
+  if (keeper.pidPath && existsSync(keeper.pidPath)) {
+    const pid = Number(readText(keeper.pidPath));
+    if (Number.isInteger(pid) && pid > 0) return pid;
+  }
+  return undefined;
+}
+
+function keeperLogDetail(keeper) {
+  if (!keeper) return '';
+  const details = [];
+  for (const [label, path] of [['stdout', keeper.stdoutPath], ['stderr', keeper.stderrPath]]) {
+    if (path && existsSync(path)) {
+      const text = readText(path);
+      if (text) details.push(`${label}: ${text.slice(-1000)}`);
+    }
+  }
+  return details.length ? ` ${details.join(' ')}` : '';
 }
 
 function readText(path) {
@@ -558,11 +661,11 @@ async function waitForProcessExit(pid, timeoutMs) {
   throw new Error(`Timed out waiting ${timeoutMs} ms for Office keeper process ${pid} to exit.`);
 }
 
-function waitForChildExit(child, timeoutMs) {
+function waitForChildExit(child, timeoutMs, detail = () => '') {
   return new Promise((resolvePromise, reject) => {
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error(`Timed out waiting ${timeoutMs} ms for Office add-in activator to exit.`));
+      reject(new Error(`Timed out waiting ${timeoutMs} ms for Office add-in activator to exit.${detail()}`));
     }, timeoutMs);
     child.once('error', (error) => {
       clearTimeout(timer);

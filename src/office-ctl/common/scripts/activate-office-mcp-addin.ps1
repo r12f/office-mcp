@@ -2,6 +2,7 @@ param(
   [string]$HostName = $env:OFFICE_MCP_E2E_HOST,
   [string]$DocumentPath = $env:OFFICE_MCP_E2E_DOCUMENT_PATH,
   [int]$TimeoutSeconds = 30,
+  [string]$LogPath = $env:OFFICE_MCP_E2E_ACTIVATOR_LOG,
   [switch]$DryRun = ($env:OFFICE_MCP_E2E_ACTIVATOR_DRY_RUN -eq "1")
 )
 
@@ -14,6 +15,23 @@ $hostKey = $HostName.ToLowerInvariant()
 if ($hostKey -notin @("word", "excel", "powerpoint")) {
   throw "Unsupported Office MCP E2E host: $HostName"
 }
+
+if ([string]::IsNullOrWhiteSpace($LogPath)) {
+  $LogPath = Join-Path $env:TEMP "office-mcp-activator-$hostKey.log"
+}
+
+function Write-ActivatorLog {
+  param([Parameter(Mandatory = $true)][string]$Message)
+  Add-Content -LiteralPath $LogPath -Value "$(Get-Date -Format o) $Message"
+}
+
+function Get-CanonicalPath {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  try { return (Get-Item -LiteralPath $Path -ErrorAction Stop).FullName.ToLowerInvariant() }
+  catch { return [System.IO.Path]::GetFullPath($Path).ToLowerInvariant() }
+}
+
+Write-ActivatorLog "start host=$hostKey document=$DocumentPath"
 
 if ($DryRun) {
   Write-Output (@{
@@ -47,31 +65,35 @@ function Activate-DriverDocument {
     [Parameter(Mandatory = $true)][string]$Path
   )
 
-  $target = [System.IO.Path]::GetFullPath($Path)
+  $target = Get-CanonicalPath -Path $Path
   if ($HostKey -eq "word") {
     foreach ($document in @($Application.Documents)) {
-      if ([System.IO.Path]::GetFullPath($document.FullName) -eq $target) {
+      if ((Get-CanonicalPath -Path $document.FullName) -eq $target) {
+        Write-ActivatorLog "activated word document=$($document.FullName)"
         $document.Activate()
         $Application.Visible = $true
         $Application.Activate()
-        return
+        return [IntPtr]$Application.ActiveWindow.Hwnd
       }
     }
   }
   if ($HostKey -eq "excel") {
     foreach ($workbook in @($Application.Workbooks)) {
-      if ([System.IO.Path]::GetFullPath($workbook.FullName) -eq $target) {
+      if ((Get-CanonicalPath -Path $workbook.FullName) -eq $target) {
+        Write-ActivatorLog "activated excel workbook=$($workbook.FullName)"
         $workbook.Activate()
         $Application.Visible = $true
-        return
+        return [IntPtr]$Application.Hwnd
       }
     }
   }
   if ($HostKey -eq "powerpoint") {
     foreach ($presentation in @($Application.Presentations)) {
-      if ([System.IO.Path]::GetFullPath($presentation.FullName) -eq $target) {
-        $presentation.Windows.Item(1).Activate()
-        return
+      if ((Get-CanonicalPath -Path $presentation.FullName) -eq $target) {
+        Write-ActivatorLog "activated powerpoint presentation=$($presentation.FullName)"
+        $window = $presentation.Windows.Item(1)
+        $window.Activate()
+        return [IntPtr]$window.HWND
       }
     }
   }
@@ -89,6 +111,44 @@ function Find-DescendantByName {
     $Name
   )
   return $Root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+}
+
+function Find-OfficeWindow {
+  param([Parameter(Mandatory = $true)][string]$HostKey)
+  $processName = switch ($HostKey) {
+    "word" { "WINWORD" }
+    "excel" { "EXCEL" }
+    "powerpoint" { "POWERPNT" }
+  }
+  $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue |
+    Where-Object { $_.MainWindowHandle -ne 0 } |
+    Sort-Object StartTime -Descending)
+  foreach ($process in $processes) {
+    $element = [System.Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
+    if ($element) {
+      Write-ActivatorLog "using window pid=$($process.Id) title=$($process.MainWindowTitle)"
+      return $element
+    }
+  }
+  throw "Could not find a visible $HostKey Office window."
+}
+
+function Get-OfficeWindowFromHandle {
+  param([Parameter(Mandatory = $true)][IntPtr]$Handle)
+  if ($Handle -eq [IntPtr]::Zero) { throw "Office window handle is zero." }
+  $element = [System.Windows.Automation.AutomationElement]::FromHandle($Handle)
+  if (-not $element) { throw "Could not resolve Office window from handle $Handle." }
+  Write-ActivatorLog "using driver document window handle=$Handle title=$($element.Current.Name)"
+  return $element
+}
+
+function Get-VisibleControlNameSample {
+  param([Parameter(Mandatory = $true)]$Root)
+  $condition = [System.Windows.Automation.Condition]::TrueCondition
+  return @($Root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition) |
+    ForEach-Object { $_.Current.Name } |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+    Select-Object -Unique -First 80)
 }
 
 function Invoke-Control {
@@ -115,15 +175,29 @@ public static extern void mouse_event(int flags, int dx, int dy, int data, int e
   [NativeMethods.Mouse]::mouse_event(0x0004, 0, 0, 0, 0)
 }
 
+function Try-InvokeNamedControl {
+  param(
+    [Parameter(Mandatory = $true)]$Root,
+    [Parameter(Mandatory = $true)][string]$Name
+  )
+  $control = Find-DescendantByName -Root $Root -Name $Name
+  if (-not $control) { return $false }
+  Write-ActivatorLog "invoking control name=$Name"
+  Invoke-Control -Element $control
+  Start-Sleep -Milliseconds 500
+  return $true
+}
+
 $app = Get-OfficeApplication -HostKey $hostKey
-Activate-DriverDocument -Application $app -HostKey $hostKey -Path $DocumentPath
+$driverWindowHandle = Activate-DriverDocument -Application $app -HostKey $hostKey -Path $DocumentPath
 
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 do {
   Start-Sleep -Milliseconds 500
-  $desktop = [System.Windows.Automation.AutomationElement]::RootElement
-  $button = Find-DescendantByName -Root $desktop -Name "Open Control Panel"
+  $window = Get-OfficeWindowFromHandle -Handle $driverWindowHandle
+  $button = Find-DescendantByName -Root $window -Name "Open Control Panel"
   if ($button) {
+    Write-ActivatorLog "found Open Control Panel control"
     Invoke-Control -Element $button
     Write-Output (@{
         activated = $true
@@ -133,6 +207,26 @@ do {
       } | ConvertTo-Json -Compress)
     exit 0
   }
+  foreach ($tabName in @("Home", "Insert", "Add-ins", "My Add-ins")) {
+    if (Try-InvokeNamedControl -Root $window -Name $tabName) {
+      $button = Find-DescendantByName -Root (Get-OfficeWindowFromHandle -Handle $driverWindowHandle) -Name "Open Control Panel"
+      if ($button) {
+        Write-ActivatorLog "found Open Control Panel control after tab=$tabName"
+        Invoke-Control -Element $button
+        Write-Output (@{
+            activated = $true
+            host = $hostKey
+            document_path = $DocumentPath
+            control_name = "Open Control Panel"
+            tab_name = $tabName
+          } | ConvertTo-Json -Compress)
+        exit 0
+      }
+    }
+  }
 } while ((Get-Date) -lt $deadline)
+
+$sample = Get-VisibleControlNameSample -Root (Get-OfficeWindowFromHandle -Handle $driverWindowHandle)
+Write-ActivatorLog "timed out; visible control sample=$($sample -join ' | ')"
 
 throw "Timed out waiting for the Office MCP Control ribbon button."

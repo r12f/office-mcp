@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const DRIVER = fileURLToPath(new URL('./office-e2e-driver.mjs', import.meta.url));
+const REPO_ROOT = resolve(dirname(DRIVER), '../../../..');
 const RUN_OFFICE_COM = process.env.OFFICE_MCP_RUN_E2E === '1';
 
 test('Office E2E driver describes a driver-owned Word lifecycle', () => {
@@ -17,11 +18,16 @@ test('Office E2E driver describes a driver-owned Word lifecycle', () => {
   assert.match(document.path, /office-mcp-e2e-word-.*\.docx$/i);
   assert.equal(document.host, 'Word');
   assert.equal(document.createdByDriver, true);
-  assert.equal(document.officeWindowMode, 'hidden');
+  assert.equal(document.officeWindowMode, 'visible');
   assert.ok(document.keeper?.closePath, 'driver-owned close sentinel is required');
+  assert.ok(document.keeper?.startedPath, 'keeper started sentinel is required');
+  assert.ok(document.keeper?.pidPath, 'keeper pid file is required');
+  assert.ok(document.keeper?.stdoutPath, 'keeper stdout log is required');
+  assert.ok(document.keeper?.stderrPath, 'keeper stderr log is required');
   assert.match(document.script, /Documents\.Add\(\)/);
   assert.match(document.script, /office-mcp-ready/);
-  assert.match(document.script, /office-mcp-close/);
+  assert.match(document.script, /office-mcp-ready/);
+  assert.doesNotMatch(document.script, /\.Quit\(\)/, 'keeper must not quit user Office applications');
 });
 
 test('Office E2E driver creates and cleans up Word documents through COM', { skip: !RUN_OFFICE_COM }, () => {
@@ -42,11 +48,16 @@ test('Office E2E driver describes a driver-owned Excel lifecycle', () => {
   assert.match(document.path, /office-mcp-e2e-excel-.*\.xlsx$/i);
   assert.equal(document.host, 'Excel');
   assert.equal(document.createdByDriver, true);
-  assert.equal(document.officeWindowMode, 'hidden');
+  assert.equal(document.officeWindowMode, 'visible');
   assert.ok(document.keeper?.closePath, 'driver-owned close sentinel is required');
+  assert.ok(document.keeper?.startedPath, 'keeper started sentinel is required');
+  assert.ok(document.keeper?.pidPath, 'keeper pid file is required');
+  assert.ok(document.keeper?.stdoutPath, 'keeper stdout log is required');
+  assert.ok(document.keeper?.stderrPath, 'keeper stderr log is required');
   assert.match(document.script, /Workbooks\.Add\(\)/);
   assert.match(document.script, /office-mcp-ready/);
-  assert.match(document.script, /office-mcp-close/);
+  assert.match(document.script, /office-mcp-ready/);
+  assert.doesNotMatch(document.script, /\.Quit\(\)/, 'keeper must not quit user Office applications');
 });
 
 test('Office E2E driver creates and cleans up Excel workbooks through COM', { skip: !RUN_OFFICE_COM }, () => {
@@ -69,9 +80,35 @@ test('Office E2E driver describes a visible PowerPoint lifecycle', () => {
   assert.equal(document.createdByDriver, true);
   assert.equal(document.officeWindowMode, 'visible');
   assert.ok(document.keeper?.closePath, 'driver-owned close sentinel is required');
+  assert.ok(document.keeper?.startedPath, 'keeper started sentinel is required');
+  assert.ok(document.keeper?.pidPath, 'keeper pid file is required');
+  assert.ok(document.keeper?.stdoutPath, 'keeper stdout log is required');
+  assert.ok(document.keeper?.stderrPath, 'keeper stderr log is required');
   assert.match(document.script, /Presentations\.Add\(\$true\)/);
   assert.match(document.script, /office-mcp-ready/);
-  assert.match(document.script, /office-mcp-close/);
+  assert.match(document.script, /office-mcp-ready/);
+  assert.doesNotMatch(document.script, /\.Quit\(\)/, 'keeper must not quit user Office applications');
+});
+
+test('Office E2E driver reuses the built daemon binary for status when available', () => {
+  const result = runDriver({ host: 'Word', step: 'describeDaemonStatusCommand' });
+  assert.equal(result.status, 0, result.stderr);
+  const command = JSON.parse(result.stdout);
+  if (existsSync(resolve(REPO_ROOT, 'target/debug/office-mcp-daemon.exe'))) {
+    assert.match(command.command, /office-mcp-daemon\.exe$/);
+    assert.deepEqual(command.args, ['daemon', 'status']);
+  } else {
+    assert.equal(command.command, 'cargo');
+    assert.deepEqual(command.args, ['run', '-q', '-p', 'office-mcp-daemon', '--', 'daemon', 'status']);
+  }
+});
+
+test('Office E2E driver cleanup canonicalizes Office document paths', () => {
+  const result = runDriver({ host: 'Word', step: 'describeDocumentLifecycle', context: { workDir: mkdtempSync(join(tmpdir(), 'office-mcp-driver-cleanup-script-')) } });
+  assert.equal(result.status, 0, result.stderr);
+  const document = JSON.parse(result.stdout);
+  assert.match(document.cleanupScript, /function Canonical/);
+  assert.match(document.cleanupScript, /Canonical \$doc\.FullName/);
 });
 
 test('Office E2E driver uses a visible PowerPoint window and safe cleanup', { skip: !RUN_OFFICE_COM }, () => {
