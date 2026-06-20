@@ -1249,11 +1249,17 @@ channel, and MCP `tools/call` dispatch.
 - [x] Add PowerPoint-specific Office automation support that uses a visible
       window path when COM rejects hidden PowerPoint automation. The test must
       prove cleanup closes only the presentation created by the E2E driver.
-- [ ] Fill every host tool table with one real case per advertised tool. Each
+- [x] Fill every host tool table with one real case per advertised tool. Each
       case follows the common pattern from [03-mcp-tool-surface.md](03-mcp-tool-surface.md):
       create fixed setup content, invoke the MCP tool against that content, and
       verify the result directly for reads or through readback for mutations and
-      deletes.
+      deletes. Current coverage uses a shared `assertConcreteE2eCases` gate so
+      Word, Excel, and PowerPoint must all define setup actions, matching MCP
+      tool calls, explicit verifier expectations, and readback tools/resources
+      where mutation or delete validation requires rereading host state. Current
+      evidence: `node --test src\office-ctl\common\test\tool-e2e-contract.test.mjs`
+      and `npm run e2e:tools` in `src/office-ctl/word`,
+      `src/office-ctl/excel`, and `src/office-ctl/powerpoint`.
 - [x] Add readback verifier helpers for common Office objects so tool cases do
       not duplicate boilerplate: Word document text/paragraph/table/content
       control/comment state, Excel workbook/sheet/range/table/chart/pivot state,

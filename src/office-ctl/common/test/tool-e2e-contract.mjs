@@ -44,6 +44,70 @@ export function assertE2eCaseCoverage({ addinRoot, host, cases, catalogPath }) {
   }
 }
 
+export function assertConcreteE2eCases({ host, cases }) {
+  assert.ok(host, 'E2E host name is required');
+  assert.equal(typeof cases, 'object', `${host} E2E cases must be an object`);
+  assert.ok(cases, `${host} E2E cases are required`);
+
+  for (const [tool, toolCase] of Object.entries(cases)) {
+    assert.equal(toolCase?.tool, tool, `${tool} case must name the tool`);
+    assertConcreteSetup(tool, toolCase);
+    assertConcreteCall(tool, toolCase);
+    assertConcreteVerifier(tool, toolCase);
+  }
+}
+
+function assertConcreteSetup(tool, toolCase) {
+  assert.ok(Array.isArray(toolCase?.setup?.actions), `${tool} case must define setup.actions`);
+  assert.ok(toolCase.setup.actions.length > 0, `${tool} case must define at least one setup action`);
+  for (const [index, action] of toolCase.setup.actions.entries()) {
+    assert.equal(typeof action, 'object', `${tool} setup action ${index} must be an object`);
+    assert.ok(action, `${tool} setup action ${index} is required`);
+    const target = action.tool || action.resource;
+    assert.equal(typeof target, 'string', `${tool} setup action ${index} must define tool or resource`);
+    assert.ok(target.length > 0, `${tool} setup action ${index} must define a non-empty tool or resource`);
+    if (action.tool) {
+      assert.equal(typeof action.arguments, 'object', `${tool} setup action ${index} must define arguments`);
+      assert.ok(action.arguments, `${tool} setup action ${index} arguments are required`);
+    }
+  }
+}
+
+function assertConcreteCall(tool, toolCase) {
+  assert.equal(toolCase?.call?.name, tool, `${tool} case must call the same tool it covers`);
+  assert.equal(typeof toolCase.call.arguments, 'object', `${tool} case must define call arguments`);
+  assert.ok(toolCase.call.arguments, `${tool} case call arguments are required`);
+}
+
+function assertConcreteVerifier(tool, toolCase) {
+  const verifier = toolCase?.verify;
+  assert.ok(verifier, `${tool} case must define a verifier`);
+  assert.match(verifier.kind, /^(direct-result|readback)$/, `${tool} case must use a supported verifier kind`);
+  assertConcreteExpectation(tool, verifier);
+  if (verifier.kind === 'readback') {
+    assert.ok(verifier.readbackTool || verifier.resource, `${tool} readback verifier must define readbackTool or resource`);
+    if (verifier.readbackTool) {
+      assert.equal(typeof verifier.readbackTool, 'string', `${tool} readbackTool must be a string`);
+      assert.equal(typeof verifier.readbackArguments, 'object', `${tool} readback verifier must define readbackArguments`);
+      assert.ok(verifier.readbackArguments, `${tool} readbackArguments are required`);
+    }
+    if (verifier.resource) {
+      assert.equal(typeof verifier.resource, 'string', `${tool} readback resource must be a string`);
+    }
+  }
+}
+
+function assertConcreteExpectation(tool, verifier) {
+  assert.equal(typeof verifier.expect, 'object', `${tool} verifier must define expect`);
+  assert.ok(verifier.expect, `${tool} verifier expect is required`);
+  const expectationKeys = Object.keys(verifier.expect);
+  const allowErrorCodes = Array.isArray(verifier.allowErrorCodes) ? verifier.allowErrorCodes : [];
+  assert.ok(
+    expectationKeys.length > 0 || allowErrorCodes.length > 0,
+    `${tool} verifier must define at least one expectation or allowed host capability error`
+  );
+}
+
 function hostToolPrefix(host) {
   const normalized = String(host || '').trim().toLowerCase();
   if (normalized === 'word' || normalized === 'excel' || normalized === 'powerpoint') return normalized;

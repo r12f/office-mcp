@@ -1,5 +1,6 @@
 import test from 'node:test';
 import {
+  assertConcreteE2eCases,
   assertE2eCaseCoverage,
   e2eCase,
   officeE2eEnabled,
@@ -308,26 +309,7 @@ test('Excel E2E case table covers every advertised tool', () => {
 });
 
 test('Excel mutating E2E cases define concrete setup and readback checks', () => {
-  assertDirectResult('excel.get_workbook_info');
-  assertDirectResult('excel.list_sheets');
-  assertDirectResult('excel.get_used_range');
-  assertDirectResult('excel.read_range');
-  assertConcreteReadback('excel.write_range');
-  assertConcreteReadback('excel.clear_range');
-  assertConcreteReadback('excel.find_replace_cells');
-  assertConcreteReadback('excel.add_sheet');
-  assertConcreteReadback('excel.update_sheet');
-  assertConcreteReadback('excel.delete_sheet');
-  assertConcreteReadback('excel.create_table');
-  assertConcreteReadback('excel.set_formula');
-  assertConcreteReadback('excel.format_range');
-  assertConcreteReadback('excel.sort_range');
-  assertConcreteReadback('excel.update_table');
-  assertConcreteReadback('excel.create_chart');
-  assertConcreteReadback('excel.update_chart');
-  assertDirectResult('excel.apply_filter');
-  assertConcreteReadback('excel.create_pivot_table');
-  assertConcreteReadback('excel.update_pivot_table');
+  assertConcreteE2eCases({ host: 'Excel', cases: EXCEL_E2E_CASES });
 });
 
 test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
@@ -337,18 +319,3 @@ test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
     driver: requireOfficeE2eDriver('Excel')
   });
 });
-
-function assertConcreteReadback(tool) {
-  const toolCase = EXCEL_E2E_CASES[tool];
-  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
-  if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
-  if (!toolCase.verify.readbackTool) throw new Error(`${tool} must define a readback tool`);
-  if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
-}
-
-function assertDirectResult(tool) {
-  const toolCase = EXCEL_E2E_CASES[tool];
-  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
-  if (toolCase.verify?.kind !== 'direct-result') throw new Error(`${tool} must use direct-result verification`);
-  if (!toolCase.verify.expect) throw new Error(`${tool} must define direct-result expectations`);
-}

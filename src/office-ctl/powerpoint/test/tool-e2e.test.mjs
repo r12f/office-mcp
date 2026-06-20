@@ -1,5 +1,6 @@
 import test from 'node:test';
 import {
+  assertConcreteE2eCases,
   assertE2eCaseCoverage,
   e2eCase,
   officeE2eEnabled,
@@ -353,31 +354,7 @@ test('PowerPoint E2E case table covers every advertised tool', () => {
 });
 
 test('PowerPoint mutating E2E cases define concrete setup and readback checks', () => {
-  assertDirectResult('powerpoint.get_presentation_info');
-  assertDirectResult('powerpoint.get_active_view');
-  assertDirectResult('powerpoint.export_file');
-  assertDirectResult('powerpoint.list_slides');
-  assertDirectResult('powerpoint.export_slide');
-  assertDirectResult('powerpoint.list_layouts');
-  assertDirectResult('powerpoint.get_selection');
-  assertDirectResult('powerpoint.list_shapes');
-  assertDirectResult('powerpoint.read_text');
-  assertDirectResult('powerpoint.read_table');
-  assertConcreteReadback('powerpoint.replace_text');
-  assertConcreteReadback('powerpoint.add_text_box');
-  assertConcreteReadback('powerpoint.add_shape');
-  assertConcreteReadback('powerpoint.add_slide');
-  assertConcreteReadback('powerpoint.update_slide');
-  assertConcreteReadback('powerpoint.add_table');
-  assertConcreteReadback('powerpoint.update_table');
-  assertConcreteReadback('powerpoint.update_shape');
-  assertConcreteReadback('powerpoint.delete_slide');
-  assertConcreteReadback('powerpoint.move_slide');
-  assertConcreteReadback('powerpoint.apply_layout');
-  assertConcreteReadback('powerpoint.update_tags');
-  assertConcreteReadback('powerpoint.format_text');
-  assertConcreteReadback('powerpoint.set_selection');
-  assertDirectResult('powerpoint.insert_image');
+  assertConcreteE2eCases({ host: 'PowerPoint', cases: POWERPOINT_E2E_CASES });
 });
 
 test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
@@ -387,18 +364,3 @@ test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => 
     driver: requireOfficeE2eDriver('PowerPoint')
   });
 });
-
-function assertConcreteReadback(tool) {
-  const toolCase = POWERPOINT_E2E_CASES[tool];
-  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
-  if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
-  if (!toolCase.verify.readbackTool) throw new Error(`${tool} must define a readback tool`);
-  if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
-}
-
-function assertDirectResult(tool) {
-  const toolCase = POWERPOINT_E2E_CASES[tool];
-  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
-  if (toolCase.verify?.kind !== 'direct-result') throw new Error(`${tool} must use direct-result verification`);
-  if (!toolCase.verify.expect) throw new Error(`${tool} must define direct-result expectations`);
-}

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import {
+  assertConcreteE2eCases,
   assertE2eCaseCoverage,
   e2eCase,
   officeE2eEnabled,
@@ -313,31 +314,7 @@ test('Word E2E case table covers every advertised tool', () => {
 });
 
 test('Word mutating E2E cases define concrete setup and readback checks', () => {
-  assertDirectResult('word.get_text');
-  assertDirectResult('word.get_outline');
-  assertDirectResult('word.get_paragraph');
-  assertDirectResult('word.find_text');
-  assertDirectResult('word.get_selection');
-  assertDirectResult('word.read_table');
-  assertDirectResult('word.list_content_controls');
-  assertConcreteReadback('word.replace_text');
-  assertConcreteReadback('word.insert_paragraph');
-  assertConcreteReadback('word.update_paragraph');
-  assertConcreteReadback('word.insert_table');
-  assertConcreteReadback('word.insert_list');
-  assertConcreteReadback('word.update_table');
-  assertConcreteReadback('word.delete_range');
-  assertConcreteReadback('word.insert_content_control');
-  assertConcreteReadback('word.update_content_control');
-  assertConcreteReadback('word.delete_content_control');
-  assertConcreteReadback('word.apply_style');
-  assertDirectResult('word.insert_image');
-  assertDirectResult('word.insert_page_break');
-  assertDirectResult('word.apply_formatting');
-  assertConcreteResourceReadback('word.add_comment');
-  assertConcreteResourceReadback('word.resolve_comment');
-  assertConcreteResourceReadback('word.update_tracked_change');
-  assertDirectResult('word.save');
+  assertConcreteE2eCases({ host: 'Word', cases: WORD_E2E_CASES });
 });
 
 test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
@@ -347,26 +324,3 @@ test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
     driver: requireOfficeE2eDriver('Word')
   });
 });
-
-function assertConcreteReadback(tool) {
-  const toolCase = WORD_E2E_CASES[tool];
-  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
-  if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
-  if (!toolCase.verify.readbackTool) throw new Error(`${tool} must define a readback tool`);
-  if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
-}
-
-function assertDirectResult(tool) {
-  const toolCase = WORD_E2E_CASES[tool];
-  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
-  if (toolCase.verify?.kind !== 'direct-result') throw new Error(`${tool} must use direct-result verification`);
-  if (!toolCase.verify.expect) throw new Error(`${tool} must define direct-result expectations`);
-}
-
-function assertConcreteResourceReadback(tool) {
-  const toolCase = WORD_E2E_CASES[tool];
-  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
-  if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
-  if (!toolCase.verify.resource) throw new Error(`${tool} must define a readback resource`);
-  if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
-}

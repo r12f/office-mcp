@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
+  assertConcreteE2eCases,
   assertE2eCaseCoverage,
   daemonCatalogTools,
   directResult,
@@ -16,6 +17,71 @@ import {
   runOfficeToolE2e,
   wordReadback
 } from './tool-e2e-contract.mjs';
+
+test('concrete E2E case gate accepts setup actions, calls, and verifiers', () => {
+  assertConcreteE2eCases({
+    host: 'Word',
+    cases: {
+      'word.replace_text': e2eCase('word.replace_text', {
+        setup: {
+          actions: [
+            { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'baseline' } }
+          ]
+        },
+        args: { find: 'baseline', replace: 'updated' },
+        verify: readbackByTool('word.get_text', {
+          arguments: { limit: 20 },
+          expect: { contains: ['updated'], notContains: ['baseline'] }
+        })
+      }),
+      'word.add_comment': e2eCase('word.add_comment', {
+        setup: {
+          actions: [
+            { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'comment target' } }
+          ]
+        },
+        args: { anchor: { kind: 'after_text', text: 'comment target' }, text: 'E2E comment' },
+        verify: readbackByResource('office://word/${session_id}/comments', {
+          expect: { contains: ['E2E comment'] }
+        })
+      })
+    }
+  });
+});
+
+test('concrete E2E case gate rejects weak placeholder cases', () => {
+  assert.throws(
+    () => assertConcreteE2eCases({
+      host: 'Word',
+      cases: { 'word.read': e2eCase('word.read') }
+    }),
+    /word\.read case must define setup\.actions/
+  );
+  assert.throws(
+    () => assertConcreteE2eCases({
+      host: 'Word',
+      cases: {
+        'word.read': e2eCase('word.read', {
+          setup: { actions: [{ tool: 'word.insert_paragraph', arguments: {} }] },
+          verify: { kind: 'direct-result', expect: {} }
+        })
+      }
+    }),
+    /word\.read verifier must define at least one expectation/
+  );
+  assert.throws(
+    () => assertConcreteE2eCases({
+      host: 'Word',
+      cases: {
+        'word.write': e2eCase('word.write', {
+          setup: { actions: [{ tool: 'word.insert_paragraph', arguments: {} }] },
+          verify: { kind: 'readback', expect: { contains: ['updated'] } }
+        })
+      }
+    }),
+    /word\.write readback verifier must define readbackTool or resource/
+  );
+});
 
 test('shared Office tool E2E loop drives daemon, document, setup, calls, verification, and cleanup', async () => {
   const events = [];
