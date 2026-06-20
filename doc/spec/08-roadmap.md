@@ -1225,15 +1225,13 @@ channel, and MCP `tools/call` dispatch.
 - [x] Add a non-evidence E2E test harness for Word tools. The harness starts the
       MCP daemon, creates a fresh empty Word document, opens/connects the Office
       add-in, waits until the daemon reports an active Word session, and then
-      iterates through every advertised `word.*` tool. Add-in activation is
-      still manual/opt-in for live Office execution until the activation driver
-      is implemented.
+      iterates through every advertised `word.*` tool. The shared lifecycle now
+      includes an explicit add-in activation step before session waiting.
 - [x] Add equivalent non-evidence E2E harnesses for Excel and PowerPoint tools.
       Each host harness creates a fresh empty workbook/presentation, waits for
       the corresponding add-in session, runs all advertised tools for that host,
-      and closes/deletes the test file at the end. Add-in activation is still
-      manual/opt-in for live Office execution until the activation driver is
-      implemented.
+      and closes/deletes the test file at the end. The default driver exposes a
+      configurable activation step via `OFFICE_MCP_E2E_ACTIVATOR`.
 - [x] Keep each host E2E run to one Office application/document lifecycle by
       default: open the host program and driver-owned test file once, connect
       one add-in session, loop over every advertised tool in that session, then
@@ -1304,8 +1302,11 @@ owns the shared table-driven loop and exact coverage checks; Word, Excel, and
 PowerPoint each provide host case tables. The shared loop contract is covered by
 `src/office-ctl/common/test/tool-e2e-contract.test.mjs`. The Office host
 automation driver now provides daemon startup, Word/Excel COM document creation
-and cleanup, MCP `tools/call`, and explicit session waiting through the
-`OFFICE_MCP_E2E_DRIVER` JSON step protocol. The driver also supports generic
+and cleanup, a first-class add-in activation step, MCP `tools/call`, and
+explicit session waiting through the `OFFICE_MCP_E2E_DRIVER` JSON step
+protocol. The default driver can invoke an external UI activator command through
+`OFFICE_MCP_E2E_ACTIVATOR`, passing host, document path, add-in origin, and
+add-in endpoint environment variables. The driver also supports generic
 setup/reset action metadata, setup-result bindings such as `${table.shape_id}`,
 resource-read bindings such as `${trackChanges.changes.0.fingerprint}`, generic
 direct-result assertions, and generic readback verification metadata. A case can
@@ -1316,10 +1317,12 @@ all currently advertised Word, Excel, and PowerPoint tools with deterministic
 setup and a direct-result or readback verifier. The shared coverage gate also
 parses the daemon Rust runtime catalog and fails if a host E2E table covers the
 task pane `AVAILABLE_TOOLS` but misses a tool exposed by MCP `tools/list`.
-Full add-in activation and live Office execution remain open. Each host exposes
-`npm run e2e:tools` as the non-evidence tool E2E command; live Office execution
-is still opt-in through `OFFICE_MCP_RUN_E2E=1` until the activation driver is
-implemented. When enabled, the Word, Excel, and PowerPoint commands write
+Fully automated Windows ribbon/task-pane activation and live Office execution
+evidence remain open. Each host exposes `npm run e2e:tools` as the non-evidence
+tool E2E command; live Office execution is still opt-in through
+`OFFICE_MCP_RUN_E2E=1`, and release-ready live reports must use a concrete
+activator rather than the `no-activator-configured` skipped path. When enabled,
+the Word, Excel, and PowerPoint commands write
 `artifacts/office-tool-e2e-word.json`,
 `artifacts/office-tool-e2e-excel.json`, and
 `artifacts/office-tool-e2e-powerpoint.json`. Those reports record the ordered
@@ -1328,7 +1331,8 @@ evidence can prove each host opened one driver-owned file/session and tested all
 tools in that single lifecycle. The runtime evidence validator now exposes
 `--require-office-tool-e2e` with explicit Word, Excel, and PowerPoint report
 paths, and rejects missing reports, non-passing reports, non-single lifecycle
-counts, incomplete executed tool lists, or failed per-tool verifiers.
+counts, skipped add-in activation, incomplete executed tool lists, or failed
+per-tool verifiers.
 Product visual evidence now embeds the same Word, Excel, and PowerPoint tool
 E2E reports and fails release validation unless those embedded reports are
 ready, passing, exact-coverage, and single-lifecycle. This ties final UI/product

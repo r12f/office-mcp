@@ -265,6 +265,17 @@ test('runtime evidence validator can require Office tool E2E reports', () => {
 
   withEvidenceFile(report('passed'), (path) => {
     withOfficeToolE2eReports(true, (reports) => {
+      const broken = JSON.parse(readFileSync(reports.word, 'utf8')) as Record<string, unknown>;
+      broken.addin_activation = { activated: false, skipped: 'no-activator-configured' };
+      writeFileSync(reports.word, JSON.stringify(broken, null, 2));
+      const result = runValidator(path, '--require-office-tool-e2e', '--word-tool-e2e-report-path', reports.word, '--excel-tool-e2e-report-path', reports.excel, '--powerpoint-tool-e2e-report-path', reports.powerpoint);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report add-in activation did not run/);
+    });
+  });
+
+  withEvidenceFile(report('passed'), (path) => {
+    withOfficeToolE2eReports(true, (reports) => {
       const broken = JSON.parse(readFileSync(reports.excel, 'utf8')) as ReturnType<typeof officeToolE2eReport>;
       broken.executed_tools = broken.executed_tools.slice(0, -1);
       writeFileSync(reports.excel, JSON.stringify(broken, null, 2));
@@ -1047,6 +1058,7 @@ function officeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tools: strin
     passed,
     daemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
     document: { path: `${host.toLowerCase()}-fixture` },
+    addin_activation: { activated: true, activator: 'office-ui-activator' },
     session: { session_id: `${host.toLowerCase()}-session`, available_tool_count: tools.length },
     lifecycle_counts: {
       start_daemon: 1,
@@ -1431,6 +1443,7 @@ function embeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tool
     kind: 'office_tool_e2e_report',
     report_host: host,
     passed,
+    addin_activation: { activated: passed, activator: 'office-ui-activator' },
     lifecycle_counts: {
       start_daemon: 1,
       list_tools: 1,

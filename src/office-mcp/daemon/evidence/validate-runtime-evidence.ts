@@ -217,6 +217,7 @@ function validateOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path
   if (e2e.host !== host) failures.push(`${host} Office tool E2E report host is ${String(e2e.host)}, expected ${host}.`);
   if (e2e.passed !== true) failures.push(`${host} Office tool E2E report did not pass.`);
   validateOfficeToolE2eLifecycle(`${host} Office tool E2E report`, e2e.lifecycle_counts);
+  validateOfficeToolE2eActivation(`${host} Office tool E2E report`, e2e.addin_activation);
 
   const advertisedTools = stringArray(e2e.advertised_tools);
   const sessionTools = stringArray(e2e.session_available_tools);
@@ -229,6 +230,15 @@ function validateOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path
   if (!isRecord(e2e.daemon) || typeof e2e.daemon.endpoint !== 'string') failures.push(`${host} Office tool E2E report missing daemon endpoint.`);
   if (!isRecord(e2e.document) || typeof e2e.document.path !== 'string') failures.push(`${host} Office tool E2E report missing driver-owned document path.`);
   if (!isRecord(e2e.session) || typeof e2e.session.session_id !== 'string') failures.push(`${host} Office tool E2E report missing session ID.`);
+}
+
+function validateOfficeToolE2eActivation(label: string, activation: unknown): void {
+  if (!isRecord(activation)) {
+    failures.push(`${label} missing add-in activation proof.`);
+    return;
+  }
+  if (activation.activated !== true) failures.push(`${label} add-in activation did not run.`);
+  if (typeof activation.skipped === 'string' && activation.skipped.length > 0) failures.push(`${label} add-in activation was skipped: ${activation.skipped}.`);
 }
 
 function validateOfficeToolE2eLifecycle(label: string, lifecycle: unknown): void {
@@ -823,6 +833,7 @@ function validateEmbeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoin
   if (evidence.report_host !== host && evidence.host !== host) failures.push(`Product visual Office tool E2E ${host} report host mismatch.`);
   if (evidence.passed !== true) failures.push(`Product visual Office tool E2E ${host} report did not pass.`);
   validateOfficeToolE2eLifecycle(`Product visual Office tool E2E ${host} report`, evidence.lifecycle_counts);
+  validateOfficeToolE2eActivation(`Product visual Office tool E2E ${host} report`, evidence.addin_activation);
   const advertisedTools = stringArray(evidence.advertised_tools);
   const sessionTools = stringArray(evidence.session_available_tools);
   const executedTools = stringArray(evidence.executed_tools);

@@ -572,6 +572,7 @@ function readOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path: st
       kind: report.kind,
       report_host: report.host,
       passed: report.passed,
+      addin_activation: report.addin_activation,
       lifecycle_counts: report.lifecycle_counts,
       advertised_tools: report.advertised_tools,
       session_available_tools: report.session_available_tools,
@@ -591,6 +592,7 @@ function officeToolE2eReportLooksReady(report: Record<string, unknown> | undefin
 function officeToolE2eDetailsLookReady(host: 'Word' | 'Excel' | 'PowerPoint', report: Record<string, unknown>): boolean {
   if (report.schema_version !== 1 || report.kind !== 'office_tool_e2e_report' || report.host !== host || report.passed !== true) return false;
   if (!officeToolE2eLifecycleLooksReady(report.lifecycle_counts)) return false;
+  if (!officeToolE2eActivationLooksReady(report.addin_activation)) return false;
   const advertisedTools = stringArray(report.advertised_tools);
   const sessionTools = stringArray(report.session_available_tools);
   const executedTools = stringArray(report.executed_tools);
@@ -599,6 +601,12 @@ function officeToolE2eDetailsLookReady(host: 'Word' | 'Excel' | 'PowerPoint', re
   if (!isRecord(report.document) || typeof report.document.path !== 'string') return false;
   if (!isRecord(report.session) || typeof report.session.session_id !== 'string') return false;
   return officeToolRunsLookReady(advertisedTools, report.tool_runs);
+}
+
+function officeToolE2eActivationLooksReady(activation: unknown): boolean {
+  return isRecord(activation)
+    && activation.activated === true
+    && typeof activation.skipped !== 'string';
 }
 
 function officeToolE2eLifecycleLooksReady(lifecycle: unknown): boolean {

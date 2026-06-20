@@ -654,6 +654,16 @@ test('product visual evidence recorder requires Office tool E2E reports', () => 
     assert.equal(evidence.office_tool_e2e_ready, false);
     assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).excel.ready, false);
 
+    const skippedActivationPath = writeOfficeToolE2eReport(dir, 'PowerPoint', true);
+    const skippedActivationReport = JSON.parse(readFileSync(skippedActivationPath, 'utf8')) as Record<string, unknown>;
+    skippedActivationReport.addin_activation = { activated: false, skipped: 'no-activator-configured' };
+    writeFileSync(skippedActivationPath, JSON.stringify(skippedActivationReport, null, 2));
+    const skippedActivation = runRecorder(join(dir, 'skipped-office-tool-e2e-activation.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--powerpoint-tool-e2e-report-path', skippedActivationPath);
+    assert.notEqual(skippedActivation.status, 0);
+    evidence = JSON.parse(readFileSync(join(dir, 'skipped-office-tool-e2e-activation.json'), 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.office_tool_e2e_ready, false);
+    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).powerpoint.ready, false);
+
     const passing = runRecorder(join(dir, 'office-tool-e2e-ready.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
     assert.equal(passing.status, 0, outputText(passing.stdout) + outputText(passing.stderr));
     evidence = JSON.parse(readFileSync(join(dir, 'office-tool-e2e-ready.json'), 'utf8')) as Record<string, unknown>;
@@ -1149,6 +1159,7 @@ function writeOfficeToolE2eReport(dir: string, host: 'Word' | 'Excel' | 'PowerPo
     passed: ready,
     daemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
     document: { path: `${key}-fixture` },
+    addin_activation: { activated: ready, activator: 'office-ui-activator' },
     session: { session_id: `${key}-session`, available_tool_count: tools.length },
     lifecycle_counts: {
       start_daemon: 1,
