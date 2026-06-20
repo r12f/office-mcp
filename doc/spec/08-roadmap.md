@@ -1230,7 +1230,7 @@ channel, and MCP `tools/call` dispatch.
       Each host harness creates a fresh empty workbook/presentation, waits for
       the corresponding add-in session, runs all advertised tools for that host,
       and closes/deletes the test file at the end.
-- [ ] Structure each host E2E as one table-driven loop. Every tool case supplies
+- [x] Structure each host E2E as one table-driven loop. Every tool case supplies
       only the tool-specific setup content, tool arguments, and verifier. The
       shared loop owns the common steps: create fixed baseline content, call the
       MCP tool, and verify the result. Read tools verify their direct result;
@@ -1241,13 +1241,21 @@ channel, and MCP `tools/call` dispatch.
       previous side effects. The loop records the tool name, setup content,
       MCP request id, and verifier result, but it must not write document body
       content to default logs.
-- [ ] The harness must fail if any advertised tool lacks a case. Catalog/tool
+- [x] The harness must fail if any advertised tool lacks a case. Catalog/tool
       list discovery is authoritative: `tools/list` or session
       `available_tools` defines the expected set, and the test asserts exact
       coverage for the host's current catalog.
 - [ ] The E2E suite must be runnable separately from release evidence commands.
       Evidence recorders may consume its output later, but passing E2E is its
       own gate and must not be implemented as `npm run evidence:*`.
+
+Current implementation evidence: `src/office-ctl/common/test/tool-e2e-contract.mjs`
+owns the shared table-driven loop and exact coverage checks; Word, Excel, and
+PowerPoint each provide host case tables. The shared loop contract is covered by
+`src/office-ctl/common/test/tool-e2e-contract.test.mjs`. The real Office host
+automation driver remains open: `OFFICE_MCP_RUN_E2E=1` enters the shared loop but
+still requires a concrete `OFFICE_MCP_E2E_DRIVER` adapter that can launch Office,
+activate the add-in, and drive MCP calls against a live document.
 
 **Exit criterion**: A developer can run one command per Office host and see the
 daemon start, a blank document connect, every MCP tool execute against fixed

@@ -3,7 +3,8 @@ import {
   assertE2eCaseCoverage,
   e2eCase,
   realOfficeE2eEnabled,
-  requireRealOfficeE2eDriver
+  requireRealOfficeE2eDriver,
+  runOfficeToolE2e
 } from '../../common/test/tool-e2e-contract.mjs';
 
 const ADDIN_ROOT = process.cwd();
@@ -41,5 +42,9 @@ test('PowerPoint E2E case table covers every advertised tool', () => {
 });
 
 test('PowerPoint real Office E2E driver', { skip: !realOfficeE2eEnabled() }, async () => {
-  requireRealOfficeE2eDriver('PowerPoint');
+  await runOfficeToolE2e({
+    host: 'PowerPoint',
+    cases: POWERPOINT_E2E_CASES,
+    driver: requireRealOfficeE2eDriver('PowerPoint')
+  });
 });
