@@ -25,8 +25,34 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
   ['powerpoint.get_selection', { verify: 'direct-result' }],
   ['powerpoint.set_selection', { args: { slide_index: 0 } }],
   ['powerpoint.list_shapes', { verify: 'direct-result' }],
-  ['powerpoint.add_text_box', { args: { slide_index: 0, text: 'E2E text box' } }],
-  ['powerpoint.add_shape', { args: { slide_index: 0, shape_type: 'rectangle' } }],
+  ['powerpoint.add_text_box', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank' } }
+      ]
+    },
+    args: { slide_index: 0, text: 'E2E text box' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.read_text',
+      readbackArguments: { slide_index: 0 },
+      expect: { contains: ['E2E text box'] }
+    }
+  }],
+  ['powerpoint.add_shape', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank' } }
+      ]
+    },
+    args: { slide_index: 0, shape_type: 'rectangle' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.list_shapes',
+      readbackArguments: { slide_index: 0 },
+      expect: { contains: ['rectangle'] }
+    }
+  }],
   ['powerpoint.insert_image', { args: { slide_index: 0, image: { base64: 'fixture' } } }],
   ['powerpoint.update_shape', { args: { slide_index: 0, shape_id: 'fixture', text: 'Updated shape' } }],
   ['powerpoint.read_text', { verify: 'direct-result' }],
@@ -54,6 +80,12 @@ test('PowerPoint E2E case table covers every advertised tool', () => {
   assertE2eCaseCoverage({ addinRoot: ADDIN_ROOT, host: 'PowerPoint', cases: POWERPOINT_E2E_CASES });
 });
 
+test('PowerPoint mutating E2E cases define concrete setup and readback checks', () => {
+  assertConcreteReadback('powerpoint.replace_text');
+  assertConcreteReadback('powerpoint.add_text_box');
+  assertConcreteReadback('powerpoint.add_shape');
+});
+
 test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
   await runOfficeToolE2e({
     host: 'PowerPoint',
@@ -61,3 +93,11 @@ test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => 
     driver: requireOfficeE2eDriver('PowerPoint')
   });
 });
+
+function assertConcreteReadback(tool) {
+  const toolCase = POWERPOINT_E2E_CASES[tool];
+  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
+  if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
+  if (!toolCase.verify.readbackTool) throw new Error(`${tool} must define a readback tool`);
+  if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
+}

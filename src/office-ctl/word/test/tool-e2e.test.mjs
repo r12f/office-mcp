@@ -15,7 +15,20 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.get_paragraph', { verify: 'direct-result' }],
   ['word.find_text', { verify: 'direct-result' }],
   ['word.get_selection', { verify: 'direct-result' }],
-  ['word.insert_paragraph', { args: { anchor: { kind: 'end_of_document' }, text: 'E2E paragraph' } }],
+  ['word.insert_paragraph', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'insert anchor marker' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'insert anchor marker' }, text: 'E2E paragraph' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_text',
+      readbackArguments: { limit: 20 },
+      expect: { contains: ['insert anchor marker', 'E2E paragraph'] }
+    }
+  }],
   ['word.insert_image', { args: { anchor: { kind: 'end_of_document' }, image: { base64: 'fixture' } } }],
   ['word.insert_table', { args: { anchor: { kind: 'end_of_document' }, rows: [['A', 'B']] } }],
   ['word.insert_page_break', { args: { anchor: { kind: 'end_of_document' } } }],
@@ -34,7 +47,20 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { contains: ['updated marker'], notContains: ['baseline marker'] }
     }
   }],
-  ['word.update_paragraph', { args: { index: 0, text: 'Updated paragraph' } }],
+  ['word.update_paragraph', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Paragraph before update' } }
+      ]
+    },
+    args: { index: 0, text: 'Updated paragraph' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_text',
+      readbackArguments: { limit: 20 },
+      expect: { contains: ['Updated paragraph'], notContains: ['Paragraph before update'] }
+    }
+  }],
   ['word.delete_range', { args: { anchor: { kind: 'paragraph_index', index: 0 }, extent: 'paragraph' } }],
   ['word.apply_formatting', { args: { anchor: { kind: 'paragraph_index', index: 0 }, formatting: { bold: true } } }],
   ['word.read_table', { verify: 'direct-result' }],
@@ -54,6 +80,12 @@ test('Word E2E case table covers every advertised tool', () => {
   assertE2eCaseCoverage({ addinRoot: ADDIN_ROOT, host: 'Word', cases: WORD_E2E_CASES });
 });
 
+test('Word mutating E2E cases define concrete setup and readback checks', () => {
+  assertConcreteReadback('word.replace_text');
+  assertConcreteReadback('word.insert_paragraph');
+  assertConcreteReadback('word.update_paragraph');
+});
+
 test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
   await runOfficeToolE2e({
     host: 'Word',
@@ -61,3 +93,11 @@ test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
     driver: requireOfficeE2eDriver('Word')
   });
 });
+
+function assertConcreteReadback(tool) {
+  const toolCase = WORD_E2E_CASES[tool];
+  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
+  if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
+  if (!toolCase.verify.readbackTool) throw new Error(`${tool} must define a readback tool`);
+  if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
+}

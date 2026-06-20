@@ -31,8 +31,34 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['updated', 'marker', '3', '4'], notContains: ['baseline'] }
     }
   }],
-  ['excel.clear_range', { args: { sheet: 'Sheet1', address: 'A1:B2' } }],
-  ['excel.find_replace_cells', { args: { sheet: 'Sheet1', find: 'baseline', replace: 'updated' } }],
+  ['excel.clear_range', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B2', values: [['clear', 'me'], ['now', 'please']] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'A1:B2' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'A1:B2' },
+      expect: { notContains: ['clear', 'please'] }
+    }
+  }],
+  ['excel.find_replace_cells', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B1', values: [['baseline', 'marker']] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', find: 'baseline', replace: 'updated' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'A1:B1' },
+      expect: { contains: ['updated', 'marker'], notContains: ['baseline'] }
+    }
+  }],
   ['excel.set_formula', { args: { sheet: 'Sheet1', address: 'C1', formula: '=SUM(A1:B1)' } }],
   ['excel.format_range', { args: { sheet: 'Sheet1', address: 'A1:B2', format: { bold: true } } }],
   ['excel.sort_range', { args: { sheet: 'Sheet1', address: 'A1:B3', key_column: 0 } }],
@@ -49,6 +75,12 @@ test('Excel E2E case table covers every advertised tool', () => {
   assertE2eCaseCoverage({ addinRoot: ADDIN_ROOT, host: 'Excel', cases: EXCEL_E2E_CASES });
 });
 
+test('Excel mutating E2E cases define concrete setup and readback checks', () => {
+  assertConcreteReadback('excel.write_range');
+  assertConcreteReadback('excel.clear_range');
+  assertConcreteReadback('excel.find_replace_cells');
+});
+
 test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
   await runOfficeToolE2e({
     host: 'Excel',
@@ -56,3 +88,11 @@ test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
     driver: requireOfficeE2eDriver('Excel')
   });
 });
+
+function assertConcreteReadback(tool) {
+  const toolCase = EXCEL_E2E_CASES[tool];
+  if (!toolCase.setup?.actions?.length) throw new Error(`${tool} must define setup actions`);
+  if (toolCase.verify?.kind !== 'readback') throw new Error(`${tool} must use readback verification`);
+  if (!toolCase.verify.readbackTool) throw new Error(`${tool} must define a readback tool`);
+  if (!toolCase.verify.expect) throw new Error(`${tool} must define readback expectations`);
+}

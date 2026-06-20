@@ -1286,11 +1286,13 @@ and cleanup, MCP `tools/call`, and explicit session waiting through the
 `OFFICE_MCP_E2E_DRIVER` JSON step protocol. The driver also supports generic
 setup/reset action metadata plus generic readback verification metadata: a case
 can declare MCP setup actions, call the tool under test, then call a follow-up
-read tool and assert expected `contains`/`notContains` markers. Word
-`replace_text`, Excel `write_range`, and PowerPoint `replace_text` are the first
-concrete setup/readback cases. Full add-in activation, live Office execution,
-and concrete setup/readback verifiers for every mutating/destructive tool remain
-open, especially PowerPoint's visible-window COM path. Each host exposes
+read tool and assert expected `contains`/`notContains` markers. The first
+concrete setup/readback cases now cover Word `insert_paragraph`,
+`replace_text`, and `update_paragraph`; Excel `write_range`, `clear_range`, and
+`find_replace_cells`; and PowerPoint `add_text_box`, `add_shape`, and
+`replace_text`. Full add-in activation, live Office execution, and concrete
+setup/readback verifiers for every mutating/destructive tool remain open,
+especially PowerPoint's visible-window COM path. Each host exposes
 `npm run e2e:tools` as the non-evidence tool E2E command.
 
 **Exit criterion**: A developer can run one command per Office host and see the
