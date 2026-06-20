@@ -186,12 +186,29 @@ async function waitForSession(host, context) {
   throw new Error(`Timed out waiting ${timeoutMs} ms for ${host} add-in session for ${document.path || 'test document'}. Open MCP Control in ${host}, ensure it connects to the daemon, then rerun npm run e2e:tools with OFFICE_MCP_RUN_E2E=1.`);
 }
 
-async function resetContent(_host, _context) {
-  return { reset: 'external-driver-delegated' };
+async function resetContent(_host, context) {
+  const actions = context.toolCase?.reset?.actions || [];
+  await runToolActions(context, actions);
+  return { reset: actions.length ? 'mcp-actions' : 'external-driver-delegated', actions: actions.length };
 }
 
-async function setupContent(_host, _context) {
-  return { setup: 'external-driver-delegated' };
+async function setupContent(_host, context) {
+  const actions = context.toolCase?.setup?.actions || [];
+  await runToolActions(context, actions);
+  return { setup: actions.length ? 'mcp-actions' : 'external-driver-delegated', actions: actions.length };
+}
+
+async function runToolActions(context, actions) {
+  const daemon = context.daemon || {};
+  const session = context.session || {};
+  for (const action of actions) {
+    if (!action?.tool) throw new Error('Office E2E setup/reset action must define a tool.');
+    const args = { ...(action.arguments || {}), session_id: session.sessionId };
+    const result = await mcpToolCall(daemon.endpoint, action.tool, args);
+    if (result.error || result.structuredContent?.error) {
+      throw new Error(`Office E2E setup/reset action ${action.tool} failed: ${JSON.stringify(result.error || result.structuredContent.error)}`);
+    }
+  }
 }
 
 async function callTool(context) {

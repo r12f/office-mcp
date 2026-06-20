@@ -31,7 +31,11 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
   ['powerpoint.update_shape', { args: { slide_index: 0, shape_id: 'fixture', text: 'Updated shape' } }],
   ['powerpoint.read_text', { verify: 'direct-result' }],
   ['powerpoint.replace_text', {
-    setup: { kind: 'slide-text', slide_index: 0, text: 'baseline marker' },
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_text_box', arguments: { slide_index: 0, text: 'baseline marker' } }
+      ]
+    },
     args: { find: 'baseline marker', replace: 'updated marker' },
     verify: {
       kind: 'readback',

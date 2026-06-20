@@ -21,7 +21,11 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.insert_page_break', { args: { anchor: { kind: 'end_of_document' } } }],
   ['word.insert_list', { args: { anchor: { kind: 'end_of_document' }, items: ['One', 'Two'] } }],
   ['word.replace_text', {
-    setup: { kind: 'document-text', text: 'baseline marker' },
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'baseline marker' } }
+      ]
+    },
     args: { find: 'baseline marker', replace: 'updated marker' },
     verify: {
       kind: 'readback',

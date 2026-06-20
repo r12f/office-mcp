@@ -18,7 +18,11 @@ const EXCEL_E2E_CASES = Object.fromEntries([
   ['excel.get_used_range', { verify: 'direct-result' }],
   ['excel.read_range', { verify: 'direct-result' }],
   ['excel.write_range', {
-    setup: { kind: 'range-values', sheet: 'Sheet1', address: 'A1:B2', values: [['baseline', 'marker'], ['1', '2']] },
+    setup: {
+      actions: [
+        { tool: 'excel.clear_range', arguments: { sheet: 'Sheet1', address: 'A1:B2' } }
+      ]
+    },
     args: { sheet: 'Sheet1', address: 'A1:B2', values: [['updated', 'marker'], ['3', '4']] },
     verify: {
       kind: 'readback',
