@@ -489,6 +489,28 @@ function Try-OpenExcelPatchedDriverWorkbook {
   }
 }
 
+function Try-OpenPatchedDriverDocument {
+  param(
+    [Parameter(Mandatory = $true)]$Application,
+    [Parameter(Mandatory = $true)][string]$HostKey,
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)]$Deadline
+  )
+
+  if ($HostKey -eq "excel") {
+    return Try-OpenExcelPatchedDriverWorkbook -Application $Application -Path $Path -Deadline $Deadline
+  }
+  if ($HostKey -eq "powerpoint") {
+    try {
+      return Wait-ForDriverDocument -Application $Application -HostKey $HostKey -Path $Path -Deadline $Deadline
+    } catch {
+      Write-ActivatorLog "powerpoint patched driver presentation unavailable path=$Path error=$($_.Exception.Message)"
+      return $null
+    }
+  }
+  return $null
+}
+
 function Set-ZipEntryText {
   param(
     [Parameter(Mandatory = $true)]$Zip,
@@ -1214,17 +1236,17 @@ if ($registered) {
   }
 }
 
-if ($hostKey -eq "excel") {
-  $patchedDriverWindowHandle = Try-OpenExcelPatchedDriverWorkbook -Application $app -Path $DocumentPath -Deadline $deadline
+if ($hostKey -in @("excel", "powerpoint")) {
+  $patchedDriverWindowHandle = Try-OpenPatchedDriverDocument -Application $app -HostKey $hostKey -Path $DocumentPath -Deadline $deadline
   if ($patchedDriverWindowHandle) {
-    Write-ActivatorLog "excel patched driver workbook active; attempting to open control panel document=$DocumentPath"
+    Write-ActivatorLog "$hostKey patched driver document active; attempting to open control panel document=$DocumentPath"
     $panel = Try-OpenControlPanelForDriverDocument -WindowHandle $patchedDriverWindowHandle -Deadline $deadline -AllowCatalogFallback:$false
     if ($panel.opened) {
-      Write-ActivationResult -DocumentPath $DocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath "patched-driver-workbook" -ControlOpened $true
+      Write-ActivationResult -DocumentPath $DocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath "patched-driver-document" -ControlOpened $true
       exit 0
     }
-    Write-ActivatorLog "excel patched driver workbook control panel did not open; skipping official sideload fallback to avoid duplicate Excel windows document=$DocumentPath"
-    throw "Excel patched driver workbook did not open Office MCP Control."
+    Write-ActivatorLog "$hostKey patched driver document control panel did not open; skipping official sideload fallback to avoid duplicate $hostKey windows document=$DocumentPath"
+    throw "$HostName patched driver document did not open Office MCP Control."
   }
 }
 

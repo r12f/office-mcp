@@ -420,9 +420,14 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /function Open-ExcelWorkbookAfterWebExtensionPatch/);
   assert.match(script, /excel \$Source workbook reopen failed on current application; creating replacement application/);
   assert.match(script, /function Try-OpenExcelPatchedDriverWorkbook/);
-  assert.match(script, /Try-OpenExcelPatchedDriverWorkbook -Application \$app -Path \$DocumentPath -Deadline \$deadline/);
-  assert.match(script, /excel patched driver workbook control panel did not open; skipping official sideload fallback to avoid duplicate Excel windows/);
-  assert.match(script, /Excel patched driver workbook did not open Office MCP Control/);
+  assert.match(script, /function Try-OpenPatchedDriverDocument/);
+  assert.match(script, /Try-OpenExcelPatchedDriverWorkbook -Application \$Application -Path \$Path -Deadline \$Deadline/);
+  assert.match(script, /Try-OpenPatchedDriverDocument -Application \$app -HostKey \$hostKey -Path \$DocumentPath -Deadline \$deadline/);
+  assert.match(script, /powerpoint patched driver presentation unavailable/);
+  assert.match(script, /\$hostKey -in @\("excel", "powerpoint"\)/);
+  assert.match(script, /\$hostKey patched driver document control panel did not open; skipping official sideload fallback to avoid duplicate \$hostKey windows/);
+  assert.match(script, /patched driver document did not open Office MCP Control/);
+  assert.doesNotMatch(script, /excel patched driver workbook control panel did not open; skipping official sideload fallback to avoid duplicate Excel windows/);
   assert.match(script, /function Reopen-ExcelSideloadDocumentAfterWebExtensionPatch/);
   assert.match(script, /Reopen-ExcelSideloadDocumentAfterWebExtensionPatch -Application \$app -Path \$activeDocumentPath/);
   assert.match(script, /Open-ExcelWorkbookAfterWebExtensionPatch -Application \$Application -Path \$Path -Source "sideload"/);
