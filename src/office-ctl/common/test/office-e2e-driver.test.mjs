@@ -778,6 +778,34 @@ test('Office E2E driver cleanup ignores documents it did not create', () => {
   assert.equal(existsSync(path), true);
 });
 
+test('Office E2E driver reports keeper diagnostics when document creation never becomes ready', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-create-fail-'));
+  const fakePowerShell = join(dir, 'fake-powershell.mjs');
+  writeFileSync(fakePowerShell, `
+import { appendFileSync } from 'node:fs';
+appendFileSync(1, 'fake keeper stdout\\n');
+appendFileSync(2, 'fake keeper stderr\\n');
+`);
+  const previous = process.env.OFFICE_MCP_E2E_POWERSHELL;
+  process.env.OFFICE_MCP_E2E_POWERSHELL = `${process.execPath} ${fakePowerShell}`;
+  try {
+    const result = runDriver({
+      host: 'Word',
+      step: 'createDocument',
+      context: { workDir: dir, keeperTimeoutMs: 50 }
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Office keeper did not create the ready sentinel/);
+    assert.match(result.stderr, /started=missing/);
+    assert.match(result.stderr, /ready=missing/);
+    assert.match(result.stderr, /error=missing/);
+    assert.match(result.stderr, /stdout: fake keeper stdout/);
+    assert.match(result.stderr, /stderr: fake keeper stderr/);
+  } finally {
+    restoreEnv('OFFICE_MCP_E2E_POWERSHELL', previous);
+  }
+});
+
 test('Office E2E driver rejects add-in activation until a concrete activator is provided', () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-empty-session-'));
   const serverPath = join(dir, 'empty-session-server.mjs');

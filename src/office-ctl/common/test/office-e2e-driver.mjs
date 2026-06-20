@@ -1,4 +1,4 @@
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -194,19 +194,32 @@ function officeKeeperScript(host, path, closePath, readyPath, startedPath, error
 }
 
 function runOfficePowerShell(scriptPath, stdoutPath, stderrPath) {
-  try {
-    const stdout = execFileSync('powershell.exe', ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 45000
-    });
-    writeFileSync(stdoutPath, stdout || '', 'utf8');
-    writeFileSync(stderrPath, '', 'utf8');
-  } catch (error) {
-    writeFileSync(stdoutPath, error.stdout?.toString() || '', 'utf8');
-    writeFileSync(stderrPath, error.stderr?.toString() || error.message || String(error), 'utf8');
-    throw error;
+  const shell = powerShellCommand(scriptPath);
+  const result = spawnSync(shell.command, shell.args, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 45000,
+    windowsHide: true
+  });
+  writeFileSync(stdoutPath, result.stdout || '', 'utf8');
+  writeFileSync(stderrPath, result.stderr || result.error?.message || '', 'utf8');
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`Office keeper PowerShell exited with status ${result.status}.`);
+}
+
+function powerShellCommand(scriptPath) {
+  const override = process.env.OFFICE_MCP_E2E_POWERSHELL;
+  if (override) {
+    const parts = splitCommand(override);
+    return { command: parts[0], args: [...parts.slice(1), scriptPath] };
   }
+  return { command: 'powershell.exe', args: ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath] };
+}
+
+function splitCommand(command) {
+  const parts = String(command).match(/(?:[^\s"]+|"[^"]*")+/g)?.map((part) => part.replace(/^"|"$/g, '')) || [];
+  if (parts.length === 0) throw new Error('OFFICE_MCP_E2E_POWERSHELL must not be empty.');
+  return parts;
 }
 
 function officeWindowMode(host) {
@@ -621,7 +634,7 @@ async function waitForFile(path, timeoutMs, keeper) {
     }
     await sleep(100);
   }
-  throw new Error(`Timed out waiting ${timeoutMs} ms for ${path}.${keeperLogDetail(keeper)}`);
+  throw new Error(`Office keeper did not create the ready sentinel within ${timeoutMs} ms for ${path}.${keeperStateDetail(path, keeper)}`);
 }
 
 function keeperPid(keeper) {
@@ -644,6 +657,22 @@ function keeperLogDetail(keeper) {
     }
   }
   return details.length ? ` ${details.join(' ')}` : '';
+}
+
+function keeperStateDetail(readyPath, keeper) {
+  if (!keeper) return '';
+  const details = [
+    `started=${fileState(keeper.startedPath)}`,
+    `ready=${existsSync(readyPath) ? 'present' : 'missing'}`,
+    `error=${fileState(keeper.errorPath)}`
+  ];
+  const logs = keeperLogDetail(keeper).trim();
+  if (logs) details.push(logs);
+  return ` ${details.join(' ')}`;
+}
+
+function fileState(path) {
+  return path && existsSync(path) ? 'present' : 'missing';
 }
 
 function readText(path) {
