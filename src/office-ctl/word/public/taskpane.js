@@ -71,52 +71,54 @@
     'word.save'
   ];
   const TOOL_GROUPS = [
-    { label: 'Read', tools: ['word.get_text', 'word.get_outline', 'word.get_paragraph', 'word.find_text', 'word.get_selection'] },
-    { label: 'Insert', tools: ['word.insert_paragraph', 'word.insert_image', 'word.insert_table', 'word.insert_page_break', 'word.insert_list'] },
-    { label: 'Edit', tools: ['word.replace_text', 'word.update_paragraph', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
+    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.insert_page_break', 'word.save'] },
+    { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
+    { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
-    { label: 'Content Controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
-    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_tracked_change'] },
-    { label: 'Document', tools: ['word.save'] }
+    { label: 'Media', tools: ['word.insert_image'] },
+    { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
+    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_tracked_change'] }
   ];
   const TOOL_METADATA = new Map([
-    ['word.get_text', { category: 'Read', sideEffect: 'read', description: 'Read document text by paragraph range.' }],
-    ['word.get_outline', { category: 'Read', sideEffect: 'read', description: 'Read heading outline and structure.' }],
-    ['word.get_paragraph', { category: 'Read', sideEffect: 'read', description: 'Read a single paragraph by index.' }],
-    ['word.find_text', { category: 'Read', sideEffect: 'read', description: 'Find text matches in the document body.' }],
-    ['word.get_selection', { category: 'Read', sideEffect: 'read', description: 'Read the current selection.' }],
-    ['word.insert_paragraph', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
-    ['word.insert_image', { category: 'Insert', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
-    ['word.insert_table', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a table with provided values.' }],
-    ['word.insert_page_break', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a page break.' }],
-    ['word.insert_list', { category: 'Insert', sideEffect: 'mutating', description: 'Insert a list.' }],
-    ['word.replace_text', { category: 'Edit', sideEffect: 'mutating', description: 'Replace matching document text.' }],
-    ['word.update_paragraph', { category: 'Edit', sideEffect: 'mutating', description: 'Update paragraph text and style.' }],
-    ['word.delete_range', { category: 'Edit', sideEffect: 'mutating', description: 'Delete text resolved from an anchor.' }],
-    ['word.apply_formatting', { category: 'Edit', sideEffect: 'mutating', description: 'Apply formatting to an anchored range.' }],
+    ['word.get_text', { category: 'Document & structure', sideEffect: 'read', description: 'Read document text by paragraph range.' }],
+    ['word.get_outline', { category: 'Document & structure', sideEffect: 'read', description: 'Read heading outline and structure.' }],
+    ['word.get_paragraph', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'Read a single paragraph by index.' }],
+    ['word.find_text', { category: 'Range & selection', sideEffect: 'read', description: 'Find text matches in the document body.' }],
+    ['word.get_selection', { category: 'Range & selection', sideEffect: 'read', description: 'Read the current selection.' }],
+    ['word.insert_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
+    ['word.insert_image', { category: 'Media', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
+    ['word.insert_table', { category: 'Tables', sideEffect: 'mutating', description: 'Insert a table with provided values.' }],
+    ['word.insert_page_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page break.' }],
+    ['word.insert_list', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a list.' }],
+    ['word.replace_text', { category: 'Range & selection', sideEffect: 'mutating', description: 'Replace matching document text.' }],
+    ['word.update_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Update paragraph text and style.' }],
+    ['word.delete_range', { category: 'Range & selection', sideEffect: 'mutating', description: 'Delete text resolved from an anchor.' }],
+    ['word.apply_formatting', { category: 'Range & selection', sideEffect: 'mutating', description: 'Apply formatting to an anchored range.' }],
     ['word.read_table', { category: 'Tables', sideEffect: 'read', description: 'Read table dimensions and cell values.' }],
     ['word.update_table', { category: 'Tables', sideEffect: 'destructive', description: 'Update table cells, rows, columns, formatting, or lifecycle.' }],
-    ['word.list_content_controls', { category: 'Content Controls', sideEffect: 'read', description: 'List content-control metadata.' }],
-    ['word.insert_content_control', { category: 'Content Controls', sideEffect: 'mutating', description: 'Create a content control around an anchored range.' }],
-    ['word.update_content_control', { category: 'Content Controls', sideEffect: 'mutating', description: 'Update content-control metadata, locks, or text.' }],
-    ['word.delete_content_control', { category: 'Content Controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling.' }],
-    ['word.apply_style', { category: 'Edit', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
+    ['word.list_content_controls', { category: 'Content controls', sideEffect: 'read', description: 'List content-control metadata.' }],
+    ['word.insert_content_control', { category: 'Content controls', sideEffect: 'mutating', description: 'Create a content control around an anchored range.' }],
+    ['word.update_content_control', { category: 'Content controls', sideEffect: 'mutating', description: 'Update content-control metadata, locks, or text.' }],
+    ['word.delete_content_control', { category: 'Content controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling.' }],
+    ['word.apply_style', { category: 'Range & selection', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
     ['word.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a comment to an anchored range.' }],
     ['word.resolve_comment', { category: 'Review', sideEffect: 'mutating', description: 'Resolve an existing comment.' }],
     ['word.update_tracked_change', { category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint.' }],
-    ['word.save', { category: 'Document', sideEffect: 'mutating', description: 'Save the current document.' }]
+    ['word.save', { category: 'Document & structure', sideEffect: 'mutating', description: 'Save the current document.' }]
   ]);
   let socket;
   let connectGeneration = 0;
   let connectTimeoutTimer;
   const { instanceId, sessionId } = runtimeIds();
   const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.word.tool-permissions.${sessionId}`;
+  const TOOL_PERMISSION_MODE_STORAGE_KEY = `office-mcp.word.tool-permission-mode.${sessionId}`;
   let documentInfo = null;
   let serverInfo = { serverVersion: 'Unknown', protocolVersion: PROTOCOL_VERSION };
   let reconnectTimer;
   let reconnectAttempt = 0;
   let endpointDirty = false;
   let toolPermissions = loadToolPermissions();
+  let toolPermissionMode = loadToolPermissionMode();
   let sessionAnnounced = false;
   const logger = new AddinLogger({ redactText });
   const taskStore = new TaskHistoryStore({ redactText });
@@ -147,6 +149,7 @@
   const connectionDetailEl = document.getElementById('connectionDetail');
   const toolCountEl = document.getElementById('toolCount');
   const toolListEl = document.getElementById('toolList');
+  const toolModeControlEl = document.getElementById('toolModeControl');
   const currentTaskEl = document.getElementById('currentTask');
   const currentTaskStateEl = document.getElementById('currentTaskState');
   const historyListEl = document.getElementById('historyList');
@@ -158,6 +161,7 @@
   const announcerEl = document.getElementById('announcer');
 
   settingsFormEl.addEventListener('submit', saveEndpointOverride);
+  toolModeControlEl?.querySelectorAll('[data-tool-mode]').forEach((button) => button.addEventListener('click', handleToolModeChange));
   document.addEventListener('click', handleMetadataCopy);
   endpointInputEl.addEventListener('input', () => {
     endpointDirty = endpointInputEl.value.trim() !== configuredEndpoint();
@@ -1551,8 +1555,16 @@
     setCopyableMetadata(daemonEl, configuredEndpoint());
     renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
     hostPlatformEl.textContent = officeHostSummary('Word');
+    renderToolModeControl();
     renderToolSummary();
     renderHistory();
+  }
+
+  function renderToolModeControl() {
+    toolModeControlEl?.querySelectorAll('[data-tool-mode]').forEach((button) => {
+      const selected = button.dataset.toolMode === toolPermissionMode;
+      button.setAttribute('aria-checked', selected ? 'true' : 'false');
+    });
   }
 
   function renderToolSummary() {
@@ -1560,11 +1572,13 @@
     const openGroups = new Set([...toolListEl.querySelectorAll('[data-tool-group]')]
       .filter((input) => input.closest('details')?.open)
       .map((input) => input.dataset.toolGroup));
-    toolCountEl.textContent = `Enabled ${effective.length} of ${AVAILABLE_TOOLS.length}`;
+    renderToolModeControl();
+    toolCountEl.textContent = `${effective.length}/${AVAILABLE_TOOLS.length}`;
     toolListEl.textContent = '';
     for (const group of TOOL_GROUPS) {
       const tools = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool));
       if (tools.length === 0) continue;
+      const allowedInGroup = tools.filter((tool) => isToolAllowedByMode(tool));
       const enabledInGroup = tools.filter((tool) => effective.includes(tool));
       const groupEl = document.createElement('details');
       groupEl.className = 'tool-group';
@@ -1572,8 +1586,8 @@
       groupEl.innerHTML = [
         '<summary class="tool-group-title">',
         `<span>${escapeHtml(group.label)}</span>`,
-        `<span class="tool-group-count">Enabled ${enabledInGroup.length} of ${tools.length}</span>`,
-        `<input class="group-toggle" type="checkbox" role="switch" data-tool-group="${escapeHtml(group.label)}" aria-label="Toggle ${escapeHtml(group.label)} tools" ${enabledInGroup.length === tools.length ? 'checked' : ''} />`,
+        `<span class="tool-group-count">${enabledInGroup.length}/${tools.length}</span>`,
+        `<input class="group-toggle" type="checkbox" role="switch" data-tool-group="${escapeHtml(group.label)}" aria-label="Toggle ${escapeHtml(group.label)} tools" ${allowedInGroup.length > 0 && enabledInGroup.length === allowedInGroup.length ? 'checked' : ''} ${allowedInGroup.length === 0 ? 'disabled' : ''} />`,
         '</summary>',
         `<div class="tool-permission-list">${tools.map(toolControlMarkup).join('')}</div>`
       ].join('');
@@ -1590,17 +1604,18 @@
   function toolControlMarkup(tool) {
     const metadata = TOOL_METADATA.get(tool) || { category: 'Tools', sideEffect: 'read', description: 'Office tool.' };
     const id = `toolPermission-${tool.replace(/[^a-z0-9_-]/gi, '-')}`;
-    const checked = isToolEnabled(tool);
+    const modeAllowed = isToolAllowedByMode(tool);
+    const checked = isToolEnabled(tool) && modeAllowed;
     return [
-      `<label class="tool-permission-row${metadata.sideEffect === 'mutating' ? ' is-mutating' : ''}" for="${id}">`,
+      `<label class="tool-permission-row${metadata.sideEffect === 'mutating' || metadata.sideEffect === 'destructive' ? ' is-mutating' : ''}${modeAllowed ? '' : ' is-disabled'}" for="${id}">`,
       '<span class="tool-permission-main">',
       '<span class="tool-permission-title">',
       `<span class="tool-permission-name">${escapeHtml(tool)}</span>`,
-      `<span class="side-effect-pill ${metadata.sideEffect === 'mutating' ? 'mutating' : 'read'}">${escapeHtml(metadata.sideEffect)}</span>`,
+      `<span class="side-effect-pill ${metadata.sideEffect === 'mutating' || metadata.sideEffect === 'destructive' ? 'mutating' : 'read'}">${escapeHtml(metadata.sideEffect)}</span>`,
       '</span>',
       `<span class="tool-permission-meta">${escapeHtml(metadata.description)}</span>`,
       '</span>',
-      `<input id="${id}" class="tool-toggle" type="checkbox" role="switch" data-tool="${escapeHtml(tool)}" aria-label="Toggle ${escapeHtml(tool)}" ${checked ? 'checked' : ''} />`,
+      `<input id="${id}" class="tool-toggle" type="checkbox" role="switch" data-tool="${escapeHtml(tool)}" aria-label="Toggle ${escapeHtml(tool)}" ${checked ? 'checked' : ''} ${modeAllowed ? '' : 'disabled aria-disabled="true"'} />`,
       '</label>'
     ].join('');
   }
@@ -1619,7 +1634,7 @@
     if (!group) return;
     const enabled = event.currentTarget.checked;
     for (const tool of group.tools) {
-      if (AVAILABLE_TOOLS.includes(tool)) toolPermissions[tool] = enabled;
+      if (AVAILABLE_TOOLS.includes(tool) && isToolAllowedByMode(tool)) toolPermissions[tool] = enabled;
     }
     saveToolPermissions();
     renderToolSummary();
@@ -1627,7 +1642,23 @@
   }
 
   function effectiveTools() {
-    return AVAILABLE_TOOLS.filter(isToolEnabled);
+    return AVAILABLE_TOOLS.filter((tool) => isToolEnabled(tool) && isToolAllowedByMode(tool));
+  }
+
+  function isToolAllowedByMode(tool) {
+    const sideEffect = TOOL_METADATA.get(tool)?.sideEffect || 'read';
+    if (toolPermissionMode === 'all') return true;
+    if (toolPermissionMode === 'write') return sideEffect !== 'destructive';
+    return sideEffect === 'read';
+  }
+
+  function handleToolModeChange(event) {
+    const mode = event.currentTarget.dataset.toolMode;
+    if (!['read', 'write', 'all'].includes(mode) || mode === toolPermissionMode) return;
+    toolPermissionMode = mode;
+    saveToolPermissionMode();
+    renderToolSummary();
+    sendSessionToolUpdate();
   }
 
   function isToolEnabled(tool) {
@@ -1644,8 +1675,21 @@
     }
   }
 
+  function loadToolPermissionMode() {
+    try {
+      const mode = window.localStorage?.getItem(TOOL_PERMISSION_MODE_STORAGE_KEY) || 'all';
+      return ['read', 'write', 'all'].includes(mode) ? mode : 'all';
+    } catch {
+      return 'all';
+    }
+  }
+
   function saveToolPermissions() {
     window.localStorage?.setItem(TOOL_PERMISSION_STORAGE_KEY, JSON.stringify(toolPermissions));
+  }
+
+  function saveToolPermissionMode() {
+    window.localStorage?.setItem(TOOL_PERMISSION_MODE_STORAGE_KEY, toolPermissionMode);
   }
 
   function sendSessionToolUpdate() {

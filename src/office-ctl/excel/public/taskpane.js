@@ -92,6 +92,7 @@
   ]);
   const { instanceId, sessionId } = runtimeIds();
   const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.excel.tool-permissions.${sessionId}`;
+  const TOOL_PERMISSION_MODE_STORAGE_KEY = `office-mcp.excel.tool-permission-mode.${sessionId}`;
   const logger = new AddinLogger({ redactText });
   const taskStore = new TaskHistoryStore({ redactText });
   let socket;
@@ -101,6 +102,7 @@
   let serverInfo = { serverVersion: 'Unknown', protocolVersion: PROTOCOL_VERSION };
   let documentInfo = null;
   let toolPermissions = loadToolPermissions();
+  let toolPermissionMode = loadToolPermissionMode();
   let sessionAnnounced = false;
 
   const connectionBadgeEl = document.getElementById('connectionBadge');
@@ -115,6 +117,7 @@
   const connectionDetailEl = document.getElementById('connectionDetail');
   const toolCountEl = document.getElementById('toolCount');
   const toolListEl = document.getElementById('toolList');
+  const toolModeControlEl = document.getElementById('toolModeControl');
   const currentTaskEl = document.getElementById('currentTask');
   const currentTaskStateEl = document.getElementById('currentTaskState');
   const historyListEl = document.getElementById('historyList');
@@ -126,6 +129,7 @@
   const announcerEl = document.getElementById('announcer');
 
   settingsFormEl.addEventListener('submit', saveEndpointOverride);
+  toolModeControlEl?.querySelectorAll('[data-tool-mode]').forEach((button) => button.addEventListener('click', handleToolModeChange));
   document.addEventListener('click', handleMetadataCopy);
   endpointInputEl.addEventListener('input', () => {
     endpointDirty = endpointInputEl.value.trim() !== configuredEndpoint();
@@ -1613,9 +1617,17 @@
     setCopyableMetadata(daemonEl, configuredEndpoint());
     renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
     hostPlatformEl.textContent = officeHostSummary('Excel');
+    renderToolModeControl();
     renderToolSummary();
     renderCurrentTask();
     renderHistory();
+  }
+
+  function renderToolModeControl() {
+    toolModeControlEl?.querySelectorAll('[data-tool-mode]').forEach((button) => {
+      const selected = button.dataset.toolMode === toolPermissionMode;
+      button.setAttribute('aria-checked', selected ? 'true' : 'false');
+    });
   }
 
   function renderToolSummary() {
@@ -1623,11 +1635,13 @@
     const openGroups = new Set([...toolListEl.querySelectorAll('[data-tool-group]')]
       .filter((input) => input.closest('details')?.open)
       .map((input) => input.dataset.toolGroup));
-    toolCountEl.textContent = `Enabled ${effective.length} of ${AVAILABLE_TOOLS.length}`;
+    renderToolModeControl();
+    toolCountEl.textContent = `${effective.length}/${AVAILABLE_TOOLS.length}`;
     toolListEl.textContent = '';
     for (const group of TOOL_GROUPS) {
       const tools = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool));
       if (tools.length === 0) continue;
+      const allowedInGroup = tools.filter((tool) => isToolSupported(tool) && isToolAllowedByMode(tool));
       const enabledInGroup = tools.filter((tool) => effective.includes(tool));
       const groupEl = document.createElement('details');
       groupEl.className = 'tool-group';
@@ -1635,8 +1649,8 @@
       groupEl.innerHTML = [
         '<summary class="tool-group-title">',
         `<span>${escapeHtml(group.label)}</span>`,
-        `<span class="tool-group-count">Enabled ${enabledInGroup.length} of ${tools.length}</span>`,
-        `<input class="group-toggle" type="checkbox" role="switch" data-tool-group="${escapeHtml(group.label)}" aria-label="Toggle ${escapeHtml(group.label)} tools" ${enabledInGroup.length === tools.length ? 'checked' : ''} />`,
+        `<span class="tool-group-count">${enabledInGroup.length}/${tools.length}</span>`,
+        `<input class="group-toggle" type="checkbox" role="switch" data-tool-group="${escapeHtml(group.label)}" aria-label="Toggle ${escapeHtml(group.label)} tools" ${allowedInGroup.length > 0 && enabledInGroup.length === allowedInGroup.length ? 'checked' : ''} ${allowedInGroup.length === 0 ? 'disabled' : ''} />`,
         '</summary>',
         `<div class="tool-permission-list">${tools.map(toolControlMarkup).join('')}</div>`
       ].join('');
@@ -1653,17 +1667,20 @@
   function toolControlMarkup(tool) {
     const metadata = TOOL_METADATA.get(tool) || { category: 'Tools', sideEffect: 'read', description: 'Office tool.' };
     const id = `toolPermission-${tool.replace(/[^a-z0-9_-]/gi, '-')}`;
-    const checked = isToolEnabled(tool);
+    const modeAllowed = isToolAllowedByMode(tool);
+    const supported = isToolSupported(tool);
+    const allowed = modeAllowed && supported;
+    const checked = isToolEnabled(tool) && allowed;
     return [
-      `<label class="tool-permission-row${metadata.sideEffect === 'mutating' ? ' is-mutating' : ''}" for="${id}">`,
+      `<label class="tool-permission-row${metadata.sideEffect === 'mutating' || metadata.sideEffect === 'destructive' ? ' is-mutating' : ''}${allowed ? '' : ' is-disabled'}" for="${id}">`,
       '<span class="tool-permission-main">',
       '<span class="tool-permission-title">',
       `<span class="tool-permission-name">${escapeHtml(tool)}</span>`,
-      `<span class="side-effect-pill ${metadata.sideEffect === 'mutating' ? 'mutating' : 'read'}">${escapeHtml(metadata.sideEffect)}</span>`,
+      `<span class="side-effect-pill ${metadata.sideEffect === 'mutating' || metadata.sideEffect === 'destructive' ? 'mutating' : 'read'}">${escapeHtml(metadata.sideEffect)}</span>`,
       '</span>',
       `<span class="tool-permission-meta">${escapeHtml(metadata.description)}</span>`,
       '</span>',
-      `<input id="${id}" class="tool-toggle" type="checkbox" role="switch" data-tool="${escapeHtml(tool)}" aria-label="Toggle ${escapeHtml(tool)}" ${checked ? 'checked' : ''} />`,
+      `<input id="${id}" class="tool-toggle" type="checkbox" role="switch" data-tool="${escapeHtml(tool)}" aria-label="Toggle ${escapeHtml(tool)}" ${checked ? 'checked' : ''} ${allowed ? '' : 'disabled aria-disabled="true"'} />`,
       '</label>'
     ].join('');
   }
@@ -1682,7 +1699,7 @@
     if (!group) return;
     const enabled = event.currentTarget.checked;
     for (const tool of group.tools) {
-      if (AVAILABLE_TOOLS.includes(tool)) toolPermissions[tool] = enabled;
+      if (AVAILABLE_TOOLS.includes(tool) && isToolSupported(tool) && isToolAllowedByMode(tool)) toolPermissions[tool] = enabled;
     }
     saveToolPermissions();
     renderToolSummary();
@@ -1690,7 +1707,23 @@
   }
 
   function effectiveTools() {
-    return AVAILABLE_TOOLS.filter((tool) => isToolSupported(tool) && isToolEnabled(tool));
+    return AVAILABLE_TOOLS.filter((tool) => isToolSupported(tool) && isToolEnabled(tool) && isToolAllowedByMode(tool));
+  }
+
+  function isToolAllowedByMode(tool) {
+    const sideEffect = TOOL_METADATA.get(tool)?.sideEffect || 'read';
+    if (toolPermissionMode === 'all') return true;
+    if (toolPermissionMode === 'write') return sideEffect !== 'destructive';
+    return sideEffect === 'read';
+  }
+
+  function handleToolModeChange(event) {
+    const mode = event.currentTarget.dataset.toolMode;
+    if (!['read', 'write', 'all'].includes(mode) || mode === toolPermissionMode) return;
+    toolPermissionMode = mode;
+    saveToolPermissionMode();
+    renderToolSummary();
+    sendSessionToolUpdate();
   }
 
   function isToolSupported(tool) {
@@ -1714,8 +1747,21 @@
     }
   }
 
+  function loadToolPermissionMode() {
+    try {
+      const mode = window.localStorage?.getItem(TOOL_PERMISSION_MODE_STORAGE_KEY) || 'all';
+      return ['read', 'write', 'all'].includes(mode) ? mode : 'all';
+    } catch {
+      return 'all';
+    }
+  }
+
   function saveToolPermissions() {
     window.localStorage?.setItem(TOOL_PERMISSION_STORAGE_KEY, JSON.stringify(toolPermissions));
+  }
+
+  function saveToolPermissionMode() {
+    window.localStorage?.setItem(TOOL_PERMISSION_MODE_STORAGE_KEY, toolPermissionMode);
   }
 
   function sendSessionToolUpdate() {

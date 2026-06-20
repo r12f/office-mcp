@@ -56,9 +56,9 @@ test('PowerPoint add-in manifest targets presentation host and product identity'
   assert.match(manifest, /https:\/\/localhost:8765\/assets\/icon-80\.png/);
   assert.doesNotMatch(manifest, /DefaultValue="office-mcp(?: for PowerPoint)?"/);
   assert.doesNotMatch(manifest, /DefaultValue="Open"/);
-  assert.match(html, /<title>Office MCP Control<\/title>/);
+  assert.match(html, /<title>MCP Control<\/title>/);
   assert.match(html, /<img class="product-mark" src="\/assets\/icon-32\.png" width="32" height="32" alt="" aria-hidden="true" \/>/);
-  assert.match(html, /<h1>Office MCP Control<\/h1>/);
+  assert.match(html, /<h1>MCP Control<\/h1>/);
 });
 
 test('PowerPoint task pane uses compact shared product UI shell', () => {
@@ -83,12 +83,17 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(html, /<dd id="protection">Not protected<\/dd>/);
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
   assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID" title="Copy session ID"/);
-  assert.match(html, /class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint" title="Copy daemon endpoint"/);
+  assert.doesNotMatch(html, /class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint" title="Copy daemon endpoint"/);
   assert.match(html, /class="panel summary-panel"/);
   assert.match(html, /class="tools-panel"/);
   assert.match(html, /<span>Tools<\/span>/);
   assert.match(html, /id="toolList"/);
-  assert.match(html, /Enabled 0 of 25/);
+  assert.match(html, /0\/25/);
+  assert.doesNotMatch(html, /Enabled \d+ of \d+/);
+  assert.match(html, /id="toolModeControl" class="tool-mode-control" role="radiogroup" aria-label="Tool capability mode"/);
+  assert.match(html, /data-tool-mode="read"/);
+  assert.match(html, /data-tool-mode="write"/);
+  assert.match(html, /data-tool-mode="all"/);
   assert.doesNotMatch(html, /Tool Permissions/);
   assert.doesNotMatch(html, /id="settingsToggle"/);
   assert.doesNotMatch(html, /id="settingsPanel"/);
@@ -127,11 +132,18 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /sessionUpdatedNotification\(\{/);
   assert.match(js, /patch: \{ available_tools: effectiveTools\(\) \}/);
   assert.match(js, /TOOL_PERMISSION_STORAGE_KEY/);
+  assert.match(js, /TOOL_PERMISSION_MODE_STORAGE_KEY/);
   assert.match(js, /TOOL_DISABLED_BY_USER/);
   assert.match(js, /function effectiveTools\(\)/);
+  assert.match(js, /return AVAILABLE_TOOLS\.filter\(\(tool\) => isToolEnabled\(tool\) && isToolAllowedByMode\(tool\)\)/);
+  assert.match(js, /function isToolAllowedByMode\(tool\)/);
+  assert.match(js, /function handleToolModeChange\(event\)/);
   assert.match(js, /function updateToolPermission\(tool, enabled\)/);
   assert.match(js, /document\.createElement\('details'\)/);
   assert.match(js, /class="group-toggle" type="checkbox" role="switch"/);
+  assert.match(js, /toolCountEl\.textContent = `\$\{effective\.length\}\/\$\{AVAILABLE_TOOLS\.length\}`/);
+  assert.match(js, /\$\{enabledInGroup\.length\}\/\$\{tools\.length\}/);
+  assert.doesNotMatch(js, /Enabled \$\{/);
   assert.match(js, /bindDetailsControl\(input, handleToolPermissionChange\)/);
   assert.match(js, /bindDetailsControl\(input, handleToolGroupPermissionChange\)/);
   assert.match(js, /<div class="tool-permission-list">\$\{rows\}<\/div>/);

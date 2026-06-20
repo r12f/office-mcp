@@ -36,9 +36,9 @@ test('Excel add-in uses product identity metadata and generated icon URLs', () =
   assert.match(manifest, /https:\/\/localhost:8765\/assets\/icon-80\.png/);
   assert.doesNotMatch(manifest, /DefaultValue="office-mcp(?: for Excel)?"/);
   assert.doesNotMatch(manifest, /DefaultValue="Open"/);
-  assert.match(html, /<title>Office MCP Control<\/title>/);
+  assert.match(html, /<title>MCP Control<\/title>/);
   assert.match(html, /<img class="product-mark" src="\/assets\/icon-32\.png" width="32" height="32" alt="" aria-hidden="true" \/>/);
-  assert.match(html, /<h1>Office MCP Control<\/h1>/);
+  assert.match(html, /<h1>MCP Control<\/h1>/);
 });
 
 test('Excel task pane uses common channel and registers Excel runtime metadata', () => {
@@ -61,7 +61,12 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(html, /class="tools-panel"/);
   assert.match(html, /<span>Tools<\/span>/);
   assert.match(html, /id="toolList"/);
-  assert.match(html, /Enabled 0 of 0/);
+  assert.match(html, /0\/0/);
+  assert.doesNotMatch(html, /Enabled \d+ of \d+/);
+  assert.match(html, /id="toolModeControl" class="tool-mode-control" role="radiogroup" aria-label="Tool capability mode"/);
+  assert.match(html, /data-tool-mode="read"/);
+  assert.match(html, /data-tool-mode="write"/);
+  assert.match(html, /data-tool-mode="all"/);
   assert.doesNotMatch(html, /Tool Permissions/);
   assert.doesNotMatch(html, /id="toolPermissionList"/);
   assert.doesNotMatch(html, /id="enabledToolCount"/);
@@ -107,15 +112,21 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /\['excel\.create_pivot_table', \{ category: 'PivotTable', sideEffect: 'mutating'/);
   assert.match(js, /\['excel\.update_pivot_table', \{ category: 'PivotTable', sideEffect: 'destructive'/);
   assert.match(js, /TOOL_PERMISSION_STORAGE_KEY/);
+  assert.match(js, /TOOL_PERMISSION_MODE_STORAGE_KEY/);
   assert.match(js, /const toolListEl = document\.getElementById\('toolList'\)/);
+  assert.match(js, /const toolModeControlEl = document\.getElementById\('toolModeControl'\)/);
   assert.match(js, /function renderToolSummary\(\)/);
-  assert.match(js, /toolCountEl\.textContent = `Enabled \$\{effective\.length\} of \$\{AVAILABLE_TOOLS\.length\}`/);
-  assert.match(js, /Enabled \$\{enabledInGroup\.length\} of \$\{tools\.length\}/);
+  assert.match(js, /toolCountEl\.textContent = `\$\{effective\.length\}\/\$\{AVAILABLE_TOOLS\.length\}`/);
+  assert.match(js, /\$\{enabledInGroup\.length\}\/\$\{tools\.length\}/);
+  assert.doesNotMatch(js, /Enabled \$\{/);
+  assert.match(js, /function isToolAllowedByMode\(tool\)/);
+  assert.match(js, /function handleToolModeChange\(event\)/);
   assert.match(js, /renderToolSummary\(\)/);
   assert.match(js, /function toolControlMarkup\(tool\)/);
   assert.doesNotMatch(js, /function renderToolPermissions\(\)/);
   assert.doesNotMatch(js, /toolPermissionListEl/);
   assert.match(js, /function effectiveTools\(\)/);
+  assert.match(js, /return AVAILABLE_TOOLS\.filter\(\(tool\) => isToolSupported\(tool\) && isToolEnabled\(tool\) && isToolAllowedByMode\(tool\)\)/);
   assert.match(js, /available_tools: effectiveTools\(\)/);
   assert.match(js, /sessionUpdatedNotification\(\{/);
   assert.match(js, /patch: \{ available_tools: effectiveTools\(\) \}/);

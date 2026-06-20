@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#F7F8FA" />
-    <title>Office MCP Control</title>
+    <title>MCP Control</title>
     <link rel="stylesheet" href="/common/taskpane.css?v=0.1.4" />
     <link rel="stylesheet" href="/powerpoint/taskpane.css?v=0.1.4" />
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -24,7 +24,7 @@
             <img class="product-mark" src="/assets/icon-32.png" width="32" height="32" alt="" aria-hidden="true" />
             <div class="identity-copy">
               <span id="connectionBadge" class="status-badge status-neutral" aria-live="polite">Connecting&hellip;</span>
-              <h1>Office MCP Control</h1>
+              <h1>MCP Control</h1>
             </div>
           </div>
         </header>
@@ -41,6 +41,7 @@
           <dd>
             <form id="settingsForm" class="daemon-endpoint-form" novalidate>
               <input id="endpointInput" class="daemon-endpoint-input" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Daemon endpoint" placeholder="wss://localhost:8765/addin" />
+              <code id="daemon" class="sr-only">-</code>
               <button id="saveEndpoint" class="icon-button reconnect-button" type="submit" aria-label="Reconnect daemon" title="Reconnect daemon">
                 <svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                   <path d="M20 12a8 8 0 1 1-2.35-5.65" />
@@ -49,7 +50,6 @@
               </button>
             </form>
             <p id="endpointError" class="field-error" role="alert"></p>
-            <button type="button" class="metadata-copy" data-copy-target="daemon" aria-label="Copy daemon endpoint" title="Copy daemon endpoint"><code id="daemon">-</code></button>
           </dd>
           <dt>Runtime</dt>
           <dd id="runtimeVersions"><span id="serverVersion">Server Unknown</span> / <span id="protocolVersion">Protocol 1.0</span></dd>
@@ -66,8 +66,13 @@
         <details class="tools-panel">
           <summary>
             <span>Tools</span>
-            <span id="toolCount" class="meta-pill">Enabled 0 of 25</span>
+            <span id="toolCount" class="meta-pill">0/25</span>
           </summary>
+          <div id="toolModeControl" class="tool-mode-control" role="radiogroup" aria-label="Tool capability mode">
+            <button type="button" class="tool-mode-button" role="radio" aria-checked="false" data-tool-mode="read">Read</button>
+            <button type="button" class="tool-mode-button" role="radio" aria-checked="false" data-tool-mode="write">Write</button>
+            <button type="button" class="tool-mode-button" role="radio" aria-checked="true" data-tool-mode="all">All</button>
+          </div>
           <div id="toolList" class="tool-list" aria-label="PowerPoint tool controls"></div>
         </details>
       </section>

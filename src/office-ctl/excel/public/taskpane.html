@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#F7F8FA" />
-    <title>Office MCP Control</title>
+    <title>MCP Control</title>
     <link rel="stylesheet" href="/common/taskpane.css?v=0.1.11" />
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script defer src="/common/browser-ui.js?v=0.1.11"></script>
@@ -23,7 +23,7 @@
             <img class="product-mark" src="/assets/icon-32.png" width="32" height="32" alt="" aria-hidden="true" />
             <div class="identity-copy">
               <span id="connectionBadge" class="status-badge status-neutral" aria-live="polite">Connecting…</span>
-              <h1>Office MCP Control</h1>
+              <h1>MCP Control</h1>
             </div>
           </div>
         </header>
@@ -67,8 +67,13 @@
         <details class="tools-panel">
           <summary>
             <span>Tools</span>
-            <span id="toolCount" class="meta-pill">Enabled 0 of 0</span>
+            <span id="toolCount" class="meta-pill">0/0</span>
           </summary>
+          <div id="toolModeControl" class="tool-mode-control" role="radiogroup" aria-label="Tool capability mode">
+            <button type="button" class="tool-mode-button" role="radio" aria-checked="false" data-tool-mode="read">Read</button>
+            <button type="button" class="tool-mode-button" role="radio" aria-checked="false" data-tool-mode="write">Write</button>
+            <button type="button" class="tool-mode-button" role="radio" aria-checked="true" data-tool-mode="all">All</button>
+          </div>
           <div id="toolList" class="tool-list" aria-label="Excel tool controls"></div>
         </details>
 
