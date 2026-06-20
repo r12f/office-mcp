@@ -423,8 +423,9 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /function Try-OpenPatchedDriverDocument/);
   assert.match(script, /Try-OpenExcelPatchedDriverWorkbook -Application \$Application -Path \$Path -Deadline \$Deadline/);
   assert.match(script, /Try-OpenPatchedDriverDocument -Application \$app -HostKey \$hostKey -Path \$DocumentPath -Deadline \$deadline/);
+  assert.match(script, /word patched driver document unavailable/);
   assert.match(script, /powerpoint patched driver presentation unavailable/);
-  assert.match(script, /\$hostKey -in @\("excel", "powerpoint"\)/);
+  assert.match(script, /\$hostKey -in @\("word", "excel", "powerpoint"\)/);
   assert.match(script, /\$hostKey patched driver document control panel did not open; skipping official sideload fallback to avoid duplicate \$hostKey windows/);
   assert.match(script, /patched driver document did not open Office MCP Control/);
   assert.doesNotMatch(script, /excel patched driver workbook control panel did not open; skipping official sideload fallback to avoid duplicate Excel windows/);

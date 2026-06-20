@@ -500,6 +500,14 @@ function Try-OpenPatchedDriverDocument {
   if ($HostKey -eq "excel") {
     return Try-OpenExcelPatchedDriverWorkbook -Application $Application -Path $Path -Deadline $Deadline
   }
+  if ($HostKey -eq "word") {
+    try {
+      return Wait-ForDriverDocument -Application $Application -HostKey $HostKey -Path $Path -Deadline $Deadline
+    } catch {
+      Write-ActivatorLog "word patched driver document unavailable path=$Path error=$($_.Exception.Message)"
+      return $null
+    }
+  }
   if ($HostKey -eq "powerpoint") {
     try {
       return Wait-ForDriverDocument -Application $Application -HostKey $HostKey -Path $Path -Deadline $Deadline
@@ -1236,7 +1244,7 @@ if ($registered) {
   }
 }
 
-if ($hostKey -in @("excel", "powerpoint")) {
+if ($hostKey -in @("word", "excel", "powerpoint")) {
   $patchedDriverWindowHandle = Try-OpenPatchedDriverDocument -Application $app -HostKey $hostKey -Path $DocumentPath -Deadline $deadline
   if ($patchedDriverWindowHandle) {
     Write-ActivatorLog "$hostKey patched driver document active; attempting to open control panel document=$DocumentPath"
