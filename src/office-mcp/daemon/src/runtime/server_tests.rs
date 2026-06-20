@@ -338,8 +338,7 @@ fn real_tls_websocket_forwards_mcp_tool_call_and_returns_response() {
         )
     });
 
-    let invoke = read_server_ws_text(&mut stream);
-    let invoke: serde_json::Value = serde_json::from_str(&invoke).expect("invoke json");
+    let invoke = read_server_ws_tool_invoke(&mut stream);
     assert_eq!(invoke["method"], "tool.invoke");
     assert_eq!(invoke["params"]["session_id"], "session-1");
     let request_id = invoke["id"].as_str().expect("request id").to_string();
@@ -694,6 +693,26 @@ fn read_server_ws_text(stream: &mut impl Read) -> String {
     let mut payload = vec![0_u8; length];
     stream.read_exact(&mut payload).expect("read frame payload");
     String::from_utf8(payload).expect("text utf8")
+}
+
+fn read_server_ws_tool_invoke(stream: &mut (impl Read + Write)) -> serde_json::Value {
+    for _ in 0..8 {
+        let message = read_server_ws_text(stream);
+        let value: serde_json::Value = serde_json::from_str(&message).expect("websocket json");
+        if value["method"] == "tool.invoke" {
+            return value;
+        }
+        if value["method"] == "ping" {
+            let ping_id = value["id"].as_str().expect("ping id");
+            write_client_ws_text(
+                stream,
+                &format!(r#"{{"jsonrpc":"2.0","id":"{ping_id}","result":{{}}}}"#),
+            );
+            continue;
+        }
+        panic!("unexpected websocket message before tool.invoke: {value}");
+    }
+    panic!("tool.invoke was not received before heartbeat guard limit");
 }
 
 fn masked_text_frame(text: &str) -> Vec<u8> {
