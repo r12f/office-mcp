@@ -226,6 +226,20 @@ test('PowerPoint runtime evidence harness proves session, tools, mutation, and h
   }
 });
 
+test('UI browser smoke follows the current inline task pane settings contract', () => {
+  const source = readFileSync(evidencePath('ui-browser-smoke.ts'), 'utf8');
+
+  assert.match(source, /\.daemon-endpoint-form/);
+  assert.match(source, /#saveEndpoint/);
+  assert.match(source, /#endpointInput/);
+  assert.match(source, /#endpointError/);
+  assert.match(source, /requestSubmit\(\)/);
+  assert.doesNotMatch(source, /#settingsToggle/);
+  assert.doesNotMatch(source, /#settingsPanel/);
+  assert.doesNotMatch(source, /is-editing-tools/);
+  assert.doesNotMatch(source, /textContent\.includes\("Enabled"\)/);
+});
+
 test('add-in communication specs stay metadata-only at the local boundary', () => {
   const specPaths = [
     '../../../../doc/spec/02-registration-protocol.md',
