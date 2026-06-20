@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+
+const DEFAULT_REAL_OFFICE_E2E_DRIVER = fileURLToPath(new URL('./real-office-e2e-driver.mjs', import.meta.url));
 
 export function advertisedTools(addinRoot) {
   const source = readFileSync(join(addinRoot, 'public', 'taskpane.js'), 'utf8');
@@ -59,10 +62,11 @@ export async function runOfficeToolE2e({ host, cases, driver }) {
     assertSessionCaseCoverage({ host, session, cases });
 
     for (const toolCase of orderedCases(cases, session.availableTools)) {
-      await driver.resetContent(toolCase, session, { host, daemon, document });
-      await driver.setupContent(toolCase, session, { host, daemon, document });
-      const result = await driver.callTool(toolCase, session, { host, daemon, document });
-      await driver.verifyResult(toolCase, result, session, { host, daemon, document });
+      const run = e2eRunMetadata(toolCase);
+      await driver.resetContent(toolCase, session, { host, daemon, document, run });
+      await driver.setupContent(toolCase, session, { host, daemon, document, run });
+      const result = await driver.callTool(toolCase, session, { host, daemon, document, run });
+      await driver.verifyResult(toolCase, result, session, { host, daemon, document, run });
     }
   } finally {
     if (document && typeof driver.cleanupDocument === 'function') {
@@ -75,11 +79,7 @@ export async function runOfficeToolE2e({ host, cases, driver }) {
 }
 
 export function requireRealOfficeE2eDriver(host) {
-  const script = process.env.OFFICE_MCP_E2E_DRIVER;
-  assert.ok(
-    script,
-    `${host} real Office E2E driver requires OFFICE_MCP_E2E_DRIVER; unset OFFICE_MCP_RUN_E2E or provide a host automation driver.`
-  );
+  const script = process.env.OFFICE_MCP_E2E_DRIVER || DEFAULT_REAL_OFFICE_E2E_DRIVER;
   return createExternalOfficeE2eDriver(host, script);
 }
 
@@ -99,6 +99,15 @@ function assertSessionCaseCoverage({ host, session, cases }) {
 
 function orderedCases(cases, availableTools) {
   return availableTools.map((tool) => cases[tool]);
+}
+
+function e2eRunMetadata(toolCase) {
+  return {
+    id: toolCase.tool,
+    tool: toolCase.tool,
+    requestId: `e2e-${toolCase.tool.replace(/[^a-z0-9]+/gi, '-')}-${Date.now()}`,
+    verify: toolCase.verify?.kind || 'readback'
+  };
 }
 
 function createExternalOfficeE2eDriver(host, script) {

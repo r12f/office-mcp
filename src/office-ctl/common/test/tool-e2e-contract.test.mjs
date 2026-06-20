@@ -64,6 +64,44 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
   ]);
 });
 
+test('shared Office tool E2E loop records per-tool run metadata without body text', async () => {
+  const records = [];
+  const driver = {
+    async startDaemon() {},
+    async createDocument() {
+      return {};
+    },
+    async waitForSession() {
+      return { sessionId: 'session-1', availableTools: ['word.read'] };
+    },
+    async resetContent(toolCase, _session, context) {
+      records.push({ phase: 'reset', tool: toolCase.tool, run: context.run.id, hasSetupBody: Object.hasOwn(context.run, 'setup') });
+    },
+    async setupContent(toolCase, _session, context) {
+      records.push({ phase: 'setup', tool: toolCase.tool, run: context.run.id, hasSetupBody: Object.hasOwn(context.run, 'setup') });
+    },
+    async callTool(toolCase, _session, context) {
+      records.push({ phase: 'call', tool: toolCase.tool, run: context.run.id, requestId: context.run.requestId });
+      return { ok: true };
+    },
+    async verifyResult(toolCase, _result, _session, context) {
+      records.push({ phase: 'verify', tool: toolCase.tool, run: context.run.id, requestId: context.run.requestId });
+    }
+  };
+
+  await runOfficeToolE2e({
+    host: 'Word',
+    cases: { 'word.read': e2eCase('word.read', { setup: 'secret body text', verify: 'direct-result' }) },
+    driver
+  });
+
+  assert.deepEqual(records.map((record) => record.phase), ['reset', 'setup', 'call', 'verify']);
+  assert.ok(records.every((record) => record.tool === 'word.read'));
+  assert.ok(records.every((record) => record.run === 'word.read'));
+  assert.ok(records.every((record) => record.hasSetupBody !== true));
+  assert.match(records.find((record) => record.phase === 'call').requestId, /^e2e-word-read-/);
+});
+
 test('shared Office tool E2E loop fails when session tools and case table differ', async () => {
   const driver = {
     async startDaemon() {},
