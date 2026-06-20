@@ -75,6 +75,35 @@ fn ui_state_uses_origin_guard_and_snapshot_service() {
 }
 
 #[test]
+fn addin_diagnostics_accepts_local_events_and_rejects_foreign_origins() {
+    let mut allowed = request(
+        HttpMethod::Post,
+        "/addin/diagnostics",
+        BTreeMap::from([("origin".to_string(), "https://localhost:8765".to_string())]),
+    );
+    allowed.body = br#"{"host_app":"word","event":"websocket.error"}"#.to_vec();
+
+    let response = route(allowed);
+
+    assert_eq!(response.status, 200);
+    assert!(response_text(&response).contains("{\"ok\":true}"));
+
+    let forbidden = route(request(
+        HttpMethod::Post,
+        "/addin/diagnostics",
+        BTreeMap::from([("origin".to_string(), "https://evil.example".to_string())]),
+    ));
+    assert_eq!(forbidden.status, 403);
+
+    let method_not_allowed = route(request(
+        HttpMethod::Get,
+        "/addin/diagnostics",
+        BTreeMap::new(),
+    ));
+    assert_eq!(method_not_allowed.status, 405);
+}
+
+#[test]
 fn non_get_requests_outside_addin_upgrade_are_rejected() {
     let response = route(request(HttpMethod::Post, "/taskpane.html", BTreeMap::new()));
 

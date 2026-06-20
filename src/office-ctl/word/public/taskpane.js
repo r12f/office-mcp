@@ -1,5 +1,5 @@
 (() => {
-  const ADDIN_VERSION = '0.1.13';
+  const ADDIN_VERSION = '0.1.18';
   const PROTOCOL_VERSION = '1.0';
   const {
     boolLabel,
@@ -42,6 +42,7 @@
     renderRuntimeVersions,
     setCopyableMetadata
   } = window.OfficeCtlMainUi;
+  const CONNECT_TIMEOUT_MS = 8000;
   const AVAILABLE_TOOLS = [
     'word.get_text',
     'word.get_outline',
@@ -106,6 +107,8 @@
     ['word.save', { category: 'Document', sideEffect: 'mutating', description: 'Save the current document.' }]
   ]);
   let socket;
+  let connectGeneration = 0;
+  let connectTimeoutTimer;
   const { instanceId, sessionId } = runtimeIds();
   const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.word.tool-permissions.${sessionId}`;
   let documentInfo = null;
@@ -117,6 +120,20 @@
   let sessionAnnounced = false;
   const logger = new AddinLogger({ redactText });
   const taskStore = new TaskHistoryStore({ redactText });
+
+  window.addEventListener('error', (event) => {
+    recordDiagnostic('runtime.error', {
+      message: event.message,
+      source: event.filename,
+      line: event.lineno,
+      column: event.colno
+    });
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    recordDiagnostic('runtime.unhandled_rejection', {
+      message: event.reason?.message || String(event.reason || '')
+    });
+  });
 
   const connectionBadgeEl = document.getElementById('connectionBadge');
   const sessionEl = document.getElementById('session');
@@ -153,8 +170,15 @@
   endpointInputEl.value = configuredEndpoint();
   renderStaticState();
   window.__OFFICE_MCP_TASKPANE_READY__ = true;
+  recordDiagnostic('taskpane.ready', { endpoint: configuredEndpoint() });
 
   whenOfficeReady(async (info) => {
+    recordDiagnostic('office.ready', {
+      host: info?.host,
+      platform: Office.context?.platform,
+      diagnosticsHost: Office.context?.diagnostics?.host,
+      diagnosticsVersion: Office.context?.diagnostics?.version
+    });
     if (!isWordHost(info)) {
       setStatus('Unsupported host');
       return;
@@ -186,23 +210,66 @@
 
   function connect() {
     clearTimeout(reconnectTimer);
+    clearTimeout(connectTimeoutTimer);
+    const generation = ++connectGeneration;
     const endpoint = configuredEndpoint();
+    recordDiagnostic('websocket.connecting', { endpoint, generation });
     setCopyableMetadata(daemonEl, endpoint);
     endpointInputEl.value = endpoint;
     endpointDirty = false;
     setConnectionState('connecting', 'Connecting…');
-    socket = new WebSocket(endpoint);
-    socket.addEventListener('open', () => register());
-    socket.addEventListener('message', (event) => handleMessage(event.data));
-    socket.addEventListener('close', () => {
-      logger.warn('websocket.closed');
+    let failureHandled = false;
+    const handleConnectionFailure = (message) => {
+      if (failureHandled || generation !== connectGeneration) return;
+      failureHandled = true;
+      clearTimeout(connectTimeoutTimer);
+      connectionDetailEl.textContent = message;
+      setConnectionState('failed', 'Failed');
+      scheduleReconnect();
+    };
+    try {
+      socket = new WebSocket(endpoint);
+    } catch (error) {
+      logger.error('websocket.create.failed', error);
+      recordDiagnostic('websocket.create_failed', { endpoint, message: error.message });
       if (tryCurrentOriginEndpointFallback(endpoint)) return;
+      handleConnectionFailure(error.message || 'Connection failed before the daemon socket could open.');
+      return;
+    }
+    connectTimeoutTimer = setTimeout(() => {
+      logger.warn('websocket.open.timeout', { endpoint, timeoutMs: CONNECT_TIMEOUT_MS });
+      recordDiagnostic('websocket.open_timeout', { endpoint, timeoutMs: CONNECT_TIMEOUT_MS });
+      try {
+        socket?.close(1000, 'Open timeout');
+      } catch {
+        // Nothing else can be recovered from a socket that never opened.
+      }
+      handleConnectionFailure('Connection timed out before the daemon socket opened. Check the daemon log and Office WebView runtime.');
+    }, CONNECT_TIMEOUT_MS);
+    socket.addEventListener('open', () => {
+      if (generation !== connectGeneration) return;
+      clearTimeout(connectTimeoutTimer);
+      recordDiagnostic('websocket.open', { endpoint, generation });
+      register();
+    });
+    socket.addEventListener('message', (event) => handleMessage(event.data));
+    socket.addEventListener('close', (event) => {
+      if (generation !== connectGeneration) return;
+      clearTimeout(connectTimeoutTimer);
+      logger.warn('websocket.closed', { code: event.code, reason: event.reason, wasClean: event.wasClean });
+      recordDiagnostic('websocket.closed', { endpoint, code: event.code, reason: event.reason, wasClean: event.wasClean });
+      if (tryCurrentOriginEndpointFallback(endpoint)) return;
+      if (!sessionAnnounced) {
+        handleConnectionFailure('Connection closed before the document registered with the daemon.');
+        return;
+      }
       scheduleReconnect();
     });
     socket.addEventListener('error', () => {
+      if (generation !== connectGeneration) return;
+      recordDiagnostic('websocket.error', { endpoint });
       if (tryCurrentOriginEndpointFallback(endpoint)) return;
-      connectionDetailEl.textContent = 'Connection failed. Check that the local daemon is running and the endpoint uses wss://localhost.';
-      setConnectionState('failed', 'Failed');
+      handleConnectionFailure('Connection failed. Check that the local daemon is running and the endpoint uses wss://localhost.');
     });
   }
 
@@ -1427,6 +1494,26 @@
     sendJsonRpc(socket, message);
   }
 
+  function recordDiagnostic(event, fields = {}) {
+    try {
+      const payload = {
+        host_app: 'word',
+        addin_version: ADDIN_VERSION,
+        event: String(event || '').slice(0, 120),
+        fields: logger.redactFields ? logger.redactFields(fields) : fields,
+        at: new Date().toISOString()
+      };
+      fetch('/addin/diagnostics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch(() => {});
+    } catch {
+      // Diagnostics must never break the task pane runtime.
+    }
+  }
+
   function scheduleReconnect() {
     reconnectAttempt += 1;
     const delay = reconnectDelay(reconnectAttempt);
@@ -1441,6 +1528,10 @@
     connectionBadgeEl.className = `status-badge ${statusClass(state)}`;
     if (state === 'connected') connectionDetailEl.textContent = 'None';
     announce(label);
+  }
+
+  function announce(message) {
+    if (announcerEl) announcerEl.textContent = message;
   }
 
   function setStatus(label) {

@@ -35,6 +35,9 @@ impl AddinHttpService {
         if request.path == "/healthz" && request.method == HttpMethod::Get {
             return WireHttpResponse::json(200, BTreeMap::new(), "{\"ok\":true}".to_string());
         }
+        if request.path == "/addin/diagnostics" {
+            return self.route_addin_diagnostics(request);
+        }
         if request.path == "/addin" {
             return self.route_websocket_upgrade(request);
         }
@@ -47,6 +50,27 @@ impl AddinHttpService {
             return WireHttpResponse::text(405, "Method not allowed".to_string());
         }
         self.assets.serve_addin_asset(&request.path)
+    }
+
+    fn route_addin_diagnostics(&self, request: &WireHttpRequest) -> WireHttpResponse {
+        if request.method != HttpMethod::Post {
+            return WireHttpResponse::text(405, "Method not allowed".to_string());
+        }
+        if request
+            .headers
+            .get("origin")
+            .is_some_and(|origin| origin != &self.addin_origin)
+        {
+            return WireHttpResponse::text(403, "Forbidden origin".to_string());
+        }
+        let body = String::from_utf8_lossy(&request.body);
+        let clipped = body.chars().take(2000).collect::<String>();
+        tracing::info!(
+            component = "addin_diagnostics",
+            body = %clipped,
+            "received add-in diagnostic event"
+        );
+        WireHttpResponse::json(200, BTreeMap::new(), "{\"ok\":true}".to_string())
     }
 
     #[must_use]

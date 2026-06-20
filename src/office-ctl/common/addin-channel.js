@@ -13,7 +13,21 @@
   function configuredEndpoint(options = {}) {
     const storage = options.storage || global.localStorage;
     const locationLike = options.location || global.location;
-    return storage?.getItem(ENDPOINT_STORAGE_KEY) || defaultEndpoint(locationLike);
+    const fallback = defaultEndpoint(locationLike);
+    const stored = storage?.getItem(ENDPOINT_STORAGE_KEY);
+    if (!stored) return fallback;
+    try {
+      const parsed = validateEndpoint(stored);
+      const fallbackOrigin = new URL(fallback).origin;
+      if (parsed.origin !== fallbackOrigin) {
+        storage?.removeItem(ENDPOINT_STORAGE_KEY);
+        return fallback;
+      }
+      return String(stored).trim();
+    } catch {
+      storage?.removeItem(ENDPOINT_STORAGE_KEY);
+      return fallback;
+    }
   }
 
   function currentOriginEndpoint(options = {}) {

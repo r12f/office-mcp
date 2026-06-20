@@ -49,13 +49,29 @@ test('common add-in channel manages endpoint configuration', () => {
   const channel = loadChannel({ localStorage });
 
   assert.equal(channel.configuredEndpoint(), 'wss://localhost:8765/addin');
-  assert.equal(channel.saveEndpointOverride('wss://localhost:9443/addin'), 'wss://localhost:9443/addin');
-  assert.equal(channel.configuredEndpoint(), 'wss://localhost:9443/addin');
+  assert.equal(channel.saveEndpointOverride('wss://localhost:8765/custom-addin'), 'wss://localhost:8765/custom-addin');
+  assert.equal(channel.configuredEndpoint(), 'wss://localhost:8765/custom-addin');
   assert.equal(channel.currentOriginEndpoint(), 'wss://localhost:8765/addin');
   assert.equal(channel.clearEndpointOverride(), 'wss://localhost:8765/addin');
   assert.equal(channel.configuredEndpoint(), 'wss://localhost:8765/addin');
   assert.throws(() => channel.validateEndpoint('https://localhost:8765/addin'), /wss:\/\/localhost/);
   assert.throws(() => channel.validateEndpoint('wss://example.invalid/addin'), /wss:\/\/localhost/);
+});
+
+test('common add-in channel clears stale invalid endpoint overrides', () => {
+  const localStorage = storage({ 'office-mcp.addin-endpoint': 'https://localhost:8765/addin' });
+  const channel = loadChannel({ localStorage });
+
+  assert.equal(channel.configuredEndpoint(), 'wss://localhost:8765/addin');
+  assert.equal(localStorage.getItem('office-mcp.addin-endpoint'), null);
+});
+
+test('common add-in channel clears endpoint overrides from a stale manifest origin', () => {
+  const localStorage = storage({ 'office-mcp.addin-endpoint': 'wss://localhost:8766/addin' });
+  const channel = loadChannel({ localStorage, location: { origin: 'https://localhost:8765' } });
+
+  assert.equal(channel.configuredEndpoint(), 'wss://localhost:8765/addin');
+  assert.equal(localStorage.getItem('office-mcp.addin-endpoint'), null);
 });
 
 test('common add-in channel derives fallback endpoint from the manifest origin', () => {
