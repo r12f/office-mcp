@@ -2,8 +2,8 @@ import test from 'node:test';
 import {
   assertE2eCaseCoverage,
   e2eCase,
-  realOfficeE2eEnabled,
-  requireRealOfficeE2eDriver,
+  officeE2eEnabled,
+  requireOfficeE2eDriver,
   runOfficeToolE2e
 } from '../../common/test/tool-e2e-contract.mjs';
 
@@ -41,10 +41,10 @@ test('Word E2E case table covers every advertised tool', () => {
   assertE2eCaseCoverage({ addinRoot: ADDIN_ROOT, host: 'Word', cases: WORD_E2E_CASES });
 });
 
-test('Word real Office E2E driver', { skip: !realOfficeE2eEnabled() }, async () => {
+test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
   await runOfficeToolE2e({
     host: 'Word',
     cases: WORD_E2E_CASES,
-    driver: requireRealOfficeE2eDriver('Word')
+    driver: requireOfficeE2eDriver('Word')
   });
 });

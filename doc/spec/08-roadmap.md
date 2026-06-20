@@ -1230,13 +1230,19 @@ channel, and MCP `tools/call` dispatch.
       Each host harness creates a fresh empty workbook/presentation, waits for
       the corresponding add-in session, runs all advertised tools for that host,
       and closes/deletes the test file at the end.
-- [ ] Convert the real Office E2E driver from step-local automation to a
+- [ ] Keep each host E2E run to one Office application/document lifecycle by
+      default: open the host program and driver-owned test file once, connect
+      one add-in session, loop over every advertised tool in that session, then
+      close and delete the test file once during cleanup. Per-tool Office
+      process restarts are allowed only as an explicit diagnostic fallback, not
+      as the normal gate.
+- [ ] Convert the Office E2E driver from step-local automation to a
       lifecycle-safe driver that can keep the driver-owned Word, Excel, and
       PowerPoint files open long enough for the add-in to connect. The driver
       must preserve state across daemon startup, document creation, session
       waiting, tool calls, readback verification, and cleanup without closing or
       modifying any pre-existing user Office windows.
-- [ ] Add PowerPoint-specific real Office automation support that uses a visible
+- [ ] Add PowerPoint-specific Office automation support that uses a visible
       window path when COM rejects hidden PowerPoint automation. The test must
       prove cleanup closes only the presentation created by the E2E driver.
 - [ ] Fill every host tool table with one real case per advertised tool. Each
@@ -1248,7 +1254,7 @@ channel, and MCP `tools/call` dispatch.
       not duplicate boilerplate: Word document text/paragraph/table/content
       control/comment state, Excel workbook/sheet/range/table/chart/pivot state,
       and PowerPoint presentation/slide/shape/text/table/chart state.
-- [ ] Make exact advertised-tool coverage part of the real Office gate, not only
+- [ ] Make exact advertised-tool coverage part of the Office E2E gate, not only
       the synthetic driver contract. A host-specific `npm run e2e:tools` command
       must fail when `tools/list` or session `available_tools` exposes a tool
       without a real setup/action/verifier row.
@@ -1274,7 +1280,7 @@ channel, and MCP `tools/call` dispatch.
 Current implementation evidence: `src/office-ctl/common/test/tool-e2e-contract.mjs`
 owns the shared table-driven loop and exact coverage checks; Word, Excel, and
 PowerPoint each provide host case tables. The shared loop contract is covered by
-`src/office-ctl/common/test/tool-e2e-contract.test.mjs`. The real Office host
+`src/office-ctl/common/test/tool-e2e-contract.test.mjs`. The Office host
 automation driver now provides daemon startup, Word/Excel COM document creation
 and cleanup, MCP `tools/call`, and explicit session waiting through the
 `OFFICE_MCP_E2E_DRIVER` JSON step protocol. Add-in activation and full live

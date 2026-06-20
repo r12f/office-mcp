@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,9 +39,29 @@ async function dispatch({ host, step, context = {} }) {
       return cleanupDocument(context);
     case 'stopDaemon':
       return stopDaemon(context);
+    case 'describeDocumentLifecycle':
+      return describeDocumentLifecycle(host, context);
     default:
-      throw new Error(`Unsupported real Office E2E driver step: ${step}`);
+      throw new Error(`Unsupported Office E2E driver step: ${step}`);
   }
+}
+
+function describeDocumentLifecycle(host, context) {
+  const normalizedHost = normalizeHost(host);
+  const workDir = resolve(context.workDir || process.env.OFFICE_MCP_E2E_WORK_DIR || tmpdir());
+  const extension = normalizedHost === 'word' ? 'docx' : normalizedHost === 'excel' ? 'xlsx' : 'pptx';
+  const path = resolve(workDir, `office-mcp-e2e-${normalizedHost}-fixture.${extension}`);
+  const closePath = `${path}.office-mcp-close`;
+  const readyPath = `${path}.office-mcp-ready`;
+  const errorPath = `${path}.office-mcp-error`;
+  return {
+    host,
+    path,
+    createdByDriver: true,
+    officeWindowMode: officeWindowMode(normalizedHost),
+    keeper: { closePath, readyPath, errorPath, scriptPath: `${path}.office-mcp-keeper.ps1` },
+    script: officeKeeperScript(normalizedHost, path, closePath, readyPath, errorPath)
+  };
 }
 
 async function startDaemon(context) {
@@ -95,19 +115,54 @@ async function createDocument(host, context) {
   mkdirSync(workDir, { recursive: true });
   const extension = normalizedHost === 'word' ? 'docx' : normalizedHost === 'excel' ? 'xlsx' : 'pptx';
   const path = resolve(workDir, `office-mcp-e2e-${normalizedHost}-${Date.now()}.${extension}`);
-  runPowerShell(documentCreateScript(normalizedHost, path));
-  return { host, path };
+  const keeper = startOfficeKeeper(normalizedHost, path);
+  await waitForFile(keeper.readyPath, Number(context.keeperTimeoutMs || 30000), keeper.errorPath);
+  return {
+    host,
+    path,
+    createdByDriver: true,
+    officeWindowMode: officeWindowMode(normalizedHost),
+    keeper
+  };
 }
 
-function documentCreateScript(host, path) {
-  const literal = psSingle(path);
+function startOfficeKeeper(host, path) {
+  const closePath = `${path}.office-mcp-close`;
+  const readyPath = `${path}.office-mcp-ready`;
+  const errorPath = `${path}.office-mcp-error`;
+  const scriptPath = `${path}.office-mcp-keeper.ps1`;
+  rmSync(closePath, { force: true });
+  rmSync(readyPath, { force: true });
+  rmSync(errorPath, { force: true });
+  rmSync(scriptPath, { force: true });
+  const script = officeKeeperScript(host, path, closePath, readyPath, errorPath);
+  writeFileSync(scriptPath, script, 'utf8');
+  const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: host !== 'powerpoint'
+  });
+  child.unref();
+  return { pid: child.pid, closePath, readyPath, errorPath, scriptPath };
+}
+
+function officeKeeperScript(host, path, closePath, readyPath, errorPath) {
+  const file = psSingle(path);
+  const close = psSingle(closePath);
+  const ready = psSingle(readyPath);
+  const error = psSingle(errorPath);
+  const commonFinally = `if ($null -ne $app) { try { $app.Quit() } catch {} }`;
   if (host === 'word') {
-    return `$ErrorActionPreference='Stop'; $app=New-Object -ComObject Word.Application; $app.Visible=$false; $doc=$app.Documents.Add(); $doc.Content.Text='office-mcp e2e baseline'; $doc.SaveAs2('${literal}'); $doc.Close($false); $app.Quit(); Write-Output '${literal}'`;
+    return `$ErrorActionPreference='Stop'; $app=$null; $doc=$null; try { $app=New-Object -ComObject Word.Application; $app.Visible=$false; $doc=$app.Documents.Add(); $doc.Content.Text='office-mcp e2e baseline'; $doc.SaveAs2('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null; while (-not (Test-Path -LiteralPath '${close}')) { Start-Sleep -Milliseconds 250 }; if ($null -ne $doc) { $doc.Close($false) } } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message } finally { ${commonFinally} }`;
   }
   if (host === 'excel') {
-    return `$ErrorActionPreference='Stop'; $app=New-Object -ComObject Excel.Application; $app.Visible=$false; $wb=$app.Workbooks.Add(); $ws=$wb.Worksheets.Item(1); $ws.Cells.Item(1,1).Value2='office-mcp e2e baseline'; $wb.SaveAs('${literal}'); $wb.Close($false); $app.Quit(); Write-Output '${literal}'`;
+    return `$ErrorActionPreference='Stop'; $app=$null; $wb=$null; try { $app=New-Object -ComObject Excel.Application; $app.Visible=$false; $app.DisplayAlerts=$false; $wb=$app.Workbooks.Add(); $ws=$wb.Worksheets.Item(1); $ws.Cells.Item(1,1).Value2='office-mcp e2e baseline'; $wb.SaveAs('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null; while (-not (Test-Path -LiteralPath '${close}')) { Start-Sleep -Milliseconds 250 }; if ($null -ne $wb) { $wb.Close($false) } } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message } finally { ${commonFinally} }`;
   }
-  return `$ErrorActionPreference='Stop'; $app=New-Object -ComObject PowerPoint.Application; $pres=$app.Presentations.Add($true); $slide=$pres.Slides.Add(1, 1); $slide.Shapes.Title.TextFrame.TextRange.Text='office-mcp e2e baseline'; $pres.SaveAs('${literal}'); $pres.Close(); $app.Quit(); Write-Output '${literal}'`;
+  return `$ErrorActionPreference='Stop'; $app=$null; $pres=$null; try { $app=New-Object -ComObject PowerPoint.Application; $pres=$app.Presentations.Add($true); $slide=$pres.Slides.Add(1, 1); $slide.Shapes.Title.TextFrame.TextRange.Text='office-mcp e2e baseline'; $pres.SaveAs('${file}'); New-Item -ItemType File -Path '${ready}' -Force | Out-Null; while (-not (Test-Path -LiteralPath '${close}')) { Start-Sleep -Milliseconds 250 }; if ($null -ne $pres) { $pres.Close() } } catch { Set-Content -LiteralPath '${error}' -Value $_.Exception.Message } finally { ${commonFinally} }`;
+}
+
+function officeWindowMode(host) {
+  return host === 'powerpoint' ? 'visible' : 'hidden';
 }
 
 async function waitForSession(host, context) {
@@ -161,9 +216,18 @@ async function verifyResult(context) {
 async function cleanupDocument(context) {
   const document = context.document || {};
   if (!document.path) return { deleted: false };
+  if (document.createdByDriver !== true || !document.keeper?.closePath) {
+    return { deleted: false, skipped: 'not-driver-owned' };
+  }
   const resolved = resolve(document.path);
+  writeFileSync(document.keeper.closePath, 'close');
+  await waitForProcessExit(document.keeper.pid, Number(context.timeoutMs || 30000));
   if (existsSync(resolved)) rmSync(resolved, { force: true });
-  return { deleted: !existsSync(resolved), path: resolved };
+  rmSync(document.keeper.closePath, { force: true });
+  if (document.keeper.readyPath) rmSync(document.keeper.readyPath, { force: true });
+  if (document.keeper.errorPath) rmSync(document.keeper.errorPath, { force: true });
+  if (document.keeper.scriptPath) rmSync(document.keeper.scriptPath, { force: true });
+  return { closedByDriver: true, deleted: !existsSync(resolved), path: resolved };
 }
 
 async function stopDaemon(context) {
@@ -243,6 +307,50 @@ function runPowerShell(command) {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe']
   });
+}
+
+async function waitForFile(path, timeoutMs, errorPath) {
+  const started = Date.now();
+  while (Date.now() - started <= timeoutMs) {
+    if (existsSync(path)) return;
+    if (errorPath && existsSync(errorPath)) {
+      throw new Error(`Office keeper failed before creating ${path}: ${readText(errorPath)}`);
+    }
+    await sleep(100);
+  }
+  throw new Error(`Timed out waiting ${timeoutMs} ms for ${path}.`);
+}
+
+function readText(path) {
+  try {
+    return execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `Get-Content -LiteralPath '${psSingle(path)}' -Raw`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim();
+  } catch {
+    return 'unknown keeper error';
+  }
+}
+
+async function waitForProcessExit(pid, timeoutMs) {
+  if (!pid) return;
+  const started = Date.now();
+  while (Date.now() - started <= timeoutMs) {
+    if (!processExists(pid)) return;
+    await sleep(100);
+  }
+  throw new Error(`Timed out waiting ${timeoutMs} ms for Office keeper process ${pid} to exit.`);
+}
+
+function processExists(pid) {
+  try {
+    execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `Get-Process -Id ${Number(pid)} -ErrorAction Stop | Out-Null`], {
+      stdio: 'ignore'
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function psSingle(value) {

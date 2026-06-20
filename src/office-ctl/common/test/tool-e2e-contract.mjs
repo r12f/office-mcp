@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
-const DEFAULT_REAL_OFFICE_E2E_DRIVER = fileURLToPath(new URL('./real-office-e2e-driver.mjs', import.meta.url));
+const DEFAULT_OFFICE_E2E_DRIVER = fileURLToPath(new URL('./office-e2e-driver.mjs', import.meta.url));
 
 export function advertisedTools(addinRoot) {
   const source = readFileSync(join(addinRoot, 'public', 'taskpane.js'), 'utf8');
@@ -37,7 +37,7 @@ export function e2eCase(tool, { setup = 'fixed baseline content', args = {}, ver
   };
 }
 
-export function realOfficeE2eEnabled() {
+export function officeE2eEnabled() {
   return process.env.OFFICE_MCP_RUN_E2E === '1';
 }
 
@@ -78,8 +78,8 @@ export async function runOfficeToolE2e({ host, cases, driver }) {
   }
 }
 
-export function requireRealOfficeE2eDriver(host) {
-  const script = process.env.OFFICE_MCP_E2E_DRIVER || DEFAULT_REAL_OFFICE_E2E_DRIVER;
+export function requireOfficeE2eDriver(host) {
+  const script = process.env.OFFICE_MCP_E2E_DRIVER || DEFAULT_OFFICE_E2E_DRIVER;
   return createExternalOfficeE2eDriver(host, script);
 }
 

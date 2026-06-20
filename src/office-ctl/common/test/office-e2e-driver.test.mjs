@@ -1,41 +1,93 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const DRIVER = fileURLToPath(new URL('./real-office-e2e-driver.mjs', import.meta.url));
+const DRIVER = fileURLToPath(new URL('./office-e2e-driver.mjs', import.meta.url));
+const RUN_OFFICE_COM = process.env.OFFICE_MCP_RUN_E2E === '1';
 
-test('real Office E2E driver creates and cleans up Word documents through COM', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-real-driver-word-'));
-  const create = runDriver({ host: 'Word', step: 'createDocument', context: { workDir: dir } });
+test('Office E2E driver describes a driver-owned Word lifecycle', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-word-'));
+  const create = runDriver({ host: 'Word', step: 'describeDocumentLifecycle', context: { workDir: dir } });
   assert.equal(create.status, 0, create.stderr);
   const document = JSON.parse(create.stdout);
   assert.match(document.path, /office-mcp-e2e-word-.*\.docx$/i);
   assert.equal(document.host, 'Word');
+  assert.equal(document.createdByDriver, true);
+  assert.equal(document.officeWindowMode, 'hidden');
+  assert.ok(document.keeper?.closePath, 'driver-owned close sentinel is required');
+  assert.match(document.script, /Documents\.Add\(\)/);
+  assert.match(document.script, /office-mcp-ready/);
+  assert.match(document.script, /office-mcp-close/);
+});
 
+test('Office E2E driver creates and cleans up Word documents through COM', { skip: !RUN_OFFICE_COM }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-word-com-'));
+  const create = runDriver({ host: 'Word', step: 'createDocument', context: { workDir: dir } });
+  assert.equal(create.status, 0, create.stderr);
+  const document = JSON.parse(create.stdout);
   const cleanup = runDriver({ host: 'Word', step: 'cleanupDocument', context: { document } });
   assert.equal(cleanup.status, 0, cleanup.stderr);
   assert.equal(JSON.parse(cleanup.stdout).deleted, true);
 });
 
-test('real Office E2E driver creates and cleans up Excel workbooks through COM', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-real-driver-excel-'));
-  const create = runDriver({ host: 'Excel', step: 'createDocument', context: { workDir: dir } });
+test('Office E2E driver describes a driver-owned Excel lifecycle', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-excel-'));
+  const create = runDriver({ host: 'Excel', step: 'describeDocumentLifecycle', context: { workDir: dir } });
   assert.equal(create.status, 0, create.stderr);
   const document = JSON.parse(create.stdout);
   assert.match(document.path, /office-mcp-e2e-excel-.*\.xlsx$/i);
   assert.equal(document.host, 'Excel');
+  assert.equal(document.createdByDriver, true);
+  assert.equal(document.officeWindowMode, 'hidden');
+  assert.ok(document.keeper?.closePath, 'driver-owned close sentinel is required');
+  assert.match(document.script, /Workbooks\.Add\(\)/);
+  assert.match(document.script, /office-mcp-ready/);
+  assert.match(document.script, /office-mcp-close/);
+});
 
+test('Office E2E driver creates and cleans up Excel workbooks through COM', { skip: !RUN_OFFICE_COM }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-excel-com-'));
+  const create = runDriver({ host: 'Excel', step: 'createDocument', context: { workDir: dir } });
+  assert.equal(create.status, 0, create.stderr);
+  const document = JSON.parse(create.stdout);
   const cleanup = runDriver({ host: 'Excel', step: 'cleanupDocument', context: { document } });
   assert.equal(cleanup.status, 0, cleanup.stderr);
   assert.equal(JSON.parse(cleanup.stdout).deleted, true);
 });
 
-test('real Office E2E driver callTool posts MCP requests through an injectable endpoint', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-real-driver-mcp-'));
+test('Office E2E driver describes a visible PowerPoint lifecycle', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-powerpoint-'));
+  const create = runDriver({ host: 'PowerPoint', step: 'describeDocumentLifecycle', context: { workDir: dir } });
+  assert.equal(create.status, 0, create.stderr);
+  const document = JSON.parse(create.stdout);
+  assert.match(document.path, /office-mcp-e2e-powerpoint-.*\.pptx$/i);
+  assert.equal(document.host, 'PowerPoint');
+  assert.equal(document.createdByDriver, true);
+  assert.equal(document.officeWindowMode, 'visible');
+  assert.ok(document.keeper?.closePath, 'driver-owned close sentinel is required');
+  assert.match(document.script, /Presentations\.Add\(\$true\)/);
+  assert.match(document.script, /office-mcp-ready/);
+  assert.match(document.script, /office-mcp-close/);
+});
+
+test('Office E2E driver uses a visible PowerPoint window and safe cleanup', { skip: !RUN_OFFICE_COM }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-powerpoint-com-'));
+  const create = runDriver({ host: 'PowerPoint', step: 'createDocument', context: { workDir: dir } });
+  assert.equal(create.status, 0, create.stderr);
+  const document = JSON.parse(create.stdout);
+  const cleanup = runDriver({ host: 'PowerPoint', step: 'cleanupDocument', context: { document } });
+  assert.equal(cleanup.status, 0, cleanup.stderr);
+  const result = JSON.parse(cleanup.stdout);
+  assert.equal(result.closedByDriver, true);
+  assert.equal(result.deleted, true);
+});
+
+test('Office E2E driver callTool posts MCP requests through an injectable endpoint', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-mcp-'));
   const logPath = join(dir, 'mcp-requests.jsonl');
   const serverPath = join(dir, 'mcp-server.mjs');
   writeFileSync(serverPath, `
@@ -86,8 +138,20 @@ server.listen(0, '127.0.0.1', () => {
   }
 });
 
-test('real Office E2E driver rejects add-in activation until a concrete activator is provided', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-real-driver-empty-session-'));
+test('Office E2E driver cleanup ignores documents it did not create', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-cleanup-'));
+  const path = join(dir, 'user-owned.docx');
+  writeFileSync(path, 'do not delete');
+  const cleanup = runDriver({ host: 'Word', step: 'cleanupDocument', context: { document: { path } } });
+  assert.equal(cleanup.status, 0, cleanup.stderr);
+  const result = JSON.parse(cleanup.stdout);
+  assert.equal(result.deleted, false);
+  assert.equal(result.skipped, 'not-driver-owned');
+  assert.equal(existsSync(path), true);
+});
+
+test('Office E2E driver rejects add-in activation until a concrete activator is provided', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-empty-session-'));
   const serverPath = join(dir, 'empty-session-server.mjs');
   writeFileSync(serverPath, `
 import { createServer } from 'node:http';
@@ -127,7 +191,7 @@ function runDriver(payload) {
   return spawnSync(process.execPath, [DRIVER], {
     input: JSON.stringify(payload),
     encoding: 'utf8',
-    timeout: 30000
+    timeout: 90000
   });
 }
 

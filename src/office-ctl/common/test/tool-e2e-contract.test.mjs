@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { e2eCase, requireRealOfficeE2eDriver, runOfficeToolE2e } from './tool-e2e-contract.mjs';
+import { e2eCase, requireOfficeE2eDriver, runOfficeToolE2e } from './tool-e2e-contract.mjs';
 
 test('shared Office tool E2E loop drives daemon, document, setup, calls, verification, and cleanup', async () => {
   const events = [];
@@ -62,6 +62,9 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
     'cleanupDocument:fixture.docx',
     'stopDaemon'
   ]);
+  assert.equal(events.filter((event) => event === 'createDocument').length, 1);
+  assert.equal(events.filter((event) => event.startsWith('waitForSession:')).length, 1);
+  assert.equal(events.filter((event) => event.startsWith('call:')).length, 2);
 });
 
 test('shared Office tool E2E loop records per-tool run metadata without body text', async () => {
@@ -206,7 +209,7 @@ process.stdout.write(JSON.stringify(responses[request.step] || {}));
     await runOfficeToolE2e({
       host: 'Word',
       cases: { 'word.read': e2eCase('word.read', { verify: 'direct-result' }) },
-      driver: requireRealOfficeE2eDriver('Word')
+      driver: requireOfficeE2eDriver('Word')
     });
   } finally {
     restoreEnv('OFFICE_MCP_RUN_E2E', previousRun);
@@ -243,7 +246,7 @@ process.exit(7);
   process.env.OFFICE_MCP_E2E_DRIVER = driverPath;
   try {
     await assert.rejects(
-      () => requireRealOfficeE2eDriver('Word').startDaemon({ host: 'Word' }),
+      () => requireOfficeE2eDriver('Word').startDaemon({ host: 'Word' }),
       /Word E2E driver step startDaemon failed with exit code 7: driver exploded/
     );
   } finally {
