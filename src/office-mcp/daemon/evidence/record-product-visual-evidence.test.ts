@@ -165,6 +165,8 @@ test('README product visual evidence command matches current product visual gate
     '--word-tool-e2e-report-path',
     '--excel-tool-e2e-report-path',
     '--powerpoint-tool-e2e-report-path',
+    '--word-runtime-evidence-path',
+    '--excel-runtime-evidence-path',
     '--powerpoint-runtime-evidence-path',
     '--powerpoint-ribbon-command',
     '--powerpoint-ribbon-command-screenshot',
@@ -216,6 +218,16 @@ test('README product visual evidence command matches current product visual gate
   assert.match(catalogIdentityLine, /record-catalog-identity-review\.mjs/);
   assert.match(catalogIdentityLine, /--catalog-path/);
   assert.match(catalogIdentityLine, /--output .*catalog-identity-review\.json/);
+});
+
+test('README Word runtime evidence command matches self-contained gate', () => {
+  const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
+
+  assert.match(readme, /npm run evidence:word/);
+  assert.match(readme, /runtime-evidence-word\.json/);
+  assert.match(readme, /--require-mutation --require-full-word-smoke --require-com-tracked-changes/);
+  assert.doesNotMatch(readme, /runtime-evidence-full\.json/);
+  assert.doesNotMatch(readme, /npm run evidence:runtime -- --endpoint http:\/\/127\.0\.0\.1:8800\/mcp --output .*runtime-evidence-full\.json/);
 });
 
 test('README describes current Word Excel and PowerPoint product surface', () => {

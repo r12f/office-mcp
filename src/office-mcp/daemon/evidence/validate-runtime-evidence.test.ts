@@ -353,6 +353,8 @@ test('README documents Office tool E2E report validation command', () => {
   const commandLine = readme.split('\n').find((line) => line.includes('--require-office-tool-e2e') && line.includes('--word-tool-e2e-report-path')) ?? '';
 
   assert.match(readme, /OFFICE_MCP_RUN_E2E = '1'/);
+  assert.match(readme, /npm run evidence:word/);
+  assert.match(readme, /runtime-evidence-word\.json/);
   assert.match(readme, /OFFICE_MCP_E2E_ACTIVATOR/);
   assert.match(readme, /activate-office-mcp-addin\.ps1/);
   assert.match(readme, /OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR=0/);
@@ -362,6 +364,7 @@ test('README documents Office tool E2E report validation command', () => {
   assert.match(readme, /office-tool-e2e-<host>\.json/);
   assert.match(commandLine, /npm run evidence:validate/);
   assert.match(commandLine, /--require-office-tool-e2e/);
+  assert.match(commandLine, /--input .*runtime-evidence-word\.json/);
   assert.match(commandLine, /--word-tool-e2e-report-path .*office-tool-e2e-word\.json/);
   assert.match(commandLine, /--excel-tool-e2e-report-path .*office-tool-e2e-excel\.json/);
   assert.match(commandLine, /--powerpoint-tool-e2e-report-path .*office-tool-e2e-powerpoint\.json/);
