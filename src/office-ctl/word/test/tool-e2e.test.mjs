@@ -30,9 +30,35 @@ const WORD_E2E_CASES = Object.fromEntries([
     }
   }],
   ['word.insert_image', { args: { anchor: { kind: 'end_of_document' }, image: { base64: 'fixture' } } }],
-  ['word.insert_table', { args: { anchor: { kind: 'end_of_document' }, rows: [['A', 'B']] } }],
+  ['word.insert_table', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'table anchor marker' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'table anchor marker' }, rows: [['E2E-A', 'E2E-B']] },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.read_table',
+      readbackArguments: { table_index: 0 },
+      expect: { contains: ['E2E-A', 'E2E-B'] }
+    }
+  }],
   ['word.insert_page_break', { args: { anchor: { kind: 'end_of_document' } } }],
-  ['word.insert_list', { args: { anchor: { kind: 'end_of_document' }, items: ['One', 'Two'] } }],
+  ['word.insert_list', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'list anchor marker' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'list anchor marker' }, items: ['E2E One', 'E2E Two'] },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_text',
+      readbackArguments: { limit: 20 },
+      expect: { contains: ['E2E One', 'E2E Two'] }
+    }
+  }],
   ['word.replace_text', {
     setup: {
       actions: [
@@ -84,6 +110,8 @@ test('Word mutating E2E cases define concrete setup and readback checks', () => 
   assertConcreteReadback('word.replace_text');
   assertConcreteReadback('word.insert_paragraph');
   assertConcreteReadback('word.update_paragraph');
+  assertConcreteReadback('word.insert_table');
+  assertConcreteReadback('word.insert_list');
 });
 
 test('Word Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

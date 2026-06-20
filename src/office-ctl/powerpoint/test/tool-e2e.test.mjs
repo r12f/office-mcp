@@ -15,8 +15,34 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
   ['powerpoint.export_file', { verify: 'direct-result' }],
   ['powerpoint.update_tags', { args: { action: 'set', key: 'e2e', value: 'true' } }],
   ['powerpoint.list_slides', { verify: 'direct-result' }],
-  ['powerpoint.add_slide', { args: { layout: 'Title and Content' } }],
-  ['powerpoint.update_slide', { args: { slide_index: 0, title: 'Updated slide' } }],
+  ['powerpoint.add_slide', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.list_slides', arguments: {} }
+      ]
+    },
+    args: { layout: 'Title and Content', title: 'E2E Added Slide' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.list_slides',
+      readbackArguments: {},
+      expect: { contains: ['E2E Added Slide'] }
+    }
+  }],
+  ['powerpoint.update_slide', {
+    setup: {
+      actions: [
+        { tool: 'powerpoint.add_slide', arguments: { layout: 'Title and Content', title: 'Slide Before Update' } }
+      ]
+    },
+    args: { slide_index: 0, title: 'Updated slide' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'powerpoint.list_slides',
+      readbackArguments: {},
+      expect: { contains: ['Updated slide'], notContains: ['Slide Before Update'] }
+    }
+  }],
   ['powerpoint.delete_slide', { args: { slide_index: 1 } }],
   ['powerpoint.move_slide', { args: { slide_index: 1, target_index: 0 } }],
   ['powerpoint.export_slide', { verify: 'direct-result' }],
@@ -84,6 +110,8 @@ test('PowerPoint mutating E2E cases define concrete setup and readback checks', 
   assertConcreteReadback('powerpoint.replace_text');
   assertConcreteReadback('powerpoint.add_text_box');
   assertConcreteReadback('powerpoint.add_shape');
+  assertConcreteReadback('powerpoint.add_slide');
+  assertConcreteReadback('powerpoint.update_slide');
 });
 
 test('PowerPoint Office E2E driver', { skip: !officeE2eEnabled() }, async () => {

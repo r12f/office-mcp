@@ -12,8 +12,34 @@ const ADDIN_ROOT = process.cwd();
 const EXCEL_E2E_CASES = Object.fromEntries([
   ['excel.get_workbook_info', { verify: 'direct-result' }],
   ['excel.list_sheets', { verify: 'direct-result' }],
-  ['excel.add_sheet', { args: { name: 'E2E Sheet' } }],
-  ['excel.update_sheet', { args: { sheet: 'Sheet1', name: 'Renamed Sheet' } }],
+  ['excel.add_sheet', {
+    setup: {
+      actions: [
+        { tool: 'excel.list_sheets', arguments: {} }
+      ]
+    },
+    args: { name: 'E2E Sheet' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.list_sheets',
+      readbackArguments: {},
+      expect: { contains: ['E2E Sheet'] }
+    }
+  }],
+  ['excel.update_sheet', {
+    setup: {
+      actions: [
+        { tool: 'excel.add_sheet', arguments: { name: 'Sheet To Rename' } }
+      ]
+    },
+    args: { sheet: 'Sheet To Rename', name: 'Renamed Sheet' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.list_sheets',
+      readbackArguments: {},
+      expect: { contains: ['Renamed Sheet'], notContains: ['Sheet To Rename'] }
+    }
+  }],
   ['excel.delete_sheet', { args: { sheet: 'Delete Me' } }],
   ['excel.get_used_range', { verify: 'direct-result' }],
   ['excel.read_range', { verify: 'direct-result' }],
@@ -79,6 +105,8 @@ test('Excel mutating E2E cases define concrete setup and readback checks', () =>
   assertConcreteReadback('excel.write_range');
   assertConcreteReadback('excel.clear_range');
   assertConcreteReadback('excel.find_replace_cells');
+  assertConcreteReadback('excel.add_sheet');
+  assertConcreteReadback('excel.update_sheet');
 });
 
 test('Excel Office E2E driver', { skip: !officeE2eEnabled() }, async () => {
