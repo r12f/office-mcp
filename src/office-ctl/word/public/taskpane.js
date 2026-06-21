@@ -118,6 +118,7 @@
   let connectGeneration = 0;
   let connectTimeoutTimer;
   const { instanceId, sessionId } = runtimeIds();
+  let runtimeInstanceId = instanceId;
   const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.word.tool-permissions.${sessionId}`;
   const TOOL_PERMISSION_MODE_STORAGE_KEY = `office-mcp.word.tool-permission-mode.${sessionId}`;
   let documentInfo = null;
@@ -326,7 +327,7 @@
     logger.info('session.added', { sessionId, document });
     send(sessionAddedNotification({
       session_id: sessionId,
-      instance_id: instanceId,
+      instance_id: runtimeInstanceId,
       document,
       available_tools: effectiveTools(),
       is_active: null
@@ -378,6 +379,7 @@
       return;
     }
     serverInfo = registerResult(message, PROTOCOL_VERSION);
+    runtimeInstanceId = serverInfo.assignedInstanceId || instanceId;
     renderStaticState();
     announceSession().catch((error) => {
       logger.error('session.announce.failed', error);

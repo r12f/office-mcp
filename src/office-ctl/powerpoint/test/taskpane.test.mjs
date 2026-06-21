@@ -419,12 +419,15 @@ test('PowerPoint task pane announces session only after successful register resp
 
   assert.doesNotMatch(registerBody, /announceSession\(/);
   assert.match(responseBody, /serverInfo = registerResult\(message, PROTOCOL_VERSION\)/);
+  assert.match(responseBody, /runtimeInstanceId = serverInfo\.assignedInstanceId \|\| instanceId/);
   assert.match(responseBody, /announceSession\(\)\.catch/);
   assert.match(responseBody, /enableAutoOpen\(\)\.catch/);
   assert.ok(responseBody.indexOf('announceSession().catch') < responseBody.indexOf('enableAutoOpen().catch'), 'session announcement must not wait on auto-open persistence');
   assert.match(responseBody, /session\.announce\.failed/);
   assert.match(responseBody, /autoopen\.failed/);
   assert.match(announceBody, /const sent = send\(sessionAddedNotification\(\{/);
+  assert.match(announceBody, /instance_id: runtimeInstanceId/);
+  assert.doesNotMatch(announceBody, /instance_id: instanceId/);
   assert.match(announceBody, /if \(!sent\) throw new Error\('Session announcement could not be sent because the daemon socket is not open\.'\)/);
 });
 

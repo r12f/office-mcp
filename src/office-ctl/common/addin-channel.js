@@ -145,7 +145,8 @@
   function registerResult(message, fallbackProtocolVersion = '1.0') {
     return {
       serverVersion: message?.result?.server_version || 'Unknown',
-      protocolVersion: message?.result?.protocol_version || fallbackProtocolVersion
+      protocolVersion: message?.result?.protocol_version || fallbackProtocolVersion,
+      assignedInstanceId: message?.result?.assigned_instance_id || undefined
     };
   }
 

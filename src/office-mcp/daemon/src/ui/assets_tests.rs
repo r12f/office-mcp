@@ -118,6 +118,21 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("emptyState('No documents connected'"));
     assert!(js.contains("$('configPath').textContent = snapshot.daemon?.config_path || '-'"));
     assert!(!js.contains("'Not configured'"));
+    assert!(js.contains("function renderDocumentCard(doc, app)"));
+    assert!(js.contains("class=\"row document-card ${esc(app)}\""));
+    assert!(js.contains("Session ${esc(middleTruncate(doc.session_id, 18))}"));
+    assert!(js.contains("title=\"${esc(doc.session_id || '-')}\""));
+    assert!(js.contains("function documentConnectionLabel(status) { return status === 'active' || !status ? 'active' : 'dead'; }"));
+    assert!(js.contains("function documentStateTone(status) { return status === 'active' || !status ? 'success' : 'danger'; }"));
+    assert!(js.contains("Finished ${esc(metrics.finished)}"));
+    assert!(js.contains("Failed ${esc(metrics.failed)}"));
+    assert!(js.contains("function documentTaskMetrics(sessionId)"));
+    assert!(js.contains("command.status === 'success'"));
+    assert!(!js.contains("function renderDocumentHistory"));
+    assert!(!js.contains("doc-history"));
+    assert!(!js.contains("aria-expanded"));
+    assert!(!js.contains("Show details"));
+    assert!(!js.contains("Hide details"));
     assert!(js.contains("state.app = event.target.value"));
     assert!(js.contains("if (state.app !== 'all' && app !== state.app) continue;"));
     assert!(js.contains("emptyState('No matching documents'"));
@@ -136,7 +151,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("function copyableId(value, label)"));
     assert!(js.contains("class=\"id-copy\" data-copy-value=\"${esc(text)}\""));
     assert!(js.contains("function middleTruncate(value, maxLength = 30)"));
-    assert!(js.contains("copyableId(doc.session_id, 'Copy session ID')"));
+    assert!(!js.contains("stale | reconnecting"));
+    assert!(!js.contains("copyableId(doc.session_id, 'Copy session ID')"));
     assert!(
         js.contains("copyableId(command.command_id || command.mcp_request_id, 'Copy command ID')")
     );

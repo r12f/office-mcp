@@ -576,11 +576,15 @@ test('Word task pane announces session only after successful register response',
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const registerBody = functionBody(js, 'register');
   const responseBody = functionBody(js, 'handleRegisterResponse');
+  const announceBody = functionBody(js, 'announceSession');
 
   assert.doesNotMatch(registerBody, /announceSession\(/);
   assert.match(responseBody, /serverInfo = registerResult\(message, PROTOCOL_VERSION\)/);
+  assert.match(responseBody, /runtimeInstanceId = serverInfo\.assignedInstanceId \|\| instanceId/);
   assert.match(responseBody, /announceSession\(\)\.catch/);
   assert.match(responseBody, /session\.announce\.failed/);
+  assert.match(announceBody, /instance_id: runtimeInstanceId/);
+  assert.doesNotMatch(announceBody, /instance_id: instanceId/);
 });
 
 function functionBody(source, name) {

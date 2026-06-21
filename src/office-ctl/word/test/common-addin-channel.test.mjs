@@ -152,9 +152,13 @@ test('common add-in channel builds and classifies protocol messages', () => {
   const registerResult = channel.registerResult({ result: { server_version: '0.2.0', protocol_version: '1.1' } }, '1.0');
   assert.equal(registerResult.serverVersion, '0.2.0');
   assert.equal(registerResult.protocolVersion, '1.1');
+  assert.equal(registerResult.assignedInstanceId, undefined);
+  const assignedRegisterResult = channel.registerResult({ result: { server_version: '0.2.0', protocol_version: '1.1', assigned_instance_id: 'daemon-instance-1' } }, '1.0');
+  assert.equal(assignedRegisterResult.assignedInstanceId, 'daemon-instance-1');
   const fallbackRegisterResult = channel.registerResult({}, '1.0');
   assert.equal(fallbackRegisterResult.serverVersion, 'Unknown');
   assert.equal(fallbackRegisterResult.protocolVersion, '1.0');
+  assert.equal(fallbackRegisterResult.assignedInstanceId, undefined);
   assert.equal(channel.isToolInvoke({ method: 'tool.invoke' }), true);
   assert.equal(channel.isPing({ method: 'ping' }), true);
   assert.equal(channel.isToolCancel({ method: 'tool.cancel', params: { request_id: 'request-1' } }), true);

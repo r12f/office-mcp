@@ -100,6 +100,7 @@
     ['excel.update_pivot_table', { category: 'PivotTable', sideEffect: 'destructive', description: 'Read or update PivotTable fields, layout, filters, refresh, and lifecycle.' }]
   ]);
   const { instanceId, sessionId } = runtimeIds();
+  let runtimeInstanceId = instanceId;
   const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.excel.tool-permissions.${sessionId}`;
   const TOOL_PERMISSION_MODE_STORAGE_KEY = `office-mcp.excel.tool-permission-mode.${sessionId}`;
   const logger = new AddinLogger({ redactText });
@@ -248,7 +249,7 @@
     logger.info('session.added', { sessionId, workbook });
     send(sessionAddedNotification({
       session_id: sessionId,
-      instance_id: instanceId,
+      instance_id: runtimeInstanceId,
       document: workbook,
       available_tools: effectiveTools(),
       is_active: null
@@ -289,6 +290,7 @@
       return;
     }
     serverInfo = registerResult(message, PROTOCOL_VERSION);
+    runtimeInstanceId = serverInfo.assignedInstanceId || instanceId;
     renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
     connectionDetailEl.textContent = 'None';
     enableAutoOpen().then(() => announceSession()).catch((error) => {

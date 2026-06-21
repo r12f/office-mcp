@@ -1,4 +1,4 @@
-const state = { snapshot: null, search: '', app: 'all', result: 'all', expandedDocuments: new Set(), previousStatus: null };
+const state = { snapshot: null, search: '', app: 'all', result: 'all', previousStatus: null };
 const $ = (id) => document.getElementById(id);
 
 $('search').addEventListener('input', (event) => { state.search = event.target.value.toLowerCase(); render(); });
@@ -14,8 +14,6 @@ document.addEventListener('click', async (event) => {
     await copyText(value, copy);
     return;
   }
-  const toggle = event.target.closest('[data-document-toggle]');
-  if (toggle) toggleDocument(toggle.dataset.documentToggle);
   const inspect = event.target.closest('[data-inspect]');
   if (inspect) inspectRow(inspect);
 });
@@ -74,30 +72,33 @@ function render() {
 
 function renderDocuments(groups) {
   const rows = [];
-  const documentCommandHistory = state.snapshot?.document_command_history || {};
   for (const [app, docs] of Object.entries(groups)) {
     if (state.app !== 'all' && app !== state.app) continue;
     const visible = docs.filter((doc) => matches(JSON.stringify(doc)));
     if (!visible.length) continue;
     rows.push(`<h3>${esc(title(app))}</h3>`);
     for (const doc of visible) {
-      const label = doc.document?.title || doc.document?.filename || 'Untitled';
-      const connection = documentConnectionLabel(doc.status);
-      const expanded = state.expandedDocuments.has(doc.session_id);
-      const detailId = `document-detail-${safeId(doc.session_id)}`;
-      rows.push(`<button class="row ${esc(app)}" type="button" data-key-activate data-document-toggle="${esc(doc.session_id)}" data-inspect='${attr(doc)}' aria-expanded="${expanded}" aria-controls="${detailId}"><strong>${esc(label)}</strong><span>${esc(connection)} | ${copyableId(doc.session_id, 'Copy session ID')}</span><span class="meta">${expanded ? 'Hide details' : 'Show details'} | ${esc(doc.host?.version || '-')} | ${esc(doc.available_tool_count || 0)} tools | queue ${esc(doc.queue_depth || 0)}</span></button>`);
-      rows.push(renderDocumentHistory(doc.session_id, documentCommandHistory[doc.session_id] || [], expanded, detailId));
+      rows.push(renderDocumentCard(doc, app));
     }
   }
   const filtered = state.search || state.app !== 'all';
   $('documents').innerHTML = rows.join('') || (filtered ? emptyState('No matching documents', 'Adjust the app or search filter.') : emptyState('No documents connected', 'Open Word, Excel, or PowerPoint, then open Office MCP Control.', state.snapshot?.daemon?.addin_endpoint, 'Copy add-in endpoint'));
 }
 
-function renderDocumentHistory(sessionId, commands, expanded, detailId) {
-  const hidden = expanded ? '' : ' hidden';
-  if (!commands.length) return `<div id="${detailId}" class="doc-history" aria-label="Command history for ${esc(sessionId)}"${hidden}>${emptyState('No recent commands for this document', 'Completed commands for this document appear here.')}</div>`;
-  const rows = commands.slice(0, 10).map((command) => `<button class="history-row" type="button" data-inspect='${attr(command)}'><span><strong>${esc(command.tool)}</strong><small>${copyableId(command.command_id || command.mcp_request_id, 'Copy command ID')} | ${esc(relative(command.completed_at || command.started_at))}</small></span><span class="pill ${tone(command.status)}">${esc(title(command.status))}</span><small>${esc(command.error?.office_mcp_code || '')}</small></button>`).join('');
-  return `<div id="${detailId}" class="doc-history" aria-label="Command history for ${esc(sessionId)}"${hidden}>${rows}</div>`;
+function renderDocumentCard(doc, app) {
+  const label = doc.document?.title || doc.document?.filename || 'Untitled';
+  const status = documentConnectionLabel(doc.status);
+  const metrics = documentTaskMetrics(doc.session_id);
+  return `<button class="row document-card ${esc(app)}" type="button" data-key-activate data-inspect='${attr(doc)}' aria-label="Inspect ${esc(label)} ${esc(status)}"><span class="document-card-title"><span class="state-dot ${esc(documentStateTone(doc.status))}" aria-hidden="true"></span><strong title="${esc(label)}">${esc(label)}</strong><span class="pill ${esc(documentStateTone(doc.status))}">${esc(title(status))}</span></span><span class="document-card-meta"><span title="${esc(doc.session_id || '-')}">Session ${esc(middleTruncate(doc.session_id, 18))}</span><span>Version ${esc(doc.host?.version || '-')}</span><span>${esc(doc.available_tool_count || 0)} tools</span><span>Queue ${esc(doc.queue_depth || 0)}</span></span><span class="document-card-meta"><span>Finished ${esc(metrics.finished)}</span><span>Failed ${esc(metrics.failed)}</span></span></button>`;
+}
+
+function documentTaskMetrics(sessionId) {
+  const commands = state.snapshot?.document_command_history?.[sessionId] || [];
+  return commands.reduce((metrics, command) => {
+    if (command.status === 'failure' || command.status === 'timeout') metrics.failed += 1;
+    else if (command.status === 'success') metrics.finished += 1;
+    return metrics;
+  }, { finished: 0, failed: 0 });
 }
 
 function renderClients(clients) {
@@ -157,14 +158,8 @@ function fallbackCopy(text) {
 }
 
 function matches(text) { return !state.search || text.toLowerCase().includes(state.search); }
-function documentConnectionLabel(status) { return status === 'stale' ? 'stale | reconnecting' : (status || 'active'); }
-function toggleDocument(sessionId) {
-  if (!sessionId) return;
-  if (state.expandedDocuments.has(sessionId)) state.expandedDocuments.delete(sessionId);
-  else state.expandedDocuments.add(sessionId);
-  render();
-  document.querySelector(`[data-document-toggle="${cssEscape(sessionId)}"]`)?.focus();
-}
+function documentConnectionLabel(status) { return status === 'active' || !status ? 'active' : 'dead'; }
+function documentStateTone(status) { return status === 'active' || !status ? 'success' : 'danger'; }
 function fmt(value) { return new Intl.NumberFormat().format(value); }
 function duration(ms) { if (!ms) return '0s'; const seconds = ms / 1000; if (seconds < 60) return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(seconds) + 's'; return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(seconds / 60) + 'm'; }
 function relative(value) { if (!value) return 'now'; const delta = Math.round((Number(value) - Date.now()) / 1000); const abs = Math.abs(delta); const unit = abs < 60 ? 'second' : abs < 3600 ? 'minute' : 'hour'; const divisor = unit === 'second' ? 1 : unit === 'minute' ? 60 : 3600; return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(Math.round(delta / divisor), unit); }
@@ -175,5 +170,3 @@ function announceStatus(status) { if (state.previousStatus === status) return; s
 function announce(message) { $('announcer').textContent = message; }
 function esc(value) { return String(value ?? '').replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]); }
 function attr(value) { return esc(JSON.stringify(value)).replace(/'/g, '&#39;'); }
-function safeId(value) { return String(value || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '-'); }
-function cssEscape(value) { return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"'); }

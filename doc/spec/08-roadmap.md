@@ -317,19 +317,35 @@ or running developer build commands.
       confused with daemon health.
 - [ ] Rework the daemon main-window connected-document list so each document is
       a compact summary block, not a verbose session/activity panel. The block
-      should primarily show the document name plus state (`active` or `dead`,
-      with `stale`/`reconnecting` only when recovery is in progress), version,
+      should primarily show the document name plus a middle-truncated session
+      ID, a user-facing state of only `active` or `dead`, host/add-in version,
       available tool count, queue depth, finished task count, and failed task
-      count. Remove inline recent-command history, verbose session IDs, and
-      expanded host metadata from the default document block because the
-      right-side Activity/Inspector pane already owns command history and
-      diagnostics. Session IDs may remain available only behind a details/copy
-      affordance with middle truncation.
+      count. The document title has first layout priority and must not be
+      squeezed by status badges or right-side metadata. Do not label a stale or
+      disconnected session as `reconnecting` in the compact document card unless
+      the daemon owns explicit evidence that a live reconnect attempt is
+      currently in progress; otherwise stale/disconnected/unavailable sessions
+      are `dead`. Remove inline recent-command history and expanded host
+      metadata from the default document block because the right-side
+      Activity/Inspector pane already owns command history and diagnostics. The
+      compact card must show a bounded session ID, while full session IDs remain
+      available through copy, tooltip, or Inspector affordances.
+- [ ] Fix add-in runtime identity correlation so connected Word, Excel, and
+      PowerPoint document cards preserve registered host metadata. A real Word
+      session must show app `word` and the Office host version when the add-in
+      sent those fields during `register`; it must not fall back to `other` or
+      `Version -` because `session.added` was correlated to the wrong runtime
+      instance. Add regression coverage for daemon register -> session.added ->
+      UI snapshot flow, including daemon-assigned instance IDs returned by the
+      register response.
 - [ ] Add scan-friendly document state indicators in the daemon main window.
-      Active/dead/stale/reconnecting states must use a stable icon, status dot,
-      or host-accent-compatible color marker next to the text label so users can
-      identify dead sessions quickly when many documents are listed. Color alone
-      is not enough; keep the text label for accessibility and tests.
+      Compact document cards must use only `active` and `dead` user-facing
+      labels with a stable icon, status dot, or host-accent-compatible color
+      marker next to the text label so users can identify dead sessions quickly
+      when many documents are listed. Color alone is not enough; keep the text
+      label for accessibility and tests. Raw internal states such as `stale`,
+      `disconnected`, or future reconnect diagnostics may appear in the
+      Inspector, but must not replace the compact card's `dead` label.
 - [ ] Enforce closed-session cleanup across daemon runtime state. A closed,
       disconnected, stale, or otherwise dead Office document session may remain
       visible only during the reconnect grace window. The default grace is 60

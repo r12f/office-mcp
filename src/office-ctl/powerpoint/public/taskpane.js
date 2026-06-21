@@ -96,6 +96,7 @@
   ]);
 
   const { instanceId, sessionId } = runtimeIds();
+  let runtimeInstanceId = instanceId;
   const TOOL_PERMISSION_STORAGE_KEY = `office-mcp.powerpoint.tool-permissions.${sessionId}`;
   const TOOL_PERMISSION_MODE_STORAGE_KEY = `office-mcp.powerpoint.tool-permission-mode.${sessionId}`;
   const logger = new AddinLogger({ redactText });
@@ -244,7 +245,7 @@
     logger.info('session.added', { sessionId, presentation });
     const sent = send(sessionAddedNotification({
       session_id: sessionId,
-      instance_id: instanceId,
+      instance_id: runtimeInstanceId,
       document: presentation,
       available_tools: effectiveTools(),
       is_active: null
@@ -286,6 +287,7 @@
       return;
     }
     serverInfo = registerResult(message, PROTOCOL_VERSION);
+    runtimeInstanceId = serverInfo.assignedInstanceId || instanceId;
     renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
     connectionDetailEl.textContent = 'None';
     announceSession().catch((error) => {
