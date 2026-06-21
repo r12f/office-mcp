@@ -299,6 +299,22 @@ or running developer build commands.
       success/failure details. Current evidence: `npm run check:ui` verifies
       collapsed/expanded document detail panels and per-document command
       history rendering in the daemon main window.
+- [ ] Rework the daemon main-window top details rail from the latest visible
+      build feedback. The current `Config: Not configured` field is ambiguous:
+      the UI must show the effective config file path, just like the `Log` file
+      path, with middle truncation and copy/open affordances. A normal default
+      configuration must not display `Not configured`; show the default config
+      file path that would be read or written, or omit the field from the first
+      row and explain the deployment-specific reason in diagnostics/details.
+      The details rail must also reduce the width allocated to compact metadata
+      such as `Version` and `Uptime`, keep `Log` truncatable with copy/open
+      affordance, and reserve the widest flexible diagnostic area for `Last
+      Error` so degraded/down states can show useful error text without being
+      squeezed by low-priority metadata. The
+      top metrics must also rename the ambiguous `Running` counter to an
+      explicit task-execution label such as `Active Tasks`, `Tasks Running`, or
+      `Running Tasks`; bare `Running` is not acceptable because it can be
+      confused with daemon health.
 - [x] Add-in task pane product UI showing daemon connection, current document
       session, current task, and latest 20 task history entries for Word and
       Excel. Current evidence: `npm run check` in `src/office-ctl/word` and
@@ -530,6 +546,57 @@ shared `Read`/`Write`/`All` mode UI, compact `X/Y` counts, object-owner Word
 groups, compact PowerPoint daemon row, and Word/Excel/PowerPoint task pane
 contract tests. Verification passed with `npm test` in each Office add-in and
 `cargo test -p office-mcp-daemon static_response`.
+
+### M6.5.5 — Daemon-wide tool access control
+
+User-reported access-control follow-up: tool permissions must not live only in
+each Office task pane session. The daemon needs one canonical global tool access
+policy that controls discovery and dispatch for every MCP client and every
+Word, Excel, and PowerPoint session.
+
+- [ ] Add a daemon-owned tool access policy store. It must support a global all
+      tools switch, app-level switches for Word/Excel/PowerPoint, category-level
+      switches, individual tool switches, and a `Read` / `Write` / `All` access
+      ceiling. The policy must persist through daemon restart and be visible in
+      the daemon UI.
+- [ ] Classify every Word, Excel, and PowerPoint tool by app, object/category,
+      and side-effect level so the daemon UI can display grouped controls. The
+      UI must allow expanding/collapsing categories and independently toggling
+      every app/category/tool without collapsing the group accidentally.
+- [ ] Filter MCP `tools/list` through the daemon global access policy. Disabled
+      tools must not be returned to clients, reducing context and preventing
+      stale planning from tools the daemon will reject. Management tools such as
+      `office.list_sessions` and `office.get_session_info` remain available
+      unless a future explicit management-policy section says otherwise.
+- [ ] Enforce daemon policy before session preflight on every `tools/call`.
+      When a stale client calls a globally disabled tool, return
+      `TOOL_NOT_AVAILABLE` with text beginning `Tool <name> is disabled by
+      daemon access policy.`, telling the client to refresh `tools/list`, and
+      structured `refresh_tools: true`. Do not forward the request to any add-in
+      session.
+- [ ] Keep session `available_tools` as the second access-control layer. After
+      daemon policy passes, if the target session does not expose the tool,
+      return `TOOL_NOT_ENABLED_FOR_DOCUMENT` with the target `session_id`, text
+      beginning `Tool <name> is disabled for this document session.`, a refresh
+      instruction for `office.get_session_info` or `office.list_sessions`, and
+      structured `refresh_session_info: true`.
+- [ ] Add daemon UI controls for the global policy. The UI must show app,
+      category, and tool controls with `Read` / `Write` / `All` mode, and it
+      must make clear that daemon policy is global while task-pane
+      `available_tools` remains document/session-specific.
+- [ ] Add tests covering discovery filtering, daemon-policy dispatch rejection,
+      session preflight rejection, refresh hints, persistence, and UI rendering.
+      Tests must prove a disabled tool disappears from `tools/list`, a stale
+      call gets `TOOL_NOT_AVAILABLE`, and a session-missing tool gets
+      `TOOL_NOT_ENABLED_FOR_DOCUMENT` rather than the older generic capability
+      failure. Tests must also assert both access-control messages use the
+      unified `Tool <name> is disabled...` wording rather than `not enabled`.
+
+**Exit criterion**: A user can manage tool access once in the daemon UI across
+all sessions, MCP clients see only daemon-allowed tools from `tools/list`, and
+every call is enforced first by daemon policy and then by the target session's
+`available_tools`, with actionable refresh hints when either layer rejects the
+call.
 
 ### M6.5.3 — Product identity, add-in metadata, and native tray polish
 

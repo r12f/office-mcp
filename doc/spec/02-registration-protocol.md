@@ -221,8 +221,12 @@ its current document.
   core tier. `url`, `is_read_only`, `is_protected`, and `is_active` are
   nullable because their portable equivalents are not available on every
   supported host. Unknown MUST remain `null`, not a guessed value.
-- `available_tools` is authoritative for this session. The daemon returns
-  `HOST_CAPABILITY_UNAVAILABLE` before dispatch when a tool is absent.
+- `available_tools` is authoritative for this session. After the daemon global
+  tool access policy allows a call, the daemon returns
+  `TOOL_NOT_ENABLED_FOR_DOCUMENT` before dispatch when a tool is absent from the
+  target session. The error includes `refresh_session_info: true` so the client
+  can refresh `office.get_session_info` or `office.list_sessions` instead of
+  repeatedly calling with stale session capability data.
 - `available_tools` is the effective tool set after host capability probing and
   user-controlled per-tool permissions. Tools disabled in the task pane settings
   are omitted from this array. The add-in may also include
@@ -257,6 +261,13 @@ after the user changes per-tool permissions in task pane settings. The daemon
 uses that effective set for capability preflight. If an already-dispatched call
 races with a permission change, the add-in returns `TOOL_DISABLED_BY_USER` from
 `tool.invoke`.
+
+Daemon-wide tool access policy is evaluated before this session-level preflight.
+When the daemon disables a tool globally, `tools/list` omits it and any stale
+`tools/call` receives `TOOL_NOT_AVAILABLE` with `refresh_tools: true`. When the
+daemon allows the tool globally but the current session does not expose it,
+`tools/call` receives `TOOL_NOT_ENABLED_FOR_DOCUMENT` with
+`refresh_session_info: true`.
 
 ### 3.3 `session.removed`
 

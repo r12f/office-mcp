@@ -28,6 +28,8 @@ failures that an agent can act on.
 | `PATH_REFUSED` | A daemon-side file destination violates path policy. |
 | `IMAGE_FETCH_FAILED` | The daemon could not fetch or validate an image URL. |
 | `HOST_CAPABILITY_UNAVAILABLE` | The session lacks a required API set or verified host capability. |
+| `TOOL_NOT_AVAILABLE` | The daemon global tool access policy disabled this tool, so it is not currently discoverable or callable. |
+| `TOOL_NOT_ENABLED_FOR_DOCUMENT` | The target document session has disabled this tool by omitting it from `available_tools`. |
 | `TOOL_DISABLED_BY_USER` | The user disabled this tool for the current add-in session. |
 | `CANCELLED` | The client or daemon cancelled the operation. |
 | `TIMEOUT` | The operation exceeded its deadline. |
@@ -73,6 +75,26 @@ Expected tool execution failures are MCP tool results:
 For backwards compatibility with clients that ignore `structuredContent`, the
 text content must summarize the same failure. If an `outputSchema` is declared,
 the error result must conform to it.
+
+Tool availability failures must include client refresh guidance so agents do
+not continue planning from stale capability data. When the daemon global tool
+access policy rejects a call with `TOOL_NOT_AVAILABLE`, the structured error
+must include `refresh_tools: true` and the text message must tell the client to
+refresh `tools/list`. When the session preflight rejects a call with
+`TOOL_NOT_ENABLED_FOR_DOCUMENT`, the structured error must include
+`refresh_session_info: true`, the affected `session_id`, and a message telling
+the client to refresh `office.get_session_info` or `office.list_sessions` before
+retrying. If both daemon policy and session state may have changed, include both
+refresh flags. These hints are advisory for client UX; the daemon still enforces
+both checks on every `tools/call`.
+
+The human-facing message prefix for both tool availability failures must use
+the same wording: `Tool <name> is disabled.` Do not use `not enabled`,
+`unsupported`, or `not available` as the main sentence for these access-control
+failures. Add the layer and refresh action after that prefix, for example:
+`Tool word.get_text is disabled by daemon access policy. Refresh tools/list
+before retrying.` or `Tool word.get_text is disabled for this document session.
+Refresh office.get_session_info or office.list_sessions before retrying.`
 
 `resources/read` does not return a tool result. An operational resource failure
 uses JSON-RPC `-32000` with `error.data.office_mcp_code` and the same structured
@@ -163,6 +185,8 @@ Tools with an explicit state precondition may return `STALE_INDEX`.
 | `IRM_DENIED` | Do not retry unchanged. |
 | `ANCHOR_NOT_FOUND` | Re-read and alter arguments. |
 | `STALE_INDEX` | Re-read state; retry at most once automatically. |
+| `TOOL_NOT_AVAILABLE` | Refresh `tools/list`; do not retry unchanged unless the daemon policy changed. |
+| `TOOL_NOT_ENABLED_FOR_DOCUMENT` | Refresh `office.get_session_info` or `office.list_sessions`; do not retry unchanged unless the session's `available_tools` changed. |
 | `TOOL_DISABLED_BY_USER` | Do not retry unchanged; ask the user to re-enable the tool in the add-in task pane settings. |
 | `TIMEOUT` | Retry only when the operation is known idempotent or after re-reading state. |
 

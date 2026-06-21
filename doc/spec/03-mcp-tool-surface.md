@@ -200,9 +200,24 @@ shape remains valid:
 }
 ```
 
-The daemon lists the stable server-wide catalog. Session-specific support is
-reported by `available_tools`; invoking a listed tool against an incompatible
-session yields a tool execution error, not a protocol error.
+The daemon lists the current daemon-allowed server-wide catalog. The underlying
+host catalog is stable, but `tools/list` is filtered by the daemon global tool
+access policy before it is returned to MCP clients. Tools disabled globally are
+not listed, which reduces client context and prevents agents from planning with
+tools the daemon will reject. Session-specific support is reported by
+`available_tools`; invoking a listed tool against an incompatible session yields
+a tool execution error, not a protocol error.
+
+Every `tools/call` is still enforced server-side even if the client skipped
+refreshing discovery data. The daemon first checks the global tool access policy
+and returns `TOOL_NOT_AVAILABLE` with `refresh_tools: true` when the tool is no
+longer daemon-allowed. Only after that passes does it check the target session's
+`available_tools`; if the tool is absent, it returns
+`TOOL_NOT_ENABLED_FOR_DOCUMENT` with `refresh_session_info: true` and the target
+`session_id`. Clients SHOULD refresh `tools/list` after the first error and
+`office.get_session_info` or `office.list_sessions` after the second error.
+Both access-control errors use the same human-readable prefix,
+`Tool <name> is disabled.`, then name the rejecting layer and refresh action.
 
 ## 10. Tool-level E2E contract
 
