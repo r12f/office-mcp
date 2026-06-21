@@ -942,10 +942,22 @@ function manualTrayEvidenceLooksReady(evidence: Record<string, unknown> | undefi
   if (!manualTrayInteractionLooksReady(evidence) || evidence.tray_menu_surface_native !== true || evidence.tray_menu_surface_kind !== 'native' || evidence.show_ui_opened !== true) return false;
   if (typeof evidence.observed_tooltip !== 'string' || !/^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(evidence.observed_tooltip)) return false;
   if (typeof evidence.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(evidence.screenshot_path))) return false;
+  if (!manualTraySurfaceScreenshotsLookReady(evidence)) return false;
   const items = Array.isArray(evidence.observed_menu_items) ? evidence.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];
   return ['Status:', 'Clients:', 'Documents:', 'Show Office MCP Control', 'Quit Office MCP Control'].every((expected) => items.some((item) => item.includes(expected)))
     && evidence.daemon_context_ready === true
     && daemonContextLooksReady(isRecord(evidence.daemon_context) ? evidence.daemon_context : undefined);
+}
+
+function manualTraySurfaceScreenshotsLookReady(evidence: Record<string, unknown>): boolean {
+  if (evidence.tray_surface_screenshots_ready !== true || evidence.tray_surface_screenshots_distinct !== true) return false;
+  const paths = isRecord(evidence.tray_surface_screenshot_paths) ? evidence.tray_surface_screenshot_paths : undefined;
+  const exists = isRecord(evidence.tray_surface_screenshots_exist) ? evidence.tray_surface_screenshots_exist : undefined;
+  if (!paths || !exists) return false;
+  return ['tray_icon', 'tray_native_menu', 'tray_tooltip', 'tray_quit_confirmation'].every((surface) => {
+    const path = paths[surface];
+    return exists[surface] === true && typeof path === 'string' && screenshotFileLooksLikeImage(resolve(path));
+  });
 }
 
 function manualTrayInteractionLooksReady(evidence: Record<string, unknown>): boolean {

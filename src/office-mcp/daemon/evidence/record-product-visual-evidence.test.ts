@@ -639,6 +639,28 @@ test('product visual evidence recorder requires embedded manual tray evidence', 
   });
 });
 
+test('product visual evidence recorder rejects manual tray artifacts without ready surface screenshots', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const manualTrayEvidencePath = writeManualTrayEvidence(dir, true);
+    const manualTray = JSON.parse(readFileSync(manualTrayEvidencePath, 'utf8')) as Record<string, unknown>;
+    manualTray.tray_surface_screenshots_ready = false;
+    manualTray.tray_surface_screenshots_distinct = false;
+    manualTray.tray_surface_screenshots_exist = { tray_icon: true };
+    manualTray.tray_surface_screenshot_paths = { tray_icon: screenshots.tray_icon };
+    writeFileSync(manualTrayEvidencePath, JSON.stringify(manualTray, null, 2));
+
+    const output = join(dir, 'manual-tray-missing-surfaces.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--manual-tray-evidence-path', manualTrayEvidencePath, '--skip-tray-surface-args');
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.manual_tray_evidence_ready, false);
+    assert.equal((evidence.screenshots_exist as Record<string, unknown>).tray_native_menu, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('product visual evidence recorder requires daemon context before passing', () => {
   withScreenshots((dir, screenshots) => {
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
@@ -1442,6 +1464,7 @@ function writeManualTrayEvidence(dir: string, ready = true): string {
     tray_surface_screenshot_paths: traySurfaceScreenshotPaths,
     tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
     tray_surface_screenshots_ready: ready,
+    tray_surface_screenshots_distinct: ready,
     daemon_context: manualTrayDaemonContext(ready),
     daemon_context_ready: ready,
     passed: ready
