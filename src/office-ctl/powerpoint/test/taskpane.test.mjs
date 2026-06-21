@@ -138,6 +138,8 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /function effectiveTools\(\)/);
   assert.match(js, /return AVAILABLE_TOOLS\.filter\(\(tool\) => isToolEnabled\(tool\) && isToolAllowedByMode\(tool\)\)/);
   assert.match(js, /function isToolAllowedByMode\(tool\)/);
+  assert.match(js, /isToolAllowedByCapabilityMode/);
+  assert.match(functionBody(js, 'isToolAllowedByMode'), /return isToolAllowedByCapabilityMode\(toolPermissionMode, sideEffect\);/);
   assert.match(js, /function handleToolModeChange\(event\)/);
   assert.match(js, /renderSharedToolModeControl\(toolModeControlEl, toolPermissionMode\)/);
   assert.doesNotMatch(functionBody(js, 'renderToolModeControl'), /querySelectorAll\('\[data-tool-mode\]'\)/);

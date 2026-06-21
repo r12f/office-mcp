@@ -40,6 +40,7 @@
     commandIdMarkup,
     copyMetadataValue,
     documentStateLabel,
+    isToolAllowedByCapabilityMode,
     middleTruncate,
     protectionLabel,
     renderStaticMetadata,
@@ -1644,9 +1645,7 @@
 
   function isToolAllowedByMode(tool) {
     const sideEffect = TOOL_METADATA.get(tool)?.sideEffect || 'read';
-    if (toolPermissionMode === 'all') return true;
-    if (toolPermissionMode === 'write') return sideEffect !== 'destructive';
-    return sideEffect === 'read';
+    return isToolAllowedByCapabilityMode(toolPermissionMode, sideEffect);
   }
 
   function handleToolModeChange(event) {

@@ -219,6 +219,27 @@ test('common main UI renders static task pane metadata', () => {
   assert.equal(hostPlatform.textContent, 'Excel 16.0 / PC');
 });
 
+test('common main UI applies Read Write All tool permission ceilings', () => {
+  const mainUi = loadMainUi();
+
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('read', 'read'), true);
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('read', 'mutating'), false);
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('read', 'destructive'), false);
+
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('write', 'read'), true);
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('write', 'mutating'), true);
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('write', 'comment'), true);
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('write', 'edit'), true);
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('write', 'destructive'), false);
+
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('all', 'read'), true);
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('all', 'mutating'), true);
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('all', 'destructive'), true);
+
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('unexpected', 'destructive'), true);
+  assert.equal(mainUi.isToolAllowedByCapabilityMode('read', undefined), true);
+});
+
 test('common main UI renders tool capability mode selection', () => {
   const mainUi = loadMainUi();
   const states = new Map();

@@ -72,6 +72,12 @@
     });
   }
 
+  function isToolAllowedByCapabilityMode(mode, sideEffect = 'read') {
+    if (mode === 'read') return sideEffect === 'read';
+    if (mode === 'write') return sideEffect !== 'destructive';
+    return true;
+  }
+
   function officeHostSummary(defaultHost) {
     const diagnostics = global.Office?.context?.diagnostics || {};
     const host = diagnostics.host || defaultHost || 'Office';
@@ -148,6 +154,7 @@
     bindDetailsControl,
     commandIdMarkup,
     copyMetadataValue,
+    isToolAllowedByCapabilityMode,
     middleTruncate,
     officeHostSummary,
     protectionLabel,

@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, protectionLabel, renderRuntimeVersions, renderStaticMetadata, renderToolModeControl: renderSharedToolModeControl, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, isToolAllowedByCapabilityMode, middleTruncate, protectionLabel, renderRuntimeVersions, renderStaticMetadata, renderToolModeControl: renderSharedToolModeControl, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1428,9 +1428,7 @@
 
   function isToolAllowedByMode(tool) {
     const sideEffect = TOOL_METADATA.get(tool)?.sideEffect || 'read';
-    if (toolPermissionMode === 'all') return true;
-    if (toolPermissionMode === 'write') return sideEffect !== 'destructive';
-    return sideEffect === 'read';
+    return isToolAllowedByCapabilityMode(toolPermissionMode, sideEffect);
   }
 
   function handleToolModeChange(event) {
