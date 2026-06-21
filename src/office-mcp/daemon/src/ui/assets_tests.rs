@@ -72,6 +72,12 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("aria-label=\"Copy add-in endpoint\""));
     assert!(html.contains("aria-label=\"Copy config path\""));
     assert!(html.contains("aria-label=\"Copy log path\""));
+    assert!(html.contains("id=\"toolAccessPanel\""));
+    assert!(html.contains("Global Tool Access"));
+    assert!(html.contains("id=\"toolAccessMode\""));
+    assert!(html.contains("data-access-mode=\"read\""));
+    assert!(html.contains("data-access-mode=\"write\""));
+    assert!(html.contains("data-access-mode=\"all\""));
     assert!(html.contains("<div><dt>Active Tasks</dt><dd id=\"taskCount\">0</dd></div>"));
     assert!(!html.contains("<dt>Running</dt><dd id=\"taskCount\">"));
     assert!(html.contains("<div class=\"details\" aria-label=\"Daemon details\">"));
@@ -101,6 +107,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
         ".document-card-session span { overflow: visible; text-overflow: clip; white-space: nowrap;"
     ));
     assert!(css.contains(".document-card-session code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
+    assert!(css.contains(".tool-access-panel { display: grid;"));
+    assert!(css.contains(".segmented { display: inline-grid; grid-template-columns: repeat(3"));
+    assert!(css.contains(".tool-access-list details { border: 1px solid var(--border);"));
+    assert!(css.contains(".tool-access-toggle { display: inline-flex; width: 34px;"));
     assert!(css.contains(
         ".detail-copy:hover, .detail-copy:focus-visible, .id-copy:hover, .id-copy:focus-visible"
     ));
@@ -125,6 +135,12 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("emptyState('No documents connected'"));
     assert!(js.contains("$('configPath').textContent = snapshot.daemon?.config_path || '-'"));
     assert!(!js.contains("'Not configured'"));
+    assert!(js.contains("renderToolAccess(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {})"));
+    assert!(js.contains("function renderToolAccess(catalog, policy)"));
+    assert!(js.contains("function groupedToolAccessCatalog(catalog)"));
+    assert!(js.contains("fetch('/ui/tool-access-policy'"));
+    assert!(js.contains("method: 'PUT'"));
+    assert!(js.contains("event.stopPropagation()"));
     assert!(js.contains("function renderDocumentCard(doc, app)"));
     assert!(js.contains("class=\"row document-card ${esc(app)}\""));
     assert!(js.contains(
@@ -158,7 +174,6 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("fallbackCopy"));
     assert!(js.contains("announceStatus"));
     assert!(js.contains("event.target.closest('[data-copy], [data-copy-value]')"));
-    assert!(js.contains("event.stopPropagation()"));
     assert!(js.contains("function copyableId(value, label)"));
     assert!(js.contains("class=\"id-copy\" data-copy-value=\"${esc(text)}\""));
     assert!(js.contains("function middleTruncate(value, maxLength = 30)"));

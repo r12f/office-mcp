@@ -58,6 +58,25 @@ fn renders_daemon_endpoints_and_grouped_documents() {
         rendered["daemon"]["tool_access_policy"]["disabled_tools"][0],
         "word.update_table"
     );
+    assert_eq!(
+        rendered["daemon"]["tool_catalog"][0]["name"],
+        "word.get_text"
+    );
+    assert_eq!(rendered["daemon"]["tool_catalog"][0]["app"], "word");
+    assert_eq!(
+        rendered["daemon"]["tool_catalog"][0]["category"],
+        "Document & structure"
+    );
+    assert_eq!(rendered["daemon"]["tool_catalog"][0]["side_effect"], "read");
+    assert!(
+        rendered["daemon"]["tool_catalog"]
+            .as_array()
+            .expect("tool catalog array")
+            .iter()
+            .any(
+                |tool| tool["name"] == "excel.update_table" && tool["side_effect"] == "destructive"
+            )
+    );
     assert_eq!(rendered["clients"][0]["transport"], "stdio-bridge");
     assert_eq!(rendered["clients"][0]["connected_at"], 1_000);
     assert_eq!(rendered["documents"]["word"][0]["registered_at"], "unix:3");

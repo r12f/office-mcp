@@ -3,7 +3,9 @@ use crate::api::{
     UiClientRecord, UiClientTransport, UiCommandError, UiCommandRecord, UiCommandStatus, UiHealth,
     UiSnapshot,
 };
-use crate::mcp::{AccessMode, UiToolAccessPolicySnapshot};
+use crate::mcp::{
+    AccessMode, ToolMetadata, ToolSideEffect, UiToolAccessPolicySnapshot, tool_metadata_catalog,
+};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -35,6 +37,7 @@ impl UiSnapshotRenderer {
                 "log_path": snapshot.daemon.log_path,
                 "last_error": snapshot.daemon.last_error,
                 "tool_access_policy": tool_access_policy_json(&snapshot.daemon.tool_access_policy),
+                "tool_catalog": tool_metadata_catalog().iter().map(tool_metadata_json).collect::<Vec<_>>(),
             },
             "clients": snapshot.clients.iter().map(ui_client_json).collect::<Vec<_>>(),
             "documents": snapshot.documents.iter().map(|(app, sessions)| {
@@ -46,6 +49,23 @@ impl UiSnapshotRenderer {
                 (session_id.clone(), commands.iter().map(ui_command_json).collect::<Vec<_>>())
             }).collect::<BTreeMap<_, _>>(),
         })
+    }
+}
+
+fn tool_metadata_json(metadata: &ToolMetadata) -> Value {
+    json!({
+        "name": metadata.name,
+        "app": metadata.app,
+        "category": metadata.category,
+        "side_effect": tool_side_effect_json(metadata.side_effect),
+    })
+}
+
+fn tool_side_effect_json(value: ToolSideEffect) -> &'static str {
+    match value {
+        ToolSideEffect::Read => "read",
+        ToolSideEffect::Mutating => "mutating",
+        ToolSideEffect::Destructive => "destructive",
     }
 }
 

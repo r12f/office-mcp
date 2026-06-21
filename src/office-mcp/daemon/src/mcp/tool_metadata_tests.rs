@@ -1,4 +1,4 @@
-use super::{ToolSideEffect, tool_metadata};
+use super::{ToolSideEffect, tool_metadata, tool_metadata_catalog};
 
 #[test]
 fn tool_metadata_classifies_app_category_and_side_effect() {
@@ -22,4 +22,18 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
 fn unknown_tool_has_no_metadata() {
     assert_eq!(tool_metadata("office.list_sessions"), None);
     assert_eq!(tool_metadata("word.future_tool"), None);
+}
+
+#[test]
+fn tool_metadata_catalog_is_daemon_ui_source_of_truth() {
+    let catalog = tool_metadata_catalog();
+
+    assert_eq!(catalog.first().expect("first tool").name, "word.get_text");
+    assert!(catalog.iter().any(|tool| tool.name == "excel.update_table"));
+    assert!(
+        catalog
+            .iter()
+            .any(|tool| tool.name == "powerpoint.list_slides")
+    );
+    assert!(catalog.iter().all(|tool| !tool.name.starts_with("office.")));
 }

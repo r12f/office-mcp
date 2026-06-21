@@ -100,6 +100,25 @@ tr[data-inspect]:hover td { background: color-mix(in srgb, var(--focus) 9%, tran
 .empty-copy code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px/1.4 "Cascadia Mono", Consolas, monospace; }
 .inspector pre { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.45 "Cascadia Mono", Consolas, monospace; }
 .secondary-action { border: 1px solid var(--border); border-radius: 7px; background: var(--raised); color: var(--text); padding: 4px 9px; }
+.tool-access-panel { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.tool-access-panel h3 { margin-top: 0; color: var(--text); }
+.segmented { display: inline-grid; grid-template-columns: repeat(3, minmax(44px, auto)); border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.segmented button { min-height: 28px; border: 0; border-right: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 3px 8px; cursor: pointer; }
+.segmented button:last-child { border-right: 0; }
+.segmented button[aria-checked="true"] { background: var(--raised); color: var(--focus); font-weight: 600; }
+.tool-access-list { display: grid; gap: 6px; max-height: 300px; overflow: auto; padding-right: 2px; }
+.tool-access-list details { border: 1px solid var(--border); border-radius: 7px; background: var(--raised); }
+.tool-access-list details details { margin: 6px; background: var(--surface); }
+.tool-access-list summary { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 8px; cursor: pointer; }
+.tool-access-list summary span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-access-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tool-access-toggle { display: inline-flex; width: 34px; min-height: 20px; align-items: center; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); padding: 2px; cursor: pointer; }
+.tool-access-toggle::before { content: ""; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); }
+.tool-access-toggle[aria-pressed="true"]::before { transform: translateX(12px); background: var(--success); }
+.tool-access-tools { display: grid; gap: 4px; padding: 0 6px 6px; }
+.tool-access-tool { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 5px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+.tool-access-tool code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px/1.4 "Cascadia Mono", Consolas, monospace; }
+.tool-access-effect { color: var(--muted); font-size: 11px; text-transform: uppercase; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 @media (max-width: 1050px) {
   .status-strip, .workspace, .details dl { grid-template-columns: 1fr; }

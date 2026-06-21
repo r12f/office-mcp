@@ -5,6 +5,18 @@ $('search').addEventListener('input', (event) => { state.search = event.target.v
 $('appFilter').addEventListener('change', (event) => { state.app = event.target.value; render(); });
 $('resultFilter').addEventListener('change', (event) => { state.result = event.target.value; render(); });
 $('clearInspector').addEventListener('click', () => { $('inspector').textContent = 'Select a row.'; announce('Inspector cleared'); });
+$('toolAccessMode').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-access-mode]');
+  if (!button) return;
+  updateToolAccessPolicy({ ...currentToolAccessPolicy(), access_mode: button.dataset.accessMode });
+});
+$('toolAccessList').addEventListener('click', (event) => {
+  const toggle = event.target.closest('.tool-access-toggle');
+  if (!toggle) return;
+  event.preventDefault();
+  event.stopPropagation();
+  toggleToolAccess(toggle);
+});
 
 document.addEventListener('click', async (event) => {
   const copy = event.target.closest('[data-copy], [data-copy-value]');
@@ -63,12 +75,108 @@ function render() {
   $('configPath').textContent = snapshot.daemon?.config_path || '-';
   $('logPath').textContent = snapshot.daemon?.log_path || '-';
   $('lastError').textContent = snapshot.daemon?.last_error || 'None';
+  renderToolAccess(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {});
   renderDocuments(snapshot.documents || {});
   renderClients(snapshot.clients || []);
   renderCommands('currentTasks', snapshot.current_tasks || [], true);
   const history = (snapshot.recent_commands || []).filter((command) => state.result === 'all' || command.status === state.result);
   renderCommands('history', history, false);
 }
+
+function renderToolAccess(catalog, policy) {
+  renderToolAccessMode(policy.access_mode || 'all');
+  const disabledApps = new Set(policy.disabled_apps || []);
+  const disabledCategories = new Set((policy.disabled_categories || []).map(categoryKey));
+  const disabledTools = new Set(policy.disabled_tools || []);
+  $('toolAccessList').innerHTML = groupedToolAccessCatalog(catalog).map((appGroup) => {
+    const appEnabled = !disabledApps.has(appGroup.app);
+    const categoryMarkup = appGroup.categories.map((categoryGroup) => {
+      const categoryEnabled = !disabledCategories.has(`${appGroup.app}:${categoryGroup.category}`);
+      const tools = categoryGroup.tools.map((tool) => `<div class="tool-access-tool" data-tool-name="${esc(tool.name)}"><code title="${esc(tool.name)}">${esc(tool.name)}</code><span class="tool-access-effect">${esc(tool.side_effect)}</span>${toolAccessToggle(!disabledTools.has(tool.name), 'Toggle ' + tool.name, { tool: tool.name })}</div>`).join('');
+      return `<details open data-tool-category="${esc(categoryGroup.category)}"><summary><span>${esc(categoryGroup.category)}</span><span class="tool-access-count">${esc(enabledToolCount(categoryGroup.tools, disabledTools))}/${esc(categoryGroup.tools.length)}</span>${toolAccessToggle(categoryEnabled, 'Toggle ' + categoryGroup.category, { app: appGroup.app, category: categoryGroup.category })}</summary><div class="tool-access-tools">${tools}</div></details>`;
+    }).join('');
+    return `<details open data-tool-app="${esc(appGroup.app)}"><summary><span>${esc(title(appGroup.app))}</span><span class="tool-access-count">${esc(enabledToolCount(appGroup.tools, disabledTools))}/${esc(appGroup.tools.length)}</span>${toolAccessToggle(appEnabled, 'Toggle ' + title(appGroup.app), { app: appGroup.app })}</summary>${categoryMarkup}</details>`;
+  }).join('') || emptyState('No tool catalog available', 'The daemon did not publish tool metadata.');
+}
+
+function renderToolAccessMode(mode) {
+  document.querySelectorAll('#toolAccessMode [data-access-mode]').forEach((button) => {
+    button.setAttribute('aria-checked', button.dataset.accessMode === mode ? 'true' : 'false');
+  });
+}
+
+function groupedToolAccessCatalog(catalog) {
+  const apps = new Map();
+  for (const tool of catalog) {
+    if (!tool?.name || !tool?.app || !tool?.category) continue;
+    if (!apps.has(tool.app)) apps.set(tool.app, { app: tool.app, categories: new Map(), tools: [] });
+    const appGroup = apps.get(tool.app);
+    appGroup.tools.push(tool);
+    if (!appGroup.categories.has(tool.category)) appGroup.categories.set(tool.category, { category: tool.category, tools: [] });
+    appGroup.categories.get(tool.category).tools.push(tool);
+  }
+  return [...apps.values()].map((appGroup) => ({ ...appGroup, categories: [...appGroup.categories.values()] }));
+}
+
+function toolAccessToggle(enabled, label, data) {
+  const dataAttributes = Object.entries(data).map(([key, value]) => `data-${key}="${esc(value)}"`).join(' ');
+  return `<button type="button" class="tool-access-toggle" ${dataAttributes} aria-label="${esc(label)}" aria-pressed="${enabled ? 'true' : 'false'}"></button>`;
+}
+
+function enabledToolCount(tools, disabledTools) {
+  return tools.filter((tool) => !disabledTools.has(tool.name)).length;
+}
+
+function currentToolAccessPolicy() {
+  const policy = state.snapshot?.daemon?.tool_access_policy || {};
+  return {
+    access_mode: policy.access_mode || 'all',
+    disabled_apps: [...(policy.disabled_apps || [])],
+    disabled_categories: [...(policy.disabled_categories || [])],
+    disabled_tools: [...(policy.disabled_tools || [])]
+  };
+}
+
+function toggleToolAccess(toggle) {
+  const policy = currentToolAccessPolicy();
+  if (toggle.dataset.tool) {
+    policy.disabled_tools = toggledList(policy.disabled_tools, toggle.dataset.tool);
+  } else if (toggle.dataset.category) {
+    const key = { app: toggle.dataset.app, category: toggle.dataset.category };
+    policy.disabled_categories = toggledCategoryList(policy.disabled_categories, key);
+  } else if (toggle.dataset.app) {
+    policy.disabled_apps = toggledList(policy.disabled_apps, toggle.dataset.app);
+  }
+  updateToolAccessPolicy(policy);
+}
+
+async function updateToolAccessPolicy(policy) {
+  try {
+    const response = await fetch('/ui/tool-access-policy', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(policy)
+    });
+    if (!response.ok) throw new Error('Tool access update returned ' + response.status);
+    state.snapshot = await response.json();
+    window.__OFFICE_MCP_UI__ = state.snapshot;
+    render();
+    announce('Updated global tool access');
+  } catch (error) {
+    announce(error.message || 'Tool access update failed');
+  }
+}
+
+function toggledList(values, value) {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
+function toggledCategoryList(values, value) {
+  const key = categoryKey(value);
+  return values.some((item) => categoryKey(item) === key) ? values.filter((item) => categoryKey(item) !== key) : [...values, value];
+}
+
+function categoryKey(value) { return `${value.app}:${value.category}`; }
 
 function renderDocuments(groups) {
   const rows = [];

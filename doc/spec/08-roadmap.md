@@ -631,10 +631,15 @@ Word, Excel, and PowerPoint session.
       beginning `Tool <name> is disabled for this document session.`, a refresh
       instruction for `office.get_session_info` or `office.list_sessions`, and
       structured `refresh_session_info: true`.
-- [ ] Add daemon UI controls for the global policy. The UI must show app,
+- [x] Add daemon UI controls for the global policy. The UI must show app,
       category, and tool controls with `Read` / `Write` / `All` mode, and it
       must make clear that daemon policy is global while task-pane
-      `available_tools` remains document/session-specific.
+      `available_tools` remains document/session-specific. Current control
+      panel implementation renders the daemon-owned tool metadata from
+      `/ui/state.daemon.tool_catalog`, groups controls by app and category,
+      exposes `Read` / `Write` / `All`, and updates the live daemon policy via
+      `PUT /ui/tool-access-policy`. Durable write-back from this UI action to
+      the config file remains open under the policy-store item above.
 - [ ] Add tests covering discovery filtering, daemon-policy dispatch rejection,
       session preflight rejection, refresh hints, persistence, and UI rendering.
       Tests must prove a disabled tool disappears from `tools/list`, a stale

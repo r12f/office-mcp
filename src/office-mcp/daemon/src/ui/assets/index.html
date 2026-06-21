@@ -84,6 +84,17 @@
             <h2 id="inspectorHeading">Inspector</h2>
             <button id="clearInspector" type="button" class="secondary-action">Clear</button>
           </div>
+          <section id="toolAccessPanel" class="tool-access-panel" aria-labelledby="toolAccessHeading">
+            <div class="panel-head">
+              <h3 id="toolAccessHeading">Global Tool Access</h3>
+              <div id="toolAccessMode" class="segmented" role="radiogroup" aria-label="Global tool access mode">
+                <button type="button" data-access-mode="read" role="radio" aria-checked="false">Read</button>
+                <button type="button" data-access-mode="write" role="radio" aria-checked="false">Write</button>
+                <button type="button" data-access-mode="all" role="radio" aria-checked="true">All</button>
+              </div>
+            </div>
+            <div id="toolAccessList" class="tool-access-list"></div>
+          </section>
           <pre id="inspector">Select a row.</pre>
         </aside>
       </section>

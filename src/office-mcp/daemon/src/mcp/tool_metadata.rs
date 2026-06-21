@@ -59,6 +59,11 @@ pub fn tool_metadata(name: &str) -> Option<ToolMetadata> {
         .find(|metadata| metadata.name == name)
 }
 
+#[must_use]
+pub fn tool_metadata_catalog() -> &'static [ToolMetadata] {
+    TOOL_METADATA
+}
+
 const TOOL_METADATA: &[ToolMetadata] = &[
     tool(
         "word.get_text",
