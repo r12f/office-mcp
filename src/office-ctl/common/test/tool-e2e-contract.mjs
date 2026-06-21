@@ -278,6 +278,7 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
       applyActivatedDocument(document, activation);
       applyActivationArtifacts(document, activation);
       report.addin_activation = summarizeActivation(activation);
+      assertActivationProof(host, report.addin_activation);
       report.document = summarizeDocument(document);
     }
     report.lifecycle_counts.wait_for_session += 1;
@@ -422,6 +423,14 @@ function summarizeActivation(activation) {
     activation_path: typeof activation.activation_path === 'string' ? activation.activation_path : undefined,
     control_opened: typeof activation.control_opened === 'boolean' ? activation.control_opened : undefined
   };
+}
+
+function assertActivationProof(host, activation) {
+  if (!activation || typeof activation !== 'object') throw new Error(`${host} E2E add-in activation proof is missing.`);
+  if (activation.activated !== true) throw new Error(`${host} E2E add-in activation did not run.`);
+  if (typeof activation.skipped === 'string' && activation.skipped.length > 0) throw new Error(`${host} E2E add-in activation skipped: ${activation.skipped}`);
+  if (typeof activation.activator !== 'string' || activation.activator.trim().length === 0) throw new Error(`${host} E2E add-in activator identity is missing.`);
+  if (typeof activation.activation_path !== 'string' || activation.activation_path.trim().length === 0) throw new Error(`${host} E2E add-in activation path proof is missing.`);
 }
 
 function summarizeSession(session) {

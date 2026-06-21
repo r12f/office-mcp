@@ -758,7 +758,11 @@ function officeToolE2eDetailsLookReady(host: 'Word' | 'Excel' | 'PowerPoint', re
 function officeToolE2eActivationLooksReady(activation: unknown): boolean {
   return isRecord(activation)
     && activation.activated === true
-    && typeof activation.skipped !== 'string';
+    && typeof activation.skipped !== 'string'
+    && typeof activation.activator === 'string'
+    && activation.activator.trim().length > 0
+    && typeof activation.activation_path === 'string'
+    && activation.activation_path.trim().length > 0;
 }
 
 function officeToolE2eCleanupLooksReady(cleanup: unknown): boolean {

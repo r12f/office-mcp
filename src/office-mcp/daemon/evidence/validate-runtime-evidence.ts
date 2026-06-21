@@ -356,6 +356,8 @@ function validateOfficeToolE2eActivation(label: string, activation: unknown): vo
   }
   if (activation.activated !== true) failures.push(`${label} add-in activation did not run.`);
   if (typeof activation.skipped === 'string' && activation.skipped.length > 0) failures.push(`${label} add-in activation was skipped: ${activation.skipped}.`);
+  if (typeof activation.activator !== 'string' || activation.activator.trim().length === 0) failures.push(`${label} missing add-in activator identity.`);
+  if (typeof activation.activation_path !== 'string' || activation.activation_path.trim().length === 0) failures.push(`${label} missing add-in activation path proof.`);
 }
 
 function validateOfficeToolE2eCleanup(label: string, cleanup: unknown): void {

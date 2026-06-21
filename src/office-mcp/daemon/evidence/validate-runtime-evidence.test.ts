@@ -395,6 +395,18 @@ test('runtime evidence validator can require Office tool E2E reports', () => {
 
   withEvidenceFile(report('passed'), (path) => {
     withOfficeToolE2eReports(true, (reports) => {
+      const broken = JSON.parse(readFileSync(reports.word, 'utf8')) as Record<string, unknown>;
+      broken.addin_activation = { activated: true };
+      writeFileSync(reports.word, JSON.stringify(broken, null, 2));
+      const result = runValidator(path, '--require-office-tool-e2e', '--word-tool-e2e-report-path', reports.word, '--excel-tool-e2e-report-path', reports.excel, '--powerpoint-tool-e2e-report-path', reports.powerpoint);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report missing add-in activator identity/);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report missing add-in activation path proof/);
+    });
+  });
+
+  withEvidenceFile(report('passed'), (path) => {
+    withOfficeToolE2eReports(true, (reports) => {
       const broken = JSON.parse(readFileSync(reports.excel, 'utf8')) as ReturnType<typeof officeToolE2eReport>;
       broken.executed_tools = broken.executed_tools.slice(0, -1);
       writeFileSync(reports.excel, JSON.stringify(broken, null, 2));
@@ -1494,7 +1506,7 @@ function officeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tools: strin
     passed,
     daemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
     document: { path: `${host.toLowerCase()}-fixture` },
-    addin_activation: { activated: true, activator: 'office-ui-activator' },
+    addin_activation: { activated: true, activator: 'office-ui-activator', activation_path: 'official-sideload' },
     session: { session_id: `${host.toLowerCase()}-session`, available_tool_count: tools.length },
     lifecycle_counts: {
       start_daemon: 1,
@@ -1932,7 +1944,7 @@ function embeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tool
     report_host: host,
     passed,
     session: { session_id: sessionId, available_tool_count: tools.length },
-    addin_activation: { activated: passed, activator: 'office-ui-activator' },
+    addin_activation: { activated: passed, activator: 'office-ui-activator', activation_path: passed ? 'official-sideload' : undefined },
     lifecycle_counts: {
       start_daemon: 1,
       list_tools: 1,

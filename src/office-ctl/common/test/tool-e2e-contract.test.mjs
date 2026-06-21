@@ -112,7 +112,7 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
     },
     async activateAddin(document) {
       events.push(`activateAddin:${document.path}`);
-      return { activated: true };
+      return { activated: true, activator: 'office-ui-activator', activation_path: 'official-sideload' };
     },
     async waitForSession(document) {
       events.push(`waitForSession:${document.path}`);
@@ -237,7 +237,7 @@ test('shared Office tool E2E loop uses activator-returned document path for sess
     async createDocument() { return { path: 'original.docx', createdByDriver: true, keeper: { closePath: 'close' } }; },
     async activateAddin(document) {
       events.push(`activate:${document.path}`);
-      return { activated: true, document_path: 'sideload-copy.docx', log_path: 'activation.log' };
+      return { activated: true, activator: 'office-ui-activator', activation_path: 'official-sideload', document_path: 'sideload-copy.docx', log_path: 'activation.log' };
     },
     async waitForSession(document) {
       events.push(`wait:${document.path}`);
@@ -263,6 +263,29 @@ test('shared Office tool E2E loop uses activator-returned document path for sess
     'reset:sideload-copy.docx',
     'cleanup:sideload-copy.docx:activation.log'
   ]);
+});
+
+test('shared Office tool E2E loop rejects weak activation proof', async () => {
+  const events = [];
+  const driver = {
+    async startDaemon() { events.push('startDaemon'); return { endpoint: 'http://127.0.0.1:0/mcp' }; },
+    async listTools() { events.push('listTools'); return ['word.read']; },
+    async createDocument() { events.push('createDocument'); return { path: 'fixture.docx' }; },
+    async activateAddin(document) { events.push(`activateAddin:${document.path}`); return { activated: true }; },
+    async waitForSession() { events.push('waitForSession'); return { sessionId: 'session-1', availableTools: ['word.read'] }; },
+    async resetContent() { events.push('reset'); },
+    async setupContent() { events.push('setup'); },
+    async callTool() { events.push('call'); return { ok: true }; },
+    async verifyResult() { events.push('verify'); },
+    async cleanupDocument(document) { events.push(`cleanup:${document.path}`); return cleanupProof(document.path); },
+    async stopDaemon() { events.push('stopDaemon'); }
+  };
+
+  await assert.rejects(
+    () => runOfficeToolE2e({ host: 'Word', cases: { 'word.read': e2eCase('word.read') }, driver }),
+    /Word E2E add-in activator identity is missing/
+  );
+  assert.deepEqual(events, ['startDaemon', 'listTools', 'createDocument', 'activateAddin:fixture.docx', 'cleanup:fixture.docx', 'stopDaemon']);
 });
 
 test('shared Office tool E2E loop writes failed report evidence before rethrowing', async () => {
@@ -758,7 +781,7 @@ const responses = {
   startDaemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
   listTools: ['word.read'],
   createDocument: { path: 'external.docx' },
-  activateAddin: { activated: true, activation_path: 'official-sideload', control_opened: false },
+  activateAddin: { activated: true, activator: 'office-ui-activator', activation_path: 'official-sideload', control_opened: false },
   waitForSession: { sessionId: 'session-1', availableTools: ['word.read'] },
   resetContent: { reset: true },
   setupContent: { setup: true },
@@ -805,6 +828,7 @@ process.stdout.write(JSON.stringify(responses[request.step] || {}));
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
   assert.equal(report.passed, true);
   assert.equal(report.addin_activation.activated, true);
+  assert.equal(report.addin_activation.activator, 'office-ui-activator');
   assert.equal(report.addin_activation.activation_path, 'official-sideload');
   assert.equal(report.addin_activation.control_opened, false);
   assert.deepEqual(report.lifecycle_counts, {

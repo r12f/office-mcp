@@ -907,6 +907,16 @@ test('product visual evidence recorder requires Office tool E2E reports', () => 
     assert.equal(evidence.office_tool_e2e_ready, false);
     assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).powerpoint.ready, false);
 
+    const weakActivationPath = writeOfficeToolE2eReport(dir, 'PowerPoint', true);
+    const weakActivationReport = JSON.parse(readFileSync(weakActivationPath, 'utf8')) as Record<string, unknown>;
+    weakActivationReport.addin_activation = { activated: true };
+    writeFileSync(weakActivationPath, JSON.stringify(weakActivationReport, null, 2));
+    const weakActivation = runRecorder(join(dir, 'weak-office-tool-e2e-activation.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--powerpoint-tool-e2e-report-path', weakActivationPath);
+    assert.notEqual(weakActivation.status, 0);
+    evidence = JSON.parse(readFileSync(join(dir, 'weak-office-tool-e2e-activation.json'), 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.office_tool_e2e_ready, false);
+    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).powerpoint.ready, false);
+
     const skippedCleanupPath = writeOfficeToolE2eReport(dir, 'PowerPoint', true);
     const skippedCleanupReport = JSON.parse(readFileSync(skippedCleanupPath, 'utf8')) as Record<string, unknown>;
     skippedCleanupReport.cleanup = { closed_by_driver: false, deleted: false, deleted_path_count: 0, skipped: 'manual-debug' };
@@ -1469,7 +1479,7 @@ function writeOfficeToolE2eReport(dir: string, host: 'Word' | 'Excel' | 'PowerPo
     passed: ready,
     daemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
     document: { path: `${key}-fixture` },
-    addin_activation: { activated: ready, activator: 'office-ui-activator' },
+    addin_activation: { activated: ready, activator: 'office-ui-activator', activation_path: ready ? 'official-sideload' : undefined },
     session: { session_id: `${key}-session`, available_tool_count: tools.length },
     lifecycle_counts: {
       start_daemon: 1,
