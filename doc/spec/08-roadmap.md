@@ -188,6 +188,50 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       bundle, checksums, and checklist. Partner Center submission and Microsoft
       validation review remain external gates.
 
+### M6.1 — GitHub Release installer pipeline and user install docs
+
+User-reported distribution gap: the project has packaging scripts and a CI MSI
+smoke job, but it does not yet have a GitHub Release pipeline that publishes an
+installable package, and the README does not yet give non-developers a clear
+install path. A program that requires source checkout commands is not
+installable software.
+
+- [ ] Add `.github/workflows/release.yml` for version-tagged releases. The
+      workflow must trigger on tags like `v0.1.0`, support a maintainer dry-run
+      `workflow_dispatch`, build the Windows MSI on `windows-latest`, upload
+      artifacts for every run, and attach release assets only for tag builds.
+- [ ] Make the release workflow reuse the existing packaging path instead of
+      inventing another installer flow: install Rust, Node, add-in dependencies,
+      evidence dependencies, and packaging dependencies; run packaging smoke
+      checks; then call
+      `packaging/windows/build-windows-msi.ps1 -SkipNpmInstall`.
+- [ ] Add release-gate tests/checks that fail before publishing when the MSI is
+      missing, unexpectedly small, incorrectly named, or missing required
+      payloads: native Rust daemon, daemon UI assets, shared Office add-in
+      assets, Word/Excel/PowerPoint task pane bundles, catalog manifests,
+      launcher scripts, and product icons.
+- [ ] Generate and publish `SHA256SUMS` for every release artifact. If signing
+      is not implemented yet, unsigned pre-releases must be explicitly labeled
+      as unsigned rather than silently looking production-signed.
+- [ ] Keep releases draft or pre-release by default until release notes, manual
+      tray evidence, installer smoke evidence, and required live Office evidence
+      are attached or explicitly waived for that pre-release.
+- [ ] Add a README user installation section before the source/developer setup.
+      It must explain how to download `office-mcp-setup-<ver>-x64.msi` from
+      GitHub Releases, verify checksums, run the MSI, restart/open Office,
+      locate `Office MCP Control` in the Shared Folder catalog when needed,
+      open the daemon UI from the tray or CLI, configure MCP clients to
+      `http://127.0.0.1:8800/mcp`, find logs, and uninstall.
+- [ ] Add documentation tests or static checks that fail when README no longer
+      mentions GitHub Releases, the MSI asset name, checksum verification,
+      daemon UI/tray first-run verification, Office Shared Folder activation,
+      MCP endpoint configuration, log collection, and uninstall steps.
+
+**Exit criterion**: Pushing a version tag creates a GitHub Release draft or
+pre-release with a downloadable Windows MSI installer and checksums. A Windows
+desktop user can install from README instructions without cloning the repository
+or running developer build commands.
+
 ### M6.5 — Product UI
 
 - [x] Daemon UI backend and static web console assets: redacted `/ui/state`,
@@ -1316,6 +1360,20 @@ channel, and MCP `tools/call` dispatch.
       `artifacts/office-tool-e2e-excel.json`, and
       `artifacts/office-tool-e2e-powerpoint.json`; final process and temp-file
       checks found no E2E-created Word, Excel, or PowerPoint residue.
+- [ ] Split the Office E2E timeout budget by lifecycle phase and fail fast on
+      add-in/daemon connection failures. A single 120s `waitForSession` timeout
+      is too coarse because it hides fast JavaScript/runtime failures behind a
+      generic "daemon not connected" symptom. Keep longer budgets only for
+      genuinely slow phases such as Office process startup and document open;
+      once the task pane is activated, WebSocket `register` plus
+      `session.added` should have a short 5-10s budget by default. Timeouts
+      must report the exact failed phase and include useful diagnostics: the
+      activation log path/tail, daemon log tail, daemon session snapshot,
+      latest UIA visible control sample, document path being matched, add-in
+      origin/endpoint, and any task pane ready-state evidence available from
+      the activator. The harness must expose per-phase environment overrides
+      for slow machines, but release defaults should catch connection bugs
+      quickly instead of waiting two minutes.
 
 Current implementation evidence: `src/office-ctl/common/test/tool-e2e-contract.mjs`
 owns the shared table-driven loop and exact coverage checks; Word, Excel, and

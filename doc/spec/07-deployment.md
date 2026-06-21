@@ -274,7 +274,62 @@ packaging pass may replace the PowerShell launcher with a native
 `office-mcp.exe`, move mutable config to `%APPDATA%\office-mcp\`, and replace
 the `Run` entry with a Scheduled Task or service wrapper.
 
-The production MSI remains the release packaging target:
+The production MSI remains the release packaging target. A checked-in MSI build
+script is not enough for user distribution: release builds MUST be produced by
+GitHub Actions from an immutable version tag and published as GitHub Release
+assets so a non-developer can download and install the product without cloning
+the repository.
+
+The GitHub Release pipeline MUST:
+
+- Trigger on version tags such as `v0.1.0` and support an explicit
+  `workflow_dispatch` dry run for maintainers.
+- Build the Windows MSI on `windows-latest` from the tagged source using
+  `packaging/windows/build-windows-msi.ps1 -SkipNpmInstall` after installing
+  Rust, Node, WiX packaging dependencies, and all add-in dependencies.
+- Run the packaging smoke checks, PowerShell parser checks, manifest checks,
+  daemon tests needed for packaging confidence, and `git diff --check` before
+  publishing any artifact.
+- Produce versioned artifacts under `artifacts/`, including
+  `office-mcp-setup-<ver>-x64.msi`, `SHA256SUMS`, and later any tarballs,
+  hosted manifests, or add-in bundles that become supported release outputs.
+- Verify the MSI artifact is non-empty, has the expected versioned file name,
+  contains the native Rust daemon, daemon UI assets, shared Office add-in
+  assets, Word/Excel/PowerPoint task pane bundles, generated catalog manifests,
+  launcher scripts, and installer icon assets.
+- Upload artifacts with `actions/upload-artifact` for every run and attach them
+  to a GitHub Release with `softprops/action-gh-release` or `gh release` only
+  when the run is for a version tag.
+- Publish draft releases by default until signing, release notes, manual tray
+  evidence, and any required live Office evidence are attached or explicitly
+  waived for a pre-release.
+- Keep signing as a separate gate: if signing secrets are unavailable, the
+  pipeline may publish unsigned pre-release artifacts but MUST label them as
+  unsigned and MUST still publish `SHA256SUMS`.
+- Fail rather than publish when the version in the tag, MSI file name, package
+  metadata, and release notes disagree.
+
+The repository README MUST include a user-facing installation guide before the
+developer setup section. The guide MUST explain how to install from GitHub
+Releases, not only how to build from source. At minimum it must cover:
+
+- Supported platform status, with Windows desktop as the v1 installer target.
+- Downloading `office-mcp-setup-<ver>-x64.msi` from the latest GitHub Release.
+- Verifying `SHA256SUMS` when desired.
+- Running the MSI, what it installs under `%LOCALAPPDATA%\office-mcp\`, and how
+  it starts the daemon/tray at logon.
+- Opening the daemon UI from the tray or `office-mcp-daemon ui` and checking
+  `daemon status`.
+- Restarting Office if needed, opening Word/Excel/PowerPoint, and adding
+  `Office MCP Control` from the Shared Folder catalog when Office does not
+  auto-show it.
+- Configuring MCP clients to use `http://127.0.0.1:8800/mcp` or the configured
+  endpoint.
+- Where logs live and how to collect them for debugging.
+- How to uninstall from Windows Apps & Features or by removing the MSI-installed
+  package, including the separate Office add-in removal caveat.
+
+The Windows user flow remains:
 
 1. User installs `office-mcp-setup-x64.msi`. The installer:
    - Drops the native Rust daemon executable to `%LOCALAPPDATA%\office-mcp\`.
