@@ -334,14 +334,18 @@ or running developer build commands.
       `active`/`dead` labels without reconnect wording, session ID on dedicated
       copyable lines, version, tool count, queue depth, finished/failed counts,
       no inline activity history, and preserved title width.
-- [ ] Fix add-in runtime identity correlation so connected Word, Excel, and
+- [x] Fix add-in runtime identity correlation so connected Word, Excel, and
       PowerPoint document cards preserve registered host metadata. A real Word
       session must show app `word` and the Office host version when the add-in
       sent those fields during `register`; it must not fall back to `other` or
       `Version -` because `session.added` was correlated to the wrong runtime
       instance. Add regression coverage for daemon register -> session.added ->
       UI snapshot flow, including daemon-assigned instance IDs returned by the
-      register response.
+      register response. Current evidence:
+      `register_assigned_instance_id_preserves_host_metadata_in_ui_snapshot`
+      parses the daemon register response, sends `session.added` with the
+      assigned instance ID, and verifies the UI snapshot preserves `word` and
+      host version `16.0`.
 - [x] Add scan-friendly document state indicators in the daemon main window.
       Compact document cards must use only `active` and `dead` user-facing
       labels with a stable icon, status dot, or host-accent-compatible color

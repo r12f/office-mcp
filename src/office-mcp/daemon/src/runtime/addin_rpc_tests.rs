@@ -1,8 +1,11 @@
 use super::AddinJsonRpcRuntime;
 use crate::addin_mgr::{AddinChannelConfig, AddinChannelServer, SessionRegistry};
+use crate::api::ui_snapshot_service::{UiSnapshotEndpoints, UiSnapshotService};
+use crate::api::{UiStateOptions, UiStateStore};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
 #[test]
 fn register_and_session_added_update_registry() {
@@ -61,6 +64,50 @@ fn register_and_session_added_update_registry() {
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].document.title.as_deref(), Some("Draft.docx"));
     assert_eq!(sessions[0].available_tool_count, 1);
+}
+
+#[test]
+fn register_assigned_instance_id_preserves_host_metadata_in_ui_snapshot() {
+    let registry = Arc::new(Mutex::new(SessionRegistry::new()));
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::with_config(
+        AddinChannelConfig::default(),
+    )));
+
+    let register_reply = addin_handle_text(
+        r#"{"jsonrpc":"2.0","id":"register-1","method":"register","params":{"instance_id":"word-runtime-local","host":{"app":"word","version":"16.0","platform":"windows"},"add_in":{"version":"0.1.0","protocol_version":"1.0","supported_features":["doc.read"]}}}"#,
+        "connection-1",
+        &registry,
+        &addin_channel,
+    )
+    .expect("register reply");
+    let register_json: Value = serde_json::from_str(&register_reply).expect("register reply json");
+    let assigned_instance_id = register_json["result"]["assigned_instance_id"]
+        .as_str()
+        .expect("assigned instance id");
+
+    let session_added = format!(
+        r#"{{"jsonrpc":"2.0","method":"session.added","params":{{"session_id":"session-1","instance_id":"{assigned_instance_id}","document":{{"filename":"Live.docx"}},"available_tools":["word.get_text"],"is_active":true}}}}"#
+    );
+    let session_reply =
+        addin_handle_text(&session_added, "connection-1", &registry, &addin_channel);
+
+    assert_eq!(session_reply, None);
+    let ui_state = Arc::new(Mutex::new(UiStateStore::with_options(UiStateOptions {
+        now: SystemTime::UNIX_EPOCH,
+        ..UiStateOptions::default()
+    })));
+    let endpoints = UiSnapshotEndpoints {
+        mcp_endpoint: "http://127.0.0.1:8800/mcp".to_string(),
+        addin_endpoint: "https://localhost:8765/addin".to_string(),
+    };
+
+    let snapshot_text =
+        UiSnapshotService::new().render_runtime_snapshot(&ui_state, &registry, &endpoints);
+    let snapshot: Value = serde_json::from_str(&snapshot_text).expect("snapshot json");
+
+    assert_eq!(snapshot["documents"]["word"][0]["session_id"], "session-1");
+    assert_eq!(snapshot["documents"]["word"][0]["app"], "word");
+    assert_eq!(snapshot["documents"]["word"][0]["host"]["version"], "16.0");
 }
 
 #[test]
