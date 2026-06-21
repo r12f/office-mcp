@@ -591,6 +591,9 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /if \(\$panel\.opened\) \{ return \$true \}/);
   assert.doesNotMatch(script, /if \(Wait-ForOpenControlPanel/);
   assert.doesNotMatch(script, /return @\{ opened = \$true; control_name = "Open Control Panel"; activation_path = "" \}/);
+  for (const match of script.matchAll(/return @\{[^\n]*opened = \$true[^\n]*activation_path = "([^"]*)"[^\n]*\}/g)) {
+    assert.notEqual(match[1], '', `opened activator branch must include activation_path: ${match[0]}`);
+  }
   assert.match(script, /return @\{ opened = \$false; control_name = ""; activation_path = "" \}/);
   assert.match(script, /\$hasPane -and \$hasConnected -and \$hasTools/);
   assert.match(script, /Office MCP Control direct click did not show Open Control Panel; trying catalog confirmation/);

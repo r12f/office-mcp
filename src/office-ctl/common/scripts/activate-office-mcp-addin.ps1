@@ -821,7 +821,7 @@ function Try-OpenControlPanelForDriverDocument {
         return @{ opened = $true; control_name = $currentPanel.control_name; tab_name = $tabName; activation_path = $currentPanel.activation_path }
       }
       if (Try-EnableOfficeMcpAddin -Root $window -WindowHandle $WindowHandle -Deadline $Deadline -Source "current:$tabName") {
-        return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+        return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "current:$tabName" }
       }
       if (Try-InvokeOfficeAddinsRibbon -WindowHandle $WindowHandle -Window $window -Deadline $Deadline -Source "current:$tabName") {
         $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
@@ -830,7 +830,7 @@ function Try-OpenControlPanelForDriverDocument {
           return @{ opened = $true; control_name = $ribbonPanel.control_name; tab_name = $tabName; activation_path = $ribbonPanel.activation_path }
         }
         if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "ribbon:$tabName") {
-          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "ribbon:$tabName" }
         }
         if ($AllowCatalogFallback -and (Try-OpenAddinFromCatalog -WindowHandle $WindowHandle -Window $nextWindow -Deadline $Deadline)) {
           return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "catalog-fallback" }
@@ -844,7 +844,7 @@ function Try-OpenControlPanelForDriverDocument {
         }
         $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
         if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "tab:$tabName") {
-          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "tab:$tabName" }
         }
         if ($AllowCatalogFallback -and (Try-OpenAddinFromCatalog -WindowHandle $WindowHandle -Window $nextWindow -Deadline $Deadline)) {
           return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "catalog-fallback" }
