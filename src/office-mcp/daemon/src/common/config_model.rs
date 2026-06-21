@@ -8,6 +8,7 @@ pub struct LoadConfigOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DaemonConfig {
+    pub config_path: String,
     pub addin: AddinConfig,
     pub mcp: McpConfig,
     pub limits: LimitsConfig,

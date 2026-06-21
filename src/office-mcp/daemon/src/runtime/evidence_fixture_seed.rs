@@ -4,13 +4,14 @@ use crate::addin_mgr::{
 };
 use crate::api::{
     CommandFailure, CommandResult, RegisterClientInput, StartCommandInput, UiClientTransport,
-    UiHealth, UiStateStore,
+    UiHealth, UiStateOptions, UiStateStore,
 };
 use crate::runtime::RuntimeSeedState;
 use std::time::{Duration, SystemTime};
 
 #[must_use]
-pub(crate) fn seeded_state(now: SystemTime) -> RuntimeSeedState {
+pub(crate) fn seeded_state(options: UiStateOptions) -> RuntimeSeedState {
+    let now = options.now;
     let mut registry = SessionRegistry::new();
     registry.register_runtime(runtime("word-instance", "word", now));
     registry.add_session(word_session(), now);
@@ -18,7 +19,7 @@ pub(crate) fn seeded_state(now: SystemTime) -> RuntimeSeedState {
     registry.add_session(excel_session(), now);
     registry.mark_session_stale("33333333-3333-4333-8333-333333333333", now);
 
-    let mut ui_state = UiStateStore::new();
+    let mut ui_state = UiStateStore::with_options(options);
     ui_state.set_health(
         UiHealth::Degraded,
         Some("Certificate reload failed. Check the configured local PFX path."),
@@ -92,9 +93,9 @@ pub(crate) fn seeded_state(now: SystemTime) -> RuntimeSeedState {
 }
 
 #[must_use]
-pub(crate) fn empty_state() -> RuntimeSeedState {
+pub(crate) fn empty_state(options: UiStateOptions) -> RuntimeSeedState {
     let registry = SessionRegistry::new();
-    let mut ui_state = UiStateStore::new();
+    let mut ui_state = UiStateStore::with_options(options);
     ui_state.set_health(UiHealth::Up, None);
     RuntimeSeedState { ui_state, registry }
 }

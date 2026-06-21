@@ -12,6 +12,10 @@ fn runtime_config_converts_daemon_config_into_socket_settings() {
     assert_eq!(config.addin_origin, "https://localhost:8766");
     assert_eq!(config.max_pending_per_session, 7);
     assert_eq!(config.session_grace, std::time::Duration::from_secs(42));
+    assert_eq!(
+        config.config_path.as_deref(),
+        Some("C:\\office-mcp\\config.toml")
+    );
     assert_eq!(config.log_path.as_deref(), Some("C:\\logs\\office-mcp.log"));
     assert_eq!(config.mcp_http_config().requests_per_minute, 99);
     assert_eq!(
@@ -45,6 +49,7 @@ fn default_runtime_config_uses_loopback_mcp_endpoint() {
 
 fn daemon_config() -> DaemonConfig {
     DaemonConfig {
+        config_path: "C:\\office-mcp\\config.toml".to_string(),
         addin: AddinConfig {
             host: "localhost".to_string(),
             port: 8766,

@@ -566,6 +566,7 @@ fn roundtrip_with_frontend(
 
 fn daemon_config_with_log_path(log_path: &str) -> DaemonConfig {
     DaemonConfig {
+        config_path: "C:\\office-mcp\\config.toml".to_string(),
         addin: AddinConfig {
             host: "localhost".to_string(),
             port: 8765,

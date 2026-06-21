@@ -58,6 +58,7 @@ pub(crate) fn fixture_config(
     certificate_passphrase: String,
 ) -> DaemonConfig {
     DaemonConfig {
+        config_path: default_fixture_config_path().display().to_string(),
         addin: AddinConfig {
             host: "127.0.0.1".to_string(),
             port: u64::from(addin_port),
@@ -89,6 +90,10 @@ pub(crate) fn fixture_config(
             file: String::new(),
         },
     }
+}
+
+fn default_fixture_config_path() -> PathBuf {
+    std::env::temp_dir().join("office-mcp").join("config.toml")
 }
 
 pub(crate) fn default_addin_public_dir() -> PathBuf {

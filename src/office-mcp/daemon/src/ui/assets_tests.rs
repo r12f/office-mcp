@@ -72,6 +72,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("aria-label=\"Copy add-in endpoint\""));
     assert!(html.contains("aria-label=\"Copy config path\""));
     assert!(html.contains("aria-label=\"Copy log path\""));
+    assert!(html.contains("<div><dt>Active Tasks</dt><dd id=\"taskCount\">0</dd></div>"));
+    assert!(!html.contains("<dt>Running</dt><dd id=\"taskCount\">"));
     assert!(html.contains("<div class=\"details\" aria-label=\"Daemon details\">"));
     assert!(html.contains("</div>\n      </header>\n\n      <section class=\"workspace\">"));
     assert!(!html.contains("<section class=\"details\" aria-label=\"Daemon details\">"));
@@ -97,9 +99,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     ));
     assert!(css.contains(".details { grid-column: 1 / -1;"));
     assert!(css.contains("border-top: 1px solid var(--border); padding-top: 8px;"));
-    assert!(css.contains(".details dl { display: grid; grid-template-columns: minmax(72px, .45fr) minmax(72px, .45fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(180px, 1fr);"));
+    assert!(css.contains(".details dl { display: grid; grid-template-columns: minmax(64px, .35fr) minmax(64px, .35fr) minmax(150px, .9fr) minmax(150px, .9fr) minmax(240px, 1.7fr);"));
     assert!(css.contains(".details dd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains(".details .detail-copy { min-height: 24px; padding: 0 4px;"));
+    assert!(css.contains(".details .detail-path code { direction: rtl; text-align: left;"));
     assert!(css.contains("--powerpoint: #b7472a;"));
     assert!(css.contains(".row.powerpoint { border-left-color: var(--powerpoint); }"));
     assert!(css.contains(".filter-row { display: grid; grid-template-columns: auto minmax(82px, 104px) auto minmax(120px, 1fr);"));
@@ -113,6 +116,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".empty-copy code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(!css.contains("transition: all"));
     assert!(js.contains("emptyState('No documents connected'"));
+    assert!(js.contains("$('configPath').textContent = snapshot.daemon?.config_path || '-'"));
+    assert!(!js.contains("'Not configured'"));
     assert!(js.contains("state.app = event.target.value"));
     assert!(js.contains("if (state.app !== 'all' && app !== state.app) continue;"));
     assert!(js.contains("emptyState('No matching documents'"));

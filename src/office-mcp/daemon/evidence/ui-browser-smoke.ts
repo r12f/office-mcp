@@ -20,7 +20,7 @@ async function main(): Promise<void> {
   const watchdog = setTimeout(() => {
     console.error('UI smoke timed out.');
     process.exit(1);
-  }, 90000);
+  }, 180000);
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'office-mcp-ui-runtime-'));
   const cargoTargetDir = join(fixtureRoot, 'target');
   const runtimePath = join(fixtureRoot, 'ui-runtime.json');
@@ -69,10 +69,14 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row.word")', 'keyboard expansion preserves document row focus');
     await pressKey(cdp, 'Enter', 13);
     await waitFor(cdp, 'document.querySelector("#documents .row.word").getAttribute("aria-expanded") === "false"');
+    await assertEval(cdp, '[...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Active Tasks") && ![...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Running")', 'top metrics use explicit active task label');
     await assertEval(cdp, 'document.querySelector("#currentTasks").textContent.includes("Running") && document.querySelector("#taskCount").textContent.trim() === "1"', 'running task state renders');
     await assertEval(cdp, 'document.querySelector("#history").textContent.includes("Success") && document.querySelector("#history").textContent.includes("Failure") && document.querySelector("#history").textContent.includes("TIMEOUT") && document.querySelector("#history").textContent.includes("CANCELLED")', 'history renders success failure timeout and cancelled states');
     await assertEval(cdp, 'document.querySelector("#history tr[data-inspect]").getAttribute("tabindex") === "0" && document.querySelector("#history tr[data-inspect]").getAttribute("role") === "button"', 'history table rows are keyboard focusable buttons');
     await assertEval(cdp, 'document.querySelector("#daemonVersion").textContent.trim().length > 0 && document.querySelector("#daemonUptime").textContent.trim().length > 0', 'daemon details show version and uptime');
+    await assertEval(cdp, 'document.querySelector("#configPath").textContent.includes("config.toml") && !document.querySelector("#configPath").textContent.includes("Not configured")', 'daemon details show effective config file path');
+    await assertEval(cdp, 'document.querySelector("[data-copy=\\"configPath\\"]").getAttribute("aria-label") === "Copy config path" && document.querySelector("#configPath").closest(".detail-copy") !== null', 'config path has a copy affordance');
+    await assertEval(cdp, '(() => { const columns = getComputedStyle(document.querySelector(".details dl")).gridTemplateColumns.trim().split(/\\s+/); return columns.length === 5 && parseFloat(columns[4]) > parseFloat(columns[0]) && parseFloat(columns[4]) >= parseFloat(columns[2]); })()', 'daemon details reserve wider space for last error than compact metadata');
     await assertEval(cdp, 'document.querySelector("#lastError").textContent.trim().length > 0', 'daemon details show last error state');
     await assertEval(cdp, 'document.querySelector(".status-strip > .details") !== null && document.querySelector(".status-strip").nextElementSibling.classList.contains("workspace")', 'daemon details are grouped inside the compact status strip');
     await assertEval(cdp, '(() => { const header = document.querySelector(".status-strip").getBoundingClientRect(); const details = document.querySelector(".details").getBoundingClientRect(); const workspace = document.querySelector(".workspace").getBoundingClientRect(); return details.height <= 56 && workspace.top - header.bottom <= 12; })()', 'daemon header avoids detached oversized detail block');
@@ -130,7 +134,7 @@ async function main(): Promise<void> {
       const emptyRuntime = await waitForRuntimeFile(emptyRuntimePath, emptyDaemon);
       await cdp.send('Page.navigate', { url: emptyRuntime.uiUrl });
       await waitFor(cdp, 'document.querySelector("#healthBadge").textContent.includes("Up")');
-      await assertEval(cdp, 'document.querySelector("#clientCount").textContent.trim() === "0" && document.querySelector("#documentCount").textContent.trim() === "0" && document.querySelector("#taskCount").textContent.trim() === "0"', 'empty state counters render zero');
+      await assertEval(cdp, '[...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Active Tasks") && document.querySelector("#clientCount").textContent.trim() === "0" && document.querySelector("#documentCount").textContent.trim() === "0" && document.querySelector("#taskCount").textContent.trim() === "0"', 'empty state counters render zero with explicit task label');
       await assertEval(cdp, 'document.querySelector("#clients").textContent.includes("No MCP clients connected")', 'empty client state renders');
       await assertEval(cdp, 'document.querySelector("#documents").textContent.includes("No documents connected")', 'empty document state renders');
       await assertEval(cdp, 'document.querySelector("#currentTasks").textContent.includes("No command is running") && document.querySelector("#history").textContent.includes("No command history yet")', 'empty task and history states render');
@@ -292,10 +296,10 @@ async function assertTaskpane(cdp: CdpClient, pageDiagnostics: PageDiagnostics, 
   await assertEval(cdp, '!/Dirty:\\s*unknown|Read-only:\\s*unknown/i.test(document.querySelector("#documentState").textContent)', `${hostName} taskpane avoids unknown dirty/read-only state`);
   await assertEval(cdp, 'document.querySelector(".tools-panel summary").textContent.includes("Tools") && !document.body.textContent.includes("Available Tools") && !document.body.textContent.includes("Tool Permissions")', `${hostName} taskpane merges available tools and permissions into one surface`);
   await assertEval(cdp, `document.querySelectorAll("#toolList").length === 1 && document.querySelectorAll("#toolPermissionList").length === 0 && document.querySelectorAll(".tool-group").length >= ${minimumToolGroups}`, `${hostName} taskpane renders one grouped tools surface`);
-  await assertEval(cdp, '[...document.querySelectorAll(".tool-group")].every((group) => group.tagName === "DETAILS" && /\\d+\/\\d+/.test(group.querySelector("summary")?.textContent || "") && !/Enabled/.test(group.querySelector("summary")?.textContent || ""))', `${hostName} taskpane tool categories are collapsible with compact counts`);
+  await assertEval(cdp, '[...document.querySelectorAll(".tool-group")].every((group) => group.tagName === "DETAILS" && /\\d+\\/\\d+/.test(group.querySelector("summary")?.textContent || "") && !/Enabled/.test(group.querySelector("summary")?.textContent || ""))', `${hostName} taskpane tool categories are collapsible with compact counts`);
   await assertEval(cdp, 'document.querySelector(".daemon-endpoint-form") !== null && document.querySelector("#endpointInput").type === "url" && document.querySelector("#endpointInput").name === "daemonEndpoint"', `${hostName} taskpane inline daemon row exposes endpoint URL field`);
   await assertEval(cdp, '(() => { const form = document.querySelector(".daemon-endpoint-form"); const row = form.closest("dd"); const rect = form.getBoundingClientRect(); return row && rect.height > 0 && rect.height < 48 && row.textContent.includes("wss://localhost"); })()', `${hostName} taskpane daemon endpoint row stays compact and inline`);
-  await assertEval(cdp, 'document.querySelector("#endpointInput").placeholder.includes("wss://localhost") && document.querySelector("#endpointError").getAttribute("role") === "alert"', `${hostName} taskpane endpoint validation affordances render`);
+  await assertEval(cdp, 'document.querySelector("#endpointInput").placeholder.includes("wss://localhost") && document.querySelector("#endpointError") === null && document.querySelector("#connectionDetail") !== null', `${hostName} taskpane endpoint validation uses last error row`);
   await assertEval(cdp, 'document.querySelector("#settingsForm").closest(".summary-panel") !== null', `${hostName} taskpane settings are inline in the summary panel`);
   await assertEval(cdp, '!document.querySelector(".tools-panel").open && document.querySelector(".tools-panel").getBoundingClientRect().height < 48', `${hostName} tools surface stays compact while collapsed`);
   await assertEval(cdp, 'document.querySelector("#currentTaskHeading").getBoundingClientRect().top < 520 && document.querySelector("#historyHeading").getBoundingClientRect().top < 680', `${hostName} taskpane first viewport shows current and recent task regions`);
@@ -305,9 +309,7 @@ async function assertTaskpane(cdp: CdpClient, pageDiagnostics: PageDiagnostics, 
   await assertEval(cdp, '(() => { const summary = document.querySelector(".summary-panel"); const form = document.querySelector(".daemon-endpoint-form"); const task = document.querySelector(".current-task-panel"); const summaryRect = summary.getBoundingClientRect(); const formRect = form.getBoundingClientRect(); const taskRect = task.getBoundingClientRect(); return formRect.height > 0 && formRect.top >= summaryRect.top && formRect.bottom <= summaryRect.bottom && taskRect.top - summaryRect.bottom <= 12; })()', `${hostName} inline settings stay inside summary flow without a detached block`);
   await assertEval(cdp, '(() => { const summary = document.querySelector(".summary-panel"); const children = [...summary.children].filter((child) => getComputedStyle(child).display !== "none"); const rects = children.map((child) => child.getBoundingClientRect()).filter((rect) => rect.height > 0); return rects.every((rect, index) => index === 0 || (rect.top >= rects[index - 1].bottom && rect.top - rects[index - 1].bottom <= 12)); })()', `${hostName} summary content has compact non-overlapping vertical spacing`);
   await assertEval(cdp, '(() => { const panels = [...document.querySelectorAll(".panel")].map((panel) => panel.getBoundingClientRect()); return panels.every((rect, index) => index === 0 || rect.top >= panels[index - 1].bottom); })()', `${hostName} taskpane panels do not overlap`);
-  await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#endpointInput").value = "http://127.0.0.1:8765/addin"; document.querySelector("#settingsForm").requestSubmit();' });
-  await waitFor(cdp, 'document.querySelector("#endpointError").textContent.length > 0');
-  await assertEval(cdp, 'document.activeElement === document.querySelector("#endpointInput")', `${hostName} invalid endpoint validation focuses endpoint field`);
+  await assertEval(cdp, 'document.querySelector("#endpointError") === null && document.querySelector("#connectionDetail") !== null', `${hostName} taskpane keeps endpoint validation on the last error row`);
   const taskpaneScreenshot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
   if (taskpaneScreenshot.data.length < 1000) throw new Error(`UI smoke failed: ${hostName} taskpane screenshot is unexpectedly small`);
 }

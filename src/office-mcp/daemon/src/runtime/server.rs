@@ -96,8 +96,8 @@ impl RuntimeServer {
         )
     }
 
-    fn ui_state_store(&self) -> UiStateStore {
-        UiStateStore::with_options(UiStateOptions {
+    pub(crate) fn ui_state_options(&self) -> UiStateOptions {
+        UiStateOptions {
             mcp_endpoint: format!(
                 "http://{}:{}/mcp",
                 self.config.mcp_host, self.config.mcp_port
@@ -107,7 +107,11 @@ impl RuntimeServer {
             log_path: self.config.log_path.clone(),
             now: SystemTime::now(),
             ..UiStateOptions::default()
-        })
+        }
+    }
+
+    fn ui_state_store(&self) -> UiStateStore {
+        UiStateStore::with_options(self.ui_state_options())
     }
 
     /// Runs already-bound listeners with a caller-provided initial UI and

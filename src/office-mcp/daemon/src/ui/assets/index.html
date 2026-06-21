@@ -23,7 +23,7 @@
         <dl class="metrics" aria-label="Connection counts">
           <div><dt>Clients</dt><dd id="clientCount">0</dd></div>
           <div><dt>Documents</dt><dd id="documentCount">0</dd></div>
-          <div><dt>Running</dt><dd id="taskCount">0</dd></div>
+          <div><dt>Active Tasks</dt><dd id="taskCount">0</dd></div>
         </dl>
         <div class="endpoints" aria-label="Endpoints">
           <button type="button" class="copy" data-copy="mcpEndpoint" aria-label="Copy MCP endpoint"><span>MCP</span><code id="mcpEndpoint">-</code></button>
@@ -33,8 +33,8 @@
           <dl>
             <div><dt>Version</dt><dd id="daemonVersion">-</dd></div>
             <div><dt>Uptime</dt><dd id="daemonUptime">-</dd></div>
-            <div><dt>Config</dt><dd><button type="button" class="detail-copy" data-copy="configPath" aria-label="Copy config path"><code id="configPath">Not configured</code></button></dd></div>
-            <div><dt>Log</dt><dd><button type="button" class="detail-copy" data-copy="logPath" aria-label="Copy log path"><code id="logPath">Not configured</code></button></dd></div>
+            <div class="detail-path"><dt>Config</dt><dd><button type="button" class="detail-copy" data-copy="configPath" aria-label="Copy config path"><code id="configPath">-</code></button></dd></div>
+            <div class="detail-path"><dt>Log</dt><dd><button type="button" class="detail-copy" data-copy="logPath" aria-label="Copy log path"><code id="logPath">-</code></button></dd></div>
             <div><dt>Last error</dt><dd id="lastError">None</dd></div>
           </dl>
         </div>

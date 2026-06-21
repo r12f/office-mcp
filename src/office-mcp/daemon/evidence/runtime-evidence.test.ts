@@ -235,8 +235,11 @@ test('UI browser smoke follows the current inline task pane settings contract', 
   assert.match(source, /\.daemon-endpoint-form/);
   assert.match(source, /#saveEndpoint/);
   assert.match(source, /#endpointInput/);
-  assert.match(source, /#endpointError/);
-  assert.match(source, /requestSubmit\(\)/);
+  assert.match(source, /#connectionDetail/);
+  assert.match(source, /taskpane endpoint validation uses last error row/);
+  assert.match(source, /taskpane keeps endpoint validation on the last error row/);
+  assert.doesNotMatch(source, /#endpointError"\)\.getAttribute/);
+  assert.doesNotMatch(source, /requestSubmit\(\)/);
   assert.doesNotMatch(source, /#settingsToggle/);
   assert.doesNotMatch(source, /#settingsPanel/);
   assert.doesNotMatch(source, /is-editing-tools/);

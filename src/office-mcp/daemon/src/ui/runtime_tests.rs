@@ -79,6 +79,7 @@ fn default_runtime_path_uses_local_app_data_on_windows() {
 #[test]
 fn runtime_file_can_be_built_from_config() {
     let config = DaemonConfig {
+        config_path: "C:\\office-mcp\\config.toml".to_string(),
         addin: AddinConfig {
             host: "localhost".to_string(),
             port: 8765,

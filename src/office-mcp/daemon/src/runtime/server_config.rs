@@ -67,7 +67,7 @@ impl RuntimeServerConfig {
             heartbeat_interval: Duration::from_secs(config.addin.heartbeat_interval_sec),
             heartbeat_timeout: Duration::from_secs(config.addin.heartbeat_timeout_sec),
             requests_per_minute: config.limits.requests_per_minute,
-            config_path: None,
+            config_path: Some(config.config_path.clone()),
             log_path: Some(config.logging.file.clone()),
             audit_log: if config.audit.enabled {
                 AuditLog::enabled(&config.audit.path)

@@ -62,8 +62,8 @@ function render() {
   $('addinEndpoint').textContent = snapshot.daemon?.addin_endpoint || '-';
   $('daemonVersion').textContent = snapshot.daemon?.version || '-';
   $('daemonUptime').textContent = duration(snapshot.daemon?.uptime_ms || 0);
-  $('configPath').textContent = snapshot.daemon?.config_path || 'Not configured';
-  $('logPath').textContent = snapshot.daemon?.log_path || 'Not configured';
+  $('configPath').textContent = snapshot.daemon?.config_path || '-';
+  $('logPath').textContent = snapshot.daemon?.log_path || '-';
   $('lastError').textContent = snapshot.daemon?.last_error || 'None';
   renderDocuments(snapshot.documents || {});
   renderClients(snapshot.clients || []);

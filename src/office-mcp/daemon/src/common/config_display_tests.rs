@@ -36,6 +36,7 @@ fn escapes_json_control_characters() {
 
 fn config() -> DaemonConfig {
     DaemonConfig {
+        config_path: "C:\\office-mcp\\config.toml".to_string(),
         addin: AddinConfig {
             host: "localhost".to_string(),
             port: 8765,

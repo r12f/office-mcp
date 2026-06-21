@@ -70,6 +70,7 @@ impl DaemonConfigService {
         )?;
 
         Ok(DaemonConfig {
+            config_path: config_path.display().to_string(),
             addin: AddinConfig {
                 host: addin_host.clone(),
                 port: addin_port,

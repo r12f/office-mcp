@@ -50,14 +50,15 @@ pub fn run_ui_fixture(options: UiFixtureOptions) -> Result<(), RuntimeServerErro
         heartbeat_interval: Duration::from_secs(config.addin.heartbeat_interval_sec),
         heartbeat_timeout: Duration::from_secs(config.addin.heartbeat_timeout_sec),
         requests_per_minute: config.limits.requests_per_minute,
-        config_path: None,
+        config_path: Some(config.config_path.clone()),
         log_path: Some(config.logging.file.clone()),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
     });
+    let seed_options = server.ui_state_options();
     let seed = match options.state {
-        UiFixtureState::Seeded => seeded_state(std::time::SystemTime::now()),
-        UiFixtureState::Empty => empty_state(),
+        UiFixtureState::Seeded => seeded_state(seed_options),
+        UiFixtureState::Empty => empty_state(seed_options),
     };
     let result = server.serve_bound_with_state_forever(
         &mcp_listener,
