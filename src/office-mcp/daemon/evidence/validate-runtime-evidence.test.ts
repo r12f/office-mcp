@@ -849,6 +849,18 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.observations.tray_tooltip = 'Office MCP Control stale tray tooltip observation';
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual evidence tray tooltip observation does not match tray tooltip field/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.daemon_context = manualTrayDaemonContext(['Status: Up', 'Clients: 0']);
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -1437,6 +1449,7 @@ function withProductVisualEvidence(passed: boolean, callback: (path: string) => 
 
 function productVisualReport(passed: boolean, screenshots: Record<string, string>) {
   const observations = Object.fromEntries(productVisualSurfaces().map((surface) => [surface, `Office MCP Control ${surface}`]));
+  observations.tray_tooltip = 'Office MCP Control - Up - 0 clients - 0 documents';
   return {
     schema_version: 1,
     kind: 'product_visual_evidence',

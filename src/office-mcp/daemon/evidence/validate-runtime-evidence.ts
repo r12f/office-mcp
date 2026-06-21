@@ -514,7 +514,7 @@ function validateProductVisualEvidence(): void {
   validateProductVisualScreenshots(visual.screenshot_paths, visual.screenshots_exist);
   validateProductVisualScreenshotFreshness(visual.screenshot_paths, visual.screenshot_metadata, visual.screenshots_fresh, visual.screenshots_fresh_ready, visual.recorded_at);
   validateDistinctProductVisualScreenshots(visual.screenshot_paths);
-  validateProductVisualObservations(visual.observations);
+  validateProductVisualObservations(visual.observations, visual.tray_tooltip);
   validateProductIdentityReview(visual.product_identity_review);
   validateCatalogIdentityReview(visual.catalog_identity_review, visual.catalog_identity_review_ready);
   validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
@@ -959,7 +959,7 @@ function validateDistinctProductVisualScreenshots(paths: unknown): void {
   }
 }
 
-function validateProductVisualObservations(observations: unknown): void {
+function validateProductVisualObservations(observations: unknown, trayTooltip: unknown): void {
   if (!isRecord(observations)) {
     failures.push('Product visual evidence observations are malformed.');
     return;
@@ -969,6 +969,9 @@ function validateProductVisualObservations(observations: unknown): void {
     if (typeof value !== 'string' || !value.includes('Office MCP Control')) {
       failures.push(`Product visual evidence observation missing product name: ${surface}.`);
     }
+  }
+  if (typeof trayTooltip === 'string' && observations.tray_tooltip !== trayTooltip) {
+    failures.push('Product visual evidence tray tooltip observation does not match tray tooltip field.');
   }
 }
 
