@@ -386,6 +386,31 @@ fn mcp_json_rpc_forwarded_word_tool_invokes_addin_connection() {
 }
 
 #[test]
+fn mcp_json_rpc_disabled_session_tool_uses_unified_error_wording() {
+    let registry = registry_with_word_session_with_tools(vec!["word.get_outline"]);
+
+    let reply = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"disabled-tool","method":"tools/call","params":{"name":"word.get_text","arguments":{"session_id":"session-1"}}}"#,
+    );
+
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    let error = &reply["result"]["structuredContent"]["error"];
+    assert_eq!(error["office_mcp_code"], "TOOL_NOT_ENABLED_FOR_DOCUMENT");
+    assert_eq!(error["refresh_session_info"], true);
+    assert_eq!(
+        error["message"],
+        "Tool word.get_text is disabled for this document session. Refresh office.get_session_info or office.list_sessions before retrying."
+    );
+    assert!(
+        !error["message"]
+            .as_str()
+            .expect("message")
+            .contains("not enabled")
+    );
+}
+
+#[test]
 fn mcp_json_rpc_forwarded_excel_tool_invokes_addin_connection() {
     let registry = registry_with_excel_session();
     let mut ui_state = UiStateStore::new();
@@ -622,7 +647,7 @@ fn mcp_json_rpc_preflight_failure_writes_redacted_audit_record() {
 
     let contents = std::fs::read_to_string(&audit_path).expect("audit file");
     assert!(contents.contains("\"tool\":\"word.insert_paragraph\""));
-    assert!(contents.contains("HOST_CAPABILITY_UNAVAILABLE"));
+    assert!(contents.contains("TOOL_NOT_ENABLED_FOR_DOCUMENT"));
     assert!(contents.contains("\"ok\":false"));
     assert!(!contents.contains("secret body"));
     let _ = std::fs::remove_dir_all(audit_dir);

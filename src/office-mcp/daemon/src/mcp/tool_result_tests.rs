@@ -55,3 +55,29 @@ fn command_failure_result_maps_partial_effect() {
         "possible"
     );
 }
+
+#[test]
+fn disabled_document_tool_failure_includes_session_refresh_hint() {
+    let result = tool_failure_from_command(&CommandFailure {
+        office_mcp_code: "TOOL_NOT_ENABLED_FOR_DOCUMENT".to_string(),
+        message: "Tool word.get_text is disabled for this document session. Refresh office.get_session_info or office.list_sessions before retrying.".to_string(),
+        tool: Some("word.get_text".to_string()),
+        retriable: false,
+        partial_effect: None,
+    });
+
+    assert_eq!(
+        result["structuredContent"]["error"]["office_mcp_code"],
+        "TOOL_NOT_ENABLED_FOR_DOCUMENT"
+    );
+    assert_eq!(
+        result["structuredContent"]["error"]["refresh_session_info"],
+        true
+    );
+    assert!(
+        result["structuredContent"]["error"]["message"]
+            .as_str()
+            .expect("message")
+            .starts_with("Tool word.get_text is disabled")
+    );
+}

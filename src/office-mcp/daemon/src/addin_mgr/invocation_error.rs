@@ -53,6 +53,7 @@ pub enum OfficeMcpCode {
     SessionLost,
     MaxPendingExceeded,
     HostCapabilityUnavailable,
+    ToolNotEnabledForDocument,
 }
 
 impl OfficeMcpCode {
@@ -65,6 +66,7 @@ impl OfficeMcpCode {
             Self::SessionLost => "SESSION_LOST",
             Self::MaxPendingExceeded => "MAX_PENDING_EXCEEDED",
             Self::HostCapabilityUnavailable => "HOST_CAPABILITY_UNAVAILABLE",
+            Self::ToolNotEnabledForDocument => "TOOL_NOT_ENABLED_FOR_DOCUMENT",
         }
     }
 
@@ -76,6 +78,7 @@ impl OfficeMcpCode {
             Self::SessionLost => format!("Session {session_id} lost its add-in connection."),
             Self::MaxPendingExceeded => format!("Session {session_id} has too many pending tool calls."),
             Self::HostCapabilityUnavailable => format!("The selected Office session does not support {tool}."),
+            Self::ToolNotEnabledForDocument => format!("Tool {tool} is disabled for this document session. Refresh office.get_session_info or office.list_sessions before retrying."),
         }
     }
 

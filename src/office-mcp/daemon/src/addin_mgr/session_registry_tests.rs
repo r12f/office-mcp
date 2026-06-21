@@ -73,11 +73,15 @@ fn invocation_preflight_returns_protocol_errors() {
         .expect_err("missing capability");
     assert_eq!(
         error.failure.office_mcp_code,
-        OfficeMcpCode::HostCapabilityUnavailable
+        OfficeMcpCode::ToolNotEnabledForDocument
     );
     assert_eq!(
         error.failure.office_mcp_code.as_str(),
-        "HOST_CAPABILITY_UNAVAILABLE"
+        "TOOL_NOT_ENABLED_FOR_DOCUMENT"
+    );
+    assert_eq!(
+        error.failure.message,
+        "Tool word.unsupported is disabled for this document session. Refresh office.get_session_info or office.list_sessions before retrying."
     );
 
     let error = registry

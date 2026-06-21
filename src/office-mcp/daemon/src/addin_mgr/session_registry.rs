@@ -177,7 +177,7 @@ impl SessionRegistry {
         }
         if check_capability && !session.available_tools.iter().any(|value| value == tool) {
             return Err(ToolInvocationError::new(
-                OfficeMcpCode::HostCapabilityUnavailable,
+                OfficeMcpCode::ToolNotEnabledForDocument,
                 session_id,
                 tool,
             ));

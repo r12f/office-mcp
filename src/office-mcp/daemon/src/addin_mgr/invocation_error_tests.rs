@@ -14,6 +14,10 @@ fn office_mcp_codes_keep_protocol_strings() {
         OfficeMcpCode::HostCapabilityUnavailable.as_str(),
         "HOST_CAPABILITY_UNAVAILABLE"
     );
+    assert_eq!(
+        OfficeMcpCode::ToolNotEnabledForDocument.as_str(),
+        "TOOL_NOT_ENABLED_FOR_DOCUMENT"
+    );
 }
 
 #[test]
@@ -56,4 +60,19 @@ fn missing_capability_message_names_tool() {
         error.failure.message,
         "The selected Office session does not support word.insert_image."
     );
+}
+
+#[test]
+fn disabled_document_tool_message_uses_unified_wording() {
+    let error = ToolInvocationError::new(
+        OfficeMcpCode::ToolNotEnabledForDocument,
+        "session-1",
+        "word.get_text",
+    );
+
+    assert_eq!(
+        error.failure.message,
+        "Tool word.get_text is disabled for this document session. Refresh office.get_session_info or office.list_sessions before retrying."
+    );
+    assert!(!error.failure.message.contains("not enabled"));
 }

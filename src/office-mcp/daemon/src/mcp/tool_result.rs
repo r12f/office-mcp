@@ -25,13 +25,16 @@ pub fn tool_failure(code: &str, message: &str, tool: Option<&str>, retriable: bo
 #[must_use]
 pub fn tool_failure_from_command(failure: &CommandFailure) -> Value {
     let partial_effect = failure.partial_effect.map(partial_effect_json);
-    let error = json!({
+    let mut error = json!({
         "office_mcp_code": failure.office_mcp_code,
         "message": failure.message,
         "tool": failure.tool,
         "retriable": failure.retriable,
         "partial_effect": partial_effect
     });
+    if failure.office_mcp_code == "TOOL_NOT_ENABLED_FOR_DOCUMENT" {
+        error["refresh_session_info"] = json!(true);
+    }
     tool_error_result(&error)
 }
 
