@@ -907,6 +907,16 @@ test('product visual evidence recorder requires Office tool E2E reports', () => 
     assert.equal(evidence.office_tool_e2e_ready, false);
     assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).powerpoint.ready, false);
 
+    const skippedCleanupPath = writeOfficeToolE2eReport(dir, 'PowerPoint', true);
+    const skippedCleanupReport = JSON.parse(readFileSync(skippedCleanupPath, 'utf8')) as Record<string, unknown>;
+    skippedCleanupReport.cleanup = { closed_by_driver: false, deleted: false, deleted_path_count: 0, skipped: 'manual-debug' };
+    writeFileSync(skippedCleanupPath, JSON.stringify(skippedCleanupReport, null, 2));
+    const skippedCleanup = runRecorder(join(dir, 'skipped-office-tool-e2e-cleanup.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--powerpoint-tool-e2e-report-path', skippedCleanupPath);
+    assert.notEqual(skippedCleanup.status, 0);
+    evidence = JSON.parse(readFileSync(join(dir, 'skipped-office-tool-e2e-cleanup.json'), 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.office_tool_e2e_ready, false);
+    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).powerpoint.ready, false);
+
     const passing = runRecorder(join(dir, 'office-tool-e2e-ready.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
     assert.equal(passing.status, 0, outputText(passing.stdout) + outputText(passing.stderr));
     evidence = JSON.parse(readFileSync(join(dir, 'office-tool-e2e-ready.json'), 'utf8')) as Record<string, unknown>;
@@ -1470,6 +1480,7 @@ function writeOfficeToolE2eReport(dir: string, host: 'Word' | 'Excel' | 'PowerPo
       cleanup_document: 1,
       stop_daemon: 1
     },
+    cleanup: { closed_by_driver: ready, deleted: ready, deleted_path_count: ready ? 1 : 0 },
     advertised_tools: tools,
     session_available_tools: tools,
     executed_tools: ready ? tools : tools.slice(0, -1),

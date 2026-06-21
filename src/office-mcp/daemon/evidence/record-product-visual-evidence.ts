@@ -724,6 +724,7 @@ function readOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path: st
       passed: report.passed,
       addin_activation: report.addin_activation,
       lifecycle_counts: report.lifecycle_counts,
+      cleanup: report.cleanup,
       advertised_tools: report.advertised_tools,
       session_available_tools: report.session_available_tools,
       executed_tools: report.executed_tools,
@@ -743,6 +744,7 @@ function officeToolE2eDetailsLookReady(host: 'Word' | 'Excel' | 'PowerPoint', re
   if (report.schema_version !== 1 || report.kind !== 'office_tool_e2e_report' || report.host !== host || report.passed !== true) return false;
   if (!officeToolE2eLifecycleLooksReady(report.lifecycle_counts)) return false;
   if (!officeToolE2eActivationLooksReady(report.addin_activation)) return false;
+  if (!officeToolE2eCleanupLooksReady(report.cleanup)) return false;
   const advertisedTools = stringArray(report.advertised_tools);
   const sessionTools = stringArray(report.session_available_tools);
   const executedTools = stringArray(report.executed_tools);
@@ -757,6 +759,15 @@ function officeToolE2eActivationLooksReady(activation: unknown): boolean {
   return isRecord(activation)
     && activation.activated === true
     && typeof activation.skipped !== 'string';
+}
+
+function officeToolE2eCleanupLooksReady(cleanup: unknown): boolean {
+  return isRecord(cleanup)
+    && cleanup.closed_by_driver === true
+    && cleanup.deleted === true
+    && typeof cleanup.deleted_path_count === 'number'
+    && cleanup.deleted_path_count >= 1
+    && typeof cleanup.skipped !== 'string';
 }
 
 function officeToolE2eLifecycleLooksReady(lifecycle: unknown): boolean {
