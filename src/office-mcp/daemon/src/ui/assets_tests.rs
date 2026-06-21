@@ -101,7 +101,7 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".id-copy { display: inline-flex; max-width: 100%; min-height: 32px;"));
     assert!(css.contains(".id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains(
-        ".document-card-session { display: grid; grid-template-columns: auto minmax(0, 1fr);"
+        ".document-card-session { display: grid; grid-template-columns: minmax(0, 1fr);"
     ));
     assert!(css.contains(
         ".document-card-session span { overflow: visible; text-overflow: clip; white-space: nowrap;"
