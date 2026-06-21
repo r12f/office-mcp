@@ -30,7 +30,7 @@
     if (!value || value === '-') return false;
     try {
       if (navigatorRef?.clipboard?.writeText) await navigatorRef.clipboard.writeText(value);
-      else options.fallbackCopy?.(value);
+      else (options.fallbackCopy || fallbackCopy)(value, documentRef);
       if (options.announcer) options.announcer.textContent = `Copied ${button.getAttribute?.('aria-label') || 'value'}`;
       return true;
     } catch (error) {
@@ -38,6 +38,18 @@
       if (options.announcer) options.announcer.textContent = 'Copy failed';
       return false;
     }
+  }
+
+  function fallbackCopy(value, documentRef = global.document) {
+    const area = documentRef.createElement('textarea');
+    area.value = value;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    documentRef.body.appendChild(area);
+    area.select();
+    documentRef.execCommand('copy');
+    area.remove();
   }
 
   function renderRuntimeVersions(serverVersionElement, protocolVersionElement, serverInfo, fallbackProtocolVersion) {

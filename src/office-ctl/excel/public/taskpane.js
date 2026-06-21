@@ -1890,19 +1890,6 @@
   }
 
   async function handleMetadataCopy(event) {
-    await copyMetadataValue(event, { document, navigator, announcer: announcerEl, logger, fallbackCopy });
-  }
-
-
-  function fallbackCopy(value) {
-    const area = document.createElement('textarea');
-    area.value = value;
-    area.setAttribute('readonly', '');
-    area.style.position = 'fixed';
-    area.style.opacity = '0';
-    document.body.appendChild(area);
-    area.select();
-    document.execCommand('copy');
-    area.remove();
+    await copyMetadataValue(event, { document, navigator, announcer: announcerEl, logger });
   }
 })();

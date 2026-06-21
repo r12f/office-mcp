@@ -171,7 +171,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(mainUi, /middleTruncate\(requestId\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
-  assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger, fallbackCopy \}\)/);
+  assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger \}\)/);
   assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
   assert.match(mainUi, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
   assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
@@ -181,7 +181,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(mainUi, /button\.dataset\.copyValue = text/);
   assert.doesNotMatch(js, /function middleTruncate\(value, maxLength = 30\)/);
   assert.match(mainUi, /function middleTruncate\(value, maxLength = 30\)/);
-  assert.match(js, /function fallbackCopy\(value\)/);
+  assert.doesNotMatch(js, /function fallbackCopy\(value\)/);
   assert.match(js, /clearEndpointOverride/);
   assert.match(js, /currentOriginEndpoint/);
   assert.match(js, /try \{[\s\S]*validateEndpoint\(value\);[\s\S]*storeEndpointOverride\(value\);[\s\S]*\} catch \(error\) \{[\s\S]*endpointErrorEl\.textContent = error\.message \|\| 'Enter a valid wss:\/\/ endpoint\.';[\s\S]*endpointInputEl\.focus\(\);/);

@@ -87,6 +87,49 @@ test('common main UI falls back and reports copy failures', async () => {
   assert.equal(announcer.textContent, 'Copy failed');
 });
 
+test('common main UI owns textarea clipboard fallback', async () => {
+  const appended = [];
+  const removed = [];
+  const commands = [];
+  const area = {
+    value: '',
+    style: {},
+    setAttribute(name, value) { this[name] = value; },
+    select() { this.selected = true; },
+    remove() { removed.push(this); }
+  };
+  const document = {
+    createElement(tag) {
+      assert.equal(tag, 'textarea');
+      return area;
+    },
+    body: {
+      appendChild(element) { appended.push(element); }
+    },
+    execCommand(command) {
+      commands.push(command);
+      return true;
+    }
+  };
+  const mainUi = loadMainUi({ document });
+  const fixture = buttonFixture({ value: 'fallback-value' });
+
+  assert.equal(await mainUi.copyMetadataValue(fixture.event, {
+    document: { ...document, getElementById: fixture.document.getElementById },
+    navigator: {},
+    announcer: { textContent: '' }
+  }), true);
+
+  assert.equal(area.value, 'fallback-value');
+  assert.equal(area.readonly, '');
+  assert.equal(area.style.position, 'fixed');
+  assert.equal(area.style.opacity, '0');
+  assert.equal(area.selected, true);
+  assert.deepEqual(appended, [area]);
+  assert.deepEqual(commands, ['copy']);
+  assert.deepEqual(removed, [area]);
+});
+
 test('common main UI maps connection and task states to badge classes', () => {
   const mainUi = loadMainUi();
 
