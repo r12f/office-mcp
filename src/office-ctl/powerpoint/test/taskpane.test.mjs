@@ -160,11 +160,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /historyCountEl\.textContent = `\$\{history\.length\} \/ \$\{historyLimit\}`/);
   assert.match(js, /function taskMarkup\(task\)/);
   assert.match(js, /const tone = task\.status === 'success' \? 'status-success' : task\.status === 'running' \? 'status-warning' : task\.status === 'cancelled' \? 'status-neutral' : 'status-danger'/);
-  assert.match(js, /Retriable: \$\{valueLabel\(task\.error\.retriable\)\}/);
-  assert.match(js, /Partial effect: \$\{escapeHtml\(task\.error\.partial_effect \|\| 'unknown'\)\}/);
-  assert.match(js, /const intent = task\.userIntent \? `<div class="task-meta">\$\{escapeHtml\(redactText\(task\.userIntent\)\)\}<\/div>` : ''/);
-  assert.match(js, /const deadline = task\.deadlineAt \? `<div class="task-meta">Deadline \$\{escapeHtml\(formatTime\(task\.deadlineAt\)\)\}<\/div>` : ''/);
-  assert.match(js, /const cancel = task\.cancelRequested \? '<div class="task-meta">Cancel requested<\/div>' : ''/);
+  assert.match(js, /const metadata = taskMetadataMarkup\(task, \{ escapeHtml, formatTime, redactText, valueLabel \}\)/);
   assert.match(js, /function valueLabel\(value\)/);
   assert.match(js, /if \(value === true\) return 'yes'/);
   assert.match(js, /function reply\(id, result\) \{\s*return replyJsonRpc\(socket, id, result\);\s*\}/);
@@ -178,7 +174,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger, fallbackCopy \}\)/);
   assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
   assert.match(mainUi, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
-  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata, statusClass \} = window\.OfficeCtlMainUi/);
+  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
   assert.doesNotMatch(js, /classList\.add\(state === 'connected'/);
   assert.doesNotMatch(js, /function setCopyableMetadata\(element, value\)/);
   assert.match(mainUi, /function setCopyableMetadata\(element, value\)/);

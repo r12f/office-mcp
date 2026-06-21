@@ -35,7 +35,8 @@
     officeHostSummary,
     renderRuntimeVersions,
     setCopyableMetadata,
-    statusClass
+    statusClass,
+    taskMetadataMarkup
   } = window.OfficeCtlMainUi;
 
   const AVAILABLE_TOOLS = [
@@ -1832,10 +1833,7 @@
 
   function taskMarkup(task) {
     const tone = task.status === 'success' ? 'status-success' : task.status === 'running' ? 'status-warning' : task.status === 'cancelled' ? 'status-neutral' : 'status-danger';
-    const error = task.error ? `<div class="task-meta">${escapeHtml(task.error.office_mcp_code)}: ${escapeHtml(task.error.message)} · Retriable: ${valueLabel(task.error.retriable)} · Partial effect: ${escapeHtml(task.error.partial_effect || 'unknown')}</div>` : '';
-    const intent = task.userIntent ? `<div class="task-meta">${escapeHtml(redactText(task.userIntent))}</div>` : '';
-    const deadline = task.deadlineAt ? `<div class="task-meta">Deadline ${escapeHtml(formatTime(task.deadlineAt))}</div>` : '';
-    const cancel = task.cancelRequested ? '<div class="task-meta">Cancel requested</div>' : '';
+    const metadata = taskMetadataMarkup(task, { escapeHtml, formatTime, redactText, valueLabel });
     const commandId = commandIdMarkup(task.requestId, { escapeHtml });
     return [
       '<div class="task-title">',
@@ -1844,10 +1842,7 @@
       '</div>',
       commandId,
       `<div class="task-meta">${escapeHtml(formatDuration(task.elapsedMs || 0))}</div>`,
-      deadline,
-      cancel,
-      intent,
-      error
+      metadata
     ].join('');
   }
 

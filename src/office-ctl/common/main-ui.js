@@ -82,6 +82,18 @@
     return `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="${escaped}" aria-label="Copy command ID" title="${escaped}"><code>${escapeHtml(middleTruncate(requestId))}</code></button></div>`;
   }
 
+  function taskMetadataMarkup(task, options = {}) {
+    const escapeHtml = options.escapeHtml || ((value) => String(value));
+    const formatTime = options.formatTime || ((value) => String(value));
+    const redactText = options.redactText || ((value) => String(value));
+    const valueLabel = options.valueLabel || ((value) => String(value));
+    const error = task.error ? `<div class="task-meta">${escapeHtml(task.error.office_mcp_code)}: ${escapeHtml(task.error.message)} · Retriable: ${valueLabel(task.error.retriable)} · Partial effect: ${escapeHtml(task.error.partial_effect || 'unknown')}</div>` : '';
+    const intent = task.userIntent ? `<div class="task-meta">${escapeHtml(redactText(task.userIntent))}</div>` : '';
+    const deadline = task.deadlineAt ? `<div class="task-meta">Deadline ${escapeHtml(formatTime(task.deadlineAt))}</div>` : '';
+    const cancel = task.cancelRequested ? '<div class="task-meta">Cancel requested</div>' : '';
+    return `${deadline}${cancel}${intent}${error}`;
+  }
+
   global.OfficeCtlMainUi = Object.freeze({
     bindDetailsControl,
     commandIdMarkup,
@@ -90,6 +102,7 @@
     officeHostSummary,
     renderRuntimeVersions,
     setCopyableMetadata,
-    statusClass
+    statusClass,
+    taskMetadataMarkup
   });
 })(globalThis);

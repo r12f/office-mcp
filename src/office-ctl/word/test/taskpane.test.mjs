@@ -466,11 +466,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /taskStore\.isCancelled\(requestId\)/);
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
   assert.match(js, /finishTask\(requestId, 'success'/);
-  assert.match(js, /Cancel requested/);
-  assert.match(js, /Deadline/);
-  assert.match(js, /office_mcp_code/);
-  assert.match(js, /Retriable:/);
-  assert.match(js, /Partial effect:/);
+  assert.match(js, /const metadata = taskMetadataMarkup\(task, \{ escapeHtml, formatTime, redactText, valueLabel: boolLabel \}\)/);
   assert.match(js, /storeEndpointOverride\(value\)/);
   assert.doesNotMatch(js, /settingsToggleEl/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
@@ -496,8 +492,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.doesNotMatch(js, /Dirty: \$\{boolLabel/);
   assert.match(js, /protocol_version/);
   assert.match(js, /beforeunload/);
-  assert.match(js, /Cancel requested/);
-  assert.match(js, /Deadline/);
+  assert.match(js, /taskMetadataMarkup/);
   assert.match(js, /OfficeCtlCommon/);
   assert.match(js, /OfficeCtlAddinChannel/);
   assert.match(js, /createRequestId/);

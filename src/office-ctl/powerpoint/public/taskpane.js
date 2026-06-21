@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata, statusClass } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1544,13 +1544,10 @@
     const status = task.status ? titleCase(task.status) : 'Running';
     const tone = task.status === 'success' ? 'status-success' : task.status === 'running' ? 'status-warning' : task.status === 'cancelled' ? 'status-neutral' : 'status-danger';
     const elapsed = typeof task.elapsedMs === 'number' ? formatDuration(task.elapsedMs) : 'in progress';
-    const error = task.error ? `<div class="task-meta">${escapeHtml(task.error.office_mcp_code)}: ${escapeHtml(task.error.message)} · Retriable: ${valueLabel(task.error.retriable)} · Partial effect: ${escapeHtml(task.error.partial_effect || 'unknown')}</div>` : '';
-    const intent = task.userIntent ? `<div class="task-meta">${escapeHtml(redactText(task.userIntent))}</div>` : '';
-    const deadline = task.deadlineAt ? `<div class="task-meta">Deadline ${escapeHtml(formatTime(task.deadlineAt))}</div>` : '';
-    const cancel = task.cancelRequested ? '<div class="task-meta">Cancel requested</div>' : '';
+    const metadata = taskMetadataMarkup(task, { escapeHtml, formatTime, redactText, valueLabel });
     const commandId = commandIdMarkup(task.requestId, { escapeHtml });
     const startedAt = task.startedAt ? `${escapeHtml(formatTime(task.startedAt))} / ` : '';
-    return `<article class="task-card"><div class="task-title"><span>${escapeHtml(task.tool)}</span><span class="status-badge ${tone}">${escapeHtml(status)}</span></div>${commandId}<div class="task-meta">${startedAt}${escapeHtml(elapsed)}</div>${deadline}${cancel}${intent}${error}</article>`;
+    return `<article class="task-card"><div class="task-title"><span>${escapeHtml(task.tool)}</span><span class="status-badge ${tone}">${escapeHtml(status)}</span></div>${commandId}<div class="task-meta">${startedAt}${escapeHtml(elapsed)}</div>${metadata}</article>`;
   }
 
   function valueLabel(value) {

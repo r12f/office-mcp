@@ -115,3 +115,33 @@ test('common main UI renders copyable command IDs with middle truncation', () =>
   assert.match(markup, /<code>0123456789abcd\.\.\.nopqrstuvwxyz<\/code>/);
   assert.equal(mainUi.commandIdMarkup('', { escapeHtml: (value) => String(value) }), '');
 });
+
+test('common main UI renders redacted task metadata rows', () => {
+  const mainUi = loadMainUi();
+  const task = {
+    userIntent: 'replace token=secret text',
+    deadlineAt: 1700000000000,
+    cancelRequested: true,
+    error: {
+      office_mcp_code: 'HOST_ERROR',
+      message: 'failed <unsafe>',
+      retriable: false,
+      partial_effect: 'none'
+    }
+  };
+
+  const markup = mainUi.taskMetadataMarkup(task, {
+    escapeHtml: (value) => String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+    formatTime: (value) => `time-${value}`,
+    redactText: (value) => String(value).replace('token=secret', 'token=[redacted]'),
+    valueLabel: (value) => value === true ? 'yes' : value === false ? 'no' : 'unknown'
+  });
+
+  assert.match(markup, /HOST_ERROR: failed &lt;unsafe&gt;/);
+  assert.match(markup, /Retriable: no/);
+  assert.match(markup, /Partial effect: none/);
+  assert.match(markup, /replace token=\[redacted\] text/);
+  assert.match(markup, /Deadline time-1700000000000/);
+  assert.match(markup, /Cancel requested/);
+  assert.equal(mainUi.taskMetadataMarkup({}, { escapeHtml: String, formatTime: String, redactText: String, valueLabel: String }), '');
+});
