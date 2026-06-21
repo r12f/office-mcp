@@ -1,8 +1,12 @@
 use super::AddinHttpService;
-use crate::addin_mgr::SessionRegistry;
+use crate::addin_mgr::{
+    AddinChannelServer, AddinConnectionHub, CommandRouter, ImageFetcher, SessionRegistry,
+};
 use crate::api::UiStateStore;
-use crate::mcp::HttpMethod;
+use crate::common::AuditLog;
+use crate::mcp::{HttpMethod, ToolAccessPolicy};
 use crate::runtime::http_wire::WireHttpRequest;
+use crate::runtime::mcp_response::RuntimeSharedState;
 use crate::runtime::server_config::RuntimeServerConfig;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -75,6 +79,73 @@ fn ui_state_uses_origin_guard_and_snapshot_service() {
 }
 
 #[test]
+fn tool_access_policy_update_changes_ui_state_and_runtime_policy() {
+    let service = AddinHttpService::from_config(&RuntimeServerConfig::default());
+    let ui_state = Arc::new(Mutex::new(UiStateStore::new()));
+    let shared_state = shared_state();
+    let mut update = request(
+        HttpMethod::Put,
+        "/ui/tool-access-policy",
+        BTreeMap::from([("origin".to_string(), "https://localhost:8765".to_string())]),
+    );
+    update.body = br#"{
+        "access_mode":"read",
+        "disabled_apps":["powerpoint"],
+        "disabled_categories":[{"app":"excel","category":"Range"}],
+        "disabled_tools":["word.update_table"]
+    }"#
+    .to_vec();
+
+    let response = service.route_request(&ui_state, &shared_state, &update);
+
+    assert_eq!(response.status, 200);
+    let body = response_text(&response);
+    assert!(body.contains("\"access_mode\":\"read\""));
+    let snapshot = ui_state
+        .lock()
+        .expect("ui state")
+        .snapshot(&[], std::time::SystemTime::UNIX_EPOCH);
+    assert_eq!(
+        snapshot.daemon.tool_access_policy.disabled_apps,
+        vec!["powerpoint"]
+    );
+    assert!(
+        shared_state
+            .tool_access_policy()
+            .allows_tool("word.get_text")
+    );
+    assert!(
+        !shared_state
+            .tool_access_policy()
+            .allows_tool("word.insert_paragraph")
+    );
+    assert!(
+        !shared_state
+            .tool_access_policy()
+            .allows_tool("excel.read_range")
+    );
+    assert!(
+        !shared_state
+            .tool_access_policy()
+            .allows_tool("powerpoint.list_slides")
+    );
+}
+
+#[test]
+fn tool_access_policy_update_rejects_foreign_origin() {
+    let mut request = request(
+        HttpMethod::Put,
+        "/ui/tool-access-policy",
+        BTreeMap::from([("origin".to_string(), "https://evil.example".to_string())]),
+    );
+    request.body = br#"{"access_mode":"read"}"#.to_vec();
+
+    let response = route(&request);
+
+    assert_eq!(response.status, 403);
+}
+
+#[test]
 fn addin_diagnostics_accepts_local_events_and_rejects_foreign_origins() {
     let mut allowed = request(
         HttpMethod::Post,
@@ -118,9 +189,22 @@ fn non_get_requests_outside_addin_upgrade_are_rejected() {
 fn route(request: &WireHttpRequest) -> crate::runtime::http_wire::WireHttpResponse {
     let service = AddinHttpService::from_config(&RuntimeServerConfig::default());
     let ui_state = Arc::new(Mutex::new(UiStateStore::new()));
-    let registry = Arc::new(Mutex::new(SessionRegistry::new()));
+    let shared_state = shared_state();
 
-    service.route_request(&ui_state, &registry, request)
+    service.route_request(&ui_state, &shared_state, request)
+}
+
+fn shared_state() -> Arc<RuntimeSharedState> {
+    Arc::new(RuntimeSharedState {
+        registry: Arc::new(Mutex::new(SessionRegistry::new())),
+        session_grace: std::time::Duration::from_secs(60),
+        addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
+        connection_hub: Arc::new(AddinConnectionHub::new()),
+        command_router: Arc::new(Mutex::new(CommandRouter::new())),
+        audit_log: AuditLog::new(),
+        image_fetcher: ImageFetcher::new(),
+        tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+    })
 }
 
 fn request(method: HttpMethod, path: &str, headers: BTreeMap<String, String>) -> WireHttpRequest {

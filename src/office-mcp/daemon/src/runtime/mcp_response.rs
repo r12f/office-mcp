@@ -19,7 +19,7 @@ pub(crate) struct RuntimeSharedState {
     pub(crate) command_router: Arc<Mutex<CommandRouter>>,
     pub(crate) audit_log: AuditLog,
     pub(crate) image_fetcher: ImageFetcher,
-    pub(crate) tool_access_policy: ToolAccessPolicy,
+    pub(crate) tool_access_policy: Arc<Mutex<ToolAccessPolicy>>,
 }
 
 impl RuntimeSharedState {
@@ -33,6 +33,22 @@ impl RuntimeSharedState {
             tracing::info!(removed, "pruned stale Office document sessions");
         }
         removed
+    }
+
+    pub(crate) fn tool_access_policy(&self) -> ToolAccessPolicy {
+        self.tool_access_policy
+            .lock()
+            .map_or_else(|_| ToolAccessPolicy::default(), |policy| policy.clone())
+    }
+
+    pub(crate) fn set_tool_access_policy(&self, policy: ToolAccessPolicy) -> bool {
+        let Ok(mut current) = self.tool_access_policy.lock() else {
+            tracing::warn!("failed to lock daemon tool access policy for update");
+            return false;
+        };
+        *current = policy;
+        tracing::info!("updated daemon tool access policy");
+        true
     }
 }
 
@@ -75,6 +91,7 @@ impl McpHttpResponseService {
                 )
             }
             McpHttpDecision::ForwardToTransport { .. } => {
+                let tool_access_policy = shared_state.tool_access_policy();
                 let mut context = McpDispatchContext {
                     registry,
                     ui_state,
@@ -83,7 +100,7 @@ impl McpHttpResponseService {
                     command_router: &shared_state.command_router,
                     audit_log: &shared_state.audit_log,
                     image_fetcher: &shared_state.image_fetcher,
-                    tool_access_policy: &shared_state.tool_access_policy,
+                    tool_access_policy: &tool_access_policy,
                 };
                 let body = McpJsonRpcRuntime::handle_body(&mut context, body);
                 WireHttpResponse::json(200, BTreeMap::new(), body)

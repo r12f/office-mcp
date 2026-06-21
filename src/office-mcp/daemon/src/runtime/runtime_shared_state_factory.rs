@@ -20,7 +20,7 @@ impl RuntimeSharedStateFactory {
             command_router: Arc::new(Mutex::new(CommandRouter::new())),
             audit_log: config.audit_log.clone(),
             image_fetcher: config.image_fetcher.clone(),
-            tool_access_policy: config.tool_access_policy.clone(),
+            tool_access_policy: Arc::new(Mutex::new(config.tool_access_policy.clone())),
         })
     }
 }

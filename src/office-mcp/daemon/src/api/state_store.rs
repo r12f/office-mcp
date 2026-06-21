@@ -4,6 +4,7 @@ use crate::api::{
     CommandResult, RegisterClientInput, StartCommandInput, UiClientRecord, UiCommandRecord,
     UiCommandStatus, UiDaemonSnapshot, UiHealth, UiSnapshot, UiStateOptions,
 };
+use crate::mcp::ToolAccessPolicy;
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime};
 
@@ -52,6 +53,10 @@ impl UiStateStore {
     pub fn set_health(&mut self, status: UiHealth, last_error: Option<&str>) {
         self.health = status;
         self.last_error = last_error.map(redact_text);
+    }
+
+    pub fn set_tool_access_policy(&mut self, policy: ToolAccessPolicy) {
+        self.options.tool_access_policy = policy;
     }
 
     pub fn register_client(&mut self, input: RegisterClientInput) -> String {

@@ -1,7 +1,8 @@
-use crate::addin_mgr::{SessionRegistry, websocket_accept_key};
+use crate::addin_mgr::websocket_accept_key;
 use crate::api::UiStateStore;
 use crate::mcp::HttpMethod;
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
+use crate::runtime::mcp_response::RuntimeSharedState;
 use crate::runtime::server_config::RuntimeServerConfig;
 use crate::runtime::static_response::StaticResponseService;
 use crate::runtime::ui_http::UiHttpService;
@@ -29,7 +30,7 @@ impl AddinHttpService {
     pub(crate) fn route_request(
         &self,
         ui_state: &Arc<Mutex<UiStateStore>>,
-        registry: &Arc<Mutex<SessionRegistry>>,
+        shared_state: &Arc<RuntimeSharedState>,
         request: &WireHttpRequest,
     ) -> WireHttpResponse {
         if request.path == "/healthz" && request.method == HttpMethod::Get {
@@ -42,7 +43,12 @@ impl AddinHttpService {
             return self.route_websocket_upgrade(request);
         }
         if request.method == HttpMethod::Get
-            && let Some(response) = self.ui.try_handle(request, ui_state, registry)
+            && let Some(response) = self.ui.try_handle(request, ui_state, shared_state)
+        {
+            return response;
+        }
+        if request.method == HttpMethod::Put
+            && let Some(response) = self.ui.try_handle(request, ui_state, shared_state)
         {
             return response;
         }

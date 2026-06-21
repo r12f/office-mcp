@@ -1,6 +1,10 @@
-use crate::addin_mgr::SessionRegistry;
+use crate::addin_mgr::{
+    AddinChannelServer, AddinConnectionHub, CommandRouter, ImageFetcher, SessionRegistry,
+};
 use crate::api::UiStateStore;
+use crate::common::AuditLog;
 use crate::mcp::McpHttpFrontend;
+use crate::mcp::ToolAccessPolicy;
 use crate::runtime::addin_http::AddinHttpService;
 use crate::runtime::http_wire::WireHttpRequest;
 use crate::runtime::mcp_response::RuntimeSharedState;
@@ -35,11 +39,20 @@ impl<'a> RuntimeConnectionHandler<'a> {
         ui_state: &UiStateStore,
     ) -> Result<(), RuntimeServerError> {
         let request = WireHttpRequest::read_from(stream, self.config.max_request_bytes)?;
-        let registry = Arc::new(Mutex::new(SessionRegistry::new()));
         let ui_state = Arc::new(Mutex::new(ui_state.clone()));
+        let shared_state = Arc::new(RuntimeSharedState {
+            registry: Arc::new(Mutex::new(SessionRegistry::new())),
+            session_grace: self.config.session_grace,
+            addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
+            connection_hub: Arc::new(AddinConnectionHub::new()),
+            command_router: Arc::new(Mutex::new(CommandRouter::new())),
+            audit_log: AuditLog::new(),
+            image_fetcher: ImageFetcher::new(),
+            tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+        });
         let response = self
             .addin_http_service()
-            .route_request(&ui_state, &registry, &request);
+            .route_request(&ui_state, &shared_state, &request);
         stream.write_all(&response.to_bytes())?;
         stream.flush()?;
         Ok(())
@@ -55,7 +68,7 @@ impl<'a> RuntimeConnectionHandler<'a> {
         shared_state.prune_stale_sessions(SystemTime::now());
         let addin_http = self.addin_http_service();
         let websocket_upgrade = addin_http.is_valid_websocket_upgrade(&request);
-        let response = addin_http.route_request(ui_state, &shared_state.registry, &request);
+        let response = addin_http.route_request(ui_state, shared_state, &request);
         stream.write_all(&response.to_bytes())?;
         stream.flush()?;
         if websocket_upgrade && response.status == 101 {

@@ -109,7 +109,7 @@ fn shared_state(interval: Duration, timeout: Duration) -> RuntimeSharedState {
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
-        tool_access_policy: ToolAccessPolicy::default(),
+        tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
     }
 }
 

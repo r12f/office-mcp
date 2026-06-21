@@ -132,7 +132,7 @@ fn ui_state_request_prunes_expired_stale_sessions() {
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
-        tool_access_policy: ToolAccessPolicy::default(),
+        tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
     });
     let server_shared_state = Arc::clone(&shared_state);
     let server_handle = thread::spawn(move || {
@@ -354,7 +354,7 @@ fn real_tls_websocket_forwards_mcp_tool_call_and_returns_response() {
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
-        tool_access_policy: ToolAccessPolicy::default(),
+        tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
     });
     let server_shared_state = Arc::clone(&shared_state);
     let server_handle = thread::spawn(move || {
@@ -405,6 +405,7 @@ fn real_tls_websocket_forwards_mcp_tool_call_and_returns_response() {
     let mcp_shared_state = Arc::clone(&shared_state);
     let mcp_handle = thread::spawn(move || {
         let registry = mcp_shared_state.registry.lock().expect("registry").clone();
+        let tool_access_policy = mcp_shared_state.tool_access_policy();
         let mut ui_state = UiStateStore::new();
         let mut context = McpDispatchContext {
             registry: &registry,
@@ -414,7 +415,7 @@ fn real_tls_websocket_forwards_mcp_tool_call_and_returns_response() {
             command_router: &mcp_shared_state.command_router,
             audit_log: &mcp_shared_state.audit_log,
             image_fetcher: &mcp_shared_state.image_fetcher,
-            tool_access_policy: &mcp_shared_state.tool_access_policy,
+            tool_access_policy: &tool_access_policy,
         };
         McpJsonRpcRuntime::handle_body(
             &mut context,
@@ -460,7 +461,7 @@ fn real_tls_websocket_protocol_error_sends_close_frame() {
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
-        tool_access_policy: ToolAccessPolicy::default(),
+        tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
     });
     let server_shared_state = Arc::clone(&shared_state);
     let server_handle = thread::spawn(move || {
@@ -516,7 +517,7 @@ fn real_tls_websocket_heartbeat_ping_accepts_pong_response() {
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
-        tool_access_policy: ToolAccessPolicy::default(),
+        tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
     });
     let server_shared_state = Arc::clone(&shared_state);
     let server_handle = thread::spawn(move || {
@@ -692,7 +693,7 @@ fn addin_tls_roundtrip(request: &str) -> String {
             command_router: Arc::new(Mutex::new(CommandRouter::new())),
             audit_log: AuditLog::new(),
             image_fetcher: ImageFetcher::new(),
-            tool_access_policy: ToolAccessPolicy::default(),
+            tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
         });
         let (stream, _) = listener.accept().expect("accept");
         let mut stream = acceptor.accept(stream).expect("accept tls");

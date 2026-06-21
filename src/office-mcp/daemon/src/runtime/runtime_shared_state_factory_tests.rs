@@ -114,12 +114,10 @@ fn factory_applies_runtime_tool_access_policy() {
         SessionRegistry::with_limits(config.max_pending_per_session),
     );
 
-    assert!(shared_state.tool_access_policy.allows_tool("word.get_text"));
-    assert!(
-        !shared_state
-            .tool_access_policy
-            .allows_tool("word.insert_paragraph")
-    );
+    let policy = shared_state.tool_access_policy();
+
+    assert!(policy.allows_tool("word.get_text"));
+    assert!(!policy.allows_tool("word.insert_paragraph"));
 }
 
 fn runtime(registered_at: SystemTime) -> RuntimeInfo {
