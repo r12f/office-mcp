@@ -627,6 +627,17 @@ function validateProductVisualTrayBinding(visual: Record<string, unknown>): void
     if (visual.tray_menu_surface_kind !== manual.tray_menu_surface_kind || visual.tray_menu_surface_native !== manual.tray_menu_surface_native) {
       failures.push('Product visual evidence tray menu surface metadata does not match embedded manual tray evidence.');
     }
+    const visualScreenshotPaths = isRecord(visual.screenshot_paths) ? visual.screenshot_paths : undefined;
+    const manualScreenshotPaths = isRecord(manual.tray_surface_screenshot_paths) ? manual.tray_surface_screenshot_paths : undefined;
+    if (visualScreenshotPaths && manualScreenshotPaths) {
+      for (const surface of trayVisualSurfaces()) {
+        const visualPath = visualScreenshotPaths[surface];
+        const manualPath = manualScreenshotPaths[surface];
+        if (typeof visualPath === 'string' && typeof manualPath === 'string' && normalizeScreenshotPath(visualPath) !== normalizeScreenshotPath(manualPath)) {
+          failures.push(`Product visual evidence ${surface} screenshot path does not match embedded manual tray evidence.`);
+        }
+      }
+    }
   }
 
   const context = isRecord(visual.daemon_context) ? visual.daemon_context : undefined;

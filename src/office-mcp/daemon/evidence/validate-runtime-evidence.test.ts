@@ -532,6 +532,17 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.screenshot_paths.tray_native_menu = broken.screenshot_paths.word_taskpane_title;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual evidence tray_native_menu screenshot path does not match embedded manual tray evidence/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.observations.word_ribbon_command = 'Raw task pane';
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -1465,7 +1476,9 @@ function withProductVisualEvidence(passed: boolean, callback: (path: string) => 
       screenshots[surface] = screenshotPath;
     }
     for (const surface of logoVisualSurfaces()) screenshots[surface] = screenshots.logo_tray_size;
-    if (passed) for (const path of Object.values(traySurfaceScreenshotPaths(screenshots.tray_icon))) writeFileSync(path, tinyPng());
+    const trayScreenshots = traySurfaceScreenshotPaths(screenshots.tray_icon);
+    for (const surface of trayVisualSurfaces()) screenshots[surface] = trayScreenshots[surface];
+    if (passed) for (const path of Object.values(trayScreenshots)) writeFileSync(path, tinyPng());
     const path = join(dir, 'product-visual-evidence.json');
     writeFileSync(path, JSON.stringify(productVisualReport(passed, screenshots), null, 2));
     callback(path);
@@ -1504,7 +1517,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     tray_menu_surface_kind: passed ? 'native' : 'webview',
     tray_menu_surface_native: passed,
     quit_confirmation_visible: passed,
-    manual_tray_evidence: manualTrayReport(passed, screenshots.tray_icon),
+    manual_tray_evidence: productVisualManualTrayReport(passed, screenshots),
     manual_tray_evidence_ready: passed,
     product_identity_review: {
       logo_quality_reviewed: passed,
@@ -1985,6 +1998,12 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     daemon_context_ready: passed,
     passed
   };
+}
+
+function productVisualManualTrayReport(passed: boolean, screenshots: Record<string, string>) {
+  const report = manualTrayReport(passed, screenshots.tray_icon);
+  report.tray_surface_screenshot_paths = Object.fromEntries(trayVisualSurfaces().map((surface) => [surface, screenshots[surface]]));
+  return report;
 }
 
 function traySurfaceScreenshotPaths(basePath: string): Record<string, string> {
