@@ -698,6 +698,21 @@ test('runtime evidence validator can require product visual evidence', () => {
     });
   });
 
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.excel_taskpane.runtime_evidence.session.session_id = 'different-excel-session';
+      broken.excel_taskpane.runtime_evidence.smoke_details.session_id = 'different-excel-session';
+      broken.excel_taskpane.runtime_evidence_ready = false;
+      broken.excel_taskpane.density_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Excel task pane runtime evidence does not match top-level runtime evidence session/);
+    });
+  });
+
 
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {

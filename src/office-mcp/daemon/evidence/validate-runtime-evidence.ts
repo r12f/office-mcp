@@ -525,6 +525,9 @@ function validateProductVisualEvidence(): void {
   validateWordTaskpaneVisualEvidence(visual.word_taskpane);
   validateExcelTaskpaneVisualEvidence(visual.excel_taskpane);
   validatePowerPointTaskpaneVisualEvidence(visual.powerpoint_taskpane);
+  validateTaskpaneRuntimeBinding('Word', visual.word_runtime_evidence, visual.word_taskpane);
+  validateTaskpaneRuntimeBinding('Excel', visual.excel_runtime_evidence, visual.excel_taskpane);
+  validateTaskpaneRuntimeBinding('PowerPoint', visual.powerpoint_runtime_evidence, visual.powerpoint_taskpane);
   if (visual.daemon_context_ready !== true) {
     failures.push('Product visual evidence daemon context is not recorder-ready.');
   }
@@ -1062,6 +1065,22 @@ function validateTaskpaneDensityEvidence(taskpane: unknown, label: 'Word' | 'Exc
   }
   if (taskpane.density_ready !== true) failures.push(`Product visual evidence missing ${label} task pane density pass flag.`);
 }
+
+function validateTaskpaneRuntimeBinding(label: 'Word' | 'Excel' | 'PowerPoint', runtime: unknown, taskpane: unknown): void {
+  const topSessionId = sessionIdFromRuntimeEvidence(runtime);
+  const taskpaneRuntime = isRecord(taskpane) ? taskpane.runtime_evidence : undefined;
+  const taskpaneSessionId = sessionIdFromRuntimeEvidence(taskpaneRuntime);
+  if (!topSessionId || !taskpaneSessionId || topSessionId !== taskpaneSessionId) {
+    failures.push(`Product visual evidence ${label} task pane runtime evidence does not match top-level runtime evidence session.`);
+  }
+}
+
+function sessionIdFromRuntimeEvidence(runtime: unknown): string | undefined {
+  if (!isRecord(runtime)) return undefined;
+  const session = isRecord(runtime.session) ? runtime.session : undefined;
+  return typeof session?.session_id === 'string' ? session.session_id : undefined;
+}
+
 function validateExcelRuntimeEvidence(evidence: unknown, ready: unknown): void {
   if (ready !== true) failures.push('Product visual evidence missing Excel runtime evidence ready flag.');
   if (!isRecord(evidence)) {
