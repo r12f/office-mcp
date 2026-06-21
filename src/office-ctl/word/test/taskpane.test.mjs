@@ -437,6 +437,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /TOOL_PERMISSION_MODE_STORAGE_KEY/);
   assert.match(js, /function isToolAllowedByMode\(tool\)/);
   assert.match(js, /function handleToolModeChange\(event\)/);
+  assert.match(js, /renderSharedToolModeControl\(toolModeControlEl, toolPermissionMode\)/);
+  assert.doesNotMatch(functionBody(js, 'renderToolModeControl'), /querySelectorAll\('\[data-tool-mode\]'\)/);
   assert.match(js, /const toolListEl = document\.getElementById\('toolList'\)/);
   assert.match(js, /function renderToolSummary\(\)/);
   assert.match(js, /toolCountEl\.textContent = `\$\{effective\.length\}\/\$\{AVAILABLE_TOOLS\.length\}`/);

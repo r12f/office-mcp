@@ -121,6 +121,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.doesNotMatch(js, /Enabled \$\{/);
   assert.match(js, /function isToolAllowedByMode\(tool\)/);
   assert.match(js, /function handleToolModeChange\(event\)/);
+  assert.match(js, /renderSharedToolModeControl\(toolModeControlEl, toolPermissionMode\)/);
+  assert.doesNotMatch(functionBody(js, 'renderToolModeControl'), /querySelectorAll\('\[data-tool-mode\]'\)/);
   assert.match(js, /renderToolSummary\(\)/);
   assert.match(js, /function toolControlMarkup\(tool\)/);
   assert.doesNotMatch(js, /function renderToolPermissions\(\)/);

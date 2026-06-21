@@ -65,6 +65,13 @@
     if (elements?.hostPlatform) elements.hostPlatform.textContent = officeHostSummary(options.defaultHost);
   }
 
+  function renderToolModeControl(control, selectedMode) {
+    control?.querySelectorAll('[data-tool-mode]').forEach((button) => {
+      const selected = button.dataset.toolMode === selectedMode;
+      button.setAttribute('aria-checked', selected ? 'true' : 'false');
+    });
+  }
+
   function officeHostSummary(defaultHost) {
     const diagnostics = global.Office?.context?.diagnostics || {};
     const host = diagnostics.host || defaultHost || 'Office';
@@ -146,6 +153,7 @@
     protectionLabel,
     renderRuntimeVersions,
     renderStaticMetadata,
+    renderToolModeControl,
     setConnectionState,
     setCopyableMetadata,
     statusClass,

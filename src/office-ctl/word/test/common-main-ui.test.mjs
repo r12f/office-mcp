@@ -219,6 +219,27 @@ test('common main UI renders static task pane metadata', () => {
   assert.equal(hostPlatform.textContent, 'Excel 16.0 / PC');
 });
 
+test('common main UI renders tool capability mode selection', () => {
+  const mainUi = loadMainUi();
+  const states = new Map();
+  const buttons = ['read', 'write', 'all'].map((mode) => ({
+    dataset: { toolMode: mode },
+    setAttribute(name, value) { states.set(`${mode}:${name}`, value); }
+  }));
+  const control = {
+    querySelectorAll(selector) {
+      assert.equal(selector, '[data-tool-mode]');
+      return buttons;
+    }
+  };
+
+  mainUi.renderToolModeControl(control, 'write');
+
+  assert.equal(states.get('read:aria-checked'), 'false');
+  assert.equal(states.get('write:aria-checked'), 'true');
+  assert.equal(states.get('all:aria-checked'), 'false');
+});
+
 test('common main UI renders copyable command IDs with middle truncation', () => {
   const mainUi = loadMainUi();
   const requestId = '0123456789abcdefghijklmnopqrstuvwxyz';

@@ -43,6 +43,7 @@
     middleTruncate,
     protectionLabel,
     renderStaticMetadata,
+    renderToolModeControl: renderSharedToolModeControl,
     setConnectionState: setSharedConnectionState,
     setCopyableMetadata,
     statusClass,
@@ -1560,10 +1561,7 @@
   }
 
   function renderToolModeControl() {
-    toolModeControlEl?.querySelectorAll('[data-tool-mode]').forEach((button) => {
-      const selected = button.dataset.toolMode === toolPermissionMode;
-      button.setAttribute('aria-checked', selected ? 'true' : 'false');
-    });
+    renderSharedToolModeControl(toolModeControlEl, toolPermissionMode);
   }
 
   function renderToolSummary() {

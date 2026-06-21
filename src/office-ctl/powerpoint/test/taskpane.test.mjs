@@ -139,6 +139,8 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /return AVAILABLE_TOOLS\.filter\(\(tool\) => isToolEnabled\(tool\) && isToolAllowedByMode\(tool\)\)/);
   assert.match(js, /function isToolAllowedByMode\(tool\)/);
   assert.match(js, /function handleToolModeChange\(event\)/);
+  assert.match(js, /renderSharedToolModeControl\(toolModeControlEl, toolPermissionMode\)/);
+  assert.doesNotMatch(functionBody(js, 'renderToolModeControl'), /querySelectorAll\('\[data-tool-mode\]'\)/);
   assert.match(js, /function updateToolPermission\(tool, enabled\)/);
   assert.match(js, /document\.createElement\('details'\)/);
   assert.match(js, /class="group-toggle" type="checkbox" role="switch"/);
@@ -182,7 +184,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger \}\)/);
   assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
   assert.match(mainUi, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
-  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, protectionLabel, renderStaticMetadata, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
+  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, protectionLabel, renderStaticMetadata, renderToolModeControl: renderSharedToolModeControl, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
   assert.match(js, /renderStaticMetadata\(\{ session: sessionEl, daemon: daemonEl, serverVersion: serverVersionEl, protocolVersion: protocolVersionEl, hostPlatform: hostPlatformEl \}, \{ sessionId, endpoint: configuredEndpoint\(\), serverInfo, protocolVersion: PROTOCOL_VERSION, defaultHost: 'PowerPoint' \}\)/);
   assert.doesNotMatch(functionBody(js, 'renderStaticState'), /setCopyableMetadata\(sessionEl/);
   assert.doesNotMatch(functionBody(js, 'renderStaticState'), /renderRuntimeVersions\(/);

@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, protectionLabel, renderStaticMetadata, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, protectionLabel, renderStaticMetadata, renderToolModeControl: renderSharedToolModeControl, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1360,10 +1360,7 @@
   }
 
   function renderToolModeControl() {
-    toolModeControlEl?.querySelectorAll('[data-tool-mode]').forEach((button) => {
-      const selected = button.dataset.toolMode === toolPermissionMode;
-      button.setAttribute('aria-checked', selected ? 'true' : 'false');
-    });
+    renderSharedToolModeControl(toolModeControlEl, toolPermissionMode);
   }
 
   function renderToolSummary() {
