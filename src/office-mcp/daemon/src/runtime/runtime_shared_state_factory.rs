@@ -12,6 +12,7 @@ impl RuntimeSharedStateFactory {
     ) -> Arc<RuntimeSharedState> {
         Arc::new(RuntimeSharedState {
             registry: Arc::new(Mutex::new(registry)),
+            session_grace: config.session_grace,
             addin_channel: Arc::new(Mutex::new(AddinChannelServer::with_config(
                 config.addin_channel_config(),
             ))),

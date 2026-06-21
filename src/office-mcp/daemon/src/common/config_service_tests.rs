@@ -247,6 +247,27 @@ fn section_style_environment_variables_override_legacy_names() {
 }
 
 #[test]
+fn session_grace_is_capped_at_five_minutes() {
+    let path = temp_config(
+        r#"
+[addin_channel]
+session_grace_sec = 999
+"#,
+    );
+    let loaded = DaemonConfigService::with_env(env_map(HashMap::from([(
+        "OFFICE_MCP_ADDIN_CHANNEL__SESSION_GRACE_SEC",
+        "600",
+    )])))
+    .load(LoadConfigOptions {
+        config_path: Some(path.clone()),
+    })
+    .expect("load config");
+
+    assert_eq!(loaded.addin.session_grace_sec, 300);
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn refuses_non_loopback_binds() {
     let mut config = DaemonConfigService::with_env(BTreeMap::new())
         .load(LoadConfigOptions::default())

@@ -5,6 +5,7 @@ use crate::addin_mgr::CommandRouter;
 use crate::addin_mgr::ImageFetcher;
 use crate::addin_mgr::SessionRegistry;
 use crate::addin_mgr::websocket_accept_key;
+use crate::addin_mgr::{AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo};
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::common::{
@@ -102,6 +103,61 @@ fn serves_redacted_ui_state_over_addin_listener() {
     assert!(response.contains("\"clients\":[]"));
     assert!(response.contains("\"documents\""));
     assert!(response.contains("\"recent_commands\""));
+}
+
+#[test]
+fn ui_state_request_prunes_expired_stale_sessions() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let port = listener.local_addr().expect("local addr").port();
+    let server = RuntimeServer::with_config(RuntimeServerConfig {
+        addin_host: "127.0.0.1".to_string(),
+        addin_port: port,
+        addin_public_dir: crate::addin_mgr::default_addin_public_dir(),
+        certificate_path: super::default_pfx_path(),
+        session_grace: std::time::Duration::from_millis(1),
+        ..RuntimeServerConfig::default()
+    });
+    let acceptor = server.config.tls_acceptor().expect("tls acceptor");
+    let stale_since = std::time::SystemTime::now() - std::time::Duration::from_secs(1);
+    let mut registry = SessionRegistry::new();
+    registry.register_runtime(runtime("instance-prune", stale_since));
+    registry.add_session(session("session-prune", "instance-prune"), stale_since);
+    assert!(registry.remove_runtime("instance-prune", stale_since));
+    let shared_state = Arc::new(RuntimeSharedState {
+        registry: Arc::new(Mutex::new(registry)),
+        session_grace: std::time::Duration::from_millis(1),
+        addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
+        connection_hub: Arc::new(AddinConnectionHub::new()),
+        command_router: Arc::new(Mutex::new(CommandRouter::new())),
+        audit_log: AuditLog::new(),
+        image_fetcher: ImageFetcher::new(),
+    });
+    let server_shared_state = Arc::clone(&shared_state);
+    let server_handle = thread::spawn(move || {
+        let ui_state = Arc::new(Mutex::new(UiStateStore::new()));
+        let (stream, _) = listener.accept().expect("accept");
+        let mut stream = acceptor.accept(stream).expect("accept tls");
+        server
+            .handle_addin_tls_stream(&mut stream, &ui_state, &server_shared_state)
+            .expect("handle addin tls");
+    });
+
+    let response = addin_tls_request(
+        port,
+        "GET /ui/state HTTP/1.1\r\nHost: localhost\r\nOrigin: https://localhost:8765\r\nConnection: close\r\n\r\n",
+    );
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(!response.contains("session-prune"));
+    assert!(
+        shared_state
+            .registry
+            .lock()
+            .expect("registry lock")
+            .get_session_info("session-prune")
+            .is_none()
+    );
+    server_handle.join().expect("server thread");
 }
 
 #[test]
@@ -268,6 +324,7 @@ fn real_tls_websocket_forwards_mcp_tool_call_and_returns_response() {
     let acceptor = server.config.tls_acceptor().expect("tls acceptor");
     let shared_state = Arc::new(RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
+        session_grace: std::time::Duration::from_secs(60),
         addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
         connection_hub: Arc::new(AddinConnectionHub::new()),
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
@@ -371,6 +428,7 @@ fn real_tls_websocket_protocol_error_sends_close_frame() {
     let acceptor = server.config.tls_acceptor().expect("tls acceptor");
     let shared_state = Arc::new(RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
+        session_grace: std::time::Duration::from_secs(60),
         addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
         connection_hub: Arc::new(AddinConnectionHub::new()),
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
@@ -423,6 +481,7 @@ fn real_tls_websocket_heartbeat_ping_accepts_pong_response() {
     let acceptor = server.config.tls_acceptor().expect("tls acceptor");
     let shared_state = Arc::new(RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
+        session_grace: std::time::Duration::from_secs(60),
         addin_channel: Arc::new(Mutex::new(AddinChannelServer::with_config(
             server.config.addin_channel_config(),
         ))),
@@ -597,6 +656,7 @@ fn addin_tls_roundtrip(request: &str) -> String {
         let connection_hub = Arc::new(AddinConnectionHub::new());
         let shared_state = Arc::new(RuntimeSharedState {
             registry,
+            session_grace: std::time::Duration::from_secs(60),
             addin_channel,
             connection_hub,
             command_router: Arc::new(Mutex::new(CommandRouter::new())),
@@ -730,6 +790,37 @@ fn wait_for_session(registry: &Arc<Mutex<SessionRegistry>>, session_id: &str) {
         thread::sleep(std::time::Duration::from_millis(10));
     }
     panic!("session was not registered before MCP tool call: {session_id}");
+}
+
+fn runtime(instance_id: &str, registered_at: std::time::SystemTime) -> RuntimeInfo {
+    RuntimeInfo {
+        instance_id: instance_id.to_string(),
+        host: HostInfo {
+            app: "word".to_string(),
+            version: Some("16.0".to_string()),
+            platform: Some("windows".to_string()),
+            build: Some("Desktop".to_string()),
+        },
+        add_in: AddInInfo {
+            version: "0.1.0".to_string(),
+            protocol_version: "1.0".to_string(),
+            supported_features: vec!["doc.read".to_string()],
+        },
+        registered_at,
+    }
+}
+
+fn session(session_id: &str, instance_id: &str) -> NewSessionInfo {
+    NewSessionInfo {
+        session_id: session_id.to_string(),
+        instance_id: instance_id.to_string(),
+        document: DocumentInfo {
+            filename: Some("Closed.docx".to_string()),
+            ..DocumentInfo::default()
+        },
+        available_tools: vec!["word.get_text".to_string()],
+        is_active: Some(true),
+    }
 }
 
 fn masked_text_frame(text: &str) -> Vec<u8> {

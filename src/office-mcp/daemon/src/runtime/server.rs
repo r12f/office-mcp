@@ -200,6 +200,7 @@ impl RuntimeServer {
         let mut ui_state = ui_state
             .lock()
             .map_err(|_| RuntimeServerError::Internal("UI state lock poisoned.".to_string()))?;
+        shared_state.prune_stale_sessions(SystemTime::now());
         let registry = shared_state
             .registry
             .lock()

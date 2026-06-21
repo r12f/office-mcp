@@ -11,6 +11,7 @@ use native_tls::TlsStream;
 use std::io::Write;
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
 pub(crate) struct RuntimeConnectionHandler<'a> {
     config: &'a RuntimeServerConfig,
@@ -51,6 +52,7 @@ impl<'a> RuntimeConnectionHandler<'a> {
         shared_state: &Arc<RuntimeSharedState>,
     ) -> Result<(), RuntimeServerError> {
         let request = WireHttpRequest::read_from(stream, self.config.max_request_bytes)?;
+        shared_state.prune_stale_sessions(SystemTime::now());
         let addin_http = self.addin_http_service();
         let websocket_upgrade = addin_http.is_valid_websocket_upgrade(&request);
         let response = addin_http.route_request(ui_state, &shared_state.registry, &request);

@@ -12,6 +12,8 @@ use std::fs;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
+const MAX_SESSION_GRACE_SEC: u64 = 300;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DaemonConfigService {
     description: &'static str,
@@ -109,13 +111,15 @@ impl DaemonConfigService {
                     ],
                     addin_channel.int_value("heartbeat_timeout_sec", 10)?,
                 )?,
-                session_grace_sec: config_env.positive_int_any(
-                    &[
-                        "OFFICE_MCP_ADDIN_CHANNEL__SESSION_GRACE_SEC",
-                        "OFFICE_MCP_ADDIN_SESSION_GRACE_SEC",
-                    ],
-                    addin_channel.int_value("session_grace_sec", 60)?,
-                )?,
+                session_grace_sec: config_env
+                    .positive_int_any(
+                        &[
+                            "OFFICE_MCP_ADDIN_CHANNEL__SESSION_GRACE_SEC",
+                            "OFFICE_MCP_ADDIN_SESSION_GRACE_SEC",
+                        ],
+                        addin_channel.int_value("session_grace_sec", 60)?,
+                    )?
+                    .min(MAX_SESSION_GRACE_SEC),
                 max_pending_per_session: config_env.positive_int_any(
                     &[
                         "OFFICE_MCP_ADDIN_CHANNEL__MAX_PENDING_PER_SESSION",

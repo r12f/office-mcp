@@ -58,6 +58,50 @@ fn factory_applies_registry_pending_limit_from_runtime_config() {
     );
 }
 
+#[test]
+fn shared_state_prunes_stale_sessions_after_configured_grace() {
+    let config = RuntimeServerConfig {
+        session_grace: Duration::from_secs(300),
+        ..RuntimeServerConfig::default()
+    };
+    let shared_state = RuntimeSharedStateFactory::with_registry(
+        &config,
+        SessionRegistry::with_limits(config.max_pending_per_session),
+    );
+    let stale_since = SystemTime::UNIX_EPOCH + Duration::from_secs(10);
+    {
+        let mut registry = shared_state.registry.lock().expect("registry lock");
+        registry.register_runtime(runtime(stale_since));
+        registry.add_session(session(), stale_since);
+        assert!(registry.remove_runtime("instance-1", stale_since));
+    }
+
+    assert_eq!(
+        shared_state.prune_stale_sessions(stale_since + Duration::from_secs(299)),
+        0
+    );
+    assert!(
+        shared_state
+            .registry
+            .lock()
+            .expect("registry lock")
+            .get_session_info("session-1")
+            .is_some()
+    );
+    assert_eq!(
+        shared_state.prune_stale_sessions(stale_since + Duration::from_secs(301)),
+        1
+    );
+    assert!(
+        shared_state
+            .registry
+            .lock()
+            .expect("registry lock")
+            .get_session_info("session-1")
+            .is_none()
+    );
+}
+
 fn runtime(registered_at: SystemTime) -> RuntimeInfo {
     RuntimeInfo {
         instance_id: "instance-1".to_string(),

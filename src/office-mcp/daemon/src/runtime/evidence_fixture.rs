@@ -46,6 +46,7 @@ pub fn run_ui_fixture(options: UiFixtureOptions) -> Result<(), RuntimeServerErro
         max_ws_frame_bytes: usize::try_from(config.limits.max_ws_frame_bytes)
             .unwrap_or(16 * 1024 * 1024),
         max_pending_per_session: usize::try_from(config.addin.max_pending_per_session).unwrap_or(4),
+        session_grace: Duration::from_secs(config.addin.session_grace_sec),
         heartbeat_interval: Duration::from_secs(config.addin.heartbeat_interval_sec),
         heartbeat_timeout: Duration::from_secs(config.addin.heartbeat_timeout_sec),
         requests_per_minute: config.limits.requests_per_minute,

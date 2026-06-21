@@ -24,6 +24,7 @@ pub struct RuntimeServerConfig {
     pub max_request_bytes: usize,
     pub max_ws_frame_bytes: usize,
     pub max_pending_per_session: usize,
+    pub session_grace: Duration,
     pub heartbeat_interval: Duration,
     pub heartbeat_timeout: Duration,
     pub requests_per_minute: u64,
@@ -62,6 +63,7 @@ impl RuntimeServerConfig {
                 "addin.max_pending_per_session",
                 config.addin.max_pending_per_session,
             )?,
+            session_grace: Duration::from_secs(config.addin.session_grace_sec),
             heartbeat_interval: Duration::from_secs(config.addin.heartbeat_interval_sec),
             heartbeat_timeout: Duration::from_secs(config.addin.heartbeat_timeout_sec),
             requests_per_minute: config.limits.requests_per_minute,
@@ -117,6 +119,7 @@ impl RuntimeServerConfig {
     pub(crate) fn addin_channel_config(&self) -> AddinChannelConfig {
         AddinChannelConfig {
             origin: self.addin_origin.clone(),
+            session_grace: self.session_grace,
             heartbeat_interval: self.heartbeat_interval,
             heartbeat_timeout: self.heartbeat_timeout,
             max_pending_per_session: self.max_pending_per_session,
@@ -139,6 +142,7 @@ impl Default for RuntimeServerConfig {
             max_request_bytes: 16 * 1024 * 1024,
             max_ws_frame_bytes: 16 * 1024 * 1024,
             max_pending_per_session: 4,
+            session_grace: Duration::from_secs(60),
             heartbeat_interval: Duration::from_secs(30),
             heartbeat_timeout: Duration::from_secs(10),
             requests_per_minute: 1000,

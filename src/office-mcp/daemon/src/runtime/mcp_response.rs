@@ -8,15 +8,31 @@ use crate::runtime::mcp_rpc::{McpDispatchContext, McpJsonRpcRuntime};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RuntimeSharedState {
     pub(crate) registry: Arc<Mutex<SessionRegistry>>,
+    pub(crate) session_grace: Duration,
     pub(crate) addin_channel: Arc<Mutex<AddinChannelServer>>,
     pub(crate) connection_hub: Arc<AddinConnectionHub>,
     pub(crate) command_router: Arc<Mutex<CommandRouter>>,
     pub(crate) audit_log: AuditLog,
     pub(crate) image_fetcher: ImageFetcher,
+}
+
+impl RuntimeSharedState {
+    pub(crate) fn prune_stale_sessions(&self, now: SystemTime) -> usize {
+        let Ok(mut registry) = self.registry.lock() else {
+            tracing::warn!("failed to lock session registry for stale-session pruning");
+            return 0;
+        };
+        let removed = registry.prune_stale_sessions(now, self.session_grace);
+        if removed > 0 {
+            tracing::info!(removed, "pruned stale Office document sessions");
+        }
+        removed
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

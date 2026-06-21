@@ -96,6 +96,7 @@ fn timeout_decision_closes_after_third_missed_ping() {
 fn shared_state(interval: Duration, timeout: Duration) -> RuntimeSharedState {
     RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
+        session_grace: Duration::from_secs(60),
         addin_channel: Arc::new(Mutex::new(AddinChannelServer::with_config(
             AddinChannelConfig {
                 heartbeat_interval: interval,
