@@ -5,6 +5,7 @@ use crate::addin_mgr::{
 };
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
+use crate::mcp::ToolAccessPolicy;
 use std::sync::{Arc, Mutex};
 use std::thread;
 #[test]
@@ -255,6 +256,7 @@ fn mcp_json_rpc_reads_resources_through_addin_connection() {
         command_router: &command_router,
         audit_log: &AuditLog::new(),
         image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
     };
     let reply = McpJsonRpcRuntime::handle_body(
         &mut context,
@@ -309,6 +311,7 @@ fn mcp_json_rpc_structure_resource_routes_to_full_structure_tool() {
         command_router: &command_router,
         audit_log: &AuditLog::new(),
         image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
     };
     let reply = McpJsonRpcRuntime::handle_body(
         &mut context,
@@ -362,6 +365,7 @@ fn mcp_json_rpc_forwarded_word_tool_invokes_addin_connection() {
         command_router: &command_router,
         audit_log: &AuditLog::new(),
         image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
     };
     let reply = McpJsonRpcRuntime::handle_body(
         &mut context,
@@ -411,6 +415,46 @@ fn mcp_json_rpc_disabled_session_tool_uses_unified_error_wording() {
 }
 
 #[test]
+fn mcp_json_rpc_daemon_policy_filters_discovery_and_rejects_before_session_preflight() {
+    let registry = registry_with_word_session_with_tools(vec!["word.get_text"]);
+    let policy = ToolAccessPolicy::default().with_disabled_tool("word.get_text");
+
+    let tools = mcp_handle_body_with_policy(
+        &registry,
+        &policy,
+        br#"{"jsonrpc":"2.0","id":"list-policy","method":"tools/list","params":{}}"#,
+    );
+    let tools: serde_json::Value = serde_json::from_str(&tools).expect("tools json");
+    let names = tools["result"]["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect::<Vec<_>>();
+
+    assert!(!names.contains(&"word.get_text"));
+    assert!(names.contains(&"office.list_sessions"));
+
+    let reply = mcp_handle_body_with_policy(
+        &registry,
+        &policy,
+        br#"{"jsonrpc":"2.0","id":"call-policy","method":"tools/call","params":{"name":"word.get_text","arguments":{"session_id":"session-1"}}}"#,
+    );
+
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    let error = &reply["result"]["structuredContent"]["error"];
+    assert_eq!(error["office_mcp_code"], "TOOL_NOT_AVAILABLE");
+    assert_eq!(error["refresh_tools"], true);
+    assert_eq!(error["tool"], "word.get_text");
+    assert_eq!(
+        error["message"],
+        "Tool word.get_text is disabled by daemon access policy. Refresh tools/list before retrying."
+    );
+    assert_eq!(error["session_id"], serde_json::Value::Null);
+    assert_eq!(error["refresh_session_info"], serde_json::Value::Null);
+}
+
+#[test]
 fn mcp_json_rpc_forwarded_excel_tool_invokes_addin_connection() {
     let registry = registry_with_excel_session();
     let mut ui_state = UiStateStore::new();
@@ -449,6 +493,7 @@ fn mcp_json_rpc_forwarded_excel_tool_invokes_addin_connection() {
         command_router: &command_router,
         audit_log: &AuditLog::new(),
         image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
     };
     let reply = McpJsonRpcRuntime::handle_body(
         &mut context,
@@ -499,6 +544,7 @@ fn mcp_json_rpc_forwarded_powerpoint_tool_invokes_addin_connection() {
         command_router: &command_router,
         audit_log: &AuditLog::new(),
         image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
     };
     let reply = McpJsonRpcRuntime::handle_body(
         &mut context,
@@ -551,6 +597,7 @@ fn mcp_json_rpc_insert_image_base64_is_validated_before_forwarding() {
         command_router: &command_router,
         audit_log: &AuditLog::new(),
         image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
     };
     let reply = McpJsonRpcRuntime::handle_body(
         &mut context,
@@ -601,6 +648,7 @@ fn mcp_json_rpc_forwarded_word_tool_writes_audit_records() {
         command_router: &command_router,
         audit_log: &audit_log,
         image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
     };
     let _reply = McpJsonRpcRuntime::handle_body(
         &mut context,
@@ -638,6 +686,7 @@ fn mcp_json_rpc_preflight_failure_writes_redacted_audit_record() {
         command_router: &command_router,
         audit_log: &audit_log,
         image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
     };
 
     let _reply = McpJsonRpcRuntime::handle_body(
@@ -673,6 +722,7 @@ fn mcp_json_rpc_forwarded_word_tool_sends_cancel_on_timeout() {
         command_router: &command_router,
         audit_log: &AuditLog::new(),
         image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
     };
 
     let reply = McpJsonRpcRuntime::handle_body(
@@ -693,6 +743,14 @@ fn mcp_json_rpc_forwarded_word_tool_sends_cancel_on_timeout() {
 }
 
 fn mcp_handle_body(registry: &SessionRegistry, body: &[u8]) -> String {
+    mcp_handle_body_with_policy(registry, &ToolAccessPolicy::default(), body)
+}
+
+fn mcp_handle_body_with_policy(
+    registry: &SessionRegistry,
+    tool_access_policy: &ToolAccessPolicy,
+    body: &[u8],
+) -> String {
     let mut ui_state = UiStateStore::new();
     let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
     let connection_hub = Arc::new(AddinConnectionHub::new());
@@ -705,6 +763,7 @@ fn mcp_handle_body(registry: &SessionRegistry, body: &[u8]) -> String {
         command_router: &command_router,
         audit_log: &AuditLog::new(),
         image_fetcher: &ImageFetcher::new(),
+        tool_access_policy,
     };
     McpJsonRpcRuntime::handle_body(&mut context, body)
 }

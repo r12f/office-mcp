@@ -1,7 +1,7 @@
 use crate::addin_mgr::SessionRegistry;
 use crate::mcp::{
-    prompt_catalog_json, prompt_description, prompt_messages, tool_catalog_json,
-    word_resource_catalog_for_session, word_resource_templates,
+    ToolAccessPolicy, prompt_catalog_json, prompt_description, prompt_messages,
+    tool_catalog_json_for_policy, word_resource_catalog_for_session, word_resource_templates,
 };
 use crate::runtime::json_rpc;
 use serde_json::{Value, json};
@@ -10,11 +10,11 @@ pub(crate) struct McpCatalogResponder;
 
 impl McpCatalogResponder {
     #[must_use]
-    pub(crate) fn tools_list(id: &Value) -> String {
+    pub(crate) fn tools_list(id: &Value, policy: &ToolAccessPolicy) -> String {
         json!({
             "jsonrpc": "2.0",
             "id": id,
-            "result": { "tools": tool_catalog_json() }
+            "result": { "tools": tool_catalog_json_for_policy(policy) }
         })
         .to_string()
     }

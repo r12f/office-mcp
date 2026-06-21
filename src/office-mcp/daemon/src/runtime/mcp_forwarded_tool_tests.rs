@@ -4,6 +4,7 @@ use crate::addin_mgr::{
 };
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
+use crate::mcp::ToolAccessPolicy;
 use crate::runtime::mcp_rpc::McpDispatchContext;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
@@ -25,6 +26,7 @@ fn forwarded_tools_require_session_id() {
         command_router: &command_router,
         audit_log: &audit_log,
         image_fetcher: &image_fetcher,
+        tool_access_policy: &ToolAccessPolicy::default(),
     };
 
     let result = McpForwardedToolInvoker::call(

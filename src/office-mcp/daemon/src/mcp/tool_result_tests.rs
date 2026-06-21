@@ -1,4 +1,4 @@
-use super::{tool_failure, tool_failure_from_command, tool_success};
+use super::{tool_failure, tool_failure_from_command, tool_not_available_by_policy, tool_success};
 use crate::addin_mgr::PartialEffect;
 use crate::api::CommandFailure;
 use serde_json::json;
@@ -79,5 +79,22 @@ fn disabled_document_tool_failure_includes_session_refresh_hint() {
             .as_str()
             .expect("message")
             .starts_with("Tool word.get_text is disabled")
+    );
+}
+
+#[test]
+fn daemon_policy_failure_includes_tools_refresh_hint() {
+    let result = tool_not_available_by_policy("word.get_text");
+
+    let error = &result["structuredContent"]["error"];
+    assert_eq!(error["office_mcp_code"], "TOOL_NOT_AVAILABLE");
+    assert_eq!(error["refresh_tools"], true);
+    assert_eq!(error["tool"], "word.get_text");
+    assert_eq!(error["partial_effect"], json!(null));
+    assert!(
+        error["message"]
+            .as_str()
+            .expect("message")
+            .starts_with("Tool word.get_text is disabled by daemon access policy.")
     );
 }

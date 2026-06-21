@@ -2,11 +2,15 @@ use super::McpCatalogResponder;
 use crate::addin_mgr::{
     AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionRegistry,
 };
+use crate::mcp::ToolAccessPolicy;
 use serde_json::{Value, json};
 
 #[test]
 fn tools_list_contains_office_word_and_excel_tools() {
-    let response = parse(&McpCatalogResponder::tools_list(&json!(1)));
+    let response = parse(&McpCatalogResponder::tools_list(
+        &json!(1),
+        &ToolAccessPolicy::default(),
+    ));
     let names = response["result"]["tools"]
         .as_array()
         .expect("tools")
@@ -19,6 +23,22 @@ fn tools_list_contains_office_word_and_excel_tools() {
     assert!(names.contains(&"excel.read_range"));
     assert!(names.contains(&"powerpoint.add_slide"));
     assert!(names.contains(&"powerpoint.replace_text"));
+}
+
+#[test]
+fn tools_list_filters_daemon_disabled_tools() {
+    let policy = ToolAccessPolicy::default().with_disabled_tool("word.get_text");
+    let response = parse(&McpCatalogResponder::tools_list(&json!(1), &policy));
+    let names = response["result"]["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect::<Vec<_>>();
+
+    assert!(!names.contains(&"word.get_text"));
+    assert!(names.contains(&"word.get_outline"));
+    assert!(names.contains(&"office.get_session_info"));
 }
 
 #[test]

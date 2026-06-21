@@ -1,3 +1,4 @@
+use crate::mcp::ToolAccessPolicy;
 use serde_json::{Value, json};
 
 pub const WORD_V1_TOOLS: &[&str] = &[
@@ -211,6 +212,11 @@ impl PowerPointToolCatalog {
 
 #[must_use]
 pub fn tool_catalog_json() -> Vec<Value> {
+    tool_catalog_json_for_policy(&ToolAccessPolicy::default())
+}
+
+#[must_use]
+pub fn tool_catalog_json_for_policy(policy: &ToolAccessPolicy) -> Vec<Value> {
     let mut tools = vec![
         tool_json(
             "office.list_sessions",
@@ -223,21 +229,31 @@ pub fn tool_catalog_json() -> Vec<Value> {
             "Return metadata and supported tools for one Office document session.",
         ),
     ];
-    tools.extend(WORD_V1_TOOLS.iter().map(|name| {
-        tool_json(
-            name,
-            name,
-            "Forward this Word tool call to the selected Office document session.",
-        )
-    }));
-    tools.extend(ExcelToolCatalog::tools().iter().map(|tool| {
-        tool_json(
-            tool.name,
-            tool.name,
-            "Forward this Excel tool call to the selected Office workbook session.",
-        )
-    }));
-    tools.extend(PowerPointToolCatalog::tools().iter().map(|tool| {
+    tools.extend(
+        WORD_V1_TOOLS
+            .iter()
+            .filter(|name| policy.allows_tool(name))
+            .map(|name| {
+                tool_json(
+                    name,
+                    name,
+                    "Forward this Word tool call to the selected Office document session.",
+                )
+            }),
+    );
+    tools.extend(
+        ExcelToolCatalog::tools()
+            .iter()
+            .filter(|tool| policy.allows_tool(tool.name))
+            .map(|tool| {
+                tool_json(
+                    tool.name,
+                    tool.name,
+                    "Forward this Excel tool call to the selected Office workbook session.",
+                )
+            }),
+    );
+    tools.extend(PowerPointToolCatalog::tools().iter().filter(|tool| policy.allows_tool(tool.name)).map(|tool| {
         tool_json(
             tool.name,
             tool.name,

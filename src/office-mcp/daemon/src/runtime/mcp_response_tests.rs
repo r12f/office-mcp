@@ -3,7 +3,7 @@ use crate::addin_mgr::SessionRegistry;
 use crate::addin_mgr::{AddinChannelServer, AddinConnectionHub, CommandRouter, ImageFetcher};
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
-use crate::mcp::McpHttpDecision;
+use crate::mcp::{McpHttpDecision, ToolAccessPolicy};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -107,6 +107,7 @@ fn shared_state() -> Arc<RuntimeSharedState> {
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
+        tool_access_policy: ToolAccessPolicy::default(),
     })
 }
 

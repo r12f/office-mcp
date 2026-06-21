@@ -4,6 +4,7 @@ use crate::addin_mgr::{
     ImageFetcher, JsonRpcId, RegisterRequest, SessionRegistry,
 };
 use crate::common::AuditLog;
+use crate::mcp::ToolAccessPolicy;
 use crate::runtime::mcp_response::{HeartbeatLoopDecision, RuntimeSharedState};
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
@@ -108,6 +109,7 @@ fn shared_state(interval: Duration, timeout: Duration) -> RuntimeSharedState {
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
+        tool_access_policy: ToolAccessPolicy::default(),
     }
 }
 

@@ -46,6 +46,7 @@ impl RuntimeRequestRouter {
 fn test_shared_state() -> Arc<RuntimeSharedState> {
     use crate::addin_mgr::{AddinChannelServer, AddinConnectionHub, CommandRouter, ImageFetcher};
     use crate::common::AuditLog;
+    use crate::mcp::ToolAccessPolicy;
     use std::sync::Mutex;
 
     Arc::new(RuntimeSharedState {
@@ -56,6 +57,7 @@ fn test_shared_state() -> Arc<RuntimeSharedState> {
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
+        tool_access_policy: ToolAccessPolicy::default(),
     })
 }
 

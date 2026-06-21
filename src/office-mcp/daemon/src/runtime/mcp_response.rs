@@ -2,7 +2,7 @@ use crate::addin_mgr::SessionRegistry;
 use crate::addin_mgr::{AddinChannelServer, AddinConnectionHub, CommandRouter, ImageFetcher};
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
-use crate::mcp::McpHttpDecision;
+use crate::mcp::{McpHttpDecision, ToolAccessPolicy};
 use crate::runtime::http_wire::WireHttpResponse;
 use crate::runtime::mcp_rpc::{McpDispatchContext, McpJsonRpcRuntime};
 use serde_json::{Value, json};
@@ -19,6 +19,7 @@ pub(crate) struct RuntimeSharedState {
     pub(crate) command_router: Arc<Mutex<CommandRouter>>,
     pub(crate) audit_log: AuditLog,
     pub(crate) image_fetcher: ImageFetcher,
+    pub(crate) tool_access_policy: ToolAccessPolicy,
 }
 
 impl RuntimeSharedState {
@@ -82,6 +83,7 @@ impl McpHttpResponseService {
                     command_router: &shared_state.command_router,
                     audit_log: &shared_state.audit_log,
                     image_fetcher: &shared_state.image_fetcher,
+                    tool_access_policy: &shared_state.tool_access_policy,
                 };
                 let body = McpJsonRpcRuntime::handle_body(&mut context, body);
                 WireHttpResponse::json(200, BTreeMap::new(), body)

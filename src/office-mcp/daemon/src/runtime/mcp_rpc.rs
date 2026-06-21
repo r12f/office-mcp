@@ -5,8 +5,8 @@ use crate::addin_mgr::{
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::mcp::{
-    ExcelToolCatalog, PowerPointToolCatalog, ResourceReadRequest, WORD_V1_TOOLS,
-    resource_request_from_uri, tool_failure, tool_success,
+    ExcelToolCatalog, PowerPointToolCatalog, ResourceReadRequest, ToolAccessPolicy, WORD_V1_TOOLS,
+    resource_request_from_uri, tool_failure, tool_not_available_by_policy, tool_success,
 };
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_catalog_response::McpCatalogResponder;
@@ -22,6 +22,7 @@ pub(crate) struct McpDispatchContext<'a> {
     pub(crate) command_router: &'a Arc<Mutex<CommandRouter>>,
     pub(crate) audit_log: &'a AuditLog,
     pub(crate) image_fetcher: &'a ImageFetcher,
+    pub(crate) tool_access_policy: &'a ToolAccessPolicy,
 }
 
 pub(crate) struct McpJsonRpcRuntime;
@@ -36,7 +37,7 @@ impl McpJsonRpcRuntime {
             return json_rpc::error(&id, -32600, "Invalid Request");
         };
         match method {
-            "tools/list" => McpCatalogResponder::tools_list(&id),
+            "tools/list" => McpCatalogResponder::tools_list(&id, context.tool_access_policy),
             "tools/call" => Self::handle_tools_call(context, &id, &value),
             "resources/list" => McpCatalogResponder::resources_list(context.registry, &id),
             "resources/templates/list" => McpCatalogResponder::resource_templates_list(&id),
@@ -121,6 +122,14 @@ impl McpJsonRpcRuntime {
             return json_rpc::error(id, -32602, "Missing tool name");
         };
         let arguments = params.get("arguments").unwrap_or(&Value::Null);
+        if Self::is_forwarded_tool(name) && !context.tool_access_policy.allows_tool(name) {
+            return json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": tool_not_available_by_policy(name)
+            })
+            .to_string();
+        }
         let result = match name {
             "office.list_sessions" => tool_success(&json!({
                 "sessions": context
@@ -190,6 +199,12 @@ impl McpJsonRpcRuntime {
             "descriptor": SessionDescriptorView::new(&info.descriptor).to_json(),
             "available_tools": info.available_tools
         }))
+    }
+
+    fn is_forwarded_tool(name: &str) -> bool {
+        WORD_V1_TOOLS.contains(&name)
+            || ExcelToolCatalog::contains(name)
+            || PowerPointToolCatalog::contains(name)
     }
 }
 
