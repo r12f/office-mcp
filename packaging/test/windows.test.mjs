@@ -124,3 +124,57 @@ test('Windows localhost certificate helper lives under packaging', () => {
   assert.match(helper, /Export-PfxCertificate/);
   assert.doesNotMatch(helper, /Import-PfxCertificate/);
 });
+
+test('GitHub release workflow publishes the Windows installer artifacts', () => {
+  const repoRoot = join(PACKAGING_ROOT, '..');
+  const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'release.yml'), 'utf8');
+
+  assert.match(workflow, /name:\s*Release/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /tags:\s*\[\s*['"]v\*['"]\s*\]/);
+  assert.match(workflow, /runs-on:\s*windows-latest/);
+  assert.match(workflow, /actions\/checkout@v4/);
+  assert.match(workflow, /dtolnay\/rust-toolchain@stable/);
+  assert.match(workflow, /actions\/setup-node@v4/);
+  assert.match(workflow, /working-directory:\s*packaging[\s\S]*npm ci[\s\S]*npm run check/);
+  assert.match(workflow, /working-directory:\s*src\/office-mcp\/daemon\/evidence[\s\S]*npm ci/);
+  assert.match(workflow, /working-directory:\s*src\/office-ctl\/word[\s\S]*npm ci/);
+  assert.match(workflow, /working-directory:\s*src\/office-ctl\/excel[\s\S]*npm ci/);
+  assert.match(workflow, /working-directory:\s*src\/office-ctl\/powerpoint[\s\S]*npm ci/);
+  assert.match(workflow, /build-windows-msi\.ps1 -Version \$\{\{ steps\.version\.outputs\.version \}\} -SkipNpmInstall/);
+  assert.match(workflow, /git diff --check/);
+  assert.match(workflow, /office-mcp-setup-\$\{\{ steps\.version\.outputs\.version \}\}-x64\.msi/);
+  assert.doesNotMatch(workflow, /office-mcp-setup-0\.1\.0-x64\.msi/);
+  assert.match(workflow, /SHA256SUMS/);
+  assert.match(workflow, /Get-FileHash/);
+  assert.match(workflow, /actions\/upload-artifact@v4/);
+  assert.match(workflow, /softprops\/action-gh-release@v2/);
+  assert.match(workflow, /draft:\s*true/);
+  assert.match(workflow, /prerelease:\s*true/);
+  assert.match(workflow, /unsigned/i);
+  assert.match(workflow, /github\.ref_type == 'tag'/);
+});
+
+test('README documents installation from GitHub Releases', () => {
+  const repoRoot = join(PACKAGING_ROOT, '..');
+  const readme = readFileSync(join(repoRoot, 'README.md'), 'utf8');
+  const installHeading = readme.indexOf('## Install from GitHub Releases');
+  const developerHeading = readme.indexOf('## Run the MVP locally');
+
+  assert.ok(installHeading !== -1, 'README must have a user install section');
+  assert.ok(developerHeading !== -1, 'README must keep the developer setup section');
+  assert.ok(installHeading < developerHeading, 'user install instructions must come before source checkout instructions');
+  assert.match(readme, /Windows desktop/i);
+  assert.match(readme, /GitHub Releases/);
+  assert.match(readme, /office-mcp-setup-<ver>-x64\.msi/);
+  assert.match(readme, /SHA256SUMS/);
+  assert.match(readme, /%LOCALAPPDATA%\\office-mcp\\/);
+  assert.match(readme, /tray/i);
+  assert.match(readme, /office-mcp-daemon ui/);
+  assert.match(readme, /daemon status/);
+  assert.match(readme, /Shared Folder/);
+  assert.match(readme, /Office MCP Control/);
+  assert.match(readme, /http:\/\/127\.0\.0\.1:8800\/mcp/);
+  assert.match(readme, /log/i);
+  assert.match(readme, /uninstall/i);
+});

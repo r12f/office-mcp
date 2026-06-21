@@ -1,0 +1,157 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to stage, without the leading v. Defaults to 0.1.0 for dry runs.'
+        required: false
+        default: '0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    name: Windows installer release artifact
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Resolve release version
+        id: version
+        shell: pwsh
+        run: |
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            $version = '${{ github.ref_name }}'.TrimStart('v')
+          } else {
+            $version = '${{ inputs.version }}'
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[A-Za-z0-9.-]+)?$') {
+            throw "Invalid release version: $version"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            src/office-mcp/daemon/evidence/package-lock.json
+            src/office-ctl/word/package-lock.json
+            src/office-ctl/excel/package-lock.json
+            src/office-ctl/powerpoint/package-lock.json
+            packaging/package-lock.json
+
+      - name: Install evidence dependencies
+        working-directory: src/office-mcp/daemon/evidence
+        run: npm ci
+
+      - name: Install Word add-in dependencies
+        working-directory: src/office-ctl/word
+        run: npm ci
+
+      - name: Install Excel add-in dependencies
+        working-directory: src/office-ctl/excel
+        run: npm ci
+
+      - name: Install PowerPoint add-in dependencies
+        working-directory: src/office-ctl/powerpoint
+        run: npm ci
+
+      - name: Install packaging dependencies
+        working-directory: packaging
+        run: npm ci
+
+      - name: Check working tree whitespace
+        shell: pwsh
+        run: git diff --check
+
+      - name: Run packaging smoke checks
+        working-directory: packaging
+        run: npm run check
+
+      - name: Build Windows MSI
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-msi.ps1 -Version ${{ steps.version.outputs.version }} -SkipNpmInstall
+
+      - name: Stage release artifacts
+        id: stage
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $releaseMsi = "artifacts\office-mcp-setup-$version-x64.msi"
+          if (-not (Test-Path -LiteralPath $releaseMsi)) {
+            throw "MSI artifact was not produced: $releaseMsi"
+          }
+          $msi = Get-Item -LiteralPath $releaseMsi
+          if ($msi.Length -lt 1000000) {
+            throw "MSI artifact is unexpectedly small: $($msi.Length) bytes"
+          }
+          $required = @(
+            'artifacts\msi-stage\office-mcp-daemon.exe',
+            'artifacts\msi-stage\office-mcp\ui\index.html',
+            'artifacts\msi-stage\office-ctl\common\addin-channel.js',
+            'artifacts\msi-stage\office-ctl\word\public\taskpane.js',
+            'artifacts\msi-stage\office-ctl\excel\public\taskpane.js',
+            'artifacts\msi-stage\office-ctl\powerpoint\public\taskpane.js',
+            'artifacts\msi-stage\addin-catalog\office-mcp-word.xml',
+            'artifacts\msi-stage\addin-catalog\office-mcp-excel.xml',
+            'artifacts\msi-stage\addin-catalog\office-mcp-powerpoint.xml',
+            'artifacts\msi-stage\scripts\export-localhost-dev-cert.ps1',
+            'artifacts\msi-stage\office-ctl\common\assets\icon-32.png',
+            'artifacts\msi-stage\office-ctl\common\assets\icon-80.png'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "Release payload is missing required file: $path"
+            }
+          }
+          Push-Location artifacts
+          try {
+            Get-FileHash -Algorithm SHA256 -LiteralPath (Split-Path -Leaf $releaseMsi) |
+              ForEach-Object { "$($_.Hash.ToLowerInvariant())  $($_.Path | Split-Path -Leaf)" } |
+              Set-Content -LiteralPath SHA256SUMS -Encoding ascii
+          } finally {
+            Pop-Location
+          }
+          "msi=$releaseMsi" >> $env:GITHUB_OUTPUT
+          "checksums=artifacts\SHA256SUMS" >> $env:GITHUB_OUTPUT
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: office-mcp-windows-installer-${{ steps.version.outputs.version }}
+          path: |
+            ${{ steps.stage.outputs.msi }}
+            ${{ steps.stage.outputs.checksums }}
+
+      - name: Create GitHub release draft
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: true
+          files: |
+            ${{ steps.stage.outputs.msi }}
+            ${{ steps.stage.outputs.checksums }}
+          body: |
+            Unsigned Windows pre-release artifact.
+
+            Assets:
+            - office-mcp-setup-${{ steps.version.outputs.version }}-x64.msi
+            - SHA256SUMS
+
+            Keep this release as draft until release notes, signing status,
+            installer smoke evidence, tray evidence, and required live Office
+            evidence have been attached or explicitly waived.
