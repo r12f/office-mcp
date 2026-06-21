@@ -926,8 +926,12 @@ Current screenshot feedback to preserve for the next implementation goal:
       output, multi-color product palette, and current-asset fingerprints. The
       product visual evidence recorder and final validator reject rendered logo
       reviews that do not match the current `brand-mark.svg` and generated icon
-      files. This item remains open until that rendered review is included in
-      the final product visual evidence artifact from the release run.
+      files. The GitHub Release workflow now generates
+      `logo-rendered-size-review.json` and `logo-rendered-size-review.png`,
+      checks that the review is ready, publishes both as release artifacts, and
+      includes them in `SHA256SUMS`. This item remains open until that rendered
+      review is included in the final product visual evidence artifact from the
+      release run.
 - [x] Update Word and Excel add-in manifests/catalog rendering so release and
       sideloaded builds use mature product metadata: stable add-in title,
       provider, description, support URL, ribbon group label, action label, and
