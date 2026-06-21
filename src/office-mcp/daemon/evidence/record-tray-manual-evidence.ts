@@ -35,12 +35,13 @@ const traySurfaceScreenshotsExist = Object.fromEntries(
 );
 const traySurfaceScreenshotsReady = Object.values(traySurfaceScreenshotsExist).every(Boolean);
 const traySurfaceScreenshotsDistinct = screenshotPathsAreDistinct(traySurfaceScreenshots);
+const primaryScreenshotMatchesTrayIcon = screenshotPathMatchesTrayIconSurface(screenshotPath, traySurfaceScreenshots.tray_icon);
 const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
 const trayMenuSurfaceNative = trayMenuSurfaceKind === 'native';
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
 const nativeTrayInteractionReady = menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && menuAnchoredToTrayIcon && osNativeMenuBehaviorReviewed && keyboardMenuAccessReviewed && nativeQuitConfirmationReviewed;
-const passed = visibleIcon && rightClickMenu && nativeTrayInteractionReady && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && traySurfaceScreenshotsReady && traySurfaceScreenshotsDistinct && daemonContextReady;
+const passed = visibleIcon && rightClickMenu && nativeTrayInteractionReady && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && primaryScreenshotMatchesTrayIcon && traySurfaceScreenshotsReady && traySurfaceScreenshotsDistinct && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -67,6 +68,7 @@ const evidence = {
   tooltip_product_ready: tooltipLooksProductReady,
   screenshot_path: screenshotPath ? resolve(screenshotPath) : undefined,
   screenshot_exists: screenshotExists,
+  primary_screenshot_matches_tray_icon: primaryScreenshotMatchesTrayIcon,
   tray_surface_screenshot_paths: traySurfaceScreenshots,
   tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
   tray_surface_screenshots_ready: traySurfaceScreenshotsReady,
@@ -115,6 +117,11 @@ function screenshotPathsAreDistinct(paths: Record<string, string | undefined>): 
   const values = Object.values(paths).filter((path): path is string => typeof path === 'string');
   if (values.length !== Object.keys(paths).length) return false;
   return new Set(values.map((path) => resolve(path).toLowerCase())).size === values.length;
+}
+
+function screenshotPathMatchesTrayIconSurface(primaryPath: string | undefined, trayIconPath: string | undefined): boolean {
+  if (!primaryPath || !trayIconPath) return false;
+  return resolve(primaryPath).toLowerCase() === resolve(trayIconPath).toLowerCase();
 }
 
 function normalizedOptionPath(name: string): string | undefined {

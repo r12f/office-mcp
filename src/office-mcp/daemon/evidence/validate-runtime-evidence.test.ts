@@ -1265,6 +1265,17 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
   withEvidenceFile(ui, (uiPath) => {
     withManualTrayEvidence(true, (manualPath) => {
       const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.screenshot_path = broken.tray_surface_screenshot_paths.tray_native_menu;
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence screenshot path does not match tray_icon surface screenshot/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
       broken.daemon_context = manualTrayDaemonContext(['Status: Up', 'Clients: 0']);
       writeFileSync(manualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
@@ -1397,9 +1408,10 @@ function withManualTrayEvidence(passed: boolean, callback: (path: string) => voi
   try {
     const screenshotPath = join(dir, 'tray-visible.png');
     if (passed) writeFileSync(screenshotPath, tinyPng());
-    if (passed) for (const path of Object.values(traySurfaceScreenshotPaths(screenshotPath))) writeFileSync(path, tinyPng());
+    const trayScreenshots = traySurfaceScreenshotPaths(screenshotPath);
+    if (passed) for (const path of Object.values(trayScreenshots)) writeFileSync(path, tinyPng());
     const path = join(dir, 'tray-manual-evidence.json');
-    writeFileSync(path, JSON.stringify(manualTrayReport(passed, screenshotPath), null, 2));
+    writeFileSync(path, JSON.stringify(manualTrayReportWithSurfaces(passed, trayScreenshots.tray_icon, trayScreenshots), null, 2));
     callback(path);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -2034,8 +2046,12 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
 }
 
 function productVisualManualTrayReport(passed: boolean, screenshots: Record<string, string>) {
-  const report = manualTrayReport(passed, screenshots.tray_icon);
-  report.tray_surface_screenshot_paths = Object.fromEntries(trayVisualSurfaces().map((surface) => [surface, screenshots[surface]]));
+  return manualTrayReportWithSurfaces(passed, screenshots.tray_icon, Object.fromEntries(trayVisualSurfaces().map((surface) => [surface, screenshots[surface]])));
+}
+
+function manualTrayReportWithSurfaces(passed: boolean, screenshotPath: string, screenshots: Record<string, string>) {
+  const report = manualTrayReport(passed, screenshotPath);
+  report.tray_surface_screenshot_paths = screenshots;
   return report;
 }
 

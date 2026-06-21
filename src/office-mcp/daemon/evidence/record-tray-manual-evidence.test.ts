@@ -22,6 +22,8 @@ test('manual tray evidence recorder requires product tooltip', () => {
     assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_native_menu, true);
     assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_tooltip, true);
     assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_quit_confirmation, true);
+    assert.equal(evidence.primary_screenshot_matches_tray_icon, true);
+    assert.equal(evidence.screenshot_path, (evidence.tray_surface_screenshot_paths as Record<string, string>).tray_icon);
     assert.equal(evidence.tray_menu_surface_kind, 'native');
     assert.equal(evidence.tray_surface_screenshots_distinct, true);
     assert.equal(evidence.tray_menu_surface_native, true);
@@ -37,6 +39,25 @@ test('manual tray evidence recorder requires product tooltip', () => {
     const failed = JSON.parse(outputText(missingTooltip.stdout)) as Record<string, unknown>;
     assert.equal(failed.tooltip_product_ready, false);
     assert.equal(failed.passed, false);
+  });
+});
+
+
+test('manual tray evidence recorder binds primary screenshot to tray icon surface', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'mismatched-primary-screenshot.json');
+    const result = runRecorder(
+      output,
+      screenshotPath,
+      '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents',
+      '--daemon-bin', daemonBin,
+      '--mismatched-primary-screenshot'
+    );
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.primary_screenshot_matches_tray_icon, false);
+    assert.equal(evidence.passed, false);
   });
 });
 
@@ -127,13 +148,16 @@ test('manual tray evidence recorder requires distinct tray surface screenshots',
 
 test('manual tray evidence recorder rejects truncated screenshots', () => {
   withTrayScreenshot((dir, screenshotPath) => {
-    writeFileSync(screenshotPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
+    const truncatedTrayIcon = writeSurfaceScreenshot(dir, 'truncated-tray-icon.png');
+    writeFileSync(truncatedTrayIcon, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
     const daemonBin = writeFakeDaemon(dir);
     const output = join(dir, 'truncated-screenshot.json');
-    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin, '--shared-tray-surface-screenshot', truncatedTrayIcon);
     assert.notEqual(result.status, 0);
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
-    assert.equal(evidence.screenshot_exists, false);
+    assert.equal(evidence.screenshot_exists, true);
+    assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_icon, false);
+    assert.equal(evidence.tray_surface_screenshots_ready, false);
     assert.equal(evidence.passed, false);
   });
 });
@@ -173,14 +197,15 @@ test('manual tray evidence recorder rejects reused tray surface screenshots', ()
 test('manual tray evidence recorder reads daemon and screenshot paths from environment', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     const daemonBin = writeFakeDaemon(dir);
+    const envTrayIcon = writeSurfaceScreenshot(dir, 'env-tray-icon.png');
     const output = join(dir, 'tray-env-evidence.json');
     const result = runRecorder(
       output,
       screenshotPath,
       '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents',
       '--env-daemon-bin', daemonBin,
-      '--env-screenshot-path', screenshotPath,
-      '--env-tray-icon-screenshot', writeSurfaceScreenshot(dir, 'env-tray-icon.png'),
+      '--env-screenshot-path', envTrayIcon,
+      '--env-tray-icon-screenshot', envTrayIcon,
       '--env-tray-native-menu-screenshot', writeSurfaceScreenshot(dir, 'env-tray-native-menu.png'),
       '--env-tray-tooltip-screenshot', writeSurfaceScreenshot(dir, 'env-tray-tooltip.png'),
       '--env-tray-quit-confirmation-screenshot', writeSurfaceScreenshot(dir, 'env-tray-quit-confirmation.png'),
@@ -206,6 +231,7 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
   const skipNativeMenuReviewFlags = extra.includes('--skip-native-menu-review-flags');
   const skipTraySurfaceScreenshots = extra.includes('--skip-tray-surface-screenshots');
   const skipScreenshotArgs = extra.includes('--skip-screenshot-args');
+  const mismatchedPrimaryScreenshot = extra.includes('--mismatched-primary-screenshot');
   const sharedTraySurfaceScreenshot = optionValue(extra, '--shared-tray-surface-screenshot');
   const envDaemonBin = optionValue(extra, '--env-daemon-bin');
   const envScreenshotPath = optionValue(extra, '--env-screenshot-path');
@@ -222,6 +248,7 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
       && item !== '--skip-tray-surface-screenshots'
       && item !== '--skip-daemon-bin-arg'
       && item !== '--skip-screenshot-args'
+      && item !== '--mismatched-primary-screenshot'
       && item !== '--shared-tray-surface-screenshot'
       && !item.startsWith('--env-');
   });
@@ -242,7 +269,7 @@ function runRecorder(output: string, screenshotPath: string, ...extra: string[])
     ...reviewArgs,
     ...(explicitMenuSurfaceKind ? [] : ['--menu-surface-kind', 'native']),
     '--show-ui-opened', 'true',
-    ...(skipScreenshotArgs ? [] : ['--screenshot-path', screenshotPath]),
+    ...(skipScreenshotArgs ? [] : ['--screenshot-path', mismatchedPrimaryScreenshot ? screenshotPath : trayIconScreenshot]),
     ...(skipTraySurfaceScreenshots || skipScreenshotArgs ? [] : [
       '--tray-icon-screenshot', sharedTraySurfaceScreenshot ?? trayIconScreenshot,
       '--tray-native-menu-screenshot', sharedTraySurfaceScreenshot ?? trayNativeMenuScreenshot,
