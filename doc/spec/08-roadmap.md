@@ -441,6 +441,12 @@ User-reported follow-up from live task pane testing:
 - [x] Merge connection status and document metadata into one compact top block.
       The top block contains connection status, document metadata, settings,
       and tool summary, with Word/Excel contract tests enforcing the order.
+- [x] Arrange task pane top-block metadata into separate Document and
+      Daemon/Session groups. Document fields stay together, while daemon
+      endpoint, server/protocol version, session ID, and last connection error
+      stay together near the `MCP Control` title column instead of being mixed
+      into the document rows. Covered by Word/Excel/PowerPoint task pane
+      contract tests for `.document-metadata` and `.daemon-metadata` order.
 - [x] Move settings into an inline child panel of the top block. Clicking the
       gear must not append a detached settings block at the bottom of the task
       pane. Covered by Word/Excel HTML order contract tests.
