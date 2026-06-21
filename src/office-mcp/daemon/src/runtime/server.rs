@@ -5,6 +5,7 @@ use crate::mcp::McpHttpFrontend;
 use crate::runtime::mcp_response::RuntimeSharedState;
 use crate::runtime::runtime_shared_state_factory::RuntimeSharedStateFactory;
 use crate::runtime::server_connection::RuntimeConnectionHandler;
+use crate::runtime::session_cleanup_service::SessionCleanupService;
 pub use crate::runtime::{RuntimeServerConfig, RuntimeServerError, default_pfx_path};
 use crate::ui::UiRuntimeFile;
 use native_tls::TlsAcceptor;
@@ -137,6 +138,8 @@ impl RuntimeServer {
         )));
         let ui_state = Arc::new(Mutex::new(seed_ui_state));
         let shared_state = RuntimeSharedStateFactory::with_registry(&self.config, seed_registry);
+        SessionCleanupService::for_session_grace(self.config.session_grace)
+            .spawn(Arc::clone(&shared_state));
         let addin_server = self.clone();
         let addin_ui_state = Arc::clone(&ui_state);
         let addin_tls_acceptor = Arc::clone(&tls_acceptor);

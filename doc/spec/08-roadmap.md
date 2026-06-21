@@ -346,7 +346,7 @@ or running developer build commands.
       label for accessibility and tests. Raw internal states such as `stale`,
       `disconnected`, or future reconnect diagnostics may appear in the
       Inspector, but must not replace the compact card's `dead` label.
-- [ ] Enforce closed-session cleanup across daemon runtime state. A closed,
+- [x] Enforce closed-session cleanup across daemon runtime state. A closed,
       disconnected, stale, or otherwise dead Office document session may remain
       visible only during the reconnect grace window. The default grace is 60
       seconds and the effective value must be capped at 300 seconds even when
@@ -354,7 +354,12 @@ or running developer build commands.
       remove the session from the registry so it disappears from
       `office.list_sessions`, `office.get_session_info`, daemon document cards,
       and tray document counts. Do not keep historical session cards; command
-      history is the history surface.
+      history is the history surface. Current evidence: registry pruning is
+      covered by `stale_sessions_are_pruned_after_grace_period`, config capping
+      by `session_grace_is_capped_at_five_minutes`, shared-state pruning by
+      `shared_state_prunes_stale_sessions_after_configured_grace`, and the
+      request-independent runtime cleanup loop by
+      `run_once_prunes_expired_stale_sessions_without_client_request`.
 - [x] Add-in task pane product UI showing daemon connection, current document
       session, current task, and latest 20 task history entries for Word and
       Excel. Current evidence: `npm run check` in `src/office-ctl/word` and
