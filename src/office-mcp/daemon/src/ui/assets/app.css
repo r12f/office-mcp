@@ -76,6 +76,7 @@ dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .row strong, .row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .document-card { gap: 5px; }
 .document-card-title { display: grid; grid-template-columns: auto minmax(9rem, 1fr) max-content; gap: 6px; align-items: center; }
+.document-card-session { color: var(--muted); font-size: 12px; }
 .document-card-meta { display: flex; gap: 8px; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
 .document-card-meta span { flex: 0 1 auto; }
 .state-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }

@@ -120,6 +120,7 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(!js.contains("'Not configured'"));
     assert!(js.contains("function renderDocumentCard(doc, app)"));
     assert!(js.contains("class=\"row document-card ${esc(app)}\""));
+    assert!(js.contains("class=\"document-card-session\""));
     assert!(js.contains("Session ${esc(middleTruncate(doc.session_id, 18))}"));
     assert!(js.contains("title=\"${esc(doc.session_id || '-')}\""));
     assert!(js.contains("function documentConnectionLabel(status) { return status === 'active' || !status ? 'active' : 'dead'; }"));
