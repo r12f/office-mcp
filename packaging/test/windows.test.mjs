@@ -159,7 +159,7 @@ test('GitHub release workflow publishes the Windows installer artifacts', () => 
   assert.match(workflow, /cargo test -p office-mcp-daemon/);
   assert.match(workflow, /build-windows-msi\.ps1 -Version \$\{\{ steps\.version\.outputs\.version \}\} -SkipNpmInstall/);
   assert.match(workflow, /git diff --check/);
-  assert.match(workflow, /office-mcp-setup-\$\{\{ steps\.version\.outputs\.version \}\}-x64\.msi/);
+  assert.match(workflow, /office-mcp-setup-\$version-x64\.msi/);
   assert.doesNotMatch(workflow, /office-mcp-setup-0\.1\.0-x64\.msi/);
   assert.match(workflow, /SHA256SUMS/);
   assert.match(workflow, /RELEASE_NOTES\.md/);
@@ -168,7 +168,7 @@ test('GitHub release workflow publishes the Windows installer artifacts', () => 
   assert.match(workflow, /softprops\/action-gh-release@v2/);
   assert.match(workflow, /draft:\s*true/);
   assert.match(workflow, /prerelease:\s*true/);
-  assert.match(workflow, /unsigned/i);
+  assert.match(workflow, /body_path:\s*RELEASE_NOTES\.md/);
   assert.match(workflow, /github\.ref_type == 'tag'/);
 });
 

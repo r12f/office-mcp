@@ -214,13 +214,4 @@ jobs:
           files: |
             ${{ steps.stage.outputs.msi }}
             ${{ steps.stage.outputs.checksums }}
-          body: |
-            Unsigned Windows pre-release artifact.
-
-            Assets:
-            - office-mcp-setup-${{ steps.version.outputs.version }}-x64.msi
-            - SHA256SUMS
-
-            Keep this release as draft until release notes, signing status,
-            installer smoke evidence, tray evidence, and required live Office
-            evidence have been attached or explicitly waived.
+          body_path: RELEASE_NOTES.md
