@@ -638,6 +638,15 @@ function validateProductVisualTrayBinding(visual: Record<string, unknown>): void
         }
       }
     }
+    const visualScreenshotFlags = isRecord(visual.screenshots_exist) ? visual.screenshots_exist : undefined;
+    const manualScreenshotFlags = isRecord(manual.tray_surface_screenshots_exist) ? manual.tray_surface_screenshots_exist : undefined;
+    if (visualScreenshotFlags && manualScreenshotFlags) {
+      for (const surface of trayVisualSurfaces()) {
+        if (visualScreenshotFlags[surface] !== manualScreenshotFlags[surface]) {
+          failures.push(`Product visual evidence ${surface} screenshot ready flag does not match embedded manual tray evidence.`);
+        }
+      }
+    }
   }
 
   const context = isRecord(visual.daemon_context) ? visual.daemon_context : undefined;
