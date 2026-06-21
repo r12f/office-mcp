@@ -95,6 +95,13 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".id-copy { display: inline-flex; max-width: 100%; min-height: 32px;"));
     assert!(css.contains(".id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains(
+        ".document-card-session { display: grid; grid-template-columns: auto minmax(0, 1fr);"
+    ));
+    assert!(css.contains(
+        ".document-card-session span { overflow: visible; text-overflow: clip; white-space: nowrap;"
+    ));
+    assert!(css.contains(".document-card-session code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
+    assert!(css.contains(
         ".detail-copy:hover, .detail-copy:focus-visible, .id-copy:hover, .id-copy:focus-visible"
     ));
     assert!(css.contains(".details { grid-column: 1 / -1;"));
@@ -120,8 +127,11 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(!js.contains("'Not configured'"));
     assert!(js.contains("function renderDocumentCard(doc, app)"));
     assert!(js.contains("class=\"row document-card ${esc(app)}\""));
-    assert!(js.contains("class=\"document-card-session\""));
-    assert!(js.contains("Session ${esc(middleTruncate(doc.session_id, 18))}"));
+    assert!(js.contains(
+        "class=\"document-card-session\" data-copy-value=\"${esc(doc.session_id || '-')}\""
+    ));
+    assert!(js.contains("<span>Session ID</span><code>${esc(doc.session_id || '-')}</code>"));
+    assert!(!js.contains("Session ${esc(middleTruncate(doc.session_id, 18))}"));
     assert!(js.contains("title=\"${esc(doc.session_id || '-')}\""));
     assert!(js.contains("function documentConnectionLabel(status) { return status === 'active' || !status ? 'active' : 'dead'; }"));
     assert!(js.contains("function documentStateTone(status) { return status === 'active' || !status ? 'success' : 'danger'; }"));
