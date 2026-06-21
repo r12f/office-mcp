@@ -315,7 +315,7 @@ or running developer build commands.
       explicit task-execution label such as `Active Tasks`, `Tasks Running`, or
       `Running Tasks`; bare `Running` is not acceptable because it can be
       confused with daemon health.
-- [ ] Rework the daemon main-window connected-document list so each document is
+- [x] Rework the daemon main-window connected-document list so each document is
       a compact summary block, not a verbose session/activity panel. The block
       should primarily show the document name plus a middle-truncated session
       ID, a user-facing state of only `active` or `dead`, host/add-in version,
@@ -329,7 +329,11 @@ or running developer build commands.
       metadata from the default document block because the right-side
       Activity/Inspector pane already owns command history and diagnostics. The
       compact card must show a bounded session ID, while full session IDs remain
-      available through copy, tooltip, or Inspector affordances.
+      available through copy, tooltip, or Inspector affordances. Current
+      evidence: `npm run smoke:ui` validates compact document cards with title,
+      `active`/`dead` labels without reconnect wording, session ID on dedicated
+      copyable lines, version, tool count, queue depth, finished/failed counts,
+      no inline activity history, and preserved title width.
 - [ ] Fix add-in runtime identity correlation so connected Word, Excel, and
       PowerPoint document cards preserve registered host metadata. A real Word
       session must show app `word` and the Office host version when the add-in
@@ -338,14 +342,17 @@ or running developer build commands.
       instance. Add regression coverage for daemon register -> session.added ->
       UI snapshot flow, including daemon-assigned instance IDs returned by the
       register response.
-- [ ] Add scan-friendly document state indicators in the daemon main window.
+- [x] Add scan-friendly document state indicators in the daemon main window.
       Compact document cards must use only `active` and `dead` user-facing
       labels with a stable icon, status dot, or host-accent-compatible color
       marker next to the text label so users can identify dead sessions quickly
       when many documents are listed. Color alone is not enough; keep the text
       label for accessibility and tests. Raw internal states such as `stale`,
       `disconnected`, or future reconnect diagnostics may appear in the
-      Inspector, but must not replace the compact card's `dead` label.
+      Inspector, but must not replace the compact card's `dead` label. Current
+      evidence: `npm run smoke:ui` validates a visible state marker next to the
+      compact card state label and proves stale sessions render as `Dead`
+      without `stale` or `reconnecting` copy.
 - [x] Enforce closed-session cleanup across daemon runtime state. A closed,
       disconnected, stale, or otherwise dead Office document session may remain
       visible only during the reconnect grace window. The default grace is 60
