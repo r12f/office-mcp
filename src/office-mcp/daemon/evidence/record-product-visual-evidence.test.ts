@@ -252,6 +252,7 @@ test('README manual tray evidence command matches current native tray gates', ()
   ]) {
     assert.match(commandLine, new RegExp(required));
   }
+  assert.equal(optionValue(commandLine.split(/\s+/), '--screenshot-path'), optionValue(commandLine.split(/\s+/), '--tray-icon-screenshot'));
 });
 
 test('README product visual evidence command matches current product visual gates', () => {
