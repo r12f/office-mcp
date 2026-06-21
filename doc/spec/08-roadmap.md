@@ -375,7 +375,10 @@ User-reported follow-up from live daemon testing:
       evidence failed and the validator rejects required manual tray evidence
       when it is not bound to that daemon context. Screenshot artifacts must be
       real, complete image files; truncated image headers are rejected by both
-      the recorder and validator.
+      the recorder and validator. Manual tray evidence records freshness metadata
+      for every tray screenshot surface; stale screenshots are rejected
+      by the recorder, the manual tray validator, and the embedded product visual
+      evidence gate so an old tray/menu capture cannot satisfy a new release run.
 - [x] Add automated coverage that fails when production `daemon run` does not
       expose `/ui/` and when `daemon status` omits the UI URL. Covered by
       `production_bound_daemon_exposes_ui_state_and_events`,
@@ -1054,8 +1057,11 @@ Current screenshot feedback to preserve for the next implementation goal:
       also require explicit review flags proving the menu is anchored to the
       visible notification-area icon, uses OS-native menu spacing/hover/theme
       behavior, supports keyboard menu actions, and shows a native quit
-      confirmation. This item remains open until those fields are backed by a
-      real interactive Windows tray capture.
+      confirmation. The embedded manual tray evidence must include freshness
+      metadata for the tray icon, native menu, tooltip, and quit confirmation
+      screenshots; stale screenshots keep the product visual evidence from
+      passing. This item remains open until those fields are backed by a real
+      interactive Windows tray capture.
 - [x] Polish the automated tray product surface model so normal Windows users
       are expected to see a deliberate app icon, native tooltip/title, native
       context menu text, disabled status rows, and confirmation dialogs that

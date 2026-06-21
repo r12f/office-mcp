@@ -248,11 +248,20 @@ test('README manual tray evidence command matches current native tray gates', ()
     '--tray-icon-screenshot',
     '--tray-native-menu-screenshot',
     '--tray-tooltip-screenshot',
-    '--tray-quit-confirmation-screenshot'
+    '--tray-quit-confirmation-screenshot',
+    '--screenshot-freshness-window-ms'
   ]) {
     assert.match(commandLine, new RegExp(required));
   }
+  assert.match(readme, /freshness metadata/i);
+  assert.match(readme, /stale screenshots/i);
   assert.equal(optionValue(commandLine.split(/\s+/), '--screenshot-path'), optionValue(commandLine.split(/\s+/), '--tray-icon-screenshot'));
+});
+
+test('roadmap documents manual tray screenshot freshness gate', () => {
+  const roadmap = readFileSync(resolve(process.cwd(), '../../../..', 'doc/spec/08-roadmap.md'), 'utf8');
+  assert.match(roadmap, /manual tray evidence[\s\S]*freshness metadata/i);
+  assert.match(roadmap, /manual tray evidence[\s\S]*stale screenshots/i);
 });
 
 test('README product visual evidence command matches current product visual gates', () => {
