@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1621,19 +1621,7 @@
   }
 
   async function handleMetadataCopy(event) {
-    const button = event.target.closest('[data-copy-target], [data-copy-value]');
-    if (!button) return;
-    const target = button.dataset.copyTarget ? document.getElementById(button.dataset.copyTarget) : null;
-    const value = button.dataset.copyValue || target?.textContent?.trim();
-    if (!value || value === '-') return;
-    try {
-      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value);
-      else fallbackCopy(value);
-      announcerEl.textContent = `Copied ${button.getAttribute('aria-label') || 'value'}`;
-    } catch (error) {
-      logger.warn('metadata_copy.failed', error);
-      announcerEl.textContent = 'Copy failed';
-    }
+    await copyMetadataValue(event, { document, navigator, announcer: announcerEl, logger, fallbackCopy });
   }
 
   function fallbackCopy(value) {

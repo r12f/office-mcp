@@ -20,6 +20,26 @@
     }
   }
 
+  async function copyMetadataValue(event, options = {}) {
+    const button = event?.target?.closest?.('[data-copy-target], [data-copy-value]');
+    if (!button) return false;
+    const documentRef = options.document || global.document;
+    const navigatorRef = options.navigator || global.navigator;
+    const target = button.dataset.copyTarget ? documentRef?.getElementById?.(button.dataset.copyTarget) : null;
+    const value = button.dataset.copyValue || target?.textContent?.trim();
+    if (!value || value === '-') return false;
+    try {
+      if (navigatorRef?.clipboard?.writeText) await navigatorRef.clipboard.writeText(value);
+      else options.fallbackCopy?.(value);
+      if (options.announcer) options.announcer.textContent = `Copied ${button.getAttribute?.('aria-label') || 'value'}`;
+      return true;
+    } catch (error) {
+      options.logger?.warn?.('metadata_copy.failed', error);
+      if (options.announcer) options.announcer.textContent = 'Copy failed';
+      return false;
+    }
+  }
+
   function renderRuntimeVersions(serverVersionElement, protocolVersionElement, serverInfo, fallbackProtocolVersion) {
     const info = serverInfo || {};
     if (serverVersionElement) serverVersionElement.textContent = `Server ${info.serverVersion || 'Unknown'}`;
@@ -50,6 +70,7 @@
 
   global.OfficeCtlMainUi = Object.freeze({
     bindDetailsControl,
+    copyMetadataValue,
     middleTruncate,
     officeHostSummary,
     renderRuntimeVersions,

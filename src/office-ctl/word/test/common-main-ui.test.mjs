@@ -1,0 +1,88 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import test from 'node:test';
+import vm from 'node:vm';
+
+const REPO_ROOT = join(process.cwd(), '..', '..', '..');
+
+function loadMainUi(overrides = {}) {
+  const source = readFileSync(join(REPO_ROOT, 'src', 'office-ctl', 'common', 'main-ui.js'), 'utf8');
+  const context = vm.createContext({
+    Object,
+    String,
+    Math,
+    globalThis: {},
+    ...overrides
+  });
+  context.globalThis = context;
+  vm.runInContext(source, context, { filename: 'main-ui.js' });
+  return context.OfficeCtlMainUi;
+}
+
+function buttonFixture({ value, targetId, targetText = '' } = {}) {
+  const target = { textContent: targetText };
+  const button = {
+    dataset: { ...(value !== undefined ? { copyValue: value } : {}), ...(targetId ? { copyTarget: targetId } : {}) },
+    getAttribute(name) { return name === 'aria-label' ? 'Copy session ID' : ''; }
+  };
+  return {
+    button,
+    document: {
+      getElementById(id) { return id === targetId ? target : null; }
+    },
+    event: {
+      target: {
+        closest(selector) { return selector === '[data-copy-target], [data-copy-value]' ? button : null; }
+      }
+    }
+  };
+}
+
+test('common main UI copies metadata from explicit values and target elements', async () => {
+  const mainUi = loadMainUi();
+  const copied = [];
+  const announcer = { textContent: '' };
+  const direct = buttonFixture({ value: 'session-123' });
+
+  assert.equal(await mainUi.copyMetadataValue(direct.event, {
+    document: direct.document,
+    navigator: { clipboard: { writeText: async (value) => copied.push(value) } },
+    announcer
+  }), true);
+  assert.deepEqual(copied, ['session-123']);
+  assert.equal(announcer.textContent, 'Copied Copy session ID');
+
+  const targeted = buttonFixture({ targetId: 'session', targetText: 'session-from-target' });
+  assert.equal(await mainUi.copyMetadataValue(targeted.event, {
+    document: targeted.document,
+    navigator: { clipboard: { writeText: async (value) => copied.push(value) } },
+    announcer
+  }), true);
+  assert.deepEqual(copied, ['session-123', 'session-from-target']);
+});
+
+test('common main UI falls back and reports copy failures', async () => {
+  const mainUi = loadMainUi();
+  const fallbackValues = [];
+  const warnings = [];
+  const announcer = { textContent: '' };
+  const fixture = buttonFixture({ value: 'daemon-endpoint' });
+
+  assert.equal(await mainUi.copyMetadataValue(fixture.event, {
+    document: fixture.document,
+    navigator: {},
+    announcer,
+    fallbackCopy: (value) => fallbackValues.push(value)
+  }), true);
+  assert.deepEqual(fallbackValues, ['daemon-endpoint']);
+
+  assert.equal(await mainUi.copyMetadataValue(fixture.event, {
+    document: fixture.document,
+    navigator: { clipboard: { writeText: async () => { throw new Error('denied'); } } },
+    announcer,
+    logger: { warn: (event, error) => warnings.push([event, error.message]) }
+  }), false);
+  assert.deepEqual(warnings, [['metadata_copy.failed', 'denied']]);
+  assert.equal(announcer.textContent, 'Copy failed');
+});

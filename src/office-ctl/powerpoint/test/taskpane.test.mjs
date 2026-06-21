@@ -176,12 +176,10 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /middleTruncate\(task\.requestId\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
-  assert.match(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
+  assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger, fallbackCopy \}\)/);
+  assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
   assert.match(mainUi, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
-  assert.match(js, /const target = button\.dataset\.copyTarget \? document\.getElementById\(button\.dataset\.copyTarget\) : null/);
-  assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
-  assert.match(js, /navigator\.clipboard\?\.writeText/);
-  assert.match(js, /const \{ bindDetailsControl, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata \} = window\.OfficeCtlMainUi/);
+  assert.match(js, /const \{ bindDetailsControl, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata \} = window\.OfficeCtlMainUi/);
   assert.doesNotMatch(js, /function setCopyableMetadata\(element, value\)/);
   assert.match(mainUi, /function setCopyableMetadata\(element, value\)/);
   assert.match(mainUi, /button\.dataset\.copyValue = text/);

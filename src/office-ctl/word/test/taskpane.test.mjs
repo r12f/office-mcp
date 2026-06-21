@@ -475,10 +475,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.doesNotMatch(js, /settingsToggleEl/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
-  assert.match(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
-  assert.match(js, /const target = button\.dataset\.copyTarget \? document\.getElementById\(button\.dataset\.copyTarget\) : null/);
-  assert.match(js, /const value = button\.dataset\.copyValue \|\| target\?\.textContent\?\.trim\(\)/);
-  assert.match(js, /navigator\.clipboard\?\.writeText/);
+  assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger, fallbackCopy \}\)/);
+  assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
   assert.match(js, /setCopyableMetadata/);
   assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function setCopyableMetadata\(element, value\)/);
   assert.match(js, /middleTruncate/);
