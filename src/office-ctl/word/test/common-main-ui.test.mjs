@@ -183,6 +183,42 @@ test('common main UI renders document protection and editability labels', () => 
   assert.equal(mainUi.documentStateLabel({ protection: { label: 'presentation protection' } }), 'Protected: presentation protection');
 });
 
+test('common main UI renders static task pane metadata', () => {
+  const mainUi = loadMainUi({
+    Office: {
+      context: {
+        diagnostics: { host: 'Excel', version: '16.0' },
+        platform: 'PC'
+      }
+    }
+  });
+  const session = { id: 'session', textContent: '', closest: () => null };
+  const daemon = { id: 'daemon', textContent: '', closest: () => null };
+  const server = { textContent: '' };
+  const protocol = { textContent: '' };
+  const hostPlatform = { textContent: '' };
+
+  mainUi.renderStaticMetadata({
+    session,
+    daemon,
+    serverVersion: server,
+    protocolVersion: protocol,
+    hostPlatform
+  }, {
+    sessionId: 'session-123',
+    endpoint: 'wss://localhost:8765/addin',
+    serverInfo: { serverVersion: '0.1.0', protocolVersion: '1.0' },
+    protocolVersion: '1.0',
+    defaultHost: 'Office'
+  });
+
+  assert.equal(session.textContent, 'session-123');
+  assert.equal(daemon.textContent, 'wss://localhost:8765/addin');
+  assert.equal(server.textContent, 'Server 0.1.0');
+  assert.equal(protocol.textContent, 'Protocol 1.0');
+  assert.equal(hostPlatform.textContent, 'Excel 16.0 / PC');
+});
+
 test('common main UI renders copyable command IDs with middle truncation', () => {
   const mainUi = loadMainUi();
   const requestId = '0123456789abcdefghijklmnopqrstuvwxyz';

@@ -182,7 +182,11 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger \}\)/);
   assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
   assert.match(mainUi, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
-  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, officeHostSummary, protectionLabel, renderRuntimeVersions, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
+  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, protectionLabel, renderStaticMetadata, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
+  assert.match(js, /renderStaticMetadata\(\{ session: sessionEl, daemon: daemonEl, serverVersion: serverVersionEl, protocolVersion: protocolVersionEl, hostPlatform: hostPlatformEl \}, \{ sessionId, endpoint: configuredEndpoint\(\), serverInfo, protocolVersion: PROTOCOL_VERSION, defaultHost: 'PowerPoint' \}\)/);
+  assert.doesNotMatch(functionBody(js, 'renderStaticState'), /setCopyableMetadata\(sessionEl/);
+  assert.doesNotMatch(functionBody(js, 'renderStaticState'), /renderRuntimeVersions\(/);
+  assert.doesNotMatch(functionBody(js, 'renderStaticState'), /officeHostSummary\(/);
   assert.doesNotMatch(js, /classList\.add\(state === 'connected'/);
   assert.doesNotMatch(js, /function setCopyableMetadata\(element, value\)/);
   assert.match(mainUi, /function setCopyableMetadata\(element, value\)/);

@@ -485,7 +485,10 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.doesNotMatch(js, /is-editing-tools/);
   assert.doesNotMatch(js, /function activateSettingsWithKeyboard/);
   assert.match(js, /registerResult\(message, PROTOCOL_VERSION\)/);
-  assert.match(js, /renderRuntimeVersions\(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION\)/);
+  assert.match(js, /renderStaticMetadata\(\{ session: sessionEl, daemon: daemonEl, serverVersion: serverVersionEl, protocolVersion: protocolVersionEl, hostPlatform: hostPlatformEl \}, \{ sessionId, endpoint: configuredEndpoint\(\), serverInfo, protocolVersion: PROTOCOL_VERSION, defaultHost: 'Word' \}\)/);
+  assert.doesNotMatch(functionBody(js, 'renderStaticState'), /setCopyableMetadata\(sessionEl/);
+  assert.doesNotMatch(functionBody(js, 'renderStaticState'), /renderRuntimeVersions\(/);
+  assert.doesNotMatch(functionBody(js, 'renderStaticState'), /officeHostSummary\(/);
   assert.match(js, /protectionLabel,/);
   assert.match(js, /documentStateLabel,/);
   assert.doesNotMatch(js, /function protectionLabel\(info\)/);

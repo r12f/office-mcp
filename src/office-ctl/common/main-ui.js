@@ -58,6 +58,13 @@
     if (protocolVersionElement) protocolVersionElement.textContent = `Protocol ${info.protocolVersion || fallbackProtocolVersion || 'Unknown'}`;
   }
 
+  function renderStaticMetadata(elements, options = {}) {
+    setCopyableMetadata(elements?.session, options.sessionId);
+    setCopyableMetadata(elements?.daemon, options.endpoint);
+    renderRuntimeVersions(elements?.serverVersion, elements?.protocolVersion, options.serverInfo, options.protocolVersion);
+    if (elements?.hostPlatform) elements.hostPlatform.textContent = officeHostSummary(options.defaultHost);
+  }
+
   function officeHostSummary(defaultHost) {
     const diagnostics = global.Office?.context?.diagnostics || {};
     const host = diagnostics.host || defaultHost || 'Office';
@@ -138,6 +145,7 @@
     officeHostSummary,
     protectionLabel,
     renderRuntimeVersions,
+    renderStaticMetadata,
     setConnectionState,
     setCopyableMetadata,
     statusClass,

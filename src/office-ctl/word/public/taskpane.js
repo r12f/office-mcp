@@ -41,9 +41,8 @@
     copyMetadataValue,
     documentStateLabel,
     middleTruncate,
-    officeHostSummary,
     protectionLabel,
-    renderRuntimeVersions,
+    renderStaticMetadata,
     setConnectionState: setSharedConnectionState,
     setCopyableMetadata,
     statusClass,
@@ -1554,10 +1553,7 @@
   }
 
   function renderStaticState() {
-    setCopyableMetadata(sessionEl, sessionId);
-    setCopyableMetadata(daemonEl, configuredEndpoint());
-    renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
-    hostPlatformEl.textContent = officeHostSummary('Word');
+    renderStaticMetadata({ session: sessionEl, daemon: daemonEl, serverVersion: serverVersionEl, protocolVersion: protocolVersionEl, hostPlatform: hostPlatformEl }, { sessionId, endpoint: configuredEndpoint(), serverInfo, protocolVersion: PROTOCOL_VERSION, defaultHost: 'Word' });
     renderToolModeControl();
     renderToolSummary();
     renderHistory();

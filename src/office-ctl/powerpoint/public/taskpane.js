@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, officeHostSummary, protectionLabel, renderRuntimeVersions, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, protectionLabel, renderStaticMetadata, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1352,10 +1352,7 @@
   }
 
   function renderStaticState() {
-    setCopyableMetadata(sessionEl, sessionId);
-    setCopyableMetadata(daemonEl, configuredEndpoint());
-    renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
-    hostPlatformEl.textContent = officeHostSummary('PowerPoint');
+    renderStaticMetadata({ session: sessionEl, daemon: daemonEl, serverVersion: serverVersionEl, protocolVersion: protocolVersionEl, hostPlatform: hostPlatformEl }, { sessionId, endpoint: configuredEndpoint(), serverInfo, protocolVersion: PROTOCOL_VERSION, defaultHost: 'PowerPoint' });
     renderToolModeControl();
     renderToolSummary();
     renderCurrentTask();
