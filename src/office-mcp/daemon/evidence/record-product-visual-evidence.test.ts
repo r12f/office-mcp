@@ -317,6 +317,8 @@ test('README product visual evidence command matches current product visual gate
   assert.doesNotMatch(commandLine, /--word-catalog-type/);
   assert.match(catalogIdentityLine, /record-catalog-identity-review\.mjs/);
   assert.match(catalogIdentityLine, /--catalog-path/);
+  assert.match(catalogIdentityLine, /artifacts\\msi-stage\\addin-catalog/);
+  assert.doesNotMatch(catalogIdentityLine, /\.\.\\\.\.\\\.\.\\\.\.\\addin-catalog/);
   assert.match(catalogIdentityLine, /--output .*catalog-identity-review\.json/);
 });
 
