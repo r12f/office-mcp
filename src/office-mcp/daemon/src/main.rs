@@ -27,11 +27,6 @@ fn main() {
             serve_daemon_with_optional_tray(true);
         }
         [command, subcommand, flag]
-            if command == "daemon" && subcommand == "run" && flag == "--no-tray" =>
-        {
-            serve_daemon_with_optional_tray(false);
-        }
-        [command, subcommand, flag]
             if command == "daemon" && subcommand == "run" && flag == "--with-tray" =>
         {
             serve_daemon_with_optional_tray(true);
@@ -69,7 +64,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: office-mcp-daemon [--describe|--parity-gates|serve|stdio|sessions|ui|tray [--probe] [--runtime-path <path>] [--probe-state-path <path>]|daemon run [--no-tray|--with-tray]|daemon status|daemon start|daemon stop|config endpoints|config show|config claude-desktop [--installed] [--install-root <path>]]"
+                "usage: office-mcp-daemon [--describe|--parity-gates|serve|stdio|sessions|ui|tray [--probe] [--runtime-path <path>] [--probe-state-path <path>]|daemon run [--with-tray]|daemon status|daemon start|daemon stop|config endpoints|config show|config claude-desktop [--installed] [--install-root <path>]]"
             );
             std::process::exit(2);
         }
@@ -99,7 +94,7 @@ fn run_stdio_bridge() {
 }
 
 fn serve_daemon() {
-    serve_daemon_with_optional_tray(false);
+    serve_daemon_with_optional_tray(true);
 }
 
 fn serve_daemon_with_optional_tray(start_tray: bool) {
@@ -178,7 +173,7 @@ fn run_tray(args: &[String]) {
 fn print_description(daemon: &OfficeMcpDaemon) {
     println!("Office MCP Control daemon");
     println!("Local Office automation control server for live add-in sessions.");
-    println!("Usage: office-mcp-daemon daemon run [--no-tray|--with-tray]");
+    println!("Usage: office-mcp-daemon daemon run [--with-tray]");
     println!("Components:");
     for component in daemon.component_descriptions() {
         println!("- {}: {}", component.name(), component.description());

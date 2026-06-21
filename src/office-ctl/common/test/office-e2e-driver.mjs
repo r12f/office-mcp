@@ -95,7 +95,7 @@ async function startDaemon(context) {
   if (status.running && status.uiUrl) {
     return daemonFromStatus(status, false);
   }
-  const child = spawn('cargo', ['run', '-q', '-p', 'office-mcp-daemon', '--', 'daemon', 'run', '--no-tray'], {
+  const child = spawn('cargo', ['run', '-q', '-p', 'office-mcp-daemon', '--', 'daemon', 'run'], {
     cwd: REPO_ROOT,
     detached: true,
     stdio: 'ignore',

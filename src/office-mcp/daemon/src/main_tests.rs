@@ -7,11 +7,12 @@ fn daemon_run_starts_background_tray_by_default() {
 
     assert!(source.contains("daemon\" && subcommand == \"run\" =>"));
     assert!(source.contains("serve_daemon_with_optional_tray(true)"));
-    assert!(source.contains("flag == \"--no-tray\""));
-    assert!(source.contains("serve_daemon_with_optional_tray(false)"));
     assert!(source.contains("flag == \"--with-tray\""));
     assert!(source.contains("start_tray_background();"));
-    assert!(source.contains("daemon run [--no-tray|--with-tray]"));
+    assert!(source.contains("daemon run [--with-tray]"));
+    assert!(!source.contains("flag == \"--no-tray\""));
+    assert!(!source.contains("daemon run [--no-tray"));
+    assert!(!source.contains("serve_daemon_with_optional_tray(false)"));
 }
 
 #[test]
@@ -50,7 +51,7 @@ fn default_description_uses_product_language_not_scaffold_wording() {
 
     assert!(source.contains("Office MCP Control daemon"));
     assert!(source.contains("Local Office automation control server for live add-in sessions."));
-    assert!(source.contains("Usage: office-mcp-daemon daemon run [--no-tray|--with-tray]"));
+    assert!(source.contains("Usage: office-mcp-daemon daemon run [--with-tray]"));
     assert!(source.contains("Components:"));
     assert!(!source.to_ascii_lowercase().contains("reference scaffold"));
     assert!(!source.to_ascii_lowercase().contains("debug daemon"));

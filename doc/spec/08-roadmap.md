@@ -346,8 +346,9 @@ User-reported follow-up from live daemon testing:
       icon in normal interactive runs, not just `tray --probe` evidence. Current
       automated evidence covers `office-mcp-daemon daemon run`, which starts the
       native tray host by default on a background thread before running the
-      daemon. `--no-tray` is retained for headless/service runs, and
-      `--with-tray` remains accepted for compatibility. `ui.production_daemon_tray`
+      daemon. `--no-tray` is not an accepted local/manual startup path because
+      users need the tray icon to know the daemon is running; `--with-tray`
+      remains accepted for compatibility. `ui.production_daemon_tray`
       now proves the production path creates the native Windows tray host,
       exposes live UI state, and logs native notification-area icon creation.
       Manual Windows interaction evidence remains required for right-click menu

@@ -11,6 +11,12 @@ const REPO_ROOT = resolve(dirname(DRIVER), '../../../..');
 const DEFAULT_ACTIVATOR = resolve(REPO_ROOT, 'src/office-ctl/common/scripts/activate-office-mcp-addin.ps1');
 const RUN_OFFICE_COM = process.env.OFFICE_MCP_RUN_E2E === '1';
 
+test('Office E2E driver starts the daemon with the visible tray path', () => {
+  const source = readFileSync(DRIVER, 'utf8');
+  assert.match(source, /'daemon', 'run'/);
+  assert.doesNotMatch(source, /--no-tray/);
+});
+
 test('Office E2E driver describes a driver-owned Word lifecycle', () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-word-'));
   const create = runDriver({ host: 'Word', step: 'describeDocumentLifecycle', context: { workDir: dir } });
