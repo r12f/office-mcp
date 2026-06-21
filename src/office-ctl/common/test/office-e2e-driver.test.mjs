@@ -426,6 +426,8 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /word patched driver document unavailable/);
   assert.match(script, /powerpoint patched driver presentation unavailable/);
   assert.match(script, /\$hostKey -in @\("word", "excel", "powerpoint"\)/);
+  assert.match(script, /Try-OpenControlPanelForDriverDocument -WindowHandle \$patchedDriverWindowHandle -Deadline \$deadline -AllowCatalogFallback/);
+  assert.doesNotMatch(script, /Try-OpenControlPanelForDriverDocument -WindowHandle \$patchedDriverWindowHandle -Deadline \$deadline -AllowCatalogFallback:\$false/);
   assert.match(script, /\$hostKey patched driver document control panel did not open; skipping official sideload fallback to avoid duplicate \$hostKey windows/);
   assert.match(script, /patched driver document did not open Office MCP Control/);
   assert.doesNotMatch(script, /excel patched driver workbook control panel did not open; skipping official sideload fallback to avoid duplicate Excel windows/);
@@ -514,6 +516,8 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /Office MCP Control was clicked but Open Control Panel did not appear yet/);
   assert.match(script, /found Office MCP Control source=\$Source/);
   assert.doesNotMatch(script, /control_name\s*=\s*"Office MCP Control"/, 'clicking the add-in entry alone is not a completed activation');
+  assert.doesNotMatch(script, /foreach \(\$name in @\("Insert", "Add-ins", "My Add-ins", "Shared Folder", "Office MCP Control", "Add"\)\)/);
+  assert.match(script, /foreach \(\$name in @\("Office MCP Control", "Open Control Panel", "My Add-ins", "Shared Folder"\)\)/);
   assert.match(script, /Get-OfficeStateSnapshot/);
   assert.match(script, /waiting for driver document/);
   assert.match(script, /\$Path -match '\^https\?:\/\/'/);

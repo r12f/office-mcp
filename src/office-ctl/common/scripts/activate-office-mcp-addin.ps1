@@ -1232,7 +1232,7 @@ function Try-OpenAddinFromCatalog {
     }
   }
 
-  foreach ($name in @("Insert", "Add-ins", "My Add-ins", "Shared Folder", "Office MCP Control", "Add")) {
+  foreach ($name in @("Office MCP Control", "Open Control Panel", "My Add-ins", "Shared Folder")) {
     if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
     if (Try-InvokeNamedControl -Root $Window -Name $name) {
       Write-ActivatorLog "catalog fallback invoked name=$name"
@@ -1271,7 +1271,7 @@ if ($hostKey -in @("word", "excel", "powerpoint")) {
   $patchedDriverWindowHandle = Try-OpenPatchedDriverDocument -Application $app -HostKey $hostKey -Path $DocumentPath -Deadline $deadline
   if ($patchedDriverWindowHandle) {
     Write-ActivatorLog "$hostKey patched driver document active; attempting to open control panel document=$DocumentPath"
-    $panel = Try-OpenControlPanelForDriverDocument -WindowHandle $patchedDriverWindowHandle -Deadline $deadline -AllowCatalogFallback:$false
+    $panel = Try-OpenControlPanelForDriverDocument -WindowHandle $patchedDriverWindowHandle -Deadline $deadline -AllowCatalogFallback
     if ($panel.opened) {
       Write-ActivationResult -DocumentPath $DocumentPath -ControlName $panel.control_name -TabName $panel.tab_name -ActivationPath "patched-driver-document" -ControlOpened $true
       exit 0
