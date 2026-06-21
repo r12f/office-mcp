@@ -509,7 +509,7 @@ function validateProductVisualEvidence(): void {
   if (visual.tray_menu_surface_kind !== 'native' || visual.tray_menu_surface_native !== true) {
     failures.push('Product visual evidence tray menu surface is not native.');
   }
-  validateProductVisualScreenshots(visual.screenshot_paths);
+  validateProductVisualScreenshots(visual.screenshot_paths, visual.screenshots_exist);
   validateProductVisualScreenshotFreshness(visual.screenshot_paths, visual.screenshot_metadata, visual.screenshots_fresh, visual.screenshots_fresh_ready, visual.recorded_at);
   validateDistinctProductVisualScreenshots(visual.screenshot_paths);
   validateProductVisualObservations(visual.observations);
@@ -831,9 +831,13 @@ function productCatalogTypeLooksReady(value: unknown): boolean {
   return /local productivity automation control utility/i.test(value) && !/(add-in|task pane|developer tool|mcp server|protocol bridge|sample|debug|experimental|office-mcp-(word|excel|powerpoint))/i.test(value);
 }
 
-function validateProductVisualScreenshots(paths: unknown): void {
+function validateProductVisualScreenshots(paths: unknown, exists: unknown): void {
   if (!isRecord(paths)) {
     failures.push('Product visual evidence screenshot paths are malformed.');
+    return;
+  }
+  if (!isRecord(exists)) {
+    failures.push('Product visual evidence screenshot ready flags are malformed.');
     return;
   }
   for (const surface of productVisualSurfaces()) {
@@ -841,6 +845,7 @@ function validateProductVisualScreenshots(paths: unknown): void {
     if (typeof path !== 'string' || !screenshotFileLooksLikeImage(resolve(path))) {
       failures.push(`Product visual evidence screenshot missing or invalid: ${surface}.`);
     }
+    if (exists[surface] !== true) failures.push(`Product visual evidence screenshot ready flag is false: ${surface}.`);
   }
 }
 

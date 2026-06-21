@@ -541,6 +541,18 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.screenshots_exist.daemon_main_window = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /screenshot ready flag is false: daemon_main_window/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.screenshots_fresh_ready = false;
       broken.screenshots_fresh.word_ribbon_command = false;
       broken.screenshot_metadata.word_ribbon_command.fresh = false;
