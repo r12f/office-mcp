@@ -42,6 +42,7 @@
     middleTruncate,
     officeHostSummary,
     renderRuntimeVersions,
+    setConnectionState: setSharedConnectionState,
     setCopyableMetadata,
     statusClass,
     taskMetadataMarkup
@@ -1538,10 +1539,7 @@
   }
 
   function setConnectionState(state, label) {
-    connectionBadgeEl.textContent = label;
-    connectionBadgeEl.className = `status-badge ${statusClass(state)}`;
-    if (state === 'connected') connectionDetailEl.textContent = 'None';
-    announce(label);
+    setSharedConnectionState({ badge: connectionBadgeEl, detail: connectionDetailEl, announcer: announcerEl }, state, label);
   }
 
   function announce(message) {

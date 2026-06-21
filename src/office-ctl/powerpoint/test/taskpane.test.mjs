@@ -170,11 +170,13 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(js, /settingsToggleEl/);
   assert.match(mainUi, /middleTruncate\(requestId\)/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
+  assert.match(js, /setConnectionState: setSharedConnectionState/);
+  assert.match(js, /setSharedConnectionState\(\{ badge: connectionBadgeEl, detail: connectionDetailEl, announcer: announcerEl \}, state, label\)/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
   assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger \}\)/);
   assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
   assert.match(mainUi, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
-  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
+  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
   assert.doesNotMatch(js, /classList\.add\(state === 'connected'/);
   assert.doesNotMatch(js, /function setCopyableMetadata\(element, value\)/);
   assert.match(mainUi, /function setCopyableMetadata\(element, value\)/);

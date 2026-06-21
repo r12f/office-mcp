@@ -145,6 +145,27 @@ test('common main UI maps connection and task states to badge classes', () => {
   assert.equal(mainUi.statusClass('idle'), 'status-neutral');
 });
 
+test('common main UI renders connection state consistently', () => {
+  const mainUi = loadMainUi();
+  const badge = { textContent: '', className: '' };
+  const detail = { textContent: 'Connecting' };
+  const announcer = { textContent: '' };
+
+  mainUi.setConnectionState({ badge, detail, announcer }, 'connected', 'Connected');
+
+  assert.equal(badge.textContent, 'Connected');
+  assert.equal(badge.className, 'status-badge status-success');
+  assert.equal(detail.textContent, 'None');
+  assert.equal(announcer.textContent, 'Connected');
+
+  mainUi.setConnectionState({ badge, detail, announcer }, 'failed', 'Failed');
+
+  assert.equal(badge.textContent, 'Failed');
+  assert.equal(badge.className, 'status-badge status-danger');
+  assert.equal(detail.textContent, 'None');
+  assert.equal(announcer.textContent, 'Failed');
+});
+
 test('common main UI renders copyable command IDs with middle truncation', () => {
   const mainUi = loadMainUi();
   const requestId = '0123456789abcdefghijklmnopqrstuvwxyz';

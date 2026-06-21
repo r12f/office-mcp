@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1564,9 +1564,7 @@
   }
 
   function setConnectionState(state, label) {
-    connectionBadgeEl.textContent = label;
-    connectionBadgeEl.className = `status-badge ${statusClass(state)}`;
-    announcerEl.textContent = label;
+    setSharedConnectionState({ badge: connectionBadgeEl, detail: connectionDetailEl, announcer: announcerEl }, state, label);
   }
 
   function reply(id, result) {

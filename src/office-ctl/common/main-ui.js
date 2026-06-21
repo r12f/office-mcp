@@ -87,6 +87,16 @@
     return 'status-neutral';
   }
 
+  function setConnectionState(elements, state, label) {
+    const badge = elements?.badge;
+    if (badge) {
+      badge.textContent = label;
+      badge.className = `status-badge ${statusClass(state)}`;
+    }
+    if (state === 'connected' && elements?.detail) elements.detail.textContent = 'None';
+    if (elements?.announcer) elements.announcer.textContent = label;
+  }
+
   function commandIdMarkup(requestId, options = {}) {
     if (!requestId) return '';
     const escapeHtml = options.escapeHtml || ((value) => String(value));
@@ -113,6 +123,7 @@
     middleTruncate,
     officeHostSummary,
     renderRuntimeVersions,
+    setConnectionState,
     setCopyableMetadata,
     statusClass,
     taskMetadataMarkup
