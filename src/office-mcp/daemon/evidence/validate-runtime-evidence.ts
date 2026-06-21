@@ -517,6 +517,7 @@ function validateProductVisualEvidence(): void {
   validateCatalogIdentityReview(visual.catalog_identity_review, visual.catalog_identity_review_ready);
   validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
   validateFirstRunIdentity(visual.first_run_identity);
+  validateFirstRunCatalogBinding(visual.first_run_identity, visual.catalog_identity_review);
   validateDaemonMainWindowVisualEvidence(visual.daemon_main_window);
   validateWordRuntimeEvidence(visual.word_runtime_evidence, visual.word_runtime_evidence_ready);
   validateExcelRuntimeEvidence(visual.excel_runtime_evidence, visual.excel_runtime_evidence_ready);
@@ -815,6 +816,31 @@ function validateHostFirstRunIdentity(identity: unknown, host: string): void {
     failures.push(`Product visual evidence missing ${host} first-run high-resolution icon URL.`);
   }
   if (identity.ready !== true) failures.push(`Product visual evidence missing ${host} first-run identity ready flag.`);
+}
+
+function validateFirstRunCatalogBinding(firstRun: unknown, catalogReview: unknown): void {
+  if (!isRecord(firstRun) || !isRecord(catalogReview) || !isRecord(catalogReview.hosts)) return;
+  validateHostFirstRunCatalogBinding('Word', firstRun.word, catalogReview.hosts.word);
+  validateHostFirstRunCatalogBinding('Excel', firstRun.excel, catalogReview.hosts.excel);
+  validateHostFirstRunCatalogBinding('PowerPoint', firstRun.powerpoint, catalogReview.hosts.powerpoint);
+}
+
+function validateHostFirstRunCatalogBinding(label: 'Word' | 'Excel' | 'PowerPoint', firstRun: unknown, catalogHost: unknown): void {
+  if (!isRecord(firstRun) || !isRecord(catalogHost)) return;
+  for (const [firstRunField, catalogField, fieldLabel] of [
+    ['display_name', 'display_name', 'display name'],
+    ['provider', 'provider', 'provider'],
+    ['description', 'description', 'description'],
+    ['icon_url', 'icon_url', 'icon URL'],
+    ['high_resolution_icon_url', 'high_resolution_icon_url', 'high-resolution icon URL']
+  ] as const) {
+    if (typeof firstRun[firstRunField] !== 'string' || typeof catalogHost[catalogField] !== 'string' || firstRun[firstRunField] !== catalogHost[catalogField]) {
+      failures.push(`Product visual evidence ${label} first-run identity ${fieldLabel} does not match catalog identity review.`);
+    }
+  }
+  if (typeof firstRun.taskpane_url === 'string' && typeof catalogHost.taskpane_url === 'string' && firstRun.taskpane_url !== catalogHost.taskpane_url) {
+    failures.push(`Product visual evidence ${label} first-run identity task pane URL does not match catalog identity review.`);
+  }
 }
 
 function validateDaemonMainWindowVisualEvidence(mainWindow: unknown): void {

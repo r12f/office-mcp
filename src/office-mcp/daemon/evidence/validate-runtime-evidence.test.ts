@@ -1013,6 +1013,20 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.first_run_identity.excel.icon_url = 'https://localhost:8765/assets/blank.png';
+      broken.first_run_identity.excel.ready = false;
+      broken.product_identity_review.excel_first_run_identity_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Excel first-run identity icon URL does not match catalog identity review/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.rendered_logo_review.design_review.concept_pass = {
         ready: false,
         selected_direction: '',
@@ -1444,7 +1458,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
         manifest_ready: passed,
         display_name: 'Office MCP Control',
         provider: 'Office MCP Control',
-        description: 'Local office productivity automation and control utility',
+        description: 'Control live documents through a local productivity automation control utility.',
         type: 'Local productivity automation control utility',
         icon_url: 'https://localhost:8765/assets/icon-32.png',
         high_resolution_icon_url: 'https://localhost:8765/assets/icon-80.png',
@@ -1454,7 +1468,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
         manifest_ready: passed,
         display_name: 'Office MCP Control',
         provider: 'Office MCP Control',
-        description: 'Local office productivity automation and control utility',
+        description: 'Control live documents through a local productivity automation control utility.',
         type: 'Local productivity automation control utility',
         icon_url: 'https://localhost:8765/assets/icon-32.png',
         high_resolution_icon_url: 'https://localhost:8765/assets/icon-80.png',
@@ -1464,7 +1478,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
         manifest_ready: passed,
         display_name: 'Office MCP Control',
         provider: 'Office MCP Control',
-        description: 'Local office productivity automation and control utility',
+        description: 'Control live documents through a local productivity automation control utility.',
         type: 'Local productivity automation control utility',
         icon_url: 'https://localhost:8765/assets/icon-32.png',
         high_resolution_icon_url: 'https://localhost:8765/assets/icon-80.png',
