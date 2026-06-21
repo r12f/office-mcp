@@ -1848,8 +1848,8 @@
   }
 
   function setStatus(text) {
-    connectionBadgeEl.textContent = text;
     connectionDetailEl.textContent = text;
+    setConnectionState('failed', text);
   }
 
   function setConnectionState(state, label) {

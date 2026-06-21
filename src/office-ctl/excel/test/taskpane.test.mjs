@@ -166,6 +166,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);
   assert.match(js, /setConnectionState: setSharedConnectionState/);
   assert.match(js, /setSharedConnectionState\(\{ badge: connectionBadgeEl, detail: connectionDetailEl, announcer: announcerEl \}, state, label\)/);
+  assert.match(js, /function setStatus\(text\) \{\s*connectionDetailEl\.textContent = text;\s*setConnectionState\('failed', text\);\s*\}/);
+  assert.doesNotMatch(js, /function setStatus\(text\) \{\s*connectionBadgeEl\.textContent = text;\s*connectionDetailEl\.textContent = text;\s*\}/);
   assert.match(js, /async function handleMetadataCopy\(event\)/);
   assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger \}\)/);
   assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
