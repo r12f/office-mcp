@@ -469,6 +469,9 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /function Try-InvokeNamedControl/);
   assert.match(script, /Find-DescendantByNameLike -Root \$Root -Name \$Name -ProcessId \$processId/);
   assert.match(script, /Find-DescendantByNameLike -Root \$Root -Name \$Name/);
+  assert.match(script, /function Invoke-ControlByMouse/);
+  assert.match(script, /Invoke-ControlByMouse -Element \$control/);
+  assert.doesNotMatch(script, /function Try-InvokeNamedControl[\s\S]*Write-ActivatorLog "invoking control name=\$Name"[\s\S]*Invoke-Control -Element \$control[\s\S]*return \$true[\s\S]*function Try-InvokeAutomationIdControl/);
   assert.match(script, /Try-EnableOfficeMcpAddin/);
   assert.match(script, /Find-DescendantByNameLike -Root \$Root -Name "Office MCP Control"/);
   assert.match(script, /"ControlType\.TabItem"/);

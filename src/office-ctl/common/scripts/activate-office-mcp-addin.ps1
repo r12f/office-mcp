@@ -927,6 +927,29 @@ public static extern bool SetForegroundWindow(System.IntPtr hWnd);
   [NativeMethods.Mouse]::mouse_event(0x0004, 0, 0, 0, 0)
 }
 
+function Invoke-ControlByMouse {
+  param([Parameter(Mandatory = $true)]$Element)
+
+  $rect = $Element.Current.BoundingRectangle
+  if ($rect.IsEmpty) { throw "Control has no clickable bounds." }
+  Add-Type -AssemblyName System.Windows.Forms
+  [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point(
+    [int]($rect.Left + ($rect.Width / 2)),
+    [int]($rect.Top + ($rect.Height / 2))
+  )
+  Add-Type -Namespace NativeMethods -Name Window -MemberDefinition @"
+[System.Runtime.InteropServices.DllImport("user32.dll")]
+public static extern bool SetForegroundWindow(System.IntPtr hWnd);
+"@ -ErrorAction SilentlyContinue
+  Add-Type -Namespace NativeMethods -Name Mouse -MemberDefinition @"
+[System.Runtime.InteropServices.DllImport("user32.dll")]
+public static extern void mouse_event(int flags, int dx, int dy, int data, int extraInfo);
+"@ -ErrorAction SilentlyContinue
+  try { [NativeMethods.Window]::SetForegroundWindow([IntPtr]$Element.Current.NativeWindowHandle) | Out-Null } catch {}
+  [NativeMethods.Mouse]::mouse_event(0x0002, 0, 0, 0, 0)
+  [NativeMethods.Mouse]::mouse_event(0x0004, 0, 0, 0, 0)
+}
+
 function Send-ActivatorKey {
   param(
     [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
@@ -964,7 +987,7 @@ function Try-InvokeNamedControl {
   }
   if (-not $control) { return $false }
   Write-ActivatorLog "invoking control name=$Name"
-  Invoke-Control -Element $control
+  Invoke-ControlByMouse -Element $control
   Start-Sleep -Milliseconds 500
   return $true
 }
@@ -1000,7 +1023,7 @@ function Try-InvokeOfficeAddinsRibbon {
     }
     if (-not $control) { continue }
     Write-ActivatorLog "invoking Office Add-ins ribbon automation_id=$automationId name=$($control.Current.Name) source=$Source"
-    Invoke-Control -Element $control
+    Invoke-ControlByMouse -Element $control
     Start-Sleep -Milliseconds 800
     return $true
   }
@@ -1013,7 +1036,7 @@ function Try-InvokeOfficeAddinsRibbon {
     }
     if (-not $control) { continue }
     Write-ActivatorLog "invoking Office Add-ins ribbon name=$name actual_name=$($control.Current.Name) source=$Source"
-    Invoke-Control -Element $control
+    Invoke-ControlByMouse -Element $control
     Start-Sleep -Milliseconds 800
     return $true
   }
@@ -1196,7 +1219,7 @@ function Try-OpenAddinFromCatalog {
     }
     if ($control) {
       Write-ActivatorLog "catalog fallback invoked automation_id=$automationId"
-      Invoke-Control -Element $control
+      Invoke-ControlByMouse -Element $control
       Start-Sleep -Milliseconds 800
       $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
       if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "catalog-fallback:$automationId") {
