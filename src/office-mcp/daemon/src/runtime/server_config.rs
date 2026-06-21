@@ -2,7 +2,7 @@ use crate::addin_mgr::{
     AddinChannelConfig, ImageFetcher, WebSocketCodecError, WebSocketProtocolError,
 };
 use crate::common::{AuditLog, DaemonConfig};
-use crate::mcp::McpHttpConfig;
+use crate::mcp::{McpHttpConfig, ToolAccessPolicy};
 use crate::ui::UiRuntimeError;
 use native_tls::{Identity, TlsAcceptor};
 use std::error::Error;
@@ -32,6 +32,7 @@ pub struct RuntimeServerConfig {
     pub log_path: Option<String>,
     pub audit_log: AuditLog,
     pub image_fetcher: ImageFetcher,
+    pub tool_access_policy: ToolAccessPolicy,
 }
 
 impl RuntimeServerConfig {
@@ -75,6 +76,7 @@ impl RuntimeServerConfig {
                 AuditLog::new()
             },
             image_fetcher: ImageFetcher::new(),
+            tool_access_policy: tool_access_policy_from_config(config),
         })
     }
 
@@ -150,8 +152,23 @@ impl Default for RuntimeServerConfig {
             log_path: None,
             audit_log: AuditLog::new(),
             image_fetcher: ImageFetcher::new(),
+            tool_access_policy: ToolAccessPolicy::default(),
         }
     }
+}
+
+fn tool_access_policy_from_config(config: &DaemonConfig) -> ToolAccessPolicy {
+    let mut policy = ToolAccessPolicy::default().with_access_mode(config.tool_access.access_mode);
+    for app in &config.tool_access.disabled_apps {
+        policy = policy.with_disabled_app(app);
+    }
+    for (app, category) in &config.tool_access.disabled_categories {
+        policy = policy.with_disabled_category(app, category);
+    }
+    for tool in &config.tool_access.disabled_tools {
+        policy = policy.with_disabled_tool(tool);
+    }
+    policy
 }
 
 #[derive(Debug)]

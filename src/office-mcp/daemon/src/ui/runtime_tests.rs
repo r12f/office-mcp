@@ -1,6 +1,7 @@
 use super::{UiRuntimeFile, UiRuntimeInfo, default_path_from_env};
 use crate::common::{
     AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
+    ToolAccessConfig,
 };
 use std::collections::BTreeMap;
 use std::fs;
@@ -110,6 +111,7 @@ fn runtime_file_can_be_built_from_config() {
             level: ConfigLogLevel::Info,
             file: "C:\\logs\\office-mcp.log".to_string(),
         },
+        tool_access: ToolAccessConfig::default(),
     };
 
     let file = UiRuntimeFile::from_config(&config);

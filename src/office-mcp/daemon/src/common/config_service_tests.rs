@@ -1,4 +1,5 @@
 use super::{ConfigError, DaemonConfigService, LoadConfigOptions, LogLevel};
+use crate::mcp::AccessMode;
 use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fs;
@@ -36,6 +37,12 @@ path = "C:\\logs\\office-mcp-audit.jsonl"
 [logging]
 level = "debug"
 file = "C:\\logs\\office-mcp.log"
+
+[tool_access]
+access_mode = "write"
+disabled_apps = "powerpoint"
+disabled_categories = "excel:Range;word:Review"
+disabled_tools = "word.update_table,powerpoint.delete_slide"
 "#,
     );
     let loaded = DaemonConfigService::with_env(BTreeMap::new())
@@ -62,7 +69,35 @@ file = "C:\\logs\\office-mcp.log"
     assert_eq!(loaded.audit.path, "C:\\logs\\office-mcp-audit.jsonl");
     assert_eq!(loaded.logging.level, LogLevel::Debug);
     assert_eq!(loaded.logging.file, "C:\\logs\\office-mcp.log");
+    assert_eq!(loaded.tool_access.access_mode, AccessMode::Write);
+    assert_eq!(loaded.tool_access.disabled_apps, vec!["powerpoint"]);
+    assert_eq!(
+        loaded.tool_access.disabled_categories,
+        vec![
+            ("excel".to_string(), "Range".to_string()),
+            ("word".to_string(), "Review".to_string())
+        ]
+    );
+    assert_eq!(
+        loaded.tool_access.disabled_tools,
+        vec![
+            "word.update_table".to_string(),
+            "powerpoint.delete_slide".to_string()
+        ]
+    );
     let _ = fs::remove_file(path);
+}
+
+#[test]
+fn tool_access_defaults_allow_all_tools() {
+    let loaded = DaemonConfigService::with_env(BTreeMap::new())
+        .load(LoadConfigOptions::default())
+        .expect("load defaults");
+
+    assert_eq!(loaded.tool_access.access_mode, AccessMode::All);
+    assert!(loaded.tool_access.disabled_apps.is_empty());
+    assert!(loaded.tool_access.disabled_categories.is_empty());
+    assert!(loaded.tool_access.disabled_tools.is_empty());
 }
 
 #[test]

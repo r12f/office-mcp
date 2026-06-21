@@ -18,7 +18,7 @@ pub use config_error::ConfigError;
 pub use config_model::{
     AddinConfig, AuditConfig, DaemonConfig, EndpointConfig, LimitsConfig, LoadConfigOptions,
     LogLevel as ConfigLogLevel, LoggingConfig, McpConfig, RedactedAddinConfig,
-    RedactedDaemonConfig, RedactedMcpConfig,
+    RedactedDaemonConfig, RedactedMcpConfig, ToolAccessConfig,
 };
 pub use config_service::DaemonConfigService;
 pub use config_toml::{RawTomlValue, parse_toml};

@@ -1,7 +1,9 @@
 use super::{RuntimeServerConfig, RuntimeServerError};
 use crate::common::{
     AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
+    ToolAccessConfig,
 };
+use crate::mcp::{AccessMode, ToolAccessPolicy};
 
 #[test]
 fn runtime_config_converts_daemon_config_into_socket_settings() {
@@ -25,6 +27,13 @@ fn runtime_config_converts_daemon_config_into_socket_settings() {
     assert_eq!(
         config.addin_channel_config().session_grace,
         std::time::Duration::from_secs(42)
+    );
+    assert_eq!(
+        config.tool_access_policy,
+        ToolAccessPolicy::default()
+            .with_access_mode(AccessMode::Write)
+            .with_disabled_category("excel", "Range")
+            .with_disabled_tool("powerpoint.delete_slide")
     );
 }
 
@@ -79,6 +88,12 @@ fn daemon_config() -> DaemonConfig {
         logging: LoggingConfig {
             level: ConfigLogLevel::Info,
             file: "C:\\logs\\office-mcp.log".to_string(),
+        },
+        tool_access: ToolAccessConfig {
+            access_mode: AccessMode::Write,
+            disabled_apps: Vec::new(),
+            disabled_categories: vec![("excel".to_string(), "Range".to_string())],
+            disabled_tools: vec!["powerpoint.delete_slide".to_string()],
         },
     }
 }

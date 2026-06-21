@@ -2,6 +2,7 @@ use super::RuntimeSharedStateFactory;
 use crate::addin_mgr::{
     AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, OfficeMcpCode, RuntimeInfo, SessionRegistry,
 };
+use crate::mcp::{AccessMode, ToolAccessPolicy};
 use crate::runtime::RuntimeServerConfig;
 use std::time::{Duration, SystemTime};
 
@@ -99,6 +100,25 @@ fn shared_state_prunes_stale_sessions_after_configured_grace() {
             .expect("registry lock")
             .get_session_info("session-1")
             .is_none()
+    );
+}
+
+#[test]
+fn factory_applies_runtime_tool_access_policy() {
+    let config = RuntimeServerConfig {
+        tool_access_policy: ToolAccessPolicy::default().with_access_mode(AccessMode::Read),
+        ..RuntimeServerConfig::default()
+    };
+    let shared_state = RuntimeSharedStateFactory::with_registry(
+        &config,
+        SessionRegistry::with_limits(config.max_pending_per_session),
+    );
+
+    assert!(shared_state.tool_access_policy.allows_tool("word.get_text"));
+    assert!(
+        !shared_state
+            .tool_access_policy
+            .allows_tool("word.insert_paragraph")
     );
 }
 

@@ -1,5 +1,4 @@
 use crate::addin_mgr::{AddinChannelServer, AddinConnectionHub, CommandRouter, SessionRegistry};
-use crate::mcp::ToolAccessPolicy;
 use crate::runtime::RuntimeServerConfig;
 use crate::runtime::mcp_response::RuntimeSharedState;
 use std::sync::{Arc, Mutex};
@@ -21,7 +20,7 @@ impl RuntimeSharedStateFactory {
             command_router: Arc::new(Mutex::new(CommandRouter::new())),
             audit_log: config.audit_log.clone(),
             image_fetcher: config.image_fetcher.clone(),
-            tool_access_policy: ToolAccessPolicy::default(),
+            tool_access_policy: config.tool_access_policy.clone(),
         })
     }
 }

@@ -1,7 +1,7 @@
 use super::{json_escape, render_endpoints, render_redacted_config};
 use crate::common::{
     AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, EndpointConfig, LimitsConfig,
-    LoggingConfig, McpConfig,
+    LoggingConfig, McpConfig, ToolAccessConfig,
 };
 
 #[test]
@@ -67,5 +67,6 @@ fn config() -> DaemonConfig {
             level: ConfigLogLevel::Info,
             file: String::new(),
         },
+        tool_access: ToolAccessConfig::default(),
     }
 }

@@ -10,6 +10,7 @@ use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::common::{
     AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
+    ToolAccessConfig,
 };
 use crate::mcp::{McpHttpFrontend, ToolAccessPolicy};
 use crate::runtime::mcp_response::RuntimeSharedState;
@@ -602,6 +603,7 @@ fn daemon_config_with_log_path(log_path: &str) -> DaemonConfig {
             level: ConfigLogLevel::Info,
             file: log_path.to_string(),
         },
+        tool_access: ToolAccessConfig::default(),
     }
 }
 

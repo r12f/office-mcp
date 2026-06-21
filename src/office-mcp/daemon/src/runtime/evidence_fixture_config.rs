@@ -1,5 +1,6 @@
 use crate::common::{
     AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
+    ToolAccessConfig,
 };
 use crate::ui::UiRuntimeFile;
 use std::path::{Path, PathBuf};
@@ -89,6 +90,7 @@ pub(crate) fn fixture_config(
             level: ConfigLogLevel::Error,
             file: String::new(),
         },
+        tool_access: ToolAccessConfig::default(),
     }
 }
 

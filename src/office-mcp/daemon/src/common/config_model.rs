@@ -1,4 +1,5 @@
 use crate::common::ConfigError;
+use crate::mcp::AccessMode;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -14,6 +15,7 @@ pub struct DaemonConfig {
     pub limits: LimitsConfig,
     pub audit: AuditConfig,
     pub logging: LoggingConfig,
+    pub tool_access: ToolAccessConfig,
 }
 
 impl DaemonConfig {
@@ -75,6 +77,25 @@ pub struct AuditConfig {
 pub struct LoggingConfig {
     pub level: LogLevel,
     pub file: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolAccessConfig {
+    pub access_mode: AccessMode,
+    pub disabled_apps: Vec<String>,
+    pub disabled_categories: Vec<(String, String)>,
+    pub disabled_tools: Vec<String>,
+}
+
+impl Default for ToolAccessConfig {
+    fn default() -> Self {
+        Self {
+            access_mode: AccessMode::All,
+            disabled_apps: Vec::new(),
+            disabled_categories: Vec::new(),
+            disabled_tools: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -5,7 +5,9 @@ use crate::common::config_toml::{RawToml, parse_toml};
 use crate::common::{
     AddinConfig, AuditConfig, ConfigError, DaemonConfig, LimitsConfig, LoadConfigOptions,
     LoggingConfig, McpConfig, RedactedAddinConfig, RedactedDaemonConfig, RedactedMcpConfig,
+    ToolAccessConfig,
 };
+use crate::mcp::AccessMode;
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
@@ -58,6 +60,7 @@ impl DaemonConfigService {
         let limits = file_config.section("limits");
         let audit = file_config.section("audit");
         let logging = file_config.section("logging");
+        let tool_access = file_config.section("tool_access");
         let config_env = ConfigEnv::new(&self.env);
 
         let addin_host = config_env.string_any(
@@ -202,6 +205,24 @@ impl DaemonConfigService {
                     ),
                 ),
             },
+            tool_access: ToolAccessConfig {
+                access_mode: parse_access_mode(&config_env.string_any(
+                    &["OFFICE_MCP_TOOL_ACCESS__ACCESS_MODE"],
+                    tool_access.string_value("access_mode", "all")?,
+                ))?,
+                disabled_apps: parse_csv_list(&config_env.string_any(
+                    &["OFFICE_MCP_TOOL_ACCESS__DISABLED_APPS"],
+                    tool_access.string_value("disabled_apps", "")?,
+                )),
+                disabled_categories: parse_category_list(&config_env.string_any(
+                    &["OFFICE_MCP_TOOL_ACCESS__DISABLED_CATEGORIES"],
+                    tool_access.string_value("disabled_categories", "")?,
+                ))?,
+                disabled_tools: parse_csv_list(&config_env.string_any(
+                    &["OFFICE_MCP_TOOL_ACCESS__DISABLED_TOOLS"],
+                    tool_access.string_value("disabled_tools", "")?,
+                )),
+            },
         })
     }
 
@@ -267,6 +288,49 @@ impl Default for DaemonConfigService {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn parse_access_mode(value: &str) -> Result<AccessMode, ConfigError> {
+    match value.to_ascii_lowercase().as_str() {
+        "read" => Ok(AccessMode::Read),
+        "write" => Ok(AccessMode::Write),
+        "all" => Ok(AccessMode::All),
+        _ => Err(ConfigError::Validation(format!(
+            "tool_access.access_mode must be one of read, write, all; got {value}."
+        ))),
+    }
+}
+
+fn parse_csv_list(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn parse_category_list(value: &str) -> Result<Vec<(String, String)>, ConfigError> {
+    value
+        .split(';')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(|item| {
+            let Some((app, category)) = item.split_once(':') else {
+                return Err(ConfigError::Validation(format!(
+                    "tool_access.disabled_categories entries must use app:category; got {item}."
+                )));
+            };
+            let app = app.trim();
+            let category = category.trim();
+            if app.is_empty() || category.is_empty() {
+                return Err(ConfigError::Validation(format!(
+                    "tool_access.disabled_categories entries must use app:category; got {item}."
+                )));
+            }
+            Ok((app.to_string(), category.to_string()))
+        })
+        .collect()
 }
 
 fn is_loopback_host(host: &str) -> bool {

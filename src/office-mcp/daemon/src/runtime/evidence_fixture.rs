@@ -1,5 +1,6 @@
 use crate::addin_mgr::ImageFetcher;
 use crate::common::AuditLog;
+use crate::mcp::ToolAccessPolicy;
 use crate::runtime::evidence_fixture_config::{
     UiFixtureOptions, UiFixtureState, default_addin_public_dir, fixture_config,
 };
@@ -54,6 +55,7 @@ pub fn run_ui_fixture(options: UiFixtureOptions) -> Result<(), RuntimeServerErro
         log_path: Some(config.logging.file.clone()),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
+        tool_access_policy: ToolAccessPolicy::default(),
     });
     let seed_options = server.ui_state_options();
     let seed = match options.state {
