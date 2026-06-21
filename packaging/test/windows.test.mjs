@@ -138,6 +138,8 @@ test('GitHub release workflow publishes the Windows installer artifacts', () => 
   assert.match(workflow, /actions\/setup-node@v4/);
   assert.match(workflow, /working-directory:\s*packaging[\s\S]*npm ci[\s\S]*npm run check/);
   assert.match(workflow, /working-directory:\s*src\/office-mcp\/daemon\/evidence[\s\S]*npm ci/);
+  assert.match(workflow, /Run daemon evidence checks/);
+  assert.match(workflow, /working-directory:\s*src\/office-mcp\/daemon\/evidence[\s\S]*npm run check/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/word[\s\S]*npm ci/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/excel[\s\S]*npm ci/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/powerpoint[\s\S]*npm ci/);

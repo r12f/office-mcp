@@ -146,6 +146,10 @@ jobs:
         working-directory: src/office-mcp
         run: cargo test -p office-mcp-daemon
 
+      - name: Run daemon evidence checks
+        working-directory: src/office-mcp/daemon/evidence
+        run: npm run check
+
       - name: Run packaging smoke checks
         working-directory: packaging
         run: npm run check
