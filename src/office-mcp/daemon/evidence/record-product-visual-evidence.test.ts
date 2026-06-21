@@ -318,7 +318,8 @@ test('README product visual evidence command matches current product visual gate
     '--powerpoint-tools-permissions-merged',
     '--powerpoint-inline-settings',
     '--powerpoint-server-protocol-row',
-    '--powerpoint-document-state'
+    '--powerpoint-document-state',
+    '--screenshot-freshness-window-ms'
   ]) {
     assert.match(commandLine, new RegExp(required));
   }
