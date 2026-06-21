@@ -471,6 +471,7 @@ function validateManualTrayEvidence(): void {
   validateManualTrayScreenshotFreshness(manual.tray_surface_screenshot_paths, manual.tray_surface_screenshot_metadata, manual.tray_surface_screenshots_fresh, manual.tray_surface_screenshots_fresh_ready, manual.recorded_at, 'Manual tray evidence');
   if (manual.tray_surface_screenshots_ready !== true) failures.push('Manual tray evidence missing tray surface screenshots ready flag.');
   if (manual.tray_surface_screenshots_distinct !== true) failures.push('Manual tray evidence reuses one screenshot for multiple tray surfaces.');
+  if (manual.observed_snapshot_binding_ready !== true) failures.push('Manual tray evidence missing observed tray state binding to daemon snapshot.');
   if (manual.daemon_context_ready !== true) {
     failures.push('Manual tray evidence daemon context is not recorder-ready.');
   }
@@ -615,6 +616,7 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
   validateManualTrayScreenshotFreshness(manual.tray_surface_screenshot_paths, manual.tray_surface_screenshot_metadata, manual.tray_surface_screenshots_fresh, manual.tray_surface_screenshots_fresh_ready, manual.recorded_at, 'Embedded manual tray evidence');
   if (manual.tray_surface_screenshots_ready !== true) failures.push('Embedded manual tray evidence missing tray surface screenshots ready flag.');
   if (manual.tray_surface_screenshots_distinct !== true) failures.push('Embedded manual tray evidence reuses one screenshot for multiple tray surfaces.');
+  if (manual.observed_snapshot_binding_ready !== true) failures.push('Embedded manual tray evidence missing observed tray state binding to daemon snapshot.');
   if (manual.daemon_context_ready !== true) failures.push('Embedded manual tray evidence daemon context is not recorder-ready.');
   validateManualTrayDaemonContext(manual.daemon_context);
   validateManualTrayObservedSnapshotBinding(manual, 'Embedded manual tray evidence');

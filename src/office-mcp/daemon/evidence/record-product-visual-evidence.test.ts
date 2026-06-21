@@ -713,6 +713,24 @@ test('product visual evidence recorder rejects manual tray artifacts without pri
   });
 });
 
+test('product visual evidence recorder rejects manual tray artifacts without observed snapshot binding', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const manualTrayEvidencePath = writeManualTrayEvidence(dir, true);
+    const manualTray = JSON.parse(readFileSync(manualTrayEvidencePath, 'utf8')) as Record<string, unknown>;
+    delete manualTray.observed_snapshot_binding_ready;
+    writeFileSync(manualTrayEvidencePath, JSON.stringify(manualTray, null, 2));
+
+    const output = join(dir, 'manual-tray-missing-observed-snapshot-binding.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--manual-tray-evidence-path', manualTrayEvidencePath);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.manual_tray_evidence_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('product visual evidence recorder requires daemon context before passing', () => {
   withScreenshots((dir, screenshots) => {
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
@@ -1546,6 +1564,7 @@ function writeManualTrayEvidence(dir: string, ready = true, status: 'Up' | 'Degr
     tray_surface_screenshots_distinct: ready,
     daemon_context: manualTrayDaemonContext(ready, status),
     daemon_context_ready: ready,
+    observed_snapshot_binding_ready: ready,
     passed: ready
   }, null, 2));
   return path;

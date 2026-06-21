@@ -608,6 +608,17 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      delete (broken.manual_tray_evidence as Record<string, unknown>).observed_snapshot_binding_ready;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Embedded manual tray evidence missing observed tray state binding to daemon snapshot/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.observations.word_ribbon_command = 'Raw task pane';
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -1389,6 +1400,17 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
   withEvidenceFile(ui, (uiPath) => {
     withManualTrayEvidence(true, (manualPath) => {
       const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      delete (broken as Record<string, unknown>).observed_snapshot_binding_ready;
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence missing observed tray state binding to daemon snapshot/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
       broken.tray_menu_surface_kind = 'webview';
       broken.tray_menu_surface_native = false;
       broken.tray_surface_screenshots_distinct = false;
@@ -2115,6 +2137,7 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     screenshot_exists: passed,
     daemon_context: manualTrayDaemonContext() as ReturnType<typeof manualTrayDaemonContext> | undefined,
     daemon_context_ready: passed,
+    observed_snapshot_binding_ready: passed,
     passed
   };
 }
