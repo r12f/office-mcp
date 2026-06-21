@@ -486,11 +486,13 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.doesNotMatch(js, /function activateSettingsWithKeyboard/);
   assert.match(js, /registerResult\(message, PROTOCOL_VERSION\)/);
   assert.match(js, /renderRuntimeVersions\(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION\)/);
-  assert.match(js, /function protectionLabel\(info\)/);
-  assert.match(js, /return 'Not protected'/);
+  assert.match(js, /protectionLabel,/);
+  assert.match(js, /documentStateLabel,/);
+  assert.doesNotMatch(js, /function protectionLabel\(info\)/);
+  assert.doesNotMatch(js, /function documentStateLabel\(info\)/);
   assert.doesNotMatch(js, /protectionEl\.textContent = documentInfo\.protection\?\.kind \|\| 'Unknown'/);
-  assert.match(js, /function documentStateLabel\(info\)/);
-  assert.match(js, /return 'Editable'/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function protectionLabel\(info = \{\}\)/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function documentStateLabel\(info = \{\}\)/);
   assert.doesNotMatch(js, /Dirty: \$\{boolLabel/);
   assert.match(js, /protocol_version/);
   assert.match(js, /beforeunload/);

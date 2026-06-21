@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, officeHostSummary, protectionLabel, renderRuntimeVersions, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1508,17 +1508,6 @@
     hostPlatformEl.textContent = `PowerPoint / ${titleCase(documentInfo.host?.platform || 'unknown')}`;
     protectionEl.textContent = protectionLabel(documentInfo);
     documentStateEl.textContent = documentStateLabel(documentInfo);
-  }
-
-  function protectionLabel(info) {
-    const label = info?.protection?.label || info?.protection?.kind;
-    if (!label || String(label).toLowerCase() === 'none') return 'Not protected';
-    return titleCase(String(label));
-  }
-
-  function documentStateLabel(info) {
-    if (info?.is_read_only === true) return 'Read-only';
-    return 'Editable';
   }
 
   function renderCurrentTask() {

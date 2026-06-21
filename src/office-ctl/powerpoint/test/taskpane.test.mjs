@@ -163,6 +163,12 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /const \{ boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText \} = window\.OfficeCtlCommon/);
   assert.match(js, /const metadata = taskMetadataMarkup\(task, \{ escapeHtml, formatTime, redactText, valueLabel: boolLabel \}\)/);
   assert.doesNotMatch(js, /function valueLabel\(value\)/);
+  assert.match(js, /protectionLabel,/);
+  assert.match(js, /documentStateLabel,/);
+  assert.doesNotMatch(js, /function protectionLabel\(info\)/);
+  assert.doesNotMatch(js, /function documentStateLabel\(info\)/);
+  assert.match(mainUi, /function protectionLabel\(info = \{\}\)/);
+  assert.match(mainUi, /function documentStateLabel\(info = \{\}\)/);
   assert.match(js, /function reply\(id, result\) \{\s*return replyJsonRpc\(socket, id, result\);\s*\}/);
   assert.match(js, /taskStore\.isCancelled\(requestId\)/);
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
@@ -176,7 +182,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger \}\)/);
   assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
   assert.match(mainUi, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
-  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
+  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, officeHostSummary, protectionLabel, renderRuntimeVersions, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
   assert.doesNotMatch(js, /classList\.add\(state === 'connected'/);
   assert.doesNotMatch(js, /function setCopyableMetadata\(element, value\)/);
   assert.match(mainUi, /function setCopyableMetadata\(element, value\)/);

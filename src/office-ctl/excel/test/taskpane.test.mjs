@@ -182,11 +182,13 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /saveEndpointEl\.disabled = true/);
   assert.match(js, /saveEndpointEl\.setAttribute\('aria-busy', 'true'\)/);
   assert.match(js, /renderRuntimeVersions\(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION\)/);
-  assert.match(js, /function protectionLabel\(info\)/);
-  assert.match(js, /return 'Not protected'/);
+  assert.match(js, /protectionLabel,/);
+  assert.match(js, /documentStateLabel,/);
+  assert.doesNotMatch(js, /function protectionLabel\(info\)/);
+  assert.doesNotMatch(js, /function documentStateLabel\(info\)/);
   assert.doesNotMatch(js, /protectionEl\.textContent = workbook\.protection\?\.kind \|\| 'Unknown'/);
-  assert.match(js, /function documentStateLabel\(info\)/);
-  assert.match(js, /return 'Editable'/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function protectionLabel\(info = \{\}\)/);
+  assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function documentStateLabel\(info = \{\}\)/);
   assert.doesNotMatch(js, /Dirty: \$\{valueLabel/);
   assert.match(js, /registerRequest\(requestId/);
   assert.match(js, /Office\.AutoShowTaskpaneWithDocument/);

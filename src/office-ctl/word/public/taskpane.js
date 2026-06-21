@@ -39,8 +39,10 @@
     bindDetailsControl,
     commandIdMarkup,
     copyMetadataValue,
+    documentStateLabel,
     middleTruncate,
     officeHostSummary,
+    protectionLabel,
     renderRuntimeVersions,
     setConnectionState: setSharedConnectionState,
     setCopyableMetadata,
@@ -1706,18 +1708,6 @@
     documentTitleEl.textContent = documentInfo.title || documentInfo.filename || 'Word Document';
     protectionEl.textContent = protectionLabel(documentInfo);
     documentStateEl.textContent = documentStateLabel(documentInfo);
-  }
-
-  function protectionLabel(info) {
-    if (info.is_protected === true || info.protection?.kind) return info.protection?.kind || 'Protected';
-    return 'Not protected';
-  }
-
-  function documentStateLabel(info) {
-    if (info.is_read_only === true) return 'Read-only';
-    if (info.is_protected === true || info.protection?.kind) return `Protected${info.protection?.kind ? `: ${info.protection.kind}` : ''}`;
-    if (info.is_dirty === true) return 'Editable, unsaved changes';
-    return 'Editable';
   }
 
   function startTask(requestId, tool, args, timeoutMs) {

@@ -66,6 +66,20 @@
     return `${host} ${version} / ${platform}`;
   }
 
+  function protectionLabel(info = {}) {
+    const label = info.protection?.label || info.protection?.kind;
+    if (!label || String(label).toLowerCase() === 'none') return info.is_protected === true ? 'Protected' : 'Not protected';
+    return String(label);
+  }
+
+  function documentStateLabel(info = {}) {
+    if (info.is_read_only === true) return 'Read-only';
+    const label = info.protection?.label || info.protection?.kind;
+    if (info.is_protected === true || (label && String(label).toLowerCase() !== 'none')) return `Protected${label && String(label).toLowerCase() !== 'none' ? `: ${label}` : ''}`;
+    if (info.is_dirty === true) return 'Editable, unsaved changes';
+    return 'Editable';
+  }
+
   function stopDetailsToggle(event) {
     event.stopPropagation();
     if (event.type === 'keydown' && event.key !== ' ' && event.key !== 'Enter') return;
@@ -122,10 +136,12 @@
     copyMetadataValue,
     middleTruncate,
     officeHostSummary,
+    protectionLabel,
     renderRuntimeVersions,
     setConnectionState,
     setCopyableMetadata,
     statusClass,
+    documentStateLabel,
     taskMetadataMarkup
   });
 })(globalThis);

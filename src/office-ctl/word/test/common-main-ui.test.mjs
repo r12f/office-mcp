@@ -166,6 +166,23 @@ test('common main UI renders connection state consistently', () => {
   assert.equal(announcer.textContent, 'Failed');
 });
 
+test('common main UI renders document protection and editability labels', () => {
+  const mainUi = loadMainUi();
+
+  assert.equal(mainUi.protectionLabel({}), 'Not protected');
+  assert.equal(mainUi.protectionLabel({ protection: { kind: 'IRM' } }), 'IRM');
+  assert.equal(mainUi.protectionLabel({ protection: { label: 'presentation protection' } }), 'presentation protection');
+  assert.equal(mainUi.protectionLabel({ is_protected: true }), 'Protected');
+  assert.equal(mainUi.protectionLabel({ protection: { kind: 'none' } }), 'Not protected');
+
+  assert.equal(mainUi.documentStateLabel({}), 'Editable');
+  assert.equal(mainUi.documentStateLabel({ is_dirty: true }), 'Editable, unsaved changes');
+  assert.equal(mainUi.documentStateLabel({ is_read_only: true }), 'Read-only');
+  assert.equal(mainUi.documentStateLabel({ is_protected: true }), 'Protected');
+  assert.equal(mainUi.documentStateLabel({ protection: { kind: 'IRM' } }), 'Protected: IRM');
+  assert.equal(mainUi.documentStateLabel({ protection: { label: 'presentation protection' } }), 'Protected: presentation protection');
+});
+
 test('common main UI renders copyable command IDs with middle truncation', () => {
   const mainUi = loadMainUi();
   const requestId = '0123456789abcdefghijklmnopqrstuvwxyz';
