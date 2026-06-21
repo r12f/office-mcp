@@ -133,6 +133,18 @@ test('manual tray evidence recorder requires live tray menu snapshot', () => {
   });
 });
 
+test('manual tray evidence recorder binds observed tray state to daemon snapshot', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const daemonBin = writeFakeDaemon(dir, true, undefined, true, 'Degraded');
+    const output = join(dir, 'mismatched-observed-snapshot.json');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.observed_snapshot_binding_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('manual tray evidence recorder requires distinct tray surface screenshots', () => {
   withTrayScreenshot((dir, screenshotPath) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -344,18 +356,19 @@ function writeFakeDaemon(
   dir: string,
   stateFetchOk = true,
   menuItems = ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control'],
-  includeStructuredMenu = true
+  includeStructuredMenu = true,
+  status = 'Up'
 ): string {
   const daemonBin = join(dir, process.platform === 'win32' ? 'daemon.cmd' : 'daemon.sh');
-  writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk, menuItems, includeStructuredMenu));
+  writeFileSync(daemonBin, fakeDaemonScript(stateFetchOk, menuItems, includeStructuredMenu, status));
   chmodSync(daemonBin, 0o755);
   return daemonBin;
 }
 
-function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[], includeStructuredMenu: boolean): string {
+function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[], includeStructuredMenu: boolean, statusText: string): string {
   const status = JSON.stringify({ running: true, uiUrl: 'https://localhost:8765/ui/' });
   const snapshot: Record<string, unknown> = {
-    tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
+    tooltip: `Office MCP Control - ${statusText} - 0 clients - 0 documents`,
     menu_items: menuItems
   };
   if (includeStructuredMenu) snapshot.menu = structuredMenu();

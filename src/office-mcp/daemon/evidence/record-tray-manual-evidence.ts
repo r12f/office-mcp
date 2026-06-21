@@ -47,8 +47,9 @@ const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office
 const trayMenuSurfaceNative = trayMenuSurfaceKind === 'native';
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
+const observedSnapshotBindingReady = observedTrayStateMatchesSnapshot(observedTooltip, observedMenuItems, daemonContext);
 const nativeTrayInteractionReady = menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && menuAnchoredToTrayIcon && osNativeMenuBehaviorReviewed && keyboardMenuAccessReviewed && nativeQuitConfirmationReviewed;
-const passed = visibleIcon && rightClickMenu && nativeTrayInteractionReady && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && primaryScreenshotMatchesTrayIcon && traySurfaceScreenshotsReady && traySurfaceScreenshotsFreshReady && traySurfaceScreenshotsDistinct && daemonContextReady;
+const passed = visibleIcon && rightClickMenu && nativeTrayInteractionReady && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && primaryScreenshotMatchesTrayIcon && traySurfaceScreenshotsReady && traySurfaceScreenshotsFreshReady && traySurfaceScreenshotsDistinct && daemonContextReady && observedSnapshotBindingReady;
 
 const evidence = {
   schema_version: 1,
@@ -85,6 +86,7 @@ const evidence = {
   tray_surface_screenshots_distinct: traySurfaceScreenshotsDistinct,
   daemon_context: daemonContext,
   daemon_context_ready: daemonContextReady,
+  observed_snapshot_binding_ready: observedSnapshotBindingReady,
   notes,
   passed
 };
@@ -211,6 +213,23 @@ function daemonContextLooksReady(context: Record<string, unknown> | undefined): 
   return isRecord(status) && status.ok === true && status.running === true && typeof status.uiUrl === 'string'
     && isRecord(trayProbe) && trayProbe.ok === true && trayProbe.native_host === true && trayProbe.state_fetch_ok === true
     && traySnapshotLooksReady(trayProbe.snapshot);
+}
+
+function observedTrayStateMatchesSnapshot(observedTooltip: string | undefined, observedMenuItems: string[], context: Record<string, unknown> | undefined): boolean {
+  const trayProbe = isRecord(context?.tray_probe) ? context.tray_probe : undefined;
+  const snapshot = isRecord(trayProbe?.snapshot) ? trayProbe.snapshot : undefined;
+  if (!snapshot) return false;
+  if (typeof observedTooltip !== 'string' || typeof snapshot.tooltip !== 'string' || observedTooltip !== snapshot.tooltip) return false;
+  const snapshotMenuItems = Array.isArray(snapshot.menu_items) ? snapshot.menu_items.filter((item): item is string => typeof item === 'string') : [];
+  return sameMenuItems(observedMenuItems, snapshotMenuItems);
+}
+
+function sameMenuItems(left: string[], right: string[]): boolean {
+  return normalizeObservedMenuItems(left).join('\n') === normalizeObservedMenuItems(right).join('\n');
+}
+
+function normalizeObservedMenuItems(items: string[]): string[] {
+  return items.filter((item) => item !== '---');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
