@@ -407,6 +407,21 @@ test('runtime evidence validator can require Office tool E2E reports', () => {
 
   withEvidenceFile(report('passed'), (path) => {
     withOfficeToolE2eReports(true, (reports) => {
+      const broken = JSON.parse(readFileSync(reports.word, 'utf8')) as ReturnType<typeof officeToolE2eReport>;
+      broken.daemon.endpoint = '';
+      broken.document.path = '';
+      broken.session.session_id = '';
+      writeFileSync(reports.word, JSON.stringify(broken, null, 2));
+      const result = runValidator(path, '--require-office-tool-e2e', '--word-tool-e2e-report-path', reports.word, '--excel-tool-e2e-report-path', reports.excel, '--powerpoint-tool-e2e-report-path', reports.powerpoint);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report missing daemon endpoint/);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report missing driver-owned document path/);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report missing session ID/);
+    });
+  });
+
+  withEvidenceFile(report('passed'), (path) => {
+    withOfficeToolE2eReports(true, (reports) => {
       const broken = JSON.parse(readFileSync(reports.excel, 'utf8')) as ReturnType<typeof officeToolE2eReport>;
       broken.executed_tools = broken.executed_tools.slice(0, -1);
       writeFileSync(reports.excel, JSON.stringify(broken, null, 2));

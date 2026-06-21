@@ -344,9 +344,9 @@ function validateOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path
   if (!sameStrings(advertisedTools, executedTools)) failures.push(`${host} Office tool E2E report executed tools do not match advertised tools.`);
   validateOfficeToolRuns(`${host} Office tool E2E report`, advertisedTools, e2e.tool_runs);
 
-  if (!isRecord(e2e.daemon) || typeof e2e.daemon.endpoint !== 'string') failures.push(`${host} Office tool E2E report missing daemon endpoint.`);
-  if (!isRecord(e2e.document) || typeof e2e.document.path !== 'string') failures.push(`${host} Office tool E2E report missing driver-owned document path.`);
-  if (!isRecord(e2e.session) || typeof e2e.session.session_id !== 'string') failures.push(`${host} Office tool E2E report missing session ID.`);
+  if (!isRecord(e2e.daemon) || typeof e2e.daemon.endpoint !== 'string' || e2e.daemon.endpoint.trim().length === 0) failures.push(`${host} Office tool E2E report missing daemon endpoint.`);
+  if (!isRecord(e2e.document) || typeof e2e.document.path !== 'string' || e2e.document.path.trim().length === 0) failures.push(`${host} Office tool E2E report missing driver-owned document path.`);
+  if (!isRecord(e2e.session) || typeof e2e.session.session_id !== 'string' || e2e.session.session_id.trim().length === 0) failures.push(`${host} Office tool E2E report missing session ID.`);
 }
 
 function validateOfficeToolE2eActivation(label: string, activation: unknown): void {
