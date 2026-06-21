@@ -414,6 +414,19 @@ test('runtime evidence validator can require Office tool E2E reports', () => {
       assert.match(outputText(result.stdout), /PowerPoint Office tool E2E report tool powerpoint\.add_slide did not pass/);
     });
   });
+
+  withEvidenceFile(report('passed'), (path) => {
+    withOfficeToolE2eReports(true, (reports) => {
+      const broken = JSON.parse(readFileSync(reports.word, 'utf8')) as Record<string, unknown>;
+      broken.cleanup = { closed_by_driver: false, deleted: false, deleted_path_count: 0, skipped: 'manual-debug' };
+      writeFileSync(reports.word, JSON.stringify(broken, null, 2));
+      const result = runValidator(path, '--require-office-tool-e2e', '--word-tool-e2e-report-path', reports.word, '--excel-tool-e2e-report-path', reports.excel, '--powerpoint-tool-e2e-report-path', reports.powerpoint);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report cleanup was skipped: manual-debug/);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report cleanup did not close the driver-owned document/);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report cleanup did not delete the driver-owned document/);
+    });
+  });
 });
 
 test('README documents Office tool E2E report validation command', () => {
@@ -1492,6 +1505,7 @@ function officeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tools: strin
       cleanup_document: 1,
       stop_daemon: 1
     },
+    cleanup: { closed_by_driver: true, deleted: true, deleted_path_count: 1 },
     advertised_tools: tools,
     session_available_tools: tools,
     executed_tools: tools,
@@ -1928,6 +1942,7 @@ function embeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tool
       cleanup_document: 1,
       stop_daemon: 1
     },
+    cleanup: { closed_by_driver: passed, deleted: passed, deleted_path_count: passed ? 1 : 0 },
     advertised_tools: tools,
     session_available_tools: tools,
     executed_tools: tools,

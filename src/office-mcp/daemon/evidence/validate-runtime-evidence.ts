@@ -334,6 +334,7 @@ function validateOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path
   if (e2e.passed !== true) failures.push(`${host} Office tool E2E report did not pass.`);
   validateOfficeToolE2eLifecycle(`${host} Office tool E2E report`, e2e.lifecycle_counts);
   validateOfficeToolE2eActivation(`${host} Office tool E2E report`, e2e.addin_activation);
+  validateOfficeToolE2eCleanup(`${host} Office tool E2E report`, e2e.cleanup);
 
   const advertisedTools = stringArray(e2e.advertised_tools);
   const sessionTools = stringArray(e2e.session_available_tools);
@@ -355,6 +356,17 @@ function validateOfficeToolE2eActivation(label: string, activation: unknown): vo
   }
   if (activation.activated !== true) failures.push(`${label} add-in activation did not run.`);
   if (typeof activation.skipped === 'string' && activation.skipped.length > 0) failures.push(`${label} add-in activation was skipped: ${activation.skipped}.`);
+}
+
+function validateOfficeToolE2eCleanup(label: string, cleanup: unknown): void {
+  if (!isRecord(cleanup)) {
+    failures.push(`${label} missing cleanup proof.`);
+    return;
+  }
+  if (typeof cleanup.skipped === 'string' && cleanup.skipped.length > 0) failures.push(`${label} cleanup was skipped: ${cleanup.skipped}.`);
+  if (cleanup.closed_by_driver !== true) failures.push(`${label} cleanup did not close the driver-owned document.`);
+  if (cleanup.deleted !== true) failures.push(`${label} cleanup did not delete the driver-owned document.`);
+  if (typeof cleanup.deleted_path_count !== 'number' || cleanup.deleted_path_count < 1) failures.push(`${label} cleanup missing deleted path proof.`);
 }
 
 function validateOfficeToolE2eLifecycle(label: string, lifecycle: unknown): void {
@@ -1185,6 +1197,7 @@ function validateEmbeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoin
   if (evidence.passed !== true) failures.push(`Product visual Office tool E2E ${host} report did not pass.`);
   validateOfficeToolE2eLifecycle(`Product visual Office tool E2E ${host} report`, evidence.lifecycle_counts);
   validateOfficeToolE2eActivation(`Product visual Office tool E2E ${host} report`, evidence.addin_activation);
+  validateOfficeToolE2eCleanup(`Product visual Office tool E2E ${host} report`, evidence.cleanup);
   const advertisedTools = stringArray(evidence.advertised_tools);
   const sessionTools = stringArray(evidence.session_available_tools);
   const executedTools = stringArray(evidence.executed_tools);
