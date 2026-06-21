@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata, statusClass } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, middleTruncate, officeHostSummary, renderRuntimeVersions, setCopyableMetadata, statusClass } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1548,7 +1548,7 @@
     const intent = task.userIntent ? `<div class="task-meta">${escapeHtml(redactText(task.userIntent))}</div>` : '';
     const deadline = task.deadlineAt ? `<div class="task-meta">Deadline ${escapeHtml(formatTime(task.deadlineAt))}</div>` : '';
     const cancel = task.cancelRequested ? '<div class="task-meta">Cancel requested</div>' : '';
-    const commandId = task.requestId ? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="${escapeHtml(task.requestId)}" aria-label="Copy command ID" title="${escapeHtml(task.requestId)}"><code>${escapeHtml(middleTruncate(task.requestId))}</code></button></div>` : '';
+    const commandId = commandIdMarkup(task.requestId, { escapeHtml });
     const startedAt = task.startedAt ? `${escapeHtml(formatTime(task.startedAt))} / ` : '';
     return `<article class="task-card"><div class="task-title"><span>${escapeHtml(task.tool)}</span><span class="status-badge ${tone}">${escapeHtml(status)}</span></div>${commandId}<div class="task-meta">${startedAt}${escapeHtml(elapsed)}</div>${deadline}${cancel}${intent}${error}</article>`;
   }

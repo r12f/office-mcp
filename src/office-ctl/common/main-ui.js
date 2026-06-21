@@ -75,8 +75,16 @@
     return 'status-neutral';
   }
 
+  function commandIdMarkup(requestId, options = {}) {
+    if (!requestId) return '';
+    const escapeHtml = options.escapeHtml || ((value) => String(value));
+    const escaped = escapeHtml(requestId);
+    return `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="${escaped}" aria-label="Copy command ID" title="${escaped}"><code>${escapeHtml(middleTruncate(requestId))}</code></button></div>`;
+  }
+
   global.OfficeCtlMainUi = Object.freeze({
     bindDetailsControl,
+    commandIdMarkup,
     copyMetadataValue,
     middleTruncate,
     officeHostSummary,

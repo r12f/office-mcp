@@ -145,9 +145,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /historyCountEl\.textContent = `\$\{history\.length\} \/ \$\{historyLimit\}`/);
   assert.match(js, /function taskMarkup\(task\)/);
   assert.match(js, /requestId: currentTask\.requestId/);
-  assert.match(js, /class="task-meta task-command-id"/);
-  assert.match(js, /aria-label="Copy command ID" title="\$\{escapeHtml\(task\.requestId\)\}"/);
-  assert.match(js, /middleTruncate\(task\.requestId\)/);
+  assert.match(js, /const commandId = commandIdMarkup\(task\.requestId, \{ escapeHtml \}\)/);
   assert.match(js, /const requestId = message\.params\?\.request_id \|\| String\(message\.id\)/);
   assert.match(js, /taskStore\.start\(requestId, tool, message\.params \|\| \{\}, message\.params\?\.timeout_ms\)/);
   assert.match(js, /taskStore\.isCancelled\(requestId\)/);

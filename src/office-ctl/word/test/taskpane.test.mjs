@@ -459,7 +459,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /historyCountEl\.textContent = `\$\{history\.length\} \/ \$\{historyLimit\}`/);
   assert.match(js, /function taskMarkup\(task\)/);
   assert.match(js, /requestId: currentTask\.requestId/);
-  assert.match(js, /const commandId = task\.requestId \? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="\$\{escapeHtml\(task\.requestId\)\}" aria-label="Copy command ID" title="\$\{escapeHtml\(task\.requestId\)\}"><code>\$\{escapeHtml\(middleTruncate\(task\.requestId\)\)\}<\/code><\/button><\/div>` : ''/);
+  assert.match(js, /const commandId = commandIdMarkup\(task\.requestId, \{ escapeHtml \}\)/);
   assert.match(js, /userIntent/);
   assert.match(js, /const requestId = message\.params\?\.request_id \|\| String\(message\.id\)/);
   assert.match(js, /startTask\(requestId, tool, message\.params \|\| \{\}, message\.params\.timeout_ms\)/);

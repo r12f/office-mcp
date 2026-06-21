@@ -101,3 +101,17 @@ test('common main UI maps connection and task states to badge classes', () => {
   assert.equal(mainUi.statusClass('cancelled'), 'status-neutral');
   assert.equal(mainUi.statusClass('idle'), 'status-neutral');
 });
+
+test('common main UI renders copyable command IDs with middle truncation', () => {
+  const mainUi = loadMainUi();
+  const requestId = '0123456789abcdefghijklmnopqrstuvwxyz';
+
+  const markup = mainUi.commandIdMarkup(requestId, { escapeHtml: (value) => String(value) });
+
+  assert.match(markup, /class="task-meta task-command-id"/);
+  assert.match(markup, /data-copy-value="0123456789abcdefghijklmnopqrstuvwxyz"/);
+  assert.match(markup, /aria-label="Copy command ID"/);
+  assert.match(markup, /title="0123456789abcdefghijklmnopqrstuvwxyz"/);
+  assert.match(markup, /<code>0123456789abcd\.\.\.nopqrstuvwxyz<\/code>/);
+  assert.equal(mainUi.commandIdMarkup('', { escapeHtml: (value) => String(value) }), '');
+});

@@ -29,6 +29,7 @@
   const { TaskHistoryStore } = window.OfficeCtlTaskHistory;
   const {
     bindDetailsControl,
+    commandIdMarkup,
     copyMetadataValue,
     middleTruncate,
     officeHostSummary,
@@ -1835,7 +1836,7 @@
     const intent = task.userIntent ? `<div class="task-meta">${escapeHtml(redactText(task.userIntent))}</div>` : '';
     const deadline = task.deadlineAt ? `<div class="task-meta">Deadline ${escapeHtml(formatTime(task.deadlineAt))}</div>` : '';
     const cancel = task.cancelRequested ? '<div class="task-meta">Cancel requested</div>' : '';
-    const commandId = task.requestId ? `<div class="task-meta task-command-id">Command <button type="button" class="inline-copy" data-copy-value="${escapeHtml(task.requestId)}" aria-label="Copy command ID" title="${escapeHtml(task.requestId)}"><code>${escapeHtml(middleTruncate(task.requestId))}</code></button></div>` : '';
+    const commandId = commandIdMarkup(task.requestId, { escapeHtml });
     return [
       '<div class="task-title">',
       `<span>${escapeHtml(task.tool)}</span>`,
