@@ -459,6 +459,7 @@ function validateManualTrayEvidence(): void {
     failures.push('Manual tray evidence daemon context is not recorder-ready.');
   }
   validateManualTrayDaemonContext(manual.daemon_context);
+  validateManualTrayObservedSnapshotBinding(manual, 'Manual tray evidence');
   for (const [key, label] of [
     ['visible_icon', 'visible tray icon'],
     ['right_click_menu', 'right-click menu'],
@@ -596,6 +597,7 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
   if (manual.tray_surface_screenshots_distinct !== true) failures.push('Embedded manual tray evidence reuses one screenshot for multiple tray surfaces.');
   if (manual.daemon_context_ready !== true) failures.push('Embedded manual tray evidence daemon context is not recorder-ready.');
   validateManualTrayDaemonContext(manual.daemon_context);
+  validateManualTrayObservedSnapshotBinding(manual, 'Embedded manual tray evidence');
   for (const [key, label] of [
     ['visible_icon', 'visible tray icon'],
     ['right_click_menu', 'right-click menu'],
@@ -1282,6 +1284,31 @@ function validateManualTrayDaemonContext(context: unknown): void {
     : [];
   validateTrayMenuLabels(menuItems, 'Manual tray daemon context live');
   validateStructuredTraySnapshot(snapshot, 'Manual tray daemon context live');
+}
+
+function validateManualTrayObservedSnapshotBinding(manual: Record<string, unknown>, label: string): void {
+  const context = isRecord(manual.daemon_context) ? manual.daemon_context : undefined;
+  const trayProbe = isRecord(context?.tray_probe) ? context.tray_probe : undefined;
+  const snapshot = isRecord(trayProbe?.snapshot) ? trayProbe.snapshot : undefined;
+  if (!snapshot) return;
+
+  if (typeof manual.observed_tooltip === 'string' && typeof snapshot.tooltip === 'string' && manual.observed_tooltip !== snapshot.tooltip) {
+    failures.push(`${label} observed tooltip does not match daemon tray snapshot.`);
+  }
+
+  const observedMenu = Array.isArray(manual.observed_menu_items) ? manual.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];
+  const snapshotMenu = Array.isArray(snapshot.menu_items) ? snapshot.menu_items.filter((item): item is string => typeof item === 'string') : [];
+  if (observedMenu.length > 0 && !sameMenuItems(observedMenu, snapshotMenu)) {
+    failures.push(`${label} observed menu items do not match daemon tray snapshot.`);
+  }
+}
+
+function sameMenuItems(left: string[], right: string[]): boolean {
+  return normalizeObservedMenuItems(left).join('\n') === normalizeObservedMenuItems(right).join('\n');
+}
+
+function normalizeObservedMenuItems(items: string[]): string[] {
+  return items.filter((item) => item !== '---');
 }
 
 

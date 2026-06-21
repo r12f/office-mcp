@@ -821,6 +821,21 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.manual_tray_evidence.observed_tooltip = 'Office MCP Control - Degraded - 0 clients - 0 documents';
+      broken.manual_tray_evidence.observed_menu_items = ['Status: Degraded', 'Clients: 0', 'Documents: 0', 'Show Office MCP Control', 'Quit Office MCP Control'];
+      broken.manual_tray_evidence_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Embedded manual tray evidence observed tooltip does not match daemon tray snapshot/);
+      assert.match(outputText(result.stdout), /Embedded manual tray evidence observed menu items do not match daemon tray snapshot/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.daemon_context = manualTrayDaemonContext(['Status: Up', 'Clients: 0']);
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -1160,6 +1175,19 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /Manual tray daemon context live missing menu item: Documents:/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.observed_tooltip = 'Office MCP Control - Degraded - 0 clients - 0 documents';
+      broken.observed_menu_items = ['Status: Degraded', 'Clients: 0', 'Documents: 0', 'Show Office MCP Control', 'Quit Office MCP Control'];
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence observed tooltip does not match daemon tray snapshot/);
+      assert.match(outputText(result.stdout), /Manual tray evidence observed menu items do not match daemon tray snapshot/);
     });
   });
 
