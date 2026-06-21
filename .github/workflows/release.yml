@@ -77,6 +77,75 @@ jobs:
         shell: pwsh
         run: git diff --check
 
+      - name: Validate release version metadata
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $package = Get-Content -LiteralPath 'packaging/package.json' -Raw | ConvertFrom-Json
+          if ($package.version -ne $version) {
+            throw "Release version mismatch: packaging/package.json has $($package.version), expected $version"
+          }
+
+          $cargoToml = Get-Content -LiteralPath 'src/office-mcp/daemon/Cargo.toml' -Raw
+          $cargoVersionMatch = [regex]::Match($cargoToml, '(?m)^version\s*=\s*"(?<version>[^"]+)"')
+          if (-not $cargoVersionMatch.Success) {
+            throw 'Release version mismatch: src/office-mcp/daemon/Cargo.toml has no package version'
+          }
+          $cargoVersion = $cargoVersionMatch.Groups['version'].Value
+          if ($cargoVersion -ne $version) {
+            throw "Release version mismatch: src/office-mcp/daemon/Cargo.toml has $cargoVersion, expected $version"
+          }
+
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            if (-not (Test-Path -LiteralPath 'RELEASE_NOTES.md')) {
+              throw "Release notes mismatch: RELEASE_NOTES.md is required for tag releases"
+            }
+            $releaseNotes = Get-Content -LiteralPath 'RELEASE_NOTES.md' -Raw
+            if ($releaseNotes -notmatch [regex]::Escape($version)) {
+              throw "Release notes mismatch: RELEASE_NOTES.md must mention $version"
+            }
+          }
+
+      - name: Check PowerShell scripts syntax
+        shell: pwsh
+        run: |
+          $scripts = @(
+            'packaging/windows/install-windows.ps1',
+            'packaging/windows/build-windows-msi.ps1',
+            'packaging/windows/uninstall-windows.ps1',
+            'packaging/windows/export-localhost-dev-cert.ps1',
+            'src/office-ctl/word/scripts/render-hosted-manifest.ps1',
+            'src/office-ctl/excel/scripts/render-hosted-manifest.ps1',
+            'src/office-ctl/powerpoint/scripts/render-hosted-manifest.ps1'
+          )
+          foreach ($script in $scripts) {
+            if (-not (Test-Path -LiteralPath $script)) {
+              throw "PowerShell syntax check target is missing: $script"
+            }
+            $errors = $null
+            [System.Management.Automation.PSParser]::Tokenize((Get-Content -LiteralPath $script -Raw), [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $formatted = $errors | ForEach-Object { "${script}:$($_.Token.StartLine):$($_.Message)" }
+              throw "PowerShell syntax errors found:`n$($formatted -join "`n")"
+            }
+          }
+
+      - name: Run Word add-in checks
+        working-directory: src/office-ctl/word
+        run: npm run check
+
+      - name: Run Excel add-in checks
+        working-directory: src/office-ctl/excel
+        run: npm run check
+
+      - name: Run PowerPoint add-in checks
+        working-directory: src/office-ctl/powerpoint
+        run: npm run check
+
+      - name: Run daemon tests
+        working-directory: src/office-mcp
+        run: cargo test -p office-mcp-daemon
+
       - name: Run packaging smoke checks
         working-directory: packaging
         run: npm run check
