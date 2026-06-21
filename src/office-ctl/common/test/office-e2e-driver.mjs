@@ -1,5 +1,5 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -332,46 +332,70 @@ async function activateAddin(host, context) {
   });
   let result;
   try {
-    result = await waitForChildExit(child, Number(context.timeoutMs || process.env.OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS || 95000), () => activatorLogDetail(activatorLogPath));
+    result = await waitForChildExit(child, Number(context.timeoutMs || process.env.OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS || 120000), () => activatorLogDetail(activatorLogPath));
   } catch (error) {
-    const session = await registeredSessionAfterActivatorFailure(host, document, daemon);
-    if (session) return activationFromDetectedSession(command, activation.kind, activatorLogPath, document.path, normalizedHost, 'session-detected-after-activator-timeout');
+    const detected = await registeredSessionAfterActivatorFailure(host, document, daemon, activatorLogPath);
+    if (detected) return activationFromDetectedSession(command, activation.kind, activatorLogPath, detected.documentPath, normalizedHost, 'session-detected-after-activator-timeout', detected.document);
     throw error;
   }
   if (result.exitCode !== 0) {
-    const session = await registeredSessionAfterActivatorFailure(host, document, daemon);
-    if (session) return activationFromDetectedSession(command, activation.kind, activatorLogPath, document.path, normalizedHost, 'session-detected-after-activator-failure');
-    throw new Error(`Office add-in activator exited with code ${result.exitCode}.${activatorLogDetail(activatorLogPath)}`);
+    const detected = await registeredSessionAfterActivatorFailure(host, document, daemon, activatorLogPath);
+    if (detected) return activationFromDetectedSession(command, activation.kind, activatorLogPath, detected.documentPath, normalizedHost, 'session-detected-after-activator-failure', detected.document);
+    const preservedLogPath = preserveActivatorLogArtifact(activatorLogPath, normalizedHost);
+    throw new Error(`Office add-in activator exited with code ${result.exitCode}.${activatorFailureDetail(preservedLogPath || activatorLogPath)}`);
+  }
+  const parsed = parseActivatorResult(result.stdout);
+  if (parsed.document_path && document.path && parsed.document_path !== document.path) {
+    parsed.document = { ...document, original_path: document.original_path || document.path, path: parsed.document_path };
   }
   return {
     activated: true,
-    ...parseActivatorResult(result.stdout),
+    ...parsed,
     activator: command,
     activator_kind: activation.kind,
     log_path: activatorLogPath
   };
 }
 
-async function registeredSessionAfterActivatorFailure(host, document, daemon) {
+async function registeredSessionAfterActivatorFailure(host, document, daemon, activatorLogPath) {
   if (!daemon.endpoint || !document.path) return null;
+  const documentPaths = documentPathsAfterActivationFailure(document, activatorLogPath);
   const timeoutMs = Number(process.env.OFFICE_MCP_E2E_ACTIVATION_SESSION_TIMEOUT_MS || 10000);
   const started = Date.now();
   while (Date.now() - started <= timeoutMs) {
     try {
       const sessions = await listSessions(daemon.endpoint);
-      const match = sessions.find((session) => sessionMatches(session, host, document.path));
-      if (match) return match;
+      for (const documentPath of documentPaths) {
+        const match = sessions.find((session) => sessionMatches(session, host, documentPath));
+        if (match) return { session: match, documentPath, document: activatedDocumentContext(document, documentPath) };
+      }
     } catch {}
     await sleep(500);
   }
   return null;
 }
 
-function activationFromDetectedSession(command, kind, logPath, documentPath, host, activationPath) {
+function documentPathsAfterActivationFailure(document, activatorLogPath) {
+  const paths = [document.path].filter(Boolean);
+  const log = activatorLogPath && existsSync(activatorLogPath) ? readText(activatorLogPath) : '';
+  for (const match of log.matchAll(/^official sideload document=(.+)$/gm)) {
+    const path = match[1]?.trim();
+    if (path && !paths.includes(path)) paths.push(path);
+  }
+  return paths;
+}
+
+function activatedDocumentContext(document, documentPath) {
+  if (!documentPath || documentPath === document.path) return document;
+  return { ...document, original_path: document.original_path || document.path, path: documentPath };
+}
+
+function activationFromDetectedSession(command, kind, logPath, documentPath, host, activationPath, document) {
   return {
     activated: true,
     host: normalizeHost(host),
     document_path: documentPath,
+    document,
     control_opened: false,
     activation_path: activationPath,
     activator: command,
@@ -400,7 +424,21 @@ function manifestPathForHost(host) {
 function activatorLogDetail(path) {
   if (!path || !existsSync(path)) return '';
   const text = readText(path);
-  return text ? ` activator log: ${text.slice(-2000)}` : '';
+  return text ? ` activator log: ${text.slice(-8000)}` : '';
+}
+
+function activatorFailureDetail(path) {
+  const tail = activatorLogDetail(path);
+  return path ? `${tail} full activator log: ${path}` : tail;
+}
+
+function preserveActivatorLogArtifact(path, host) {
+  if (!path || !existsSync(path)) return '';
+  const artifactsDir = resolve(REPO_ROOT, 'artifacts');
+  mkdirSync(artifactsDir, { recursive: true });
+  const artifactPath = resolve(artifactsDir, `office-mcp-activator-${normalizeHost(host)}-${Date.now()}.log`);
+  copyFileSync(path, artifactPath);
+  return artifactPath;
 }
 
 function activationCommand() {

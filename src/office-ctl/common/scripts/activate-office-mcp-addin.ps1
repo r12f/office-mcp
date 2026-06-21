@@ -472,6 +472,41 @@ function Reopen-ExcelSideloadDocumentAfterWebExtensionPatch {
   return Open-ExcelWorkbookAfterWebExtensionPatch -Application $Application -Path $Path -Source "sideload"
 }
 
+function Reopen-WordSideloadDocumentAfterWebExtensionPatch {
+  param(
+    [Parameter(Mandatory = $true)]$Application,
+    [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  $target = Get-CanonicalPath -Path $Path
+  try {
+    foreach ($document in @($Application.Documents)) {
+      $documentPath = ""
+      try { $documentPath = [string]$document.FullName } catch {}
+      if (-not [string]::IsNullOrWhiteSpace($documentPath) -and (Get-CanonicalPath -Path $documentPath) -eq $target) {
+        Write-ActivatorLog "word sideload document closed before webextension patch path=$Path"
+        $document.Close($false)
+      }
+    }
+  } catch {
+    Write-ActivatorLog "word sideload document close before webextension patch skipped: $($_.Exception.Message)"
+  }
+
+  Ensure-WordSideloadWebExtension -DocumentPath $Path
+  try {
+    $Application.Documents.Open($Path) | Out-Null
+  } catch {
+    Write-ActivatorLog "word sideload document reopen failed on current application; creating replacement application path=$Path error=$($_.Exception.Message)"
+    $Application = New-Object -ComObject Word.Application
+    $Application.Visible = $true
+    $Application.DisplayAlerts = 0
+    $Application.Documents.Open($Path) | Out-Null
+  }
+  $Application.Visible = $true
+  Write-ActivatorLog "word sideload document reopened after webextension patch path=$Path"
+  return $Application
+}
+
 function Try-OpenExcelPatchedDriverWorkbook {
   param(
     [Parameter(Mandatory = $true)]$Application,
@@ -499,14 +534,6 @@ function Try-OpenPatchedDriverDocument {
 
   if ($HostKey -eq "excel") {
     return Try-OpenExcelPatchedDriverWorkbook -Application $Application -Path $Path -Deadline $Deadline
-  }
-  if ($HostKey -eq "word") {
-    try {
-      return Wait-ForDriverDocument -Application $Application -HostKey $HostKey -Path $Path -Deadline $Deadline
-    } catch {
-      Write-ActivatorLog "word patched driver document unavailable path=$Path error=$($_.Exception.Message)"
-      return $null
-    }
   }
   if ($HostKey -eq "powerpoint") {
     try {
@@ -651,6 +678,83 @@ function Ensure-ExcelSideloadWebExtension {
   }
 }
 
+function Ensure-WordSideloadWebExtension {
+  param([Parameter(Mandatory = $true)][string]$DocumentPath)
+
+  if ($hostKey -ne "word") { return }
+  if (-not (Test-Path -LiteralPath $DocumentPath)) {
+    Write-ActivatorLog "word webextension injection skipped; document not found path=$DocumentPath"
+    return
+  }
+  if ([string]::IsNullOrWhiteSpace($ManifestPath) -or -not (Test-Path -LiteralPath $ManifestPath)) {
+    Write-ActivatorLog "word webextension injection skipped; manifest not found path=$ManifestPath"
+    return
+  }
+
+  try {
+    [xml]$manifest = Get-Content -LiteralPath $ManifestPath -Raw
+    $addinId = [string]$manifest.OfficeApp.Id
+    $addinVersion = [string]$manifest.OfficeApp.Version
+    $sourceLocation = [string]$manifest.OfficeApp.DefaultSettings.SourceLocation.DefaultValue
+    if ([string]::IsNullOrWhiteSpace($addinId)) { throw "Manifest Id is missing." }
+    if ([string]::IsNullOrWhiteSpace($addinVersion)) { $addinVersion = "1.0.0.0" }
+    if ([string]::IsNullOrWhiteSpace($sourceLocation)) { throw "Manifest SourceLocation is missing." }
+
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::Open($DocumentPath, [System.IO.Compression.ZipArchiveMode]::Update)
+    try {
+      $contentTypes = Get-ZipEntryText -Zip $zip -EntryName "[Content_Types].xml"
+      $contentTypes = Ensure-XmlBeforeCloseTag -Xml $contentTypes -Needle "application/vnd.ms-office.webextensiontaskpanes+xml" -Insert '  <Override PartName="/word/webextensions/taskpanes.xml" ContentType="application/vnd.ms-office.webextensiontaskpanes+xml"/>' -CloseTag "</Types>"
+      $contentTypes = Ensure-XmlBeforeCloseTag -Xml $contentTypes -Needle "application/vnd.ms-office.webextension+xml" -Insert '  <Override PartName="/word/webextensions/webextension.xml" ContentType="application/vnd.ms-office.webextension+xml"/>' -CloseTag "</Types>"
+      Set-ZipEntryText -Zip $zip -EntryName "[Content_Types].xml" -Text $contentTypes
+
+      $rootRels = Get-ZipEntryText -Zip $zip -EntryName "_rels/.rels"
+      if ([string]::IsNullOrWhiteSpace($rootRels)) {
+        $rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>'
+      }
+      $rootRels = Ensure-XmlBeforeCloseTag -Xml $rootRels -Needle "relationships/webextensiontaskpanes" -Insert '  <Relationship Id="rIdOfficeMcpTaskpanes" Type="http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes" Target="/word/webextensions/taskpanes.xml"/>' -CloseTag "</Relationships>"
+      Set-ZipEntryText -Zip $zip -EntryName "_rels/.rels" -Text $rootRels
+
+      $taskpanes = @'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<wetp:taskpanes xmlns:wetp="http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11">
+  <wetp:taskpane dockstate="" visibility="1" width="350" row="1">
+    <wetp:webextensionref xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rIdOfficeMcpWebExtension"/>
+  </wetp:taskpane>
+</wetp:taskpanes>
+'@
+      Set-ZipEntryText -Zip $zip -EntryName "word/webextensions/taskpanes.xml" -Text $taskpanes
+
+      $taskpaneRels = @'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdOfficeMcpWebExtension" Type="http://schemas.microsoft.com/office/2011/relationships/webextension" Target="/word/webextensions/webextension.xml"/>
+</Relationships>
+'@
+      Set-ZipEntryText -Zip $zip -EntryName "word/webextensions/_rels/taskpanes.xml.rels" -Text $taskpaneRels
+
+      $escapedAddinId = [System.Security.SecurityElement]::Escape($addinId)
+      $escapedVersion = [System.Security.SecurityElement]::Escape($addinVersion)
+      $webExtension = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<we:webextension xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11" id="{$escapedAddinId}">
+  <we:reference id="$escapedAddinId" version="$escapedVersion" store="developer" storeType="Registry"/>
+  <we:alternateReferences/>
+  <we:properties/>
+  <we:bindings/>
+</we:webextension>
+"@
+      Set-ZipEntryText -Zip $zip -EntryName "word/webextensions/webextension.xml" -Text $webExtension
+    } finally {
+      $zip.Dispose()
+    }
+    Write-ActivatorLog "word webextension injection completed path=$DocumentPath manifest=$ManifestPath"
+  } catch {
+    Write-ActivatorLog "word webextension injection failed path=$DocumentPath error=$($_.Exception.Message)"
+  }
+}
+
 function Write-ActivationResult {
   param(
     [Parameter(Mandatory = $true)][string]$DocumentPath,
@@ -681,6 +785,16 @@ function Test-ActivatorDeadline {
   return $true
 }
 
+function Get-ClampedDeadline {
+  param(
+    [Parameter(Mandatory = $true)]$Deadline,
+    [Parameter(Mandatory = $true)][int]$Seconds
+  )
+  $candidate = (Get-Date).AddSeconds($Seconds)
+  if ($candidate -gt $Deadline) { return $Deadline }
+  return $candidate
+}
+
 function Try-OpenControlPanelForDriverDocument {
   param(
     [Parameter(Mandatory = $true)][IntPtr]$WindowHandle,
@@ -692,8 +806,9 @@ function Try-OpenControlPanelForDriverDocument {
     if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
     Start-Sleep -Milliseconds 200
     $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
-    if ($hostKey -ne "excel" -and (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(1) -Source "initial")) {
-      return @{ opened = $true; control_name = "Open Control Panel"; tab_name = ""; activation_path = "" }
+    $initialPanel = Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-ClampedDeadline -Deadline $Deadline -Seconds 1) -Source "initial"
+    if ($hostKey -ne "excel" -and $initialPanel.opened) {
+      return @{ opened = $true; control_name = $initialPanel.control_name; tab_name = ""; activation_path = $initialPanel.activation_path }
     }
     $tabNames = @("Add-ins", "Home", "Insert", "My Add-ins")
     if ($hostKey -eq "excel" -and -not $AllowCatalogFallback) {
@@ -701,16 +816,18 @@ function Try-OpenControlPanelForDriverDocument {
     }
     foreach ($tabName in $tabNames) {
       if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
-      if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(1) -Source "current:$tabName") {
-        return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+      $currentPanel = Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-ClampedDeadline -Deadline $Deadline -Seconds 1) -Source "current:$tabName"
+      if ($currentPanel.opened) {
+        return @{ opened = $true; control_name = $currentPanel.control_name; tab_name = $tabName; activation_path = $currentPanel.activation_path }
       }
       if (Try-EnableOfficeMcpAddin -Root $window -WindowHandle $WindowHandle -Deadline $Deadline -Source "current:$tabName") {
         return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
       }
       if (Try-InvokeOfficeAddinsRibbon -WindowHandle $WindowHandle -Window $window -Deadline $Deadline -Source "current:$tabName") {
         $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
-        if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "ribbon:$tabName") {
-          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+        $ribbonPanel = Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-ClampedDeadline -Deadline $Deadline -Seconds 2) -Source "ribbon:$tabName"
+        if ($ribbonPanel.opened) {
+          return @{ opened = $true; control_name = $ribbonPanel.control_name; tab_name = $tabName; activation_path = $ribbonPanel.activation_path }
         }
         if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "ribbon:$tabName") {
           return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
@@ -720,9 +837,10 @@ function Try-OpenControlPanelForDriverDocument {
         }
         $window = $nextWindow
       }
-      if (Try-InvokeNamedControl -Root $window -Name $tabName) {
-        if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "tab:$tabName") {
-          return @{ opened = $true; control_name = "Open Control Panel"; tab_name = $tabName; activation_path = "" }
+      if (Try-InvokeNamedControl -Root $window -Name $tabName -Deadline $Deadline) {
+        $tabPanel = Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-ClampedDeadline -Deadline $Deadline -Seconds 2) -Source "tab:$tabName"
+        if ($tabPanel.opened) {
+          return @{ opened = $true; control_name = $tabPanel.control_name; tab_name = $tabName; activation_path = $tabPanel.activation_path }
         }
         $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
         if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "tab:$tabName") {
@@ -977,8 +1095,10 @@ public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwE
 function Try-InvokeNamedControl {
   param(
     [Parameter(Mandatory = $true)]$Root,
-    [Parameter(Mandatory = $true)][string]$Name
+    [Parameter(Mandatory = $true)][string]$Name,
+    [Parameter(Mandatory = $true)]$Deadline
   )
+  if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { return $false }
   $processId = 0
   try { $processId = [int]$Root.Current.ProcessId } catch {}
   $control = Find-DescendantByNameLike -Root $Root -Name $Name -ProcessId $processId
@@ -986,6 +1106,7 @@ function Try-InvokeNamedControl {
     $control = Find-DescendantByNameLike -Root $Root -Name $Name
   }
   if (-not $control) { return $false }
+  if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { return $false }
   Write-ActivatorLog "invoking control name=$Name"
   Invoke-ControlByMouse -Element $control
   Start-Sleep -Milliseconds 500
@@ -1057,13 +1178,34 @@ function Wait-ForOpenControlPanel {
     if ($button) {
       Write-ActivatorLog "found Open Control Panel control source=$Source"
       Invoke-Control -Element $button
-      return $true
+      return @{ opened = $true; control_name = "Open Control Panel"; activation_path = "" }
+    }
+    $sample = Get-VisibleControlNameSample -Root $window
+    if (Test-OfficeMcpTaskPaneReady -VisibleControlNames $sample) {
+      Write-ActivatorLog "found Office MCP task pane ready source=$Source"
+      return @{ opened = $true; control_name = "MCP Control"; activation_path = "task-pane-ready" }
     }
     Start-Sleep -Milliseconds 200
   } while ((Get-Date) -lt $Deadline)
 
   Write-ActivatorLog "Open Control Panel did not appear yet source=$Source"
-  return $false
+  return @{ opened = $false; control_name = ""; activation_path = "" }
+}
+
+function Test-OfficeMcpTaskPaneReady {
+  param([Parameter(Mandatory = $true)]$VisibleControlNames)
+
+  $names = @($VisibleControlNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+  if ($names.Count -eq 0) { return $false }
+  $hasPane = $false
+  $hasConnected = $false
+  $hasTools = $false
+  foreach ($name in $names) {
+    if ($name -like "*MCP Control*" -or $name -like "*Office MCP Control*") { $hasPane = $true }
+    if ($name -eq "Connected" -or $name -like "*Daemon connection*") { $hasConnected = $true }
+    if ($name -like "Tools *" -or $name -eq "Tools") { $hasTools = $true }
+  }
+  return ($hasPane -and $hasConnected -and $hasTools)
 }
 
 function Try-EnableOfficeMcpAddin {
@@ -1087,12 +1229,11 @@ function Try-EnableOfficeMcpAddin {
   Write-ActivatorLog "found Office MCP Control source=$Source name=$($addin.Current.Name)"
   Invoke-Control -Element $addin
   Start-Sleep -Milliseconds 800
-  $shortPanelDeadline = (Get-Date).AddSeconds(4)
-  if ($shortPanelDeadline -gt $Deadline) { $shortPanelDeadline = $Deadline }
-  if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline $shortPanelDeadline -Source $Source) { return $true }
+  $shortPanelDeadline = Get-ClampedDeadline -Deadline $Deadline -Seconds 4
+  $panel = Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline $shortPanelDeadline -Source $Source
+  if ($panel.opened) { return $true }
   Write-ActivatorLog "Office MCP Control direct click did not show Open Control Panel; trying catalog confirmation source=$Source"
-  $confirmDeadline = (Get-Date).AddSeconds(12)
-  if ($confirmDeadline -gt $Deadline) { $confirmDeadline = $Deadline }
+  $confirmDeadline = Get-ClampedDeadline -Deadline $Deadline -Seconds 12
   if (Try-ConfirmCatalogAddinInstall -WindowHandle $WindowHandle -Deadline $confirmDeadline -Source $Source) { return $true }
   Write-ActivatorLog "Office MCP Control was clicked but Open Control Panel did not appear yet source=$Source"
   return $false
@@ -1120,7 +1261,8 @@ function Try-ConfirmCatalogAddinInstall {
     Write-ActivatorLog "catalog install confirm invoked name=$name source=$Source"
     Invoke-Control -Element $control
     Start-Sleep -Milliseconds 1000
-    if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(4) -Source "catalog-confirm:$name") { return $true }
+    $panel = Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-ClampedDeadline -Deadline $Deadline -Seconds 4) -Source "catalog-confirm:$name"
+    if ($panel.opened) { return $true }
     Try-DismissOfficeModalDialog -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-confirm:$name" | Out-Null
     Try-DismissCatalogOverlay -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-confirm:$name" | Out-Null
     if (Try-OpenControlPanelFromRibbonTabs -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-confirm:$name") { return $true }
@@ -1194,11 +1336,13 @@ function Try-OpenControlPanelFromRibbonTabs {
     $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
     if (Try-InvokeOfficeAddinsRibbon -WindowHandle $WindowHandle -Window $window -Deadline $Deadline -Source "$Source:ribbon:$tabName") {
       Write-ActivatorLog "post-catalog ribbon scan invoked name=$tabName source=$Source"
-      if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(3) -Source "$Source:ribbon:$tabName") { return $true }
+      $panel = Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-ClampedDeadline -Deadline $Deadline -Seconds 3) -Source "$Source:ribbon:$tabName"
+      if ($panel.opened) { return $true }
     }
-    if (-not (Try-InvokeNamedControl -Root $window -Name $tabName)) { continue }
+    if (-not (Try-InvokeNamedControl -Root $window -Name $tabName -Deadline $Deadline)) { continue }
     Write-ActivatorLog "post-catalog tab scan invoked name=$tabName source=$Source"
-    if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(3) -Source "$Source:tab:$tabName") { return $true }
+    $panel = Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-ClampedDeadline -Deadline $Deadline -Seconds 3) -Source "$Source:tab:$tabName"
+    if ($panel.opened) { return $true }
   }
   return $false
 }
@@ -1222,7 +1366,8 @@ function Try-OpenAddinFromCatalog {
       Invoke-ControlByMouse -Element $control
       Start-Sleep -Milliseconds 800
       $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
-      if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "catalog-fallback:$automationId") {
+      $panel = Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-ClampedDeadline -Deadline $Deadline -Seconds 2) -Source "catalog-fallback:$automationId"
+      if ($panel.opened) {
         return $true
       }
       if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-fallback:$automationId") {
@@ -1234,11 +1379,12 @@ function Try-OpenAddinFromCatalog {
 
   foreach ($name in @("Office MCP Control", "Open Control Panel", "My Add-ins", "Shared Folder")) {
     if (-not (Test-ActivatorDeadline -Deadline $Deadline)) { break }
-    if (Try-InvokeNamedControl -Root $Window -Name $name) {
+    if (Try-InvokeNamedControl -Root $Window -Name $name -Deadline $Deadline) {
       Write-ActivatorLog "catalog fallback invoked name=$name"
       Start-Sleep -Milliseconds 800
       $nextWindow = Get-OfficeWindowFromHandle -Handle $WindowHandle
-      if (Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-Date).AddSeconds(2) -Source "catalog-fallback:$name") {
+      $panel = Wait-ForOpenControlPanel -WindowHandle $WindowHandle -Deadline (Get-ClampedDeadline -Deadline $Deadline -Seconds 2) -Source "catalog-fallback:$name"
+      if ($panel.opened) {
         return $true
       }
       if (Try-EnableOfficeMcpAddin -Root $nextWindow -WindowHandle $WindowHandle -Deadline $Deadline -Source "catalog-fallback:$name") {
@@ -1267,7 +1413,7 @@ if ($registered) {
   }
 }
 
-if ($hostKey -in @("word", "excel", "powerpoint")) {
+if ($hostKey -in @("excel", "powerpoint")) {
   $patchedDriverWindowHandle = Try-OpenPatchedDriverDocument -Application $app -HostKey $hostKey -Path $DocumentPath -Deadline $deadline
   if ($patchedDriverWindowHandle) {
     Write-ActivatorLog "$hostKey patched driver document active; attempting to open control panel document=$DocumentPath"
@@ -1289,6 +1435,8 @@ if (-not [string]::IsNullOrWhiteSpace($script:officialDocumentPath)) {
     $copyWaitSeconds = [Math]::Min(8, [Math]::Max(3, $TimeoutSeconds / 3))
     if ($hostKey -eq "excel") {
       $app = Reopen-ExcelSideloadDocumentAfterWebExtensionPatch -Application $app -Path $activeDocumentPath
+    } elseif ($hostKey -eq "word") {
+      $app = Reopen-WordSideloadDocumentAfterWebExtensionPatch -Application $app -Path $activeDocumentPath
     } else {
       Ensure-ExcelSideloadWebExtension -WorkbookPath $activeDocumentPath
     }

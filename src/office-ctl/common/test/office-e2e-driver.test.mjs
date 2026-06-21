@@ -226,6 +226,14 @@ test('Office E2E driver records activation logs before activation can fail', () 
   assert.match(document.cleanupScript, /Close-DriverOwnedProcessIds/);
   assert.match(document.cleanupScript, /Ensure-DriverOwnedProcessIdsExited/);
   assert.match(document.cleanupScript, /office-mcp-e2e-excel-/);
+  const driver = readFileSync(DRIVER, 'utf8');
+  assert.match(driver, /text\.slice\(-8000\)/);
+  assert.match(driver, /full activator log:/);
+  assert.match(driver, /preserveActivatorLogArtifact\(activatorLogPath, normalizedHost\)/);
+  assert.match(driver, /resolve\(REPO_ROOT, 'artifacts'\)/);
+  assert.match(driver, /office-mcp-activator-\$\{normalizeHost\(host\)\}-\$\{Date\.now\(\)\}\.log/);
+  assert.match(driver, /const preservedLogPath = preserveActivatorLogArtifact\(activatorLogPath, normalizedHost\)/);
+  assert.match(driver, /Office add-in activator exited with code \$\{result\.exitCode\}\.\$\{activatorFailureDetail\(preservedLogPath \|\| activatorLogPath\)\}/);
 });
 
 test('Office E2E driver uses a visible PowerPoint window and safe cleanup', { skip: !RUN_OFFICE_COM }, () => {
@@ -280,6 +288,7 @@ console.log(JSON.stringify({ activated: true, document_path: 'sideload-copy.pptx
     const activatedResult = JSON.parse(activated.stdout);
     assert.equal(activatedResult.activated, true);
     assert.equal(activatedResult.document_path, 'sideload-copy.pptx');
+    assert.deepEqual(activatedResult.document, { path: 'sideload-copy.pptx', original_path: 'deck.pptx' });
   } finally {
     restoreEnv('OFFICE_MCP_E2E_ACTIVATOR', previous);
   }
@@ -314,7 +323,7 @@ test('Office E2E driver provides a default Windows add-in activator', () => {
   assert.equal(result.activator_kind, 'default-windows-taskpane');
   assert.match(result.activator, /activate-office-mcp-addin\.ps1/);
   const driver = readFileSync(DRIVER, 'utf8');
-  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS \|\| 95000/);
+  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS \|\| 120000/);
   assert.match(driver, /-TimeoutSeconds 90/);
   } finally {
     restoreEnv('OFFICE_MCP_E2E_ACTIVATOR', previousActivator);
@@ -375,6 +384,65 @@ server.listen(0, '127.0.0.1', () => {
   }
 });
 
+test('Office E2E driver matches sideload copy sessions after activator failure', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-sideload-session-'));
+  const documentPath = join(dir, 'fixture.docx');
+  const sideloadPath = join(dir, 'Word add-in 11111111-aaaa-bbbb-cccc-222222222222.docx');
+  const activatorPath = join(dir, 'activator.mjs');
+  writeFileSync(documentPath, 'fixture');
+  writeFileSync(activatorPath, `
+import { appendFileSync } from 'node:fs';
+appendFileSync(process.env.OFFICE_MCP_E2E_ACTIVATOR_LOG, 'official sideload document=${sideloadPath.replaceAll('\\', '\\\\')}\\n');
+process.exit(1);
+`);
+  const serverPath = join(dir, 'mcp-server.mjs');
+  writeFileSync(serverPath, `
+import { createServer } from 'node:http';
+const server = createServer((request, response) => {
+  let body = '';
+  request.setEncoding('utf8');
+  request.on('data', (chunk) => { body += chunk; });
+  request.on('end', () => {
+    response.setHeader('Content-Type', 'application/json');
+    const parsed = JSON.parse(body || '{}');
+    if (parsed.method === 'initialize') {
+      response.setHeader('MCP-Session-Id', 'mcp-session-test');
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: {} }));
+      return;
+    }
+    response.end(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, result: { structuredContent: { sessions: [{ session_id: 'word-session', app: 'word', document: { filename: 'Word add-in 11111111-aaaa-bbbb-cccc-222222222222.docx' }, available_tools: ['word.get_text'] }] } } }));
+  });
+});
+server.listen(0, '127.0.0.1', () => {
+  const address = server.address();
+  console.log(JSON.stringify({ endpoint: 'http://127.0.0.1:' + address.port + '/mcp' }));
+});
+`);
+  const previous = process.env.OFFICE_MCP_E2E_ACTIVATOR;
+  const previousTimeout = process.env.OFFICE_MCP_E2E_ACTIVATION_SESSION_TIMEOUT_MS;
+  const server = spawn(process.execPath, [serverPath], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  try {
+    const { endpoint } = JSON.parse(await firstStdoutLine(server));
+    process.env.OFFICE_MCP_E2E_ACTIVATOR = `${process.execPath} ${activatorPath}`;
+    process.env.OFFICE_MCP_E2E_ACTIVATION_SESSION_TIMEOUT_MS = '2000';
+    const result = runDriver({
+      host: 'Word',
+      step: 'activateAddin',
+      context: { daemon: { endpoint }, document: { path: documentPath, createdByDriver: true }, timeoutMs: 5000 }
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const activation = JSON.parse(result.stdout);
+    assert.equal(activation.activated, true);
+    assert.equal(activation.activation_path, 'session-detected-after-activator-failure');
+    assert.equal(activation.document_path, sideloadPath);
+    assert.deepEqual(activation.document, { path: sideloadPath, original_path: documentPath, createdByDriver: true });
+  } finally {
+    restoreEnv('OFFICE_MCP_E2E_ACTIVATOR', previous);
+    restoreEnv('OFFICE_MCP_E2E_ACTIVATION_SESSION_TIMEOUT_MS', previousTimeout);
+    server.kill();
+  }
+});
+
 test('Office E2E driver reuses one MCP HTTP session per driver process', () => {
   const driver = readFileSync(DRIVER, 'utf8');
   assert.match(driver, /const mcpSessionIds = new Map\(\);/);
@@ -413,6 +481,7 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /official sideload copy not active yet; opening document path=\$activeDocumentPath/);
   assert.match(script, /New-Object -ComObject Excel\.Application/);
   assert.match(script, /function Ensure-ExcelSideloadWebExtension/);
+  assert.match(script, /function Ensure-WordSideloadWebExtension/);
   assert.match(script, /function Get-ExcelApplicationForWorkbookOpen/);
   assert.match(script, /excel application handle was stale before workbook reopen/);
   assert.match(script, /excel application reacquired before workbook reopen/);
@@ -423,28 +492,62 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /function Try-OpenPatchedDriverDocument/);
   assert.match(script, /Try-OpenExcelPatchedDriverWorkbook -Application \$Application -Path \$Path -Deadline \$Deadline/);
   assert.match(script, /Try-OpenPatchedDriverDocument -Application \$app -HostKey \$hostKey -Path \$DocumentPath -Deadline \$deadline/);
-  assert.match(script, /word patched driver document unavailable/);
   assert.match(script, /powerpoint patched driver presentation unavailable/);
-  assert.match(script, /\$hostKey -in @\("word", "excel", "powerpoint"\)/);
+  assert.doesNotMatch(script, /word patched driver document unavailable/);
+  assert.match(script, /\$hostKey -in @\("excel", "powerpoint"\)/);
+  assert.doesNotMatch(script, /\$hostKey -in @\("word", "excel", "powerpoint"\)/);
   assert.match(script, /Try-OpenControlPanelForDriverDocument -WindowHandle \$patchedDriverWindowHandle -Deadline \$deadline -AllowCatalogFallback/);
   assert.doesNotMatch(script, /Try-OpenControlPanelForDriverDocument -WindowHandle \$patchedDriverWindowHandle -Deadline \$deadline -AllowCatalogFallback:\$false/);
   assert.match(script, /\$hostKey patched driver document control panel did not open; skipping official sideload fallback to avoid duplicate \$hostKey windows/);
   assert.match(script, /patched driver document did not open Office MCP Control/);
   assert.doesNotMatch(script, /excel patched driver workbook control panel did not open; skipping official sideload fallback to avoid duplicate Excel windows/);
   assert.match(script, /function Reopen-ExcelSideloadDocumentAfterWebExtensionPatch/);
+  assert.match(script, /function Reopen-WordSideloadDocumentAfterWebExtensionPatch/);
   assert.match(script, /Reopen-ExcelSideloadDocumentAfterWebExtensionPatch -Application \$app -Path \$activeDocumentPath/);
+  assert.match(script, /Reopen-WordSideloadDocumentAfterWebExtensionPatch -Application \$app -Path \$activeDocumentPath/);
   assert.match(script, /Open-ExcelWorkbookAfterWebExtensionPatch -Application \$Application -Path \$Path -Source "sideload"/);
   assert.match(script, /Open-ExcelWorkbookAfterWebExtensionPatch -Application \$Application -Path \$Path -Source "driver"/);
   assert.match(script, /excel \$Source workbook closed before webextension patch path=\$Path/);
   assert.match(script, /excel \$Source workbook reopened after webextension patch path=\$Path/);
   assert.match(script, /Ensure-ExcelSideloadWebExtension -WorkbookPath \$activeDocumentPath/);
+  assert.match(script, /Ensure-WordSideloadWebExtension -DocumentPath \$Path/);
+  assert.match(script, /word webextension injection completed path=\$DocumentPath manifest=\$ManifestPath/);
+  assert.match(script, /word sideload document reopened after webextension patch path=\$Path/);
+  assert.match(script, /_rels\/\.rels/);
+  assert.match(script, /Target="\/word\/webextensions\/taskpanes\.xml"/);
+  assert.match(script, /word\/webextensions\/webextension\.xml/);
+  assert.match(script, /store="developer" storeType="Registry"/);
+  assert.doesNotMatch(script, /word\/_rels\/document\.xml\.rels[\s\S]*relationships\/webextensiontaskpanes/);
+  assert.doesNotMatch(script, /word\/_rels\/webSettings\.xml\.rels[\s\S]*relationships\/webextensiontaskpanes/);
+  const wordInjection = script.slice(script.indexOf('function Ensure-WordSideloadWebExtension'), script.indexOf('function Write-ActivationResult'));
+  assert.doesNotMatch(wordInjection, /storeType="FileSystem"/);
+  assert.doesNotMatch(script, /PartName=\\"\/word\/webextensions/);
+  assert.doesNotMatch(script, /<wetp:taskpanes[^\n]+\\"http:\/\/schemas\.microsoft\.com\/office\/webextensions\/taskpanes/);
+  assert.doesNotMatch(script, /<we:webextension[^\n]+\\"http:\/\/schemas\.microsoft\.com\/office\/webextensions\/webextension/);
   assert.match(script, /application\/vnd\.ms-office\.webextension\+xml/);
   assert.match(script, /application\/vnd\.ms-office\.webextensiontaskpanes\+xml/);
   assert.match(script, /http:\/\/schemas\.microsoft\.com\/office\/2011\/relationships\/webextensiontaskpanes/);
   assert.match(script, /Office\.AutoShowTaskpaneWithDocument/);
   assert.match(script, /function Try-OpenControlPanelForDriverDocument/);
+  assert.match(script, /function Test-OfficeMcpTaskPaneReady/);
+  assert.match(script, /found Office MCP task pane ready source=\$Source/);
+  assert.match(script, /control_name = "MCP Control"/);
+  assert.match(script, /activation_path = "task-pane-ready"/);
+  assert.match(script, /\$initialPanel = Wait-ForOpenControlPanel/);
+  assert.match(script, /\$initialPanel\.opened/);
+  assert.match(script, /\$currentPanel = Wait-ForOpenControlPanel/);
+  assert.match(script, /if \(\$currentPanel\.opened\)/);
+  assert.match(script, /\$ribbonPanel = Wait-ForOpenControlPanel/);
+  assert.match(script, /if \(\$ribbonPanel\.opened\)/);
+  assert.match(script, /\$tabPanel = Wait-ForOpenControlPanel/);
+  assert.match(script, /if \(\$tabPanel\.opened\)/);
+  assert.match(script, /if \(\$panel\.opened\) \{ return \$true \}/);
+  assert.doesNotMatch(script, /if \(Wait-ForOpenControlPanel/);
+  assert.match(script, /return @\{ opened = \$true; control_name = "Open Control Panel"; activation_path = "" \}/);
+  assert.match(script, /return @\{ opened = \$false; control_name = ""; activation_path = "" \}/);
+  assert.match(script, /\$hasPane -and \$hasConnected -and \$hasTools/);
   assert.match(script, /Office MCP Control direct click did not show Open Control Panel; trying catalog confirmation/);
-  assert.match(script, /\$confirmDeadline = \(Get-Date\)\.AddSeconds\(12\)/);
+  assert.match(script, /\$confirmDeadline = Get-ClampedDeadline -Deadline \$Deadline -Seconds 12/);
   assert.match(script, /Try-ConfirmCatalogAddinInstall -WindowHandle \$WindowHandle -Deadline \$confirmDeadline -Source \$Source/);
   assert.match(script, /Wait-ForOpenControlPanel[\s\S]*Office MCP Control direct click did not show Open Control Panel; trying catalog confirmation[\s\S]*Try-ConfirmCatalogAddinInstall/);
   assert.match(script, /\$hostKey -ne "excel"/);
@@ -487,7 +590,7 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /activation_path = "catalog-fallback"/);
   assert.match(script, /control panel visible control sample failed:/);
   assert.match(script, /function Try-ConfirmCatalogAddinInstall/);
-  assert.match(script, /\$shortPanelDeadline = \(Get-Date\)\.AddSeconds\(4\)/);
+  assert.match(script, /\$shortPanelDeadline = Get-ClampedDeadline -Deadline \$Deadline -Seconds 4/);
   assert.match(script, /Wait-ForOpenControlPanel -WindowHandle \$WindowHandle -Deadline \$shortPanelDeadline -Source \$Source/);
   assert.match(script, /catalog install confirm invoked name=\$name source=\$Source/);
   assert.match(script, /Find-DescendantByNameLike -Root \$window -Name \$name/);
@@ -535,6 +638,14 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /using powerpoint main window fallback/);
   assert.match(script, /function Test-ActivatorDeadline/);
   assert.match(script, /Test-ActivatorDeadline -Deadline \$Deadline/);
+  assert.match(script, /function Get-ClampedDeadline/);
+  assert.match(script, /Get-ClampedDeadline -Deadline \$Deadline -Seconds 1/);
+  assert.match(script, /Get-ClampedDeadline -Deadline \$Deadline -Seconds 2/);
+  assert.match(script, /Get-ClampedDeadline -Deadline \$Deadline -Seconds 3/);
+  assert.match(script, /Get-ClampedDeadline -Deadline \$Deadline -Seconds 4/);
+  assert.match(script, /Try-InvokeNamedControl -Root \$window -Name \$tabName -Deadline \$Deadline/);
+  assert.match(script, /Try-InvokeNamedControl -Root \$Window -Name \$name -Deadline \$Deadline/);
+  assert.doesNotMatch(script, /Try-InvokeNamedControl -Root \$window -Name \$tabName\)/);
   assert.match(script, /try \{/);
   assert.match(script, /My Add-ins/);
   assert.match(script, /Office MCP Control/);
@@ -544,7 +655,7 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
 
 test('default Windows add-in activator exits before the external driver timeout', () => {
   const driver = readFileSync(DRIVER, 'utf8');
-  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS \|\| 95000/);
+  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS \|\| 120000/);
   assert.match(driver, /-TimeoutSeconds 90/);
 });
 

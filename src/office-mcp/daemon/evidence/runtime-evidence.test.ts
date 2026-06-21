@@ -115,6 +115,7 @@ test('Excel runtime evidence can own the live Office E2E lifecycle', () => {
   assert.match(source, /runOfficeE2eDriverStep\('Excel', 'startDaemon'/);
   assert.match(source, /runOfficeE2eDriverStep\('Excel', 'createDocument'/);
   assert.match(source, /runOfficeE2eDriverStep\('Excel', 'activateAddin'/);
+  assert.match(source, /applyActivatedDocument\(document, activation\)/);
   assert.match(source, /runOfficeE2eDriverStep\('Excel', 'waitForSession'/);
   assert.match(source, /runOfficeE2eDriverStep\('Excel', 'cleanupDocument'/);
   assert.match(source, /runOfficeE2eDriverStep\('Excel', 'stopDaemon'/);
@@ -139,6 +140,7 @@ test('Word runtime evidence can own the live Office E2E lifecycle', () => {
   assert.match(source, /runOfficeE2eDriverStep\('Word', 'startDaemon'/);
   assert.match(source, /runOfficeE2eDriverStep\('Word', 'createDocument'/);
   assert.match(source, /runOfficeE2eDriverStep\('Word', 'activateAddin'/);
+  assert.match(source, /applyActivatedDocument\(document, activation\)/);
   assert.match(source, /runOfficeE2eDriverStep\('Word', 'waitForSession'/);
   assert.match(source, /runOfficeE2eDriverStep\('Word', 'cleanupDocument'/);
   assert.match(source, /runOfficeE2eDriverStep\('Word', 'stopDaemon'/);
@@ -176,6 +178,7 @@ test('PowerPoint runtime evidence harness proves session, tools, mutation, and h
   assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'startDaemon'/);
   assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'createDocument'/);
   assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'activateAddin'/);
+  assert.match(source, /applyActivatedDocument\(document, activation\)/);
   assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'waitForSession'/);
   assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'cleanupDocument'/);
   assert.match(source, /runOfficeE2eDriverStep\('PowerPoint', 'stopDaemon'/);

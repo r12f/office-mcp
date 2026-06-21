@@ -423,7 +423,8 @@ async function runExcelE2eSessionSmoke(): Promise<void> {
       context.daemon = daemon;
       const document = await runOfficeE2eDriverStep('Excel', 'createDocument', context);
       context.document = document;
-      await runOfficeE2eDriverStep('Excel', 'activateAddin', context);
+      const activation = await runOfficeE2eDriverStep('Excel', 'activateAddin', context);
+      applyActivatedDocument(document, activation);
       const session = await runOfficeE2eDriverStep('Excel', 'waitForSession', context);
       sessionId = String(session.sessionId ?? '');
       if (!sessionId) throw new Error('Excel E2E driver did not return a sessionId.');
@@ -459,7 +460,9 @@ async function runWordE2eSessionSmoke(): Promise<string> {
       const document = await runOfficeE2eDriverStep('Word', 'createDocument', context);
       context.document = document;
       wordSmokeDocumentUrl = String(document.path ?? '');
-      await runOfficeE2eDriverStep('Word', 'activateAddin', context);
+      const activation = await runOfficeE2eDriverStep('Word', 'activateAddin', context);
+      applyActivatedDocument(document, activation);
+      wordSmokeDocumentUrl = String(document.path ?? '');
       const session = await runOfficeE2eDriverStep('Word', 'waitForSession', context);
       sessionId = String(session.sessionId ?? '');
       if (!sessionId) throw new Error('Word E2E driver did not return a sessionId.');
@@ -506,7 +509,8 @@ async function runPowerPointE2eSessionSmoke(): Promise<void> {
       context.daemon = daemon;
       const document = await runOfficeE2eDriverStep('PowerPoint', 'createDocument', context);
       context.document = document;
-      await runOfficeE2eDriverStep('PowerPoint', 'activateAddin', context);
+      const activation = await runOfficeE2eDriverStep('PowerPoint', 'activateAddin', context);
+      applyActivatedDocument(document, activation);
       const session = await runOfficeE2eDriverStep('PowerPoint', 'waitForSession', context);
       sessionId = String(session.sessionId ?? '');
       if (!sessionId) throw new Error('PowerPoint E2E driver did not return a sessionId.');
@@ -530,6 +534,15 @@ async function runPowerPointE2eSessionSmoke(): Promise<void> {
       return {};
     });
   }
+}
+
+function applyActivatedDocument(document: OfficeE2eDriverContext, activation: OfficeE2eDriverContext): void {
+  const activatedPath = typeof activation.document_path === 'string' ? activation.document_path.trim() : '';
+  if (!activatedPath) return;
+  if (typeof document.original_path !== 'string' && typeof document.path === 'string') {
+    document.original_path = document.path;
+  }
+  document.path = activatedPath;
 }
 
 
