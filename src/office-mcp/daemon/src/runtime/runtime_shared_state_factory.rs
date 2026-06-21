@@ -21,6 +21,7 @@ impl RuntimeSharedStateFactory {
             audit_log: config.audit_log.clone(),
             image_fetcher: config.image_fetcher.clone(),
             tool_access_policy: Arc::new(Mutex::new(config.tool_access_policy.clone())),
+            config_path: config.config_path.clone(),
         })
     }
 }

@@ -9,6 +9,8 @@ use crate::runtime::http_wire::WireHttpRequest;
 use crate::runtime::mcp_response::RuntimeSharedState;
 use crate::runtime::server_config::RuntimeServerConfig;
 use std::collections::BTreeMap;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 #[test]
@@ -132,6 +134,46 @@ fn tool_access_policy_update_changes_ui_state_and_runtime_policy() {
 }
 
 #[test]
+fn tool_access_policy_update_persists_config_file() {
+    let service = AddinHttpService::from_config(&RuntimeServerConfig::default());
+    let ui_state = Arc::new(Mutex::new(UiStateStore::new()));
+    let config_path = temp_config_path();
+    fs::write(
+        &config_path,
+        r#"
+[mcp_http]
+port = 8800
+"#,
+    )
+    .expect("write config");
+    let shared_state = shared_state_with_config_path(Some(config_path.display().to_string()));
+    let mut update = request(
+        HttpMethod::Put,
+        "/ui/tool-access-policy",
+        BTreeMap::from([("origin".to_string(), "https://localhost:8765".to_string())]),
+    );
+    update.body = br#"{
+        "access_mode":"write",
+        "disabled_apps":["powerpoint"],
+        "disabled_categories":[{"app":"excel","category":"Range"}],
+        "disabled_tools":["word.update_table"]
+    }"#
+    .to_vec();
+
+    let response = service.route_request(&ui_state, &shared_state, &update);
+
+    assert_eq!(response.status, 200);
+    let config = fs::read_to_string(&config_path).expect("read config");
+    assert!(config.contains("[mcp_http]"));
+    assert!(config.contains("[tool_access]"));
+    assert!(config.contains("access_mode = \"write\""));
+    assert!(config.contains("disabled_apps = \"powerpoint\""));
+    assert!(config.contains("disabled_categories = \"excel:Range\""));
+    assert!(config.contains("disabled_tools = \"word.update_table\""));
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
 fn tool_access_policy_update_rejects_foreign_origin() {
     let mut request = request(
         HttpMethod::Put,
@@ -195,6 +237,10 @@ fn route(request: &WireHttpRequest) -> crate::runtime::http_wire::WireHttpRespon
 }
 
 fn shared_state() -> Arc<RuntimeSharedState> {
+    shared_state_with_config_path(None)
+}
+
+fn shared_state_with_config_path(config_path: Option<String>) -> Arc<RuntimeSharedState> {
     Arc::new(RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
         session_grace: std::time::Duration::from_secs(60),
@@ -204,7 +250,19 @@ fn shared_state() -> Arc<RuntimeSharedState> {
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
         tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+        config_path,
     })
+}
+
+fn temp_config_path() -> PathBuf {
+    std::env::temp_dir().join(format!(
+        "office-mcp-ui-tool-access-{}-{}.toml",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time")
+            .as_nanos()
+    ))
 }
 
 fn request(method: HttpMethod, path: &str, headers: BTreeMap<String, String>) -> WireHttpRequest {

@@ -58,6 +58,7 @@ fn test_shared_state() -> Arc<RuntimeSharedState> {
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
         tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+        config_path: None,
     })
 }
 

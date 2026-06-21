@@ -20,6 +20,7 @@ pub(crate) struct RuntimeSharedState {
     pub(crate) audit_log: AuditLog,
     pub(crate) image_fetcher: ImageFetcher,
     pub(crate) tool_access_policy: Arc<Mutex<ToolAccessPolicy>>,
+    pub(crate) config_path: Option<String>,
 }
 
 impl RuntimeSharedState {

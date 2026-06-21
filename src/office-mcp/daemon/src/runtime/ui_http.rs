@@ -1,4 +1,5 @@
 use crate::api::{UiSnapshotEndpoints, UiSnapshotService, UiStateStore};
+use crate::common::{DaemonConfigService, ToolAccessConfig};
 use crate::mcp::{AccessMode, HttpMethod, ToolAccessPolicy};
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
 use crate::runtime::mcp_response::RuntimeSharedState;
@@ -6,6 +7,7 @@ use crate::runtime::server_config::RuntimeServerConfig;
 use crate::runtime::static_response::StaticResponseService;
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,6 +110,20 @@ impl UiHttpService {
             Ok(policy) => policy,
             Err(message) => return WireHttpResponse::text(400, message),
         };
+        if let Some(config_path) = &shared_state.config_path {
+            if let Err(error) = DaemonConfigService::save_tool_access_config(
+                &PathBuf::from(config_path),
+                &tool_access_config_from_policy(&policy),
+            ) {
+                tracing::error!(%error, config_path, "failed to persist daemon tool access policy");
+                return WireHttpResponse::text(
+                    500,
+                    "Failed to persist tool access policy".to_string(),
+                );
+            }
+        } else {
+            tracing::warn!("updated daemon tool access policy without config persistence path");
+        }
         if !shared_state.set_tool_access_policy(policy.clone()) {
             return WireHttpResponse::text(500, "Failed to update tool access policy".to_string());
         }
@@ -145,6 +161,16 @@ impl UiHttpService {
                 addin_endpoint: self.addin_endpoint.clone(),
             },
         )
+    }
+}
+
+fn tool_access_config_from_policy(policy: &ToolAccessPolicy) -> ToolAccessConfig {
+    let snapshot = policy.snapshot();
+    ToolAccessConfig {
+        access_mode: snapshot.access_mode,
+        disabled_apps: snapshot.disabled_apps,
+        disabled_categories: snapshot.disabled_categories,
+        disabled_tools: snapshot.disabled_tools,
     }
 }
 

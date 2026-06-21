@@ -101,6 +101,82 @@ fn tool_access_defaults_allow_all_tools() {
 }
 
 #[test]
+fn save_tool_access_config_replaces_existing_section_and_preserves_other_config() {
+    let path = temp_config(
+        r#"
+[addin_channel]
+bind = "localhost"
+port = 9443
+
+[tool_access]
+access_mode = "all"
+disabled_apps = "word"
+disabled_categories = "word:Review"
+disabled_tools = "word.save"
+
+[mcp_http]
+port = 9900
+"#,
+    );
+    let update = crate::common::ToolAccessConfig {
+        access_mode: AccessMode::Read,
+        disabled_apps: vec!["powerpoint".to_string()],
+        disabled_categories: vec![("excel".to_string(), "Range".to_string())],
+        disabled_tools: vec!["word.update_table".to_string()],
+    };
+
+    DaemonConfigService::save_tool_access_config(&path, &update).expect("save tool access");
+
+    let contents = fs::read_to_string(&path).expect("read config");
+    assert!(contents.contains("[addin_channel]"));
+    assert!(contents.contains("port = 9443"));
+    assert!(contents.contains("[mcp_http]"));
+    assert!(contents.contains("port = 9900"));
+    assert!(contents.contains("access_mode = \"read\""));
+    assert!(contents.contains("disabled_apps = \"powerpoint\""));
+    assert!(contents.contains("disabled_categories = \"excel:Range\""));
+    assert!(contents.contains("disabled_tools = \"word.update_table\""));
+    assert_eq!(contents.matches("[tool_access]").count(), 1);
+    let loaded = DaemonConfigService::with_env(BTreeMap::new())
+        .load(LoadConfigOptions {
+            config_path: Some(path.clone()),
+        })
+        .expect("reload config");
+    assert_eq!(loaded.tool_access, update);
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn save_tool_access_config_appends_section_when_missing() {
+    let path = temp_config(
+        r#"
+[mcp_http]
+bind = "127.0.0.1"
+"#,
+    );
+
+    DaemonConfigService::save_tool_access_config(
+        &path,
+        &crate::common::ToolAccessConfig {
+            access_mode: AccessMode::Write,
+            disabled_apps: Vec::new(),
+            disabled_categories: vec![("powerpoint".to_string(), "Slides".to_string())],
+            disabled_tools: vec!["excel.delete_sheet".to_string()],
+        },
+    )
+    .expect("save tool access");
+
+    let contents = fs::read_to_string(&path).expect("read config");
+    assert!(contents.contains("[mcp_http]"));
+    assert!(contents.contains("[tool_access]"));
+    assert!(contents.contains("access_mode = \"write\""));
+    assert!(contents.contains("disabled_apps = \"\""));
+    assert!(contents.contains("disabled_categories = \"powerpoint:Slides\""));
+    assert!(contents.contains("disabled_tools = \"excel.delete_sheet\""));
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn office_mcp_config_path_environment_selects_config_file() {
     let path = temp_config(
         r#"

@@ -110,6 +110,7 @@ fn shared_state(interval: Duration, timeout: Duration) -> RuntimeSharedState {
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
         tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+        config_path: None,
     }
 }
 

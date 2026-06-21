@@ -49,6 +49,7 @@ impl<'a> RuntimeConnectionHandler<'a> {
             audit_log: AuditLog::new(),
             image_fetcher: ImageFetcher::new(),
             tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+            config_path: None,
         });
         let response = self
             .addin_http_service()

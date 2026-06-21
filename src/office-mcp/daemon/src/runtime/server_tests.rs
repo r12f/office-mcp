@@ -133,6 +133,7 @@ fn ui_state_request_prunes_expired_stale_sessions() {
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
         tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+        config_path: None,
     });
     let server_shared_state = Arc::clone(&shared_state);
     let server_handle = thread::spawn(move || {
@@ -355,6 +356,7 @@ fn real_tls_websocket_forwards_mcp_tool_call_and_returns_response() {
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
         tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+        config_path: None,
     });
     let server_shared_state = Arc::clone(&shared_state);
     let server_handle = thread::spawn(move || {
@@ -462,6 +464,7 @@ fn real_tls_websocket_protocol_error_sends_close_frame() {
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
         tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+        config_path: None,
     });
     let server_shared_state = Arc::clone(&shared_state);
     let server_handle = thread::spawn(move || {
@@ -518,6 +521,7 @@ fn real_tls_websocket_heartbeat_ping_accepts_pong_response() {
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
         tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+        config_path: None,
     });
     let server_shared_state = Arc::clone(&shared_state);
     let server_handle = thread::spawn(move || {
@@ -694,6 +698,7 @@ fn addin_tls_roundtrip(request: &str) -> String {
             audit_log: AuditLog::new(),
             image_fetcher: ImageFetcher::new(),
             tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+            config_path: None,
         });
         let (stream, _) = listener.accept().expect("accept");
         let mut stream = acceptor.accept(stream).expect("accept tls");

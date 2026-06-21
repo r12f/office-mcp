@@ -247,6 +247,28 @@ impl DaemonConfigService {
         Ok(())
     }
 
+    /// Persists the daemon-wide tool access section in the config file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the config file cannot be read or written.
+    pub fn save_tool_access_config(
+        path: &Path,
+        tool_access: &ToolAccessConfig,
+    ) -> Result<(), ConfigError> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(ConfigError::Io)?;
+        }
+        let current = if path.exists() {
+            fs::read_to_string(path).map_err(ConfigError::Io)?
+        } else {
+            String::new()
+        };
+        let updated =
+            replace_tool_access_section(&current, &render_tool_access_section(tool_access));
+        fs::write(path, updated).map_err(ConfigError::Io)
+    }
+
     #[must_use]
     pub fn redacted(config: &DaemonConfig) -> RedactedDaemonConfig {
         RedactedDaemonConfig {
@@ -288,6 +310,94 @@ impl Default for DaemonConfigService {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn replace_tool_access_section(current: &str, section: &str) -> String {
+    let Some((start, end)) = tool_access_section_range(current) else {
+        let mut output = current.trim_end().to_string();
+        if !output.is_empty() {
+            output.push_str("\n\n");
+        }
+        output.push_str(section);
+        return output;
+    };
+    let mut output = String::new();
+    output.push_str(current[..start].trim_end());
+    if !output.is_empty() {
+        output.push_str("\n\n");
+    }
+    output.push_str(section);
+    let suffix = current[end..].trim_start_matches(['\r', '\n']);
+    if !suffix.is_empty() {
+        output.push_str("\n\n");
+        output.push_str(suffix.trim_start());
+    }
+    output
+}
+
+fn tool_access_section_range(contents: &str) -> Option<(usize, usize)> {
+    let mut start = None;
+    for (index, line) in line_spans(contents) {
+        if strip_inline_comment(line).trim() == "[tool_access]" {
+            start = Some(index);
+            break;
+        }
+    }
+    let start = start?;
+    let mut end = contents.len();
+    for (index, line) in line_spans(&contents[start..]) {
+        if index == 0 {
+            continue;
+        }
+        let trimmed = strip_inline_comment(line).trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            end = start + index;
+            break;
+        }
+    }
+    Some((start, end))
+}
+
+fn line_spans(contents: &str) -> impl Iterator<Item = (usize, &str)> {
+    contents.split_inclusive('\n').scan(0, |offset, line| {
+        let start = *offset;
+        *offset += line.len();
+        Some((start, line.trim_end_matches(['\r', '\n'])))
+    })
+}
+
+fn strip_inline_comment(line: &str) -> &str {
+    line.split_once('#').map_or(line, |(value, _)| value)
+}
+
+fn render_tool_access_section(tool_access: &ToolAccessConfig) -> String {
+    format!(
+        "[tool_access]\naccess_mode = \"{}\"\ndisabled_apps = \"{}\"\ndisabled_categories = \"{}\"\ndisabled_tools = \"{}\"\n",
+        access_mode_config_value(tool_access.access_mode),
+        comma_list(&tool_access.disabled_apps),
+        category_list(&tool_access.disabled_categories),
+        comma_list(&tool_access.disabled_tools),
+    )
+}
+
+fn access_mode_config_value(value: AccessMode) -> &'static str {
+    match value {
+        AccessMode::Read => "read",
+        AccessMode::Write => "write",
+        AccessMode::All => "all",
+    }
+}
+
+fn comma_list(values: &[String]) -> String {
+    values.join(",")
+}
+
+fn category_list(values: &[(String, String)]) -> String {
+    values
+        .iter()
+        .map(|(app, category)| format!("{app}:{category}"))
+        .collect::<Vec<_>>()
+        .join(";")
 }
 
 fn parse_access_mode(value: &str) -> Result<AccessMode, ConfigError> {

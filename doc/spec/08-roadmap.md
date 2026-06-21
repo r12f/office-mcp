@@ -605,11 +605,15 @@ each Office task pane session. The daemon needs one canonical global tool access
 policy that controls discovery and dispatch for every MCP client and every
 Word, Excel, and PowerPoint session.
 
-- [ ] Add a daemon-owned tool access policy store. It must support a global all
+- [x] Add a daemon-owned tool access policy store. It must support a global all
       tools switch, app-level switches for Word/Excel/PowerPoint, category-level
       switches, individual tool switches, and a `Read` / `Write` / `All` access
       ceiling. The policy must persist through daemon restart and be visible in
-      the daemon UI.
+      the daemon UI. Current implementation loads `[tool_access]` at daemon
+      startup, keeps an immediately mutable runtime policy, exposes it in
+      `/ui/state`, updates it via `PUT /ui/tool-access-policy`, and writes that
+      UI update back to the daemon config file so restart applies the same
+      policy.
 - [ ] Classify every Word, Excel, and PowerPoint tool by app, object/category,
       and side-effect level so the daemon UI can display grouped controls. The
       UI must allow expanding/collapsing categories and independently toggling
@@ -638,15 +642,18 @@ Word, Excel, and PowerPoint session.
       panel implementation renders the daemon-owned tool metadata from
       `/ui/state.daemon.tool_catalog`, groups controls by app and category,
       exposes `Read` / `Write` / `All`, and updates the live daemon policy via
-      `PUT /ui/tool-access-policy`. Durable write-back from this UI action to
-      the config file remains open under the policy-store item above.
-- [ ] Add tests covering discovery filtering, daemon-policy dispatch rejection,
+      `PUT /ui/tool-access-policy`.
+- [x] Add tests covering discovery filtering, daemon-policy dispatch rejection,
       session preflight rejection, refresh hints, persistence, and UI rendering.
       Tests must prove a disabled tool disappears from `tools/list`, a stale
       call gets `TOOL_NOT_AVAILABLE`, and a session-missing tool gets
       `TOOL_NOT_ENABLED_FOR_DOCUMENT` rather than the older generic capability
       failure. Tests must also assert both access-control messages use the
       unified `Tool <name> is disabled...` wording rather than `not enabled`.
+      Current evidence covers daemon catalog filtering, daemon-policy dispatch
+      rejection, session preflight rejection wording and refresh hints,
+      config-file startup and UI write-back persistence, and browser-level UI
+      rendering/toggle interaction.
 
 **Exit criterion**: A user can manage tool access once in the daemon UI across
 all sessions, MCP clients see only daemon-allowed tools from `tools/list`, and
@@ -663,12 +670,13 @@ disabled...` wording. The policy now classifies Word, Excel, and PowerPoint
 tools by app, object/category, and read/mutating/destructive side effect, and
 supports `Read` / `Write` / `All` ceilings plus app, category, and individual
 tool switches for discovery filtering and dispatch enforcement. The daemon
-config file now persists startup policy under `[tool_access]` and runtime state
-applies that policy after restart. `/ui/state` now exposes the daemon policy so
-the control panel can render the global access state. `PUT /ui/tool-access-policy`
-now updates the in-memory daemon policy for immediate UI and MCP discovery
-changes. Durable write-back from the UI to the config file and the full control
-panel editing surface remain open items in this milestone.
+config file now persists startup policy under `[tool_access]`, runtime state
+applies that policy after restart, and UI updates write the same policy back to
+the config file. `/ui/state` now exposes the daemon policy and daemon-owned tool
+metadata so the control panel can render the global access state. `PUT
+/ui/tool-access-policy` updates both the in-memory daemon policy for immediate
+UI and MCP discovery changes and the durable config section for restart
+consistency.
 
 ### M6.5.3 — Product identity, add-in metadata, and native tray polish
 
