@@ -6,6 +6,7 @@ use crate::api::{
     CommandFailure, CommandResult, RegisterClientInput, StartCommandInput, UiClientTransport,
     UiCommandStatus, UiStateOptions,
 };
+use crate::mcp::{AccessMode, ToolAccessPolicy};
 use std::time::{Duration, SystemTime};
 
 #[test]
@@ -105,6 +106,37 @@ fn tracks_clients_and_in_flight_request_counts() {
 }
 
 #[test]
+fn snapshots_daemon_tool_access_policy() {
+    let store = UiStateStore::with_options(UiStateOptions {
+        tool_access_policy: ToolAccessPolicy::default()
+            .with_access_mode(AccessMode::Read)
+            .with_disabled_app("powerpoint")
+            .with_disabled_category("excel", "Range")
+            .with_disabled_tool("word.update_table"),
+        ..options()
+    });
+
+    let snapshot = store.snapshot(&[], SystemTime::UNIX_EPOCH);
+
+    assert_eq!(
+        snapshot.daemon.tool_access_policy.access_mode,
+        AccessMode::Read
+    );
+    assert_eq!(
+        snapshot.daemon.tool_access_policy.disabled_apps,
+        vec!["powerpoint"]
+    );
+    assert_eq!(
+        snapshot.daemon.tool_access_policy.disabled_categories,
+        vec![("excel".to_string(), "Range".to_string())]
+    );
+    assert_eq!(
+        snapshot.daemon.tool_access_policy.disabled_tools,
+        vec!["word.update_table"]
+    );
+}
+
+#[test]
 fn maps_timeout_cancelled_and_thrown_statuses() {
     let mut store = UiStateStore::with_options(options());
     let timeout = store.start_command(StartCommandInput {
@@ -169,6 +201,7 @@ fn options() -> UiStateOptions {
         addin_endpoint: "https://localhost:8765/addin".to_string(),
         config_path: None,
         log_path: None,
+        tool_access_policy: ToolAccessPolicy::default(),
         now: SystemTime::UNIX_EPOCH,
     }
 }

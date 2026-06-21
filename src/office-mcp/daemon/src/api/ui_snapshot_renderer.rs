@@ -3,6 +3,7 @@ use crate::api::{
     UiClientRecord, UiClientTransport, UiCommandError, UiCommandRecord, UiCommandStatus, UiHealth,
     UiSnapshot,
 };
+use crate::mcp::{AccessMode, UiToolAccessPolicySnapshot};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -33,6 +34,7 @@ impl UiSnapshotRenderer {
                 "config_path": snapshot.daemon.config_path,
                 "log_path": snapshot.daemon.log_path,
                 "last_error": snapshot.daemon.last_error,
+                "tool_access_policy": tool_access_policy_json(&snapshot.daemon.tool_access_policy),
             },
             "clients": snapshot.clients.iter().map(ui_client_json).collect::<Vec<_>>(),
             "documents": snapshot.documents.iter().map(|(app, sessions)| {
@@ -44,6 +46,25 @@ impl UiSnapshotRenderer {
                 (session_id.clone(), commands.iter().map(ui_command_json).collect::<Vec<_>>())
             }).collect::<BTreeMap<_, _>>(),
         })
+    }
+}
+
+fn tool_access_policy_json(policy: &UiToolAccessPolicySnapshot) -> Value {
+    json!({
+        "access_mode": access_mode_json(policy.access_mode),
+        "disabled_apps": policy.disabled_apps,
+        "disabled_categories": policy.disabled_categories.iter().map(|(app, category)| {
+            json!({ "app": app, "category": category })
+        }).collect::<Vec<_>>(),
+        "disabled_tools": policy.disabled_tools,
+    })
+}
+
+fn access_mode_json(value: AccessMode) -> &'static str {
+    match value {
+        AccessMode::Read => "read",
+        AccessMode::Write => "write",
+        AccessMode::All => "all",
     }
 }
 

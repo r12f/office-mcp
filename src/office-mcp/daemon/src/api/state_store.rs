@@ -163,6 +163,7 @@ impl UiStateStore {
                 config_path: self.options.config_path.clone(),
                 log_path: self.options.log_path.clone(),
                 last_error: self.last_error.clone(),
+                tool_access_policy: self.options.tool_access_policy.snapshot(),
             },
             clients: self.clients.values().cloned().collect(),
             documents: group_sessions_by_app(sessions),

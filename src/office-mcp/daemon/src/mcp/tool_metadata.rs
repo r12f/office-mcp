@@ -21,6 +21,25 @@ pub struct ToolMetadata {
     pub side_effect: ToolSideEffect,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UiToolAccessPolicySnapshot {
+    pub access_mode: AccessMode,
+    pub disabled_apps: Vec<String>,
+    pub disabled_categories: Vec<(String, String)>,
+    pub disabled_tools: Vec<String>,
+}
+
+impl Default for UiToolAccessPolicySnapshot {
+    fn default() -> Self {
+        Self {
+            access_mode: AccessMode::All,
+            disabled_apps: Vec::new(),
+            disabled_categories: Vec::new(),
+            disabled_tools: Vec::new(),
+        }
+    }
+}
+
 impl AccessMode {
     #[must_use]
     pub const fn allows(self, side_effect: ToolSideEffect) -> bool {

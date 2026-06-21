@@ -6,7 +6,7 @@ use crate::api::{
     UiClientRecord, UiClientTransport, UiCommandError, UiCommandRecord, UiCommandStatus,
     UiDaemonSnapshot, UiHealth, UiSnapshot,
 };
-use crate::mcp::WORD_V1_TOOLS;
+use crate::mcp::{AccessMode, ToolAccessPolicy, WORD_V1_TOOLS};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime};
@@ -38,6 +38,26 @@ fn renders_daemon_endpoints_and_grouped_documents() {
         "C:/office-mcp/config.toml"
     );
     assert_eq!(rendered["daemon"]["log_path"], "C:/office-mcp/daemon.jsonl");
+    assert_eq!(
+        rendered["daemon"]["tool_access_policy"]["access_mode"],
+        "read"
+    );
+    assert_eq!(
+        rendered["daemon"]["tool_access_policy"]["disabled_apps"][0],
+        "powerpoint"
+    );
+    assert_eq!(
+        rendered["daemon"]["tool_access_policy"]["disabled_categories"][0]["app"],
+        "excel"
+    );
+    assert_eq!(
+        rendered["daemon"]["tool_access_policy"]["disabled_categories"][0]["category"],
+        "Range"
+    );
+    assert_eq!(
+        rendered["daemon"]["tool_access_policy"]["disabled_tools"][0],
+        "word.update_table"
+    );
     assert_eq!(rendered["clients"][0]["transport"], "stdio-bridge");
     assert_eq!(rendered["clients"][0]["connected_at"], 1_000);
     assert_eq!(rendered["documents"]["word"][0]["registered_at"], "unix:3");
@@ -91,6 +111,12 @@ fn daemon_snapshot() -> UiDaemonSnapshot {
         config_path: Some("C:/office-mcp/config.toml".to_string()),
         log_path: Some("C:/office-mcp/daemon.jsonl".to_string()),
         last_error: Some("last error".to_string()),
+        tool_access_policy: ToolAccessPolicy::default()
+            .with_access_mode(AccessMode::Read)
+            .with_disabled_app("powerpoint")
+            .with_disabled_category("excel", "Range")
+            .with_disabled_tool("word.update_table")
+            .snapshot(),
     }
 }
 

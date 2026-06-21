@@ -659,8 +659,9 @@ tools by app, object/category, and read/mutating/destructive side effect, and
 supports `Read` / `Write` / `All` ceilings plus app, category, and individual
 tool switches for discovery filtering and dispatch enforcement. The daemon
 config file now persists startup policy under `[tool_access]` and runtime state
-applies that policy after restart. Daemon UI editing and API endpoints for
-managing the policy remain open items in this milestone.
+applies that policy after restart. `/ui/state` now exposes the daemon policy so
+the control panel can render the global access state. Daemon UI editing and API
+endpoints for managing the policy remain open items in this milestone.
 
 ### M6.5.3 — Product identity, add-in metadata, and native tray polish
 

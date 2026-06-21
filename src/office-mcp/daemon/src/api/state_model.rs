@@ -1,5 +1,6 @@
 use crate::addin_mgr::{PartialEffect, SessionDescriptor};
 use crate::api::ui_redaction::redact_text;
+use crate::mcp::{ToolAccessPolicy, UiToolAccessPolicySnapshot};
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
@@ -10,6 +11,7 @@ pub struct UiStateOptions {
     pub addin_endpoint: String,
     pub config_path: Option<String>,
     pub log_path: Option<String>,
+    pub tool_access_policy: ToolAccessPolicy,
     pub now: SystemTime,
 }
 
@@ -21,6 +23,7 @@ impl Default for UiStateOptions {
             addin_endpoint: "https://localhost:8765/addin".to_string(),
             config_path: None,
             log_path: None,
+            tool_access_policy: ToolAccessPolicy::default(),
             now: SystemTime::UNIX_EPOCH,
         }
     }
@@ -191,6 +194,7 @@ pub struct UiDaemonSnapshot {
     pub config_path: Option<String>,
     pub log_path: Option<String>,
     pub last_error: Option<String>,
+    pub tool_access_policy: UiToolAccessPolicySnapshot,
 }
 
 #[cfg(test)]

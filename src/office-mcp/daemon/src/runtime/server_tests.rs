@@ -12,7 +12,7 @@ use crate::common::{
     AddinConfig, AuditConfig, ConfigLogLevel, DaemonConfig, LimitsConfig, LoggingConfig, McpConfig,
     ToolAccessConfig,
 };
-use crate::mcp::{McpHttpFrontend, ToolAccessPolicy};
+use crate::mcp::{AccessMode, McpHttpFrontend, ToolAccessPolicy};
 use crate::runtime::mcp_response::RuntimeSharedState;
 use crate::runtime::mcp_rpc::{McpDispatchContext, McpJsonRpcRuntime};
 use native_tls::TlsConnector;
@@ -164,7 +164,13 @@ fn ui_state_request_prunes_expired_stale_sessions() {
 
 #[test]
 fn ui_state_exposes_configured_log_path_for_debugging() {
-    let config = daemon_config_with_log_path("C:\\logs\\office-mcp.log");
+    let mut config = daemon_config_with_log_path("C:\\logs\\office-mcp.log");
+    config.tool_access = ToolAccessConfig {
+        access_mode: AccessMode::Read,
+        disabled_apps: vec!["powerpoint".to_string()],
+        disabled_categories: vec![("excel".to_string(), "Range".to_string())],
+        disabled_tools: vec!["word.update_table".to_string()],
+    };
     let server = RuntimeServer::from_daemon_config(&config).expect("server config");
     let ui_state = server.ui_state_store();
     let snapshot = ui_state.snapshot(&[], std::time::SystemTime::now());
@@ -172,6 +178,22 @@ fn ui_state_exposes_configured_log_path_for_debugging() {
     assert_eq!(
         snapshot.daemon.log_path.as_deref(),
         Some("C:\\logs\\office-mcp.log")
+    );
+    assert_eq!(
+        snapshot.daemon.tool_access_policy.access_mode,
+        AccessMode::Read
+    );
+    assert_eq!(
+        snapshot.daemon.tool_access_policy.disabled_apps,
+        vec!["powerpoint"]
+    );
+    assert_eq!(
+        snapshot.daemon.tool_access_policy.disabled_categories,
+        vec![("excel".to_string(), "Range".to_string())]
+    );
+    assert_eq!(
+        snapshot.daemon.tool_access_policy.disabled_tools,
+        vec!["word.update_table"]
     );
 }
 

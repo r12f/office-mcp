@@ -105,6 +105,7 @@ impl RuntimeServer {
             addin_endpoint: format!("{}/addin", self.config.addin_origin),
             config_path: self.config.config_path.clone(),
             log_path: self.config.log_path.clone(),
+            tool_access_policy: self.config.tool_access_policy.clone(),
             now: SystemTime::now(),
             ..UiStateOptions::default()
         }

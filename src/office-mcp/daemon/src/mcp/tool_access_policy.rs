@@ -1,4 +1,4 @@
-use crate::mcp::{AccessMode, tool_metadata};
+use crate::mcp::{AccessMode, UiToolAccessPolicySnapshot, tool_metadata};
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -50,6 +50,16 @@ impl ToolAccessPolicy {
             && !self
                 .disabled_categories
                 .contains(&(metadata.app.to_string(), metadata.category.to_string()))
+    }
+
+    #[must_use]
+    pub fn snapshot(&self) -> UiToolAccessPolicySnapshot {
+        UiToolAccessPolicySnapshot {
+            access_mode: self.access_mode,
+            disabled_apps: self.disabled_apps.iter().cloned().collect(),
+            disabled_categories: self.disabled_categories.iter().cloned().collect(),
+            disabled_tools: self.disabled_tools.iter().cloned().collect(),
+        }
     }
 }
 

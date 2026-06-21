@@ -23,7 +23,9 @@ pub use prompt_catalog::{prompt_catalog_json, prompt_description, prompt_message
 pub use resource_request::{ResourceReadRequest, resource_request_from_uri};
 pub use stdio_bridge::{StdioBridge, StdioBridgeError};
 pub use tool_access_policy::ToolAccessPolicy;
-pub use tool_metadata::{AccessMode, ToolMetadata, ToolSideEffect, tool_metadata};
+pub use tool_metadata::{
+    AccessMode, ToolMetadata, ToolSideEffect, UiToolAccessPolicySnapshot, tool_metadata,
+};
 pub use tool_result::{
     tool_failure, tool_failure_from_command, tool_not_available_by_policy, tool_success,
 };
