@@ -9,7 +9,10 @@ const DRIVER_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(DRIVER_DIR, '../../../..');
 const DAEMON_EXE = resolve(REPO_ROOT, 'target/debug/office-mcp-daemon.exe');
 const DEFAULT_WINDOWS_ACTIVATOR = resolve(REPO_ROOT, 'src/office-ctl/common/scripts/activate-office-mcp-addin.ps1');
-const DEFAULT_TIMEOUT_MS = 120000;
+const DEFAULT_DAEMON_START_TIMEOUT_MS = 120000;
+const DEFAULT_OFFICE_START_TIMEOUT_MS = 90000;
+const DEFAULT_ACTIVATOR_TIMEOUT_MS = 120000;
+const DEFAULT_ACTIVATION_SESSION_TIMEOUT_MS = 10000;
 const DEFAULT_SESSION_TIMEOUT_MS = 10000;
 const mcpSessionIds = new Map();
 
@@ -99,7 +102,7 @@ async function startDaemon(context) {
     windowsHide: true
   });
   child.unref();
-  const timeoutMs = Number(context.timeoutMs || DEFAULT_TIMEOUT_MS);
+  const timeoutMs = Number(context.timeoutMs || process.env.OFFICE_MCP_E2E_DAEMON_START_TIMEOUT_MS || DEFAULT_DAEMON_START_TIMEOUT_MS);
   const started = Date.now();
   while (Date.now() - started <= timeoutMs) {
     await sleep(1000);
@@ -147,7 +150,7 @@ async function createDocument(host, context) {
   mkdirSync(workDir, { recursive: true });
   const extension = normalizedHost === 'word' ? 'docx' : normalizedHost === 'excel' ? 'xlsx' : 'pptx';
   const path = resolve(workDir, `office-mcp-e2e-${normalizedHost}-${Date.now()}.${extension}`);
-  const keeperTimeoutMs = Number(context.keeperTimeoutMs || 90000);
+  const keeperTimeoutMs = Number(context.keeperTimeoutMs || process.env.OFFICE_MCP_E2E_OFFICE_START_TIMEOUT_MS || DEFAULT_OFFICE_START_TIMEOUT_MS);
   const powerShellTimeoutMs = Number(context.powerShellTimeoutMs || keeperTimeoutMs + 10000);
   let keeper;
   try {
@@ -333,7 +336,7 @@ async function activateAddin(host, context) {
   });
   let result;
   try {
-    result = await waitForChildExit(child, Number(context.timeoutMs || process.env.OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS || 120000), () => activatorLogDetail(activatorLogPath));
+    result = await waitForChildExit(child, Number(context.timeoutMs || process.env.OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS || DEFAULT_ACTIVATOR_TIMEOUT_MS), () => activatorLogDetail(activatorLogPath));
   } catch (error) {
     const detected = await registeredSessionAfterActivatorFailure(host, document, daemon, activatorLogPath);
     if (detected) return activationFromDetectedSession(command, activation.kind, activatorLogPath, detected.documentPath, normalizedHost, 'session-detected-after-activator-timeout', detected.document);
@@ -361,7 +364,7 @@ async function activateAddin(host, context) {
 async function registeredSessionAfterActivatorFailure(host, document, daemon, activatorLogPath) {
   if (!daemon.endpoint || !document.path) return null;
   const documentPaths = documentPathsAfterActivationFailure(document, activatorLogPath);
-  const timeoutMs = Number(process.env.OFFICE_MCP_E2E_ACTIVATION_SESSION_TIMEOUT_MS || 10000);
+  const timeoutMs = Number(process.env.OFFICE_MCP_E2E_ACTIVATION_SESSION_TIMEOUT_MS || DEFAULT_ACTIVATION_SESSION_TIMEOUT_MS);
   const started = Date.now();
   while (Date.now() - started <= timeoutMs) {
     try {

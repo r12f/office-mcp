@@ -330,12 +330,50 @@ test('Office E2E driver provides a default Windows add-in activator', () => {
   assert.equal(result.activator_kind, 'default-windows-taskpane');
   assert.match(result.activator, /activate-office-mcp-addin\.ps1/);
   const driver = readFileSync(DRIVER, 'utf8');
-  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS \|\| 120000/);
+  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS \|\| DEFAULT_ACTIVATOR_TIMEOUT_MS/);
   assert.match(driver, /-TimeoutSeconds 90/);
   } finally {
     restoreEnv('OFFICE_MCP_E2E_ACTIVATOR', previousActivator);
     restoreEnv('OFFICE_MCP_E2E_ACTIVATOR_DRY_RUN', previousDryRun);
     restoreEnv('OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR', previousDefault);
+  }
+});
+
+test('Office E2E driver exposes separate phase timeout environment overrides', () => {
+  const driver = readFileSync(DRIVER, 'utf8');
+
+  assert.match(driver, /OFFICE_MCP_E2E_DAEMON_START_TIMEOUT_MS/);
+  assert.match(driver, /OFFICE_MCP_E2E_OFFICE_START_TIMEOUT_MS/);
+  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS/);
+  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATION_SESSION_TIMEOUT_MS/);
+  assert.match(driver, /OFFICE_MCP_E2E_SESSION_TIMEOUT_MS/);
+  assert.match(driver, /DEFAULT_SESSION_TIMEOUT_MS = 10000/);
+  assert.doesNotMatch(driver, /context\.timeoutMs \|\| DEFAULT_TIMEOUT_MS/);
+  assert.match(driver, /context\.timeoutMs \|\| process\.env\.OFFICE_MCP_E2E_DAEMON_START_TIMEOUT_MS \|\| DEFAULT_DAEMON_START_TIMEOUT_MS/);
+  assert.match(driver, /context\.keeperTimeoutMs \|\| process\.env\.OFFICE_MCP_E2E_OFFICE_START_TIMEOUT_MS \|\| DEFAULT_OFFICE_START_TIMEOUT_MS/);
+});
+
+test('Office E2E driver honors Office startup phase timeout env override', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-office-start-timeout-'));
+  const fakePowerShell = join(dir, 'fake-powershell.mjs');
+  writeFileSync(fakePowerShell, `
+process.exit(0);
+`);
+  const previousPowerShell = process.env.OFFICE_MCP_E2E_POWERSHELL;
+  const previousTimeout = process.env.OFFICE_MCP_E2E_OFFICE_START_TIMEOUT_MS;
+  process.env.OFFICE_MCP_E2E_POWERSHELL = `${process.execPath} ${fakePowerShell}`;
+  process.env.OFFICE_MCP_E2E_OFFICE_START_TIMEOUT_MS = '50';
+  try {
+    const result = runDriver({
+      host: 'Word',
+      step: 'createDocument',
+      context: { workDir: dir, powerShellTimeoutMs: 5000 }
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Office keeper did not create the ready sentinel within 50 ms/);
+  } finally {
+    restoreEnv('OFFICE_MCP_E2E_POWERSHELL', previousPowerShell);
+    restoreEnv('OFFICE_MCP_E2E_OFFICE_START_TIMEOUT_MS', previousTimeout);
   }
 });
 
@@ -664,7 +702,7 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
 
 test('default Windows add-in activator exits before the external driver timeout', () => {
   const driver = readFileSync(DRIVER, 'utf8');
-  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS \|\| 120000/);
+  assert.match(driver, /OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS \|\| DEFAULT_ACTIVATOR_TIMEOUT_MS/);
   assert.match(driver, /-TimeoutSeconds 90/);
 });
 
