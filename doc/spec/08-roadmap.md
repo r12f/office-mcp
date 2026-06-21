@@ -719,10 +719,13 @@ Current screenshot feedback to preserve for the next implementation goal:
       `record-catalog-identity-review.mjs` emits a structured
       `catalog_identity_review` artifact proving display name, provider,
       description, command label, task pane URL, generated icon URLs, shared
-      origin, and product type/category are coherent. Word tests cover both the
-      passing clean catalog and prototype-metadata rejection. Final live Office
-      catalog/ribbon/task pane visual re-audit remains tracked by the live
-      first-contact evidence items below.
+      origin, and product type/category are coherent. The GitHub Release
+      workflow now generates `catalog-identity-review.json` from the staged
+      clean catalog, rejects non-ready reviews, publishes the report as a
+      release artifact, and includes it in `SHA256SUMS`. Word tests cover both
+      the passing clean catalog and prototype-metadata rejection. Final live
+      Office catalog/ribbon/task pane visual re-audit remains tracked by the
+      live first-contact evidence items below.
 - [ ] Rework and verify the Windows tray first-impression surface as native
       desktop software. The normal daemon launch must show the generated product
       glyph in the notification area, product-consistent tooltip text, a native
