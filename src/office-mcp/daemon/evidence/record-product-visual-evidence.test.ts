@@ -682,6 +682,24 @@ test('product visual evidence recorder rejects manual tray artifacts without rea
   });
 });
 
+test('product visual evidence recorder rejects manual tray artifacts without primary screenshot binding', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const manualTrayEvidencePath = writeManualTrayEvidence(dir, true);
+    const manualTray = JSON.parse(readFileSync(manualTrayEvidencePath, 'utf8')) as Record<string, unknown>;
+    manualTray.primary_screenshot_matches_tray_icon = false;
+    writeFileSync(manualTrayEvidencePath, JSON.stringify(manualTray, null, 2));
+
+    const output = join(dir, 'manual-tray-missing-primary-binding.json');
+    const result = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--manual-tray-evidence-path', manualTrayEvidencePath);
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.manual_tray_evidence_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('product visual evidence recorder requires daemon context before passing', () => {
   withScreenshots((dir, screenshots) => {
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
@@ -1460,9 +1478,8 @@ function writeSurfaceScreenshot(dir: string, name: string): string {
 }
 
 function writeManualTrayEvidence(dir: string, ready = true, status: 'Up' | 'Degraded' = 'Up'): string {
-  const screenshotPath = join(dir, `manual-tray-${ready ? 'ready' : 'broken'}.png`);
-  writeFileSync(screenshotPath, tinyPng());
   const traySurfaceScreenshotPaths = Object.fromEntries(TRAY_SURFACES.map((surface) => [surface.replaceAll('-', '_'), writeSurfaceScreenshot(dir, `${surface}.png`)]));
+  const primaryScreenshotPath = traySurfaceScreenshotPaths.tray_icon;
   const traySurfaceScreenshotsExist = Object.fromEntries(TRAY_SURFACES.map((surface) => [surface.replaceAll('-', '_'), ready]));
   const path = join(dir, `manual-tray-${ready ? 'ready' : 'broken'}.json`);
   writeFileSync(path, JSON.stringify({
@@ -1483,7 +1500,8 @@ function writeManualTrayEvidence(dir: string, ready = true, status: 'Up' | 'Degr
     show_ui_opened: ready,
     observed_menu_items: ready ? [`Status: ${status}`, 'Clients: 0', 'Documents: 0', 'Show Office MCP Control', 'Quit Office MCP Control'] : ['Status: Up'],
     observed_tooltip: `Office MCP Control - ${status} - 0 clients - 0 documents`,
-    screenshot_path: screenshotPath,
+    screenshot_path: primaryScreenshotPath,
+    primary_screenshot_matches_tray_icon: ready,
     tray_surface_screenshot_paths: traySurfaceScreenshotPaths,
     tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
     tray_surface_screenshots_ready: ready,

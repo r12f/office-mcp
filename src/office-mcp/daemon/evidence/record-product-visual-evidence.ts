@@ -949,6 +949,7 @@ function manualTrayEvidenceLooksReady(evidence: Record<string, unknown> | undefi
   if (!manualTrayInteractionLooksReady(evidence) || evidence.tray_menu_surface_native !== true || evidence.tray_menu_surface_kind !== 'native' || evidence.show_ui_opened !== true) return false;
   if (typeof evidence.observed_tooltip !== 'string' || !/^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(evidence.observed_tooltip)) return false;
   if (typeof evidence.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(evidence.screenshot_path))) return false;
+  if (evidence.primary_screenshot_matches_tray_icon !== true) return false;
   if (!manualTraySurfaceScreenshotsLookReady(evidence)) return false;
   const items = Array.isArray(evidence.observed_menu_items) ? evidence.observed_menu_items.filter((item): item is string => typeof item === 'string') : [];
   return ['Status:', 'Clients:', 'Documents:', 'Show Office MCP Control', 'Quit Office MCP Control'].every((expected) => items.some((item) => item.includes(expected)))
