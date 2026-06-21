@@ -982,6 +982,7 @@ function validateWordRuntimeEvidence(evidence: unknown, ready: unknown): void {
   const host = isRecord(session.host) ? session.host : undefined;
   if (session.app !== 'word' || session.status !== 'active') failures.push('Product visual Word runtime evidence missing active Word session.');
   if (typeof session.session_id !== 'string') failures.push('Product visual Word runtime evidence missing session_id.');
+  if (typeof session.session_id !== 'string' || details.session_id !== session.session_id) failures.push('Product visual Word runtime evidence session_id mismatch.');
   if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual Word runtime evidence missing document title.');
   if (host?.app !== 'word') failures.push('Product visual Word runtime evidence missing Word host metadata.');
   validateExactToolCatalog('Product visual Word runtime evidence', session.available_tool_count, details.available_tools, wordV1Tools());

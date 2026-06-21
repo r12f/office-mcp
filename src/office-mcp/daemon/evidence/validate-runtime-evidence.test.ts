@@ -616,6 +616,22 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.word_runtime_evidence.smoke_details.session_id = 'different-word-session';
+      broken.word_taskpane.runtime_evidence.smoke_details.session_id = 'different-word-session';
+      broken.word_runtime_evidence_ready = false;
+      broken.word_taskpane.runtime_evidence_ready = false;
+      broken.word_taskpane.density_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Word runtime evidence session_id mismatch/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.daemon_main_window.compact_status_details_reviewed = false;
       broken.daemon_main_window.three_column_layout_reviewed = false;
       broken.daemon_main_window.ready = false;
