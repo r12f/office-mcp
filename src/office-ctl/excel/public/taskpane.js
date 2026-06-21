@@ -133,7 +133,6 @@
   const historyCountEl = document.getElementById('historyCount');
   const settingsFormEl = document.getElementById('settingsForm');
   const endpointInputEl = document.getElementById('endpointInput');
-  const endpointErrorEl = document.getElementById('endpointError');
   const saveEndpointEl = document.getElementById('saveEndpoint');
   const announcerEl = document.getElementById('announcer');
 
@@ -1843,7 +1842,7 @@
 
   function saveEndpointOverride(event) {
     event.preventDefault();
-    endpointErrorEl.textContent = '';
+    connectionDetailEl.textContent = 'None';
     const value = endpointInputEl.value.trim();
     try {
       validateEndpoint(value);
@@ -1858,7 +1857,7 @@
         connect();
       }, 0);
     } catch (error) {
-      endpointErrorEl.textContent = error.message || 'Enter a valid wss:// endpoint.';
+      setConnectionState('failed', error.message || 'Enter a valid wss:// endpoint.');
       endpointInputEl.focus();
     }
   }

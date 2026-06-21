@@ -339,6 +339,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(html, /<dd id="protection">Not protected<\/dd>/);
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
   assert.match(html, /id="connectionDetail"/);
+  assert.doesNotMatch(html, /id="endpointError"/);
+  assert.doesNotMatch(html, /class="field-error"/);
   assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID" title="Copy session ID"/);
   assert.match(html, /class="daemon-endpoint-input" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Daemon endpoint"/);
   assert.match(html, /id="currentTask"/);
@@ -546,6 +548,7 @@ test('Word task pane keeps settings inline and compact at narrow widths', () => 
   assert.match(css, /\.taskpane-shell \{[\s\S]*align-content: start;[\s\S]*gap: 10px;[\s\S]*padding: 10px;/);
   assert.match(css, /\.summary-panel \{[\s\S]*display: grid;[\s\S]*gap: 10px;/);
   assert.match(css, /\.empty-state \{[\s\S]*padding: 10px;/);
+  assert.doesNotMatch(css, /\.field-error/);
   assert.match(css, /#documentTitle \{[\s\S]*display: -webkit-box;[\s\S]*-webkit-line-clamp: 2;/);
   assert.doesNotMatch(css, /\b(min-)?height:\s*(1[2-9]\d|[2-9]\d{2,})px/);
   assert.doesNotMatch(cssRule(css, '.summary-panel'), /\bheight:/);

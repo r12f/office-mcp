@@ -105,12 +105,15 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(html, /type="url" inputmode="url" autocomplete="off" spellcheck="false"/);
   assert.match(html, /placeholder="wss:\/\/localhost:8765\/addin"/);
   assert.match(html, /id="saveEndpoint" class="icon-button reconnect-button" type="submit" aria-label="Reconnect daemon" title="Reconnect daemon"/);
+  assert.doesNotMatch(html, /id="endpointError"/);
+  assert.doesNotMatch(html, /class="field-error"/);
   assert.match(html, /<svg class="control-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">/);
   assert.doesNotMatch(html, /⚙|&#9881;/);
   assert.ok(html.indexOf('class="daemon-endpoint-form"') < html.indexOf('id="runtimeVersions"'));
 
   assert.match(css, /--powerpoint: #b7472a/);
   const commonCss = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');
+  assert.doesNotMatch(commonCss, /\.field-error/);
   assert.match(commonCss, /\.tool-toggle,\r?\n\.group-toggle/);
   assert.match(commonCss, /\.daemon-endpoint-form/);
   assert.match(commonCss, /\.metadata-grid \{[\s\S]*align-items: center;/);
@@ -204,7 +207,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(js, /function fallbackCopy\(value\)/);
   assert.match(js, /clearEndpointOverride/);
   assert.match(js, /currentOriginEndpoint/);
-  assert.match(js, /try \{[\s\S]*validateEndpoint\(value\);[\s\S]*storeEndpointOverride\(value\);[\s\S]*\} catch \(error\) \{[\s\S]*endpointErrorEl\.textContent = error\.message \|\| 'Enter a valid wss:\/\/ endpoint\.';[\s\S]*endpointInputEl\.focus\(\);/);
+  assert.match(js, /try \{[\s\S]*validateEndpoint\(value\);[\s\S]*storeEndpointOverride\(value\);[\s\S]*\} catch \(error\) \{[\s\S]*setConnectionState\('failed', error\.message \|\| 'Enter a valid wss:\/\/ endpoint\.'\);[\s\S]*endpointInputEl\.focus\(\);/);
   assert.doesNotMatch(js, /const validation = validateEndpoint\(value\)/);
   assert.doesNotMatch(js, /validation\.ok/);
   assert.match(js, /Office\.AutoShowTaskpaneWithDocument/);

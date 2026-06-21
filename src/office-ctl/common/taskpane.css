@@ -614,12 +614,6 @@ button[type="submit"] {
   cursor: pointer;
 }
 
-.field-error {
-  min-height: 18px;
-  margin: 6px 0 0;
-  color: var(--danger);
-}
-
 .sr-only {
   position: absolute;
   width: 1px;

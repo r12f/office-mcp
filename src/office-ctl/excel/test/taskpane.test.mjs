@@ -56,6 +56,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(html, /<dd id="documentState">Editable<\/dd>/);
   assert.match(html, /class="metadata-copy" data-copy-target="session" aria-label="Copy session ID" title="Copy session ID"/);
   assert.match(html, /class="daemon-endpoint-input" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Daemon endpoint"/);
+  assert.doesNotMatch(html, /id="endpointError"/);
+  assert.doesNotMatch(html, /class="field-error"/);
   assert.match(html, /id="historyList"/);
   assert.match(html, /class="panel summary-panel"/);
   assert.match(html, /class="summary-layout"/);
@@ -87,6 +89,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8'), /--accent: #3b6478/);
   assert.match(readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.css'), 'utf8'), /--accent: #217346/);
   assert.match(css, /\.summary-panel/);
+  assert.doesNotMatch(css, /\.field-error/);
   assert.match(css, /\.identity \{[\s\S]*grid-template-columns: 32px minmax\(0, 1fr\);/);
   assert.match(css, /\.product-mark \{[\s\S]*width: 32px;[\s\S]*height: 32px;/);
   assert.match(css, /\.control-glyph \{[\s\S]*width: 18px;[\s\S]*stroke: currentColor;/);
