@@ -498,6 +498,18 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.screenshot_paths.logo_ribbon_size = broken.screenshot_paths.word_taskpane_title;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual evidence logo_ribbon_size screenshot path does not match rendered logo review/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.screenshot_paths.excel_ribbon_command = broken.screenshot_paths.word_ribbon_command;
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -1452,6 +1464,7 @@ function withProductVisualEvidence(passed: boolean, callback: (path: string) => 
       if (passed) writeFileSync(screenshotPath, tinyPng());
       screenshots[surface] = screenshotPath;
     }
+    for (const surface of logoVisualSurfaces()) screenshots[surface] = screenshots.logo_tray_size;
     if (passed) for (const path of Object.values(traySurfaceScreenshotPaths(screenshots.tray_icon))) writeFileSync(path, tinyPng());
     const path = join(dir, 'product-visual-evidence.json');
     writeFileSync(path, JSON.stringify(productVisualReport(passed, screenshots), null, 2));
@@ -2075,6 +2088,15 @@ function excelOnlyReport() {
       gate('excel.runtime_smoke', 'passed', excelSmokeDetails(sessionId))
     ]
   };
+}
+
+function logoVisualSurfaces(): string[] {
+  return [
+    'logo_ribbon_size',
+    'logo_catalog_thumbnail',
+    'logo_daemon_titlebar',
+    'logo_installer_metadata'
+  ];
 }
 
 function excelSmokeDetails(sessionId: string) {

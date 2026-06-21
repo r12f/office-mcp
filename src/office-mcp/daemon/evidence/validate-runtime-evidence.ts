@@ -518,6 +518,7 @@ function validateProductVisualEvidence(): void {
   validateProductIdentityReview(visual.product_identity_review);
   validateCatalogIdentityReview(visual.catalog_identity_review, visual.catalog_identity_review_ready);
   validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
+  validateRenderedLogoProductVisualBinding(visual.rendered_logo_review, visual.screenshot_paths);
   validateFirstRunIdentity(visual.first_run_identity);
   validateFirstRunCatalogBinding(visual.first_run_identity, visual.catalog_identity_review);
   validateDaemonMainWindowVisualEvidence(visual.daemon_main_window, visual.screenshot_paths, visual.observations);
@@ -753,6 +754,19 @@ function validateRenderedLogoAssetFingerprints(review: Record<string, unknown>):
     }
     if (surface.asset_sha256 !== sha256File(join(brandAssetRoot, assetName))) {
       failures.push(`Rendered logo review asset fingerprint does not match current generated icon: ${key}.`);
+    }
+  }
+}
+
+function validateRenderedLogoProductVisualBinding(review: unknown, screenshotPaths: unknown): void {
+  if (!isRecord(review) || !isRecord(screenshotPaths) || !Array.isArray(review.surfaces)) return;
+  const surfaces = review.surfaces.filter(isRecord);
+  for (const [key] of renderedLogoReviewSurfaces()) {
+    const surface = surfaces.find((item) => item.key === key);
+    const expectedPath = typeof surface?.screenshot_path === 'string' ? surface.screenshot_path : review.sheet_path;
+    const actualPath = screenshotPaths[key];
+    if (typeof expectedPath === 'string' && typeof actualPath === 'string' && resolve(actualPath) !== resolve(expectedPath)) {
+      failures.push(`Product visual evidence ${key} screenshot path does not match rendered logo review.`);
     }
   }
 }
