@@ -655,6 +655,31 @@ function validateProductVisualTrayBinding(visual: Record<string, unknown>): void
   if (snapshot && typeof visual.tray_tooltip === 'string' && typeof snapshot.tooltip === 'string' && visual.tray_tooltip !== snapshot.tooltip) {
     failures.push('Product visual evidence tray tooltip does not match daemon tray snapshot.');
   }
+  if (manual && context) validateProductVisualManualTrayDaemonContextBinding(context, manual.daemon_context);
+}
+
+function validateProductVisualManualTrayDaemonContextBinding(context: Record<string, unknown>, manualContext: unknown): void {
+  if (!isRecord(manualContext)) return;
+  const status = isRecord(context.status) ? context.status : undefined;
+  const manualStatus = isRecord(manualContext.status) ? manualContext.status : undefined;
+  const snapshot = productVisualTraySnapshot(context);
+  const manualSnapshot = productVisualTraySnapshot(manualContext);
+  const statusMatches = status?.pid === manualStatus?.pid && status?.uiUrl === manualStatus?.uiUrl;
+  const snapshotMatches = snapshot && manualSnapshot
+    && snapshot.tooltip === manualSnapshot.tooltip
+    && sameMenuItems(traySnapshotMenuItems(snapshot), traySnapshotMenuItems(manualSnapshot));
+  if (!statusMatches || !snapshotMatches) {
+    failures.push('Product visual evidence daemon context does not match embedded manual tray evidence.');
+  }
+}
+
+function productVisualTraySnapshot(context: Record<string, unknown>): Record<string, unknown> | undefined {
+  const trayProbe = isRecord(context.tray_probe) ? context.tray_probe : undefined;
+  return isRecord(trayProbe?.snapshot) ? trayProbe.snapshot : undefined;
+}
+
+function traySnapshotMenuItems(snapshot: Record<string, unknown>): string[] {
+  return Array.isArray(snapshot.menu_items) ? snapshot.menu_items.filter((item): item is string => typeof item === 'string') : [];
 }
 
 function validateManualTraySurfaceScreenshots(paths: unknown, exists: unknown, label: string): void {
