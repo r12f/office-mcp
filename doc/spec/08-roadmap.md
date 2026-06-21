@@ -1457,8 +1457,10 @@ Fully automated Windows ribbon/task-pane activation and live Office execution
 evidence now exists for Word, Excel, and PowerPoint. Each host exposes `npm run e2e:tools` as the non-evidence
 tool E2E command; live Office execution is still opt-in through
 `OFFICE_MCP_RUN_E2E=1`, and release-ready live reports must use a concrete
-activator rather than the `no-activator-configured` skipped path. When enabled,
-the Word, Excel, and PowerPoint commands write
+activator rather than the `no-activator-configured` skipped path. The report
+must also include the add-in activator identity and a non-empty `activation_path`;
+weak activation proof such as only `activated: true` is not release-ready. When
+enabled, the Word, Excel, and PowerPoint commands write
 `artifacts/office-tool-e2e-word.json`,
 `artifacts/office-tool-e2e-excel.json`, and
 `artifacts/office-tool-e2e-powerpoint.json`. Those reports record the ordered
@@ -1467,8 +1469,8 @@ evidence can prove each host opened one driver-owned file/session and tested all
 tools in that single lifecycle. The runtime evidence validator now exposes
 `--require-office-tool-e2e` with explicit Word, Excel, and PowerPoint report
 paths, and rejects missing reports, non-passing reports, non-single lifecycle
-counts, skipped add-in activation, incomplete executed tool lists, or failed
-per-tool verifiers.
+counts, skipped add-in activation, weak activation proof, incomplete executed
+tool lists, or failed per-tool verifiers.
 Product visual evidence now embeds the same Word, Excel, and PowerPoint tool
 E2E reports and fails release validation unless those embedded reports are
 ready, passing, exact-coverage, and single-lifecycle. This ties final UI/product

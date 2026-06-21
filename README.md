@@ -271,7 +271,9 @@ The driver passes `OFFICE_MCP_E2E_HOST`, `OFFICE_MCP_E2E_DOCUMENT_PATH`,
 `OFFICE_MCP_E2E_ADDIN_ORIGIN`, and `OFFICE_MCP_E2E_ADDIN_ENDPOINT` to the
 activator. Reports with `no-activator-configured` are useful for local manual
 debugging, but `npm run evidence:validate -- --require-office-tool-e2e` rejects
-them.
+them. Release-ready reports must also include the concrete add-in activator identity
+and a non-empty `activation_path`; weak activation proof such as only
+`activated: true` is rejected.
 
 ```powershell
 cd ..\..\office-ctl\word
