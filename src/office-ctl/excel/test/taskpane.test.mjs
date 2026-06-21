@@ -151,7 +151,9 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /taskStore\.isCancelled\(requestId\)/);
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
   assert.match(js, /function cancelledError\(tool\)/);
-  assert.match(js, /const metadata = taskMetadataMarkup\(task, \{ escapeHtml, formatTime, redactText, valueLabel \}\)/);
+  assert.match(js, /const \{ boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText \} = window\.OfficeCtlCommon/);
+  assert.match(js, /const metadata = taskMetadataMarkup\(task, \{ escapeHtml, formatTime, redactText, valueLabel: boolLabel \}\)/);
+  assert.doesNotMatch(js, /function valueLabel\(value\)/);
   assert.match(js, /mapped\.office_mcp_code === 'CANCELLED' \? 'cancelled' : 'failure'/);
   assert.doesNotMatch(js, /Discard unsaved endpoint changes\?/);
   assert.match(js, /Connecting…/);

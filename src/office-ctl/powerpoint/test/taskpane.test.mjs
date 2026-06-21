@@ -160,9 +160,9 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /historyCountEl\.textContent = `\$\{history\.length\} \/ \$\{historyLimit\}`/);
   assert.match(js, /function taskMarkup\(task\)/);
   assert.match(js, /const tone = task\.status === 'success' \? 'status-success' : task\.status === 'running' \? 'status-warning' : task\.status === 'cancelled' \? 'status-neutral' : 'status-danger'/);
-  assert.match(js, /const metadata = taskMetadataMarkup\(task, \{ escapeHtml, formatTime, redactText, valueLabel \}\)/);
-  assert.match(js, /function valueLabel\(value\)/);
-  assert.match(js, /if \(value === true\) return 'yes'/);
+  assert.match(js, /const \{ boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText \} = window\.OfficeCtlCommon/);
+  assert.match(js, /const metadata = taskMetadataMarkup\(task, \{ escapeHtml, formatTime, redactText, valueLabel: boolLabel \}\)/);
+  assert.doesNotMatch(js, /function valueLabel\(value\)/);
   assert.match(js, /function reply\(id, result\) \{\s*return replyJsonRpc\(socket, id, result\);\s*\}/);
   assert.match(js, /taskStore\.isCancelled\(requestId\)/);
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);

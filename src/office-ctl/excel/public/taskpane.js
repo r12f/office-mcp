@@ -1,7 +1,7 @@
 (() => {
   const ADDIN_VERSION = '0.1.11';
   const PROTOCOL_VERSION = '1.0';
-  const { escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
+  const { boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1833,7 +1833,7 @@
 
   function taskMarkup(task) {
     const tone = task.status === 'success' ? 'status-success' : task.status === 'running' ? 'status-warning' : task.status === 'cancelled' ? 'status-neutral' : 'status-danger';
-    const metadata = taskMetadataMarkup(task, { escapeHtml, formatTime, redactText, valueLabel });
+    const metadata = taskMetadataMarkup(task, { escapeHtml, formatTime, redactText, valueLabel: boolLabel });
     const commandId = commandIdMarkup(task.requestId, { escapeHtml });
     return [
       '<div class="task-title">',
@@ -1877,12 +1877,6 @@
       endpointErrorEl.textContent = error.message || 'Enter a valid wss:// endpoint.';
       endpointInputEl.focus();
     }
-  }
-
-  function valueLabel(value) {
-    if (value === true) return 'yes';
-    if (value === false) return 'no';
-    return 'unknown';
   }
 
   function mapError(error, tool) {
