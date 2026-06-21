@@ -520,7 +520,7 @@ function validateProductVisualEvidence(): void {
   validateRenderedLogoReview(visual.rendered_logo_review, visual.rendered_logo_review_ready);
   validateFirstRunIdentity(visual.first_run_identity);
   validateFirstRunCatalogBinding(visual.first_run_identity, visual.catalog_identity_review);
-  validateDaemonMainWindowVisualEvidence(visual.daemon_main_window);
+  validateDaemonMainWindowVisualEvidence(visual.daemon_main_window, visual.screenshot_paths, visual.observations);
   validateWordRuntimeEvidence(visual.word_runtime_evidence, visual.word_runtime_evidence_ready);
   validateExcelRuntimeEvidence(visual.excel_runtime_evidence, visual.excel_runtime_evidence_ready);
   validatePowerPointRuntimeEvidence(visual.powerpoint_runtime_evidence, visual.powerpoint_runtime_evidence_ready);
@@ -865,7 +865,7 @@ function validateHostFirstRunCatalogBinding(label: 'Word' | 'Excel' | 'PowerPoin
   }
 }
 
-function validateDaemonMainWindowVisualEvidence(mainWindow: unknown): void {
+function validateDaemonMainWindowVisualEvidence(mainWindow: unknown, screenshotPaths: unknown, observations: unknown): void {
   if (!isRecord(mainWindow)) {
     failures.push('Product visual evidence missing daemon main window review.');
     return;
@@ -886,6 +886,12 @@ function validateDaemonMainWindowVisualEvidence(mainWindow: unknown): void {
   }
   if (typeof mainWindow.observation !== 'string' || !mainWindow.observation.includes('Office MCP Control')) {
     failures.push('Product visual evidence missing daemon main window product observation.');
+  }
+  if (isRecord(screenshotPaths) && typeof screenshotPaths.daemon_main_window === 'string' && mainWindow.screenshot_path !== screenshotPaths.daemon_main_window) {
+    failures.push('Product visual evidence daemon main window screenshot path does not match top-level screenshot path.');
+  }
+  if (isRecord(observations) && typeof observations.daemon_main_window === 'string' && mainWindow.observation !== observations.daemon_main_window) {
+    failures.push('Product visual evidence daemon main window observation does not match top-level observation.');
   }
 }
 

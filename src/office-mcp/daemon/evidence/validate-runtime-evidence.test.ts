@@ -669,6 +669,20 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.daemon_main_window.screenshot_path = broken.screenshot_paths.word_taskpane_title;
+      broken.daemon_main_window.observation = 'Office MCP Control stale daemon window observation';
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /daemon main window screenshot path does not match top-level screenshot path/);
+      assert.match(outputText(result.stdout), /daemon main window observation does not match top-level observation/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.excel_taskpane.document_state = 'unknown';
       broken.excel_taskpane.document_state_ready = false;
       broken.excel_taskpane.density_ready = false;
@@ -1552,7 +1566,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       screenshot_path: screenshots.daemon_main_window,
       screenshot_exists: passed,
       screenshot_fresh: passed,
-      observation: 'Office MCP Control daemon main window visible with compact status details',
+      observation: observations.daemon_main_window,
       screenshot_ready: passed,
       ready: passed
     },
