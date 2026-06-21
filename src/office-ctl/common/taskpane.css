@@ -151,6 +151,25 @@ h3 {
   margin-bottom: 0;
 }
 
+.summary-layout {
+  display: grid;
+  gap: 10px;
+}
+
+.metadata-section {
+  display: grid;
+  gap: 6px;
+}
+
+.metadata-section h2 {
+  color: var(--text-primary);
+}
+
+.daemon-metadata {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
 .status-badge,
 .meta-pill {
   display: inline-flex;

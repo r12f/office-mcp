@@ -58,6 +58,10 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(html, /class="daemon-endpoint-input" name="daemonEndpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Daemon endpoint"/);
   assert.match(html, /id="historyList"/);
   assert.match(html, /class="panel summary-panel"/);
+  assert.match(html, /class="summary-layout"/);
+  assert.match(html, /class="metadata-section document-metadata"/);
+  assert.match(html, /class="metadata-section daemon-metadata"/);
+  assert.match(html, /<h2 id="daemonHeading">Daemon<\/h2>/);
   assert.match(html, /class="tools-panel"/);
   assert.match(html, /<span>Tools<\/span>/);
   assert.match(html, /id="toolList"/);
@@ -401,10 +405,18 @@ test('Excel task pane keeps settings inline and compact at narrow widths', () =>
   assert.doesNotMatch(css, /overflow-x:\s*(auto|scroll)/);
 
   const summaryStart = html.indexOf('class="panel summary-panel"');
+  const documentMetadataIndex = html.indexOf('class="metadata-section document-metadata"');
+  const daemonMetadataIndex = html.indexOf('class="metadata-section daemon-metadata"');
   const daemonFormIndex = html.indexOf('class="daemon-endpoint-form"');
+  const sessionIndex = html.indexOf('data-copy-target="session"');
+  const runtimeIndex = html.indexOf('id="runtimeVersions"');
   const currentTaskIndex = html.indexOf('id="currentTaskHeading"');
   assert.ok(summaryStart !== -1 && daemonFormIndex !== -1, 'summary and daemon form exist');
-  assert.ok(daemonFormIndex > summaryStart, 'daemon settings are inline in document metadata');
+  assert.ok(documentMetadataIndex > summaryStart, 'document metadata is in the summary panel');
+  assert.ok(daemonMetadataIndex > documentMetadataIndex, 'daemon metadata is separate from document metadata');
+  assert.ok(daemonFormIndex > daemonMetadataIndex, 'daemon endpoint stays inside daemon metadata');
+  assert.ok(runtimeIndex > daemonMetadataIndex, 'runtime versions stay inside daemon metadata');
+  assert.ok(sessionIndex > daemonMetadataIndex, 'session id stays inside daemon metadata');
   assert.ok(daemonFormIndex < currentTaskIndex, 'daemon settings appear before current task');
   assert.doesNotMatch(html, /<section id="settingsPanel"/);
 });
