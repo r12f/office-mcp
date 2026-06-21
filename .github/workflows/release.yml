@@ -154,6 +154,14 @@ jobs:
         working-directory: packaging
         run: npm run check
 
+      - name: Generate rendered logo review
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          node .\src\office-ctl\common\scripts\record-rendered-logo-review.mjs `
+            --output artifacts\logo-rendered-size-review.json `
+            --sheet artifacts\logo-rendered-size-review.png
+
       - name: Build Windows MSI
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-msi.ps1 -Version ${{ steps.version.outputs.version }} -SkipNpmInstall
@@ -170,6 +178,17 @@ jobs:
           $msi = Get-Item -LiteralPath $releaseMsi
           if ($msi.Length -lt 1000000) {
             throw "MSI artifact is unexpectedly small: $($msi.Length) bytes"
+          }
+          $renderedLogoReview = 'artifacts\logo-rendered-size-review.json'
+          $renderedLogoSheet = 'artifacts\logo-rendered-size-review.png'
+          foreach ($path in @($renderedLogoReview, $renderedLogoSheet)) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "Rendered logo review artifact is missing: $path"
+            }
+          }
+          $review = Get-Content -LiteralPath $renderedLogoReview -Raw | ConvertFrom-Json
+          if ($review.ready -ne $true) {
+            throw "Rendered logo review is not ready: $renderedLogoReview"
           }
           $required = @(
             'artifacts\msi-stage\office-mcp-daemon.exe',
@@ -192,7 +211,11 @@ jobs:
           }
           Push-Location artifacts
           try {
-            Get-FileHash -Algorithm SHA256 -LiteralPath (Split-Path -Leaf $releaseMsi) |
+            Get-FileHash -Algorithm SHA256 -LiteralPath @(
+              (Split-Path -Leaf $releaseMsi),
+              'logo-rendered-size-review.json',
+              'logo-rendered-size-review.png'
+            ) |
               ForEach-Object { "$($_.Hash.ToLowerInvariant())  $($_.Path | Split-Path -Leaf)" } |
               Set-Content -LiteralPath SHA256SUMS -Encoding ascii
           } finally {
@@ -200,6 +223,8 @@ jobs:
           }
           "msi=$releaseMsi" >> $env:GITHUB_OUTPUT
           "checksums=artifacts\SHA256SUMS" >> $env:GITHUB_OUTPUT
+          "rendered_logo_review=$renderedLogoReview" >> $env:GITHUB_OUTPUT
+          "rendered_logo_sheet=$renderedLogoSheet" >> $env:GITHUB_OUTPUT
 
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4
@@ -208,6 +233,8 @@ jobs:
           path: |
             ${{ steps.stage.outputs.msi }}
             ${{ steps.stage.outputs.checksums }}
+            ${{ steps.stage.outputs.rendered_logo_review }}
+            ${{ steps.stage.outputs.rendered_logo_sheet }}
 
       - name: Create GitHub release draft
         if: github.ref_type == 'tag'
@@ -218,4 +245,6 @@ jobs:
           files: |
             ${{ steps.stage.outputs.msi }}
             ${{ steps.stage.outputs.checksums }}
+            ${{ steps.stage.outputs.rendered_logo_review }}
+            ${{ steps.stage.outputs.rendered_logo_sheet }}
           body_path: RELEASE_NOTES.md

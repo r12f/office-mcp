@@ -140,6 +140,10 @@ test('GitHub release workflow publishes the Windows installer artifacts', () => 
   assert.match(workflow, /working-directory:\s*src\/office-mcp\/daemon\/evidence[\s\S]*npm ci/);
   assert.match(workflow, /Run daemon evidence checks/);
   assert.match(workflow, /working-directory:\s*src\/office-mcp\/daemon\/evidence[\s\S]*npm run check/);
+  assert.match(workflow, /Generate rendered logo review/);
+  assert.match(workflow, /record-rendered-logo-review\.mjs/);
+  assert.match(workflow, /logo-rendered-size-review\.json/);
+  assert.match(workflow, /logo-rendered-size-review\.png/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/word[\s\S]*npm ci/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/excel[\s\S]*npm ci/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/powerpoint[\s\S]*npm ci/);
@@ -164,9 +168,12 @@ test('GitHub release workflow publishes the Windows installer artifacts', () => 
   assert.match(workflow, /office-mcp-setup-\$version-x64\.msi/);
   assert.doesNotMatch(workflow, /office-mcp-setup-0\.1\.0-x64\.msi/);
   assert.match(workflow, /SHA256SUMS/);
+  assert.match(workflow, /Get-FileHash[\s\S]*logo-rendered-size-review\.json[\s\S]*logo-rendered-size-review\.png/);
   assert.match(workflow, /RELEASE_NOTES\.md/);
   assert.match(workflow, /Get-FileHash/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
+  assert.match(workflow, /\$\{\{ steps\.stage\.outputs\.rendered_logo_review \}\}/);
+  assert.match(workflow, /\$\{\{ steps\.stage\.outputs\.rendered_logo_sheet \}\}/);
   assert.match(workflow, /softprops\/action-gh-release@v2/);
   assert.match(workflow, /draft:\s*true/);
   assert.match(workflow, /prerelease:\s*true/);
