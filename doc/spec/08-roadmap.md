@@ -1392,7 +1392,7 @@ channel, and MCP `tools/call` dispatch.
       `artifacts/office-tool-e2e-excel.json`, and
       `artifacts/office-tool-e2e-powerpoint.json`; final process and temp-file
       checks found no E2E-created Word, Excel, or PowerPoint residue.
-- [ ] Split the Office E2E timeout budget by lifecycle phase and fail fast on
+- [x] Split the Office E2E timeout budget by lifecycle phase and fail fast on
       add-in/daemon connection failures. A single 120s `waitForSession` timeout
       is too coarse because it hides fast JavaScript/runtime failures behind a
       generic "daemon not connected" symptom. Keep longer budgets only for
@@ -1405,7 +1405,15 @@ channel, and MCP `tools/call` dispatch.
       origin/endpoint, and any task pane ready-state evidence available from
       the activator. The harness must expose per-phase environment overrides
       for slow machines, but release defaults should catch connection bugs
-      quickly instead of waiting two minutes.
+      quickly instead of waiting two minutes. Current implementation keeps
+      daemon startup and Office startup on separate long phase budgets,
+      exposes `OFFICE_MCP_E2E_DAEMON_START_TIMEOUT_MS`,
+      `OFFICE_MCP_E2E_OFFICE_START_TIMEOUT_MS`,
+      `OFFICE_MCP_E2E_ACTIVATOR_TIMEOUT_MS`,
+      `OFFICE_MCP_E2E_ACTIVATION_SESSION_TIMEOUT_MS`, and
+      `OFFICE_MCP_E2E_SESSION_TIMEOUT_MS`, and defaults add-in session wait to
+      10 seconds with `phase=addin-session-register`, endpoint, activation log,
+      daemon log, latest-session, and document diagnostics.
 
 Current implementation evidence: `src/office-ctl/common/test/tool-e2e-contract.mjs`
 owns the shared table-driven loop and exact coverage checks; Word, Excel, and
