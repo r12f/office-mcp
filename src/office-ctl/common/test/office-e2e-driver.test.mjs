@@ -114,7 +114,11 @@ test('Office E2E driver describes a visible PowerPoint lifecycle', () => {
   assert.ok(document.keeper?.pidPath, 'keeper pid file is required');
   assert.ok(document.keeper?.stdoutPath, 'keeper stdout log is required');
   assert.ok(document.keeper?.stderrPath, 'keeper stderr log is required');
+  assert.match(document.script, /Add-Type -AssemblyName UIAutomationClient/);
   assert.match(document.script, /Presentations\.Add\(\$true\)/);
+  assert.match(document.script, /\$createdApp=\$false/);
+  assert.match(document.script, /\$createdApp=\$true/);
+  assert.match(document.script, /Write-OfficeMcpProcessPid -Handle \$app\.HWND/);
   assert.match(document.script, /office-mcp-ready/);
   assert.match(document.script, /office-mcp-ready/);
   assert.doesNotMatch(document.script, /\.Quit\(\)/, 'keeper must not quit user Office applications');
@@ -159,7 +163,10 @@ test('Office E2E driver cleanup covers activated sideload copies and original fi
   assert.match(document.cleanupScript, /office-mcp-e2e-powerpoint-fixture\.pptx/);
   assert.match(document.cleanupScript, /Close-DriverOwnedDocuments/);
   assert.match(document.cleanupScript, /Maybe-QuitEmptyOfficeApplication/);
-  assert.match(document.cleanupScript, /PowerPoint\.Application[\s\S]*Close-DriverOwnedProcessIds; Ensure-DriverOwnedProcessIdsExited/);
+  assert.match(document.cleanupScript, /PowerPoint\.Application[\s\S]*\$app\.DisplayAlerts=1/);
+  assert.match(document.cleanupScript, /\$pres\.Saved = \$true/);
+  assert.match(document.cleanupScript, /function Close-PowerPointByWindowTitle/);
+  assert.match(document.cleanupScript, /Close-PowerPointByWindowTitle; Close-DriverOwnedProcessIds; Ensure-DriverOwnedProcessIdsExited/);
   const driver = readFileSync(DRIVER, 'utf8');
   assert.match(driver, /officeSideloadCopyCandidates/);
   assert.match(driver, /Office add-in \$\{spec\.id\}\*\.\$\{spec\.extension\}/);
@@ -531,6 +538,8 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /function Try-OpenControlPanelForDriverDocument/);
   assert.match(script, /function Test-OfficeMcpTaskPaneReady/);
   assert.match(script, /found Office MCP task pane ready source=\$Source/);
+  assert.match(script, /clicked Open Control Panel but task pane is not ready yet source=\$Source/);
+  assert.match(script, /Start-Sleep -Milliseconds 800/);
   assert.match(script, /control_name = "MCP Control"/);
   assert.match(script, /activation_path = "task-pane-ready"/);
   assert.match(script, /\$initialPanel = Wait-ForOpenControlPanel/);
@@ -543,7 +552,7 @@ test('default Windows add-in activator can fall back through My Add-ins catalog 
   assert.match(script, /if \(\$tabPanel\.opened\)/);
   assert.match(script, /if \(\$panel\.opened\) \{ return \$true \}/);
   assert.doesNotMatch(script, /if \(Wait-ForOpenControlPanel/);
-  assert.match(script, /return @\{ opened = \$true; control_name = "Open Control Panel"; activation_path = "" \}/);
+  assert.doesNotMatch(script, /return @\{ opened = \$true; control_name = "Open Control Panel"; activation_path = "" \}/);
   assert.match(script, /return @\{ opened = \$false; control_name = ""; activation_path = "" \}/);
   assert.match(script, /\$hasPane -and \$hasConnected -and \$hasTools/);
   assert.match(script, /Office MCP Control direct click did not show Open Control Panel; trying catalog confirmation/);

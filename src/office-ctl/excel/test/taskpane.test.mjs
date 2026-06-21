@@ -174,6 +174,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger \}\)/);
   assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
   assert.match(js, /setCopyableMetadata/);
+  assert.match(js, /const \{[\s\S]*renderRuntimeVersions[\s\S]*\} = window\.OfficeCtlMainUi/);
   assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function setCopyableMetadata\(element, value\)/);
   assert.match(js, /middleTruncate/);
   assert.match(readFileSync(join(ADDIN_ROOT, '..', 'common', 'main-ui.js'), 'utf8'), /function middleTruncate\(value, maxLength = 30\)/);

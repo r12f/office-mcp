@@ -184,7 +184,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(js, /copyMetadataValue\(event, \{ document, navigator, announcer: announcerEl, logger \}\)/);
   assert.doesNotMatch(js, /event\.target\.closest\('\[data-copy-target\], \[data-copy-value\]'\)/);
   assert.match(mainUi, /button\.title = text === '-' \? button\.getAttribute\('aria-label'\) \|\| '' : text/);
-  assert.match(js, /const \{ bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, protectionLabel, renderStaticMetadata, renderToolModeControl: renderSharedToolModeControl, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup \} = window\.OfficeCtlMainUi/);
+  assert.match(js, /const \{[\s\S]*renderRuntimeVersions[\s\S]*\} = window\.OfficeCtlMainUi/);
   assert.match(js, /renderStaticMetadata\(\{ session: sessionEl, daemon: daemonEl, serverVersion: serverVersionEl, protocolVersion: protocolVersionEl, hostPlatform: hostPlatformEl \}, \{ sessionId, endpoint: configuredEndpoint\(\), serverInfo, protocolVersion: PROTOCOL_VERSION, defaultHost: 'PowerPoint' \}\)/);
   assert.doesNotMatch(functionBody(js, 'renderStaticState'), /setCopyableMetadata\(sessionEl/);
   assert.doesNotMatch(functionBody(js, 'renderStaticState'), /renderRuntimeVersions\(/);
@@ -398,11 +398,17 @@ test('PowerPoint task pane announces session only after successful register resp
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const registerBody = functionBody(js, 'register');
   const responseBody = functionBody(js, 'handleRegisterResponse');
+  const announceBody = functionBody(js, 'announceSession');
 
   assert.doesNotMatch(registerBody, /announceSession\(/);
   assert.match(responseBody, /serverInfo = registerResult\(message, PROTOCOL_VERSION\)/);
-  assert.match(responseBody, /enableAutoOpen\(\)\.then\(\(\) => announceSession\(\)\)\.catch/);
+  assert.match(responseBody, /announceSession\(\)\.catch/);
+  assert.match(responseBody, /enableAutoOpen\(\)\.catch/);
+  assert.ok(responseBody.indexOf('announceSession().catch') < responseBody.indexOf('enableAutoOpen().catch'), 'session announcement must not wait on auto-open persistence');
   assert.match(responseBody, /session\.announce\.failed/);
+  assert.match(responseBody, /autoopen\.failed/);
+  assert.match(announceBody, /const sent = send\(sessionAddedNotification\(\{/);
+  assert.match(announceBody, /if \(!sent\) throw new Error\('Session announcement could not be sent because the daemon socket is not open\.'\)/);
 });
 
 function functionBody(source, name) {

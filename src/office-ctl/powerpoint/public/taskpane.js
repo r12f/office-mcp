@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, protectionLabel, renderStaticMetadata, renderToolModeControl: renderSharedToolModeControl, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, middleTruncate, protectionLabel, renderRuntimeVersions, renderStaticMetadata, renderToolModeControl: renderSharedToolModeControl, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -243,13 +243,14 @@
     const presentation = await getPresentationInfo();
     documentInfo = presentation;
     logger.info('session.added', { sessionId, presentation });
-    send(sessionAddedNotification({
+    const sent = send(sessionAddedNotification({
       session_id: sessionId,
       instance_id: instanceId,
       document: presentation,
       available_tools: effectiveTools(),
       is_active: null
     }));
+    if (!sent) throw new Error('Session announcement could not be sent because the daemon socket is not open.');
     setCopyableMetadata(sessionEl, sessionId);
     sessionAnnounced = true;
     renderDocumentState();
@@ -288,11 +289,12 @@
     serverInfo = registerResult(message, PROTOCOL_VERSION);
     renderRuntimeVersions(serverVersionEl, protocolVersionEl, serverInfo, PROTOCOL_VERSION);
     connectionDetailEl.textContent = 'None';
-    enableAutoOpen().then(() => announceSession()).catch((error) => {
+    announceSession().catch((error) => {
       logger.error('session.announce.failed', error);
       connectionDetailEl.textContent = error.message || 'Failed to announce presentation session.';
       setConnectionState('failed', 'Failed');
     });
+    enableAutoOpen().catch((error) => logger.warn('autoopen.failed', error));
   }
 
   function enableAutoOpen() {
@@ -1558,7 +1560,9 @@
     if (!sendJsonRpc(socket, message)) {
       connectionDetailEl.textContent = 'Daemon connection is not open.';
       setConnectionState('failed', 'Failed');
+      return false;
     }
+    return true;
   }
 
   function mapError(error, tool) {

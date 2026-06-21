@@ -34,6 +34,7 @@
     documentStateLabel,
     middleTruncate,
     protectionLabel,
+    renderRuntimeVersions,
     renderStaticMetadata,
     renderToolModeControl: renderSharedToolModeControl,
     setConnectionState: setSharedConnectionState,

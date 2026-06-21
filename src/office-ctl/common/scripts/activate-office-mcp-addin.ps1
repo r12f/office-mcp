@@ -1178,7 +1178,14 @@ function Wait-ForOpenControlPanel {
     if ($button) {
       Write-ActivatorLog "found Open Control Panel control source=$Source"
       Invoke-Control -Element $button
-      return @{ opened = $true; control_name = "Open Control Panel"; activation_path = "" }
+      Start-Sleep -Milliseconds 800
+      $window = Get-OfficeWindowFromHandle -Handle $WindowHandle
+      $sample = Get-VisibleControlNameSample -Root $window
+      if (Test-OfficeMcpTaskPaneReady -VisibleControlNames $sample) {
+        Write-ActivatorLog "found Office MCP task pane ready source=$Source"
+        return @{ opened = $true; control_name = "MCP Control"; activation_path = "task-pane-ready" }
+      }
+      Write-ActivatorLog "clicked Open Control Panel but task pane is not ready yet source=$Source"
     }
     $sample = Get-VisibleControlNameSample -Root $window
     if (Test-OfficeMcpTaskPaneReady -VisibleControlNames $sample) {
