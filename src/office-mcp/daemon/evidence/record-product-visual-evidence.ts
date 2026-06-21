@@ -140,7 +140,7 @@ const screenshotsExist = Object.fromEntries(
 );
 const screenshotMetadata = Object.fromEntries(requiredSurfaces.map((surface) => [surface, screenshotMetadataFor(screenshotPaths[surface])]));
 const screenshotsFresh = Object.fromEntries(requiredSurfaces.map((surface) => [surface, screenshotMetadata[surface]?.fresh === true]));
-const trayTooltip = readOption('--tray-tooltip');
+const trayTooltip = readOption('--tray-tooltip') ?? (typeof manualTrayEvidence?.observed_tooltip === 'string' ? manualTrayEvidence.observed_tooltip : undefined);
 const catalogType = readOption('--catalog-type') ?? (typeof catalogIdentityReview?.catalog_type === 'string' ? catalogIdentityReview.catalog_type : undefined);
 const catalogIconVisible = booleanFlag('--catalog-icon-visible');
 const trayMenuNative = booleanFlag('--tray-menu-native');
@@ -385,6 +385,7 @@ function observationFor(surface: string): string | undefined {
     const label = typeof logoSurface.label === 'string' ? logoSurface.label : surface.replaceAll('_', ' ');
     return `${productName} rendered logo review ${label}`;
   }
+  if (manualTrayEvidenceReady && surface === 'tray_tooltip' && typeof manualTrayEvidence?.observed_tooltip === 'string') return manualTrayEvidence.observed_tooltip;
   if (manualTrayEvidenceReady && isTraySurface(surface)) return `${productName} manual tray evidence ${surface.replaceAll('_', ' ')}`;
   return undefined;
 }

@@ -191,7 +191,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
 
 test('product visual evidence recorder rejects stale screenshots', () => {
   withScreenshots((dir, screenshots) => {
-    const daemonBin = writeFakeDaemon(dir);
+    const daemonBin = writeFakeDaemon(dir, true, ['Status: Degraded', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control']);
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
     const staleDate = new Date(Date.now() - 60 * 60 * 1000);
     utimesSync(screenshots['word-ribbon-command'], staleDate, staleDate);
@@ -408,9 +408,9 @@ test('product visual evidence recorder derives tray surfaces from manual tray ar
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
     const renderedLogoReviewPath = writeRenderedLogoReview(dir);
-    const manualTrayEvidencePath = writeManualTrayEvidence(dir);
+    const manualTrayEvidencePath = writeManualTrayEvidence(dir, true, 'Degraded');
     const output = join(dir, 'derived-tray-surfaces.json');
-    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--manual-tray-evidence-path', manualTrayEvidencePath, '--skip-tray-surface-args');
+    const passing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--manual-tray-evidence-path', manualTrayEvidencePath, '--skip-tray-surface-args', '--skip-tray-tooltip-arg');
     assert.equal(passing.status, 0, outputText(passing.stderr) || outputText(passing.stdout));
     const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     const screenshotPaths = evidence.screenshot_paths as Record<string, string>;
@@ -423,9 +423,11 @@ test('product visual evidence recorder derives tray surfaces from manual tray ar
       const key = surface.replaceAll('-', '_');
       assert.equal(screenshotPaths[key], manualPaths[key]);
       assert.equal(screenshotsExist[key], true);
-      if (key === 'tray_tooltip') assert.equal(observations[key], 'Office MCP Control - Up - 0 clients - 0 documents');
+      if (key === 'tray_tooltip') assert.equal(observations[key], manualTray.observed_tooltip);
       else assert.match(observations[key], /Office MCP Control manual tray evidence/);
     }
+    assert.equal(evidence.tray_tooltip, manualTray.observed_tooltip);
+    assert.equal(evidence.tray_tooltip_ready, true);
     assert.equal(evidence.product_text_ready, true);
     assert.equal(evidence.passed, true);
   });
@@ -968,6 +970,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
   const skipRenderedLogoAndFirstRunFlags = extra.includes('--skip-rendered-logo-and-first-run-flags');
   const skipLogoSurfaceArgs = extra.includes('--skip-logo-surface-args');
   const skipTraySurfaceArgs = extra.includes('--skip-tray-surface-args');
+  const skipTrayTooltipArg = extra.includes('--skip-tray-tooltip-arg');
   const skipManualTrayEvidence = extra.includes('--skip-manual-tray-evidence');
   const skipCatalogIdentityReview = extra.includes('--skip-catalog-identity-review');
   const skipOfficeToolE2eReports = extra.includes('--skip-office-tool-e2e-reports');
@@ -991,6 +994,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
       && item !== '--skip-rendered-logo-and-first-run-flags'
       && item !== '--skip-logo-surface-args'
       && item !== '--skip-tray-surface-args'
+      && item !== '--skip-tray-tooltip-arg'
       && item !== '--skip-manual-tray-evidence'
       && item !== '--skip-catalog-identity-review'
       && item !== '--skip-office-tool-e2e-reports'
@@ -1019,7 +1023,7 @@ function runRecorder(output: string, screenshots: Record<string, string>, ...ext
     '--output', output,
     ...(explicitCatalogType ? [] : ['--catalog-type', 'Local productivity automation control utility']),
     '--catalog-icon-visible', 'true',
-    '--tray-tooltip', 'Office MCP Control - Up - 0 clients - 0 documents',
+    ...(skipTrayTooltipArg ? [] : ['--tray-tooltip', 'Office MCP Control - Up - 0 clients - 0 documents']),
     '--tray-icon-visible', 'true',
     '--tray-menu-native', 'true',
     ...(explicitTrayMenuSurfaceKind ? [] : ['--tray-menu-surface-kind', 'native']),
@@ -1455,7 +1459,7 @@ function writeSurfaceScreenshot(dir: string, name: string): string {
   return path;
 }
 
-function writeManualTrayEvidence(dir: string, ready = true): string {
+function writeManualTrayEvidence(dir: string, ready = true, status: 'Up' | 'Degraded' = 'Up'): string {
   const screenshotPath = join(dir, `manual-tray-${ready ? 'ready' : 'broken'}.png`);
   writeFileSync(screenshotPath, tinyPng());
   const traySurfaceScreenshotPaths = Object.fromEntries(TRAY_SURFACES.map((surface) => [surface.replaceAll('-', '_'), writeSurfaceScreenshot(dir, `${surface}.png`)]));
@@ -1477,14 +1481,14 @@ function writeManualTrayEvidence(dir: string, ready = true): string {
     tray_menu_surface_kind: ready ? 'native' : 'webview',
     tray_menu_surface_native: ready,
     show_ui_opened: ready,
-    observed_menu_items: ready ? ['Status: Up', 'Clients: 0', 'Documents: 0', 'Show Office MCP Control', 'Quit Office MCP Control'] : ['Status: Up'],
-    observed_tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
+    observed_menu_items: ready ? [`Status: ${status}`, 'Clients: 0', 'Documents: 0', 'Show Office MCP Control', 'Quit Office MCP Control'] : ['Status: Up'],
+    observed_tooltip: `Office MCP Control - ${status} - 0 clients - 0 documents`,
     screenshot_path: screenshotPath,
     tray_surface_screenshot_paths: traySurfaceScreenshotPaths,
     tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
     tray_surface_screenshots_ready: ready,
     tray_surface_screenshots_distinct: ready,
-    daemon_context: manualTrayDaemonContext(ready),
+    daemon_context: manualTrayDaemonContext(ready, status),
     daemon_context_ready: ready,
     passed: ready
   }, null, 2));
@@ -1528,7 +1532,7 @@ function catalogIdentityHost(host: string, ready = true): Record<string, unknown
   };
 }
 
-function manualTrayDaemonContext(ready = true) {
+function manualTrayDaemonContext(ready = true, status: 'Up' | 'Degraded' = 'Up') {
   return {
     status: { ok: ready, running: ready, uiUrl: 'https://localhost:8765/ui/' },
     tray_probe: {
@@ -1536,9 +1540,9 @@ function manualTrayDaemonContext(ready = true) {
       native_host: ready,
       state_fetch_ok: ready,
       snapshot: {
-        tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
-        menu_items: ['Status: Up', 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control'],
-        menu: structuredTrayMenu()
+        tooltip: `Office MCP Control - ${status} - 0 clients - 0 documents`,
+        menu_items: [`Status: ${status}`, 'Clients: 0', 'Documents: 0', '---', 'Show Office MCP Control', 'Quit Office MCP Control'],
+        menu: structuredTrayMenu(status)
       }
     }
   };
@@ -1546,11 +1550,12 @@ function manualTrayDaemonContext(ready = true) {
 
 function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[], includeStructuredMenu: boolean): string {
   const status = JSON.stringify({ running: true, uiUrl: 'https://localhost:8765/ui/' });
+  const stateLabel = menuItems.find((item) => item.startsWith('Status: '))?.slice('Status: '.length) ?? 'Up';
   const snapshot: Record<string, unknown> = {
-    tooltip: 'Office MCP Control - Up - 0 clients - 0 documents',
+    tooltip: `Office MCP Control - ${stateLabel} - 0 clients - 0 documents`,
     menu_items: menuItems
   };
-  if (includeStructuredMenu) snapshot.menu = structuredTrayMenu();
+  if (includeStructuredMenu) snapshot.menu = structuredTrayMenu(stateLabel as 'Up' | 'Degraded');
   const trayProbe = JSON.stringify({
     native_host: true,
     state_fetch_ok: stateFetchOk,
@@ -1562,9 +1567,9 @@ function fakeDaemonScript(stateFetchOk: boolean, menuItems: string[], includeStr
   return `#!/bin/sh\nif [ "$1" = "daemon" ]; then printf '%s\\n' '${status}'; fi\nif [ "$1" = "tray" ]; then printf '%s\\n' '${trayProbe}'; fi\n`;
 }
 
-function structuredTrayMenu(): Array<Record<string, unknown>> {
+function structuredTrayMenu(status: 'Up' | 'Degraded' = 'Up'): Array<Record<string, unknown>> {
   return [
-    { kind: 'read_only', enabled: false, label: 'Status: Up' },
+    { kind: 'read_only', enabled: false, label: `Status: ${status}` },
     { kind: 'read_only', enabled: false, label: 'Clients: 0' },
     { kind: 'read_only', enabled: false, label: 'Documents: 0' },
     { kind: 'separator', enabled: false, label: '---' },

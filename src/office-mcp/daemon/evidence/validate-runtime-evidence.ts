@@ -510,6 +510,7 @@ function validateProductVisualEvidence(): void {
   if (visual.tray_menu_surface_kind !== 'native' || visual.tray_menu_surface_native !== true) {
     failures.push('Product visual evidence tray menu surface is not native.');
   }
+  validateProductVisualTrayBinding(visual);
   validateProductVisualScreenshots(visual.screenshot_paths, visual.screenshots_exist);
   validateProductVisualScreenshotFreshness(visual.screenshot_paths, visual.screenshot_metadata, visual.screenshots_fresh, visual.screenshots_fresh_ready, visual.recorded_at);
   validateDistinctProductVisualScreenshots(visual.screenshot_paths);
@@ -613,6 +614,25 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
     ['passed', 'manual tray evidence passed']
   ] as const) {
     if (manual[key] !== true) failures.push(`Embedded manual tray evidence missing ${label}.`);
+  }
+}
+
+function validateProductVisualTrayBinding(visual: Record<string, unknown>): void {
+  const manual = isRecord(visual.manual_tray_evidence) ? visual.manual_tray_evidence : undefined;
+  if (manual) {
+    if (typeof visual.tray_tooltip === 'string' && typeof manual.observed_tooltip === 'string' && visual.tray_tooltip !== manual.observed_tooltip) {
+      failures.push('Product visual evidence tray tooltip does not match embedded manual tray evidence.');
+    }
+    if (visual.tray_menu_surface_kind !== manual.tray_menu_surface_kind || visual.tray_menu_surface_native !== manual.tray_menu_surface_native) {
+      failures.push('Product visual evidence tray menu surface metadata does not match embedded manual tray evidence.');
+    }
+  }
+
+  const context = isRecord(visual.daemon_context) ? visual.daemon_context : undefined;
+  const trayProbe = isRecord(context?.tray_probe) ? context.tray_probe : undefined;
+  const snapshot = isRecord(trayProbe?.snapshot) ? trayProbe.snapshot : undefined;
+  if (snapshot && typeof visual.tray_tooltip === 'string' && typeof snapshot.tooltip === 'string' && visual.tray_tooltip !== snapshot.tooltip) {
+    failures.push('Product visual evidence tray tooltip does not match daemon tray snapshot.');
   }
 }
 
