@@ -616,10 +616,19 @@ function validateManualTraySurfaceScreenshots(paths: unknown, exists: unknown, l
     failures.push(`${label} missing tray surface screenshot existence flags.`);
     return;
   }
+  const seenByPath = new Map<string, string>();
   for (const surface of trayVisualSurfaces()) {
     const path = paths[surface];
     if (typeof path !== 'string' || !screenshotFileLooksLikeImage(resolve(path))) {
       failures.push(`${label} missing or invalid tray surface screenshot: ${surface}.`);
+    } else {
+      const normalized = normalizeScreenshotPath(path);
+      const previous = seenByPath.get(normalized);
+      if (previous) {
+        failures.push(`${label} reuses one tray surface screenshot for distinct surfaces: ${previous} and ${surface}.`);
+      } else {
+        seenByPath.set(normalized, surface);
+      }
     }
     if (exists[surface] !== true) failures.push(`${label} missing ready flag for tray surface screenshot: ${surface}.`);
   }

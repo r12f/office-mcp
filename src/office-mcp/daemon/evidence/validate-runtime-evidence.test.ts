@@ -1143,6 +1143,16 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
   withEvidenceFile(ui, (uiPath) => {
     withManualTrayEvidence(true, (manualPath) => {
       const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.tray_surface_screenshot_paths.tray_native_menu = broken.tray_surface_screenshot_paths.tray_icon;
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence reuses one tray surface screenshot for distinct surfaces: tray_icon and tray_native_menu/);
+    });
+  });
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
       broken.menu_opened_from_tray_icon = false;
       broken.native_menu_appearance_reviewed = false;
       broken.menu_anchored_to_tray_icon = false;
