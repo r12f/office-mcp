@@ -447,6 +447,11 @@ User-reported follow-up from live task pane testing:
       stay together near the `MCP Control` title column instead of being mixed
       into the document rows. Covered by Word/Excel/PowerPoint task pane
       contract tests for `.document-metadata` and `.daemon-metadata` order.
+- [x] Remove the separate task pane endpoint error paragraph. Endpoint
+      validation and reconnect failures now use the existing `Last Error` row
+      instead of reserving a duplicate `endpointError` element that disrupts the
+      compact daemon metadata layout. Covered by Word/Excel/PowerPoint task
+      pane contract tests rejecting `endpointError` and `.field-error`.
 - [x] Move settings into an inline child panel of the top block. Clicking the
       gear must not append a detached settings block at the bottom of the task
       pane. Covered by Word/Excel HTML order contract tests.
