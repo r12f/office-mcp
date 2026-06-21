@@ -33,7 +33,8 @@
     middleTruncate,
     officeHostSummary,
     renderRuntimeVersions,
-    setCopyableMetadata
+    setCopyableMetadata,
+    statusClass
   } = window.OfficeCtlMainUi;
 
   const AVAILABLE_TOOLS = [
@@ -1857,13 +1858,6 @@
   function setConnectionState(state, label) {
     connectionBadgeEl.textContent = label;
     connectionBadgeEl.className = `status-badge ${statusClass(state)}`;
-  }
-
-  function statusClass(state) {
-    if (state === 'connected') return 'status-success';
-    if (state === 'failed' || state === 'unsupported') return 'status-danger';
-    if (state === 'reconnecting') return 'status-warning';
-    return 'status-neutral';
   }
 
 

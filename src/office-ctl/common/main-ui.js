@@ -68,12 +68,20 @@
     if (onChange) control.addEventListener('change', onChange);
   }
 
+  function statusClass(state) {
+    if (state === 'connected' || state === 'success') return 'status-success';
+    if (state === 'connecting' || state === 'reconnecting' || state === 'running') return 'status-warning';
+    if (state === 'failed' || state === 'failure' || state === 'disconnected' || state === 'unsupported') return 'status-danger';
+    return 'status-neutral';
+  }
+
   global.OfficeCtlMainUi = Object.freeze({
     bindDetailsControl,
     copyMetadataValue,
     middleTruncate,
     officeHostSummary,
     renderRuntimeVersions,
-    setCopyableMetadata
+    setCopyableMetadata,
+    statusClass
   });
 })(globalThis);

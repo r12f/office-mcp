@@ -41,7 +41,8 @@
     middleTruncate,
     officeHostSummary,
     renderRuntimeVersions,
-    setCopyableMetadata
+    setCopyableMetadata,
+    statusClass
   } = window.OfficeCtlMainUi;
   const CONNECT_TIMEOUT_MS = 8000;
   const AVAILABLE_TOOLS = [
@@ -1548,13 +1549,6 @@
   function setStatus(label) {
     connectionDetailEl.textContent = label;
     setConnectionState('failed', label);
-  }
-
-  function statusClass(state) {
-    if (state === 'connected' || state === 'success') return 'status-success';
-    if (state === 'reconnecting' || state === 'connecting') return 'status-warning';
-    if (state === 'failed' || state === 'disconnected' || state === 'failure') return 'status-danger';
-    return 'status-neutral';
   }
 
   function renderStaticState() {

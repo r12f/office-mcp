@@ -86,3 +86,18 @@ test('common main UI falls back and reports copy failures', async () => {
   assert.deepEqual(warnings, [['metadata_copy.failed', 'denied']]);
   assert.equal(announcer.textContent, 'Copy failed');
 });
+
+test('common main UI maps connection and task states to badge classes', () => {
+  const mainUi = loadMainUi();
+
+  assert.equal(mainUi.statusClass('connected'), 'status-success');
+  assert.equal(mainUi.statusClass('success'), 'status-success');
+  assert.equal(mainUi.statusClass('connecting'), 'status-warning');
+  assert.equal(mainUi.statusClass('reconnecting'), 'status-warning');
+  assert.equal(mainUi.statusClass('running'), 'status-warning');
+  assert.equal(mainUi.statusClass('failed'), 'status-danger');
+  assert.equal(mainUi.statusClass('failure'), 'status-danger');
+  assert.equal(mainUi.statusClass('unsupported'), 'status-danger');
+  assert.equal(mainUi.statusClass('cancelled'), 'status-neutral');
+  assert.equal(mainUi.statusClass('idle'), 'status-neutral');
+});
