@@ -231,8 +231,8 @@ const powerPointDocumentStateReady = typeof powerPointDocumentState === 'string'
 const powerPointTaskpaneDensityReady = powerPointCompactTopBlock && powerPointToolsPermissionsMerged && powerPointInlineSettings && powerPointServerProtocolReady && powerPointDocumentStateReady && powerPointRuntimeEvidenceReady;
 const currentScreenshotFeedbackReady = currentLogoScreenshotFeedbackReviewed && currentAddinScreenshotFeedbackReviewed && currentTrayScreenshotFeedbackReviewed;
 const daemonMainWindowReady = daemonMainWindowReviewed && daemonMainWindowCompactReviewed && daemonMainWindowThreeColumnReviewed;
-const productIdentityReviewReady = logoQualityReviewed && logoFutureOfficeControlReviewed && finalLogoUserSurfaceReviewed && currentLogoScreenshotFeedbackReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && addinIdentityReviewed && addinTitleIconTypeReviewed && addinInstallableSurfaceReviewed && currentAddinScreenshotFeedbackReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && wordRuntimeEvidenceReady && excelRuntimeEvidenceReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNativeFirstImpressionReviewed && trayNormalWindowsLaunchReviewed && currentTrayScreenshotFeedbackReviewed;
-const passed = productTextReady && allScreenshotsExist && allScreenshotsFresh && trayTooltipReady && catalogTypeReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && officeToolE2eReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && daemonMainWindowReady && productIdentityReviewReady && renderedLogoReviewReady && wordRuntimeEvidenceReady && excelRuntimeEvidenceReady && powerPointRuntimeEvidenceReady && daemonContextReady;
+const productIdentityReviewReady = logoQualityReviewed && logoFutureOfficeControlReviewed && finalLogoUserSurfaceReviewed && currentLogoScreenshotFeedbackReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && catalogIdentityReviewReady && addinIdentityReviewed && addinTitleIconTypeReviewed && addinInstallableSurfaceReviewed && currentAddinScreenshotFeedbackReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && wordRuntimeEvidenceReady && excelRuntimeEvidenceReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNativeFirstImpressionReviewed && trayNormalWindowsLaunchReviewed && currentTrayScreenshotFeedbackReviewed;
+const passed = productTextReady && allScreenshotsExist && allScreenshotsFresh && trayTooltipReady && catalogTypeReady && catalogIdentityReviewReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && officeToolE2eReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && daemonMainWindowReady && productIdentityReviewReady && renderedLogoReviewReady && wordRuntimeEvidenceReady && excelRuntimeEvidenceReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -270,6 +270,7 @@ const evidence = {
     current_logo_screenshot_feedback_reviewed: currentLogoScreenshotFeedbackReviewed,
     rendered_size_logo_reviewed: renderedSizeLogoReviewed,
     rendered_logo_review_ready: renderedLogoReviewReady,
+    catalog_identity_review_ready: catalogIdentityReviewReady,
     addin_identity_reviewed: addinIdentityReviewed,
     addin_title_icon_type_reviewed: addinTitleIconTypeReviewed,
     addin_installable_surface_reviewed: addinInstallableSurfaceReviewed,

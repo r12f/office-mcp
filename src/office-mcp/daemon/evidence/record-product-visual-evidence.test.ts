@@ -910,11 +910,15 @@ test('product visual evidence recorder requires catalog identity review artifact
     assert.notEqual(missing.status, 0);
     let evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.catalog_identity_review_ready, false);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).catalog_identity_review_ready, false);
+    assert.equal(evidence.passed, false);
 
     const broken = runRecorder(join(dir, 'broken-catalog-identity-review.json'), screenshots, '--daemon-bin', daemonBin, '--catalog-identity-review-path', writeCatalogIdentityReview(dir, false));
     assert.notEqual(broken.status, 0);
     evidence = JSON.parse(readFileSync(join(dir, 'broken-catalog-identity-review.json'), 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.catalog_identity_review_ready, false);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).catalog_identity_review_ready, false);
+    assert.equal(evidence.passed, false);
   });
 });
 

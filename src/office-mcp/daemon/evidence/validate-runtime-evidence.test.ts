@@ -1330,6 +1330,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       current_logo_screenshot_feedback_reviewed: passed,
       rendered_size_logo_reviewed: passed,
       rendered_logo_review_ready: passed,
+      catalog_identity_review_ready: passed,
       addin_identity_reviewed: passed,
       addin_title_icon_type_reviewed: passed,
       addin_installable_surface_reviewed: passed,

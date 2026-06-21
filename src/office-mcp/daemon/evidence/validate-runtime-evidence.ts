@@ -637,6 +637,7 @@ function validateProductIdentityReview(review: unknown): void {
     ['current_logo_screenshot_feedback_reviewed', 'current screenshot logo feedback review'],
     ['rendered_size_logo_reviewed', 'rendered-size logo review'],
     ['rendered_logo_review_ready', 'rendered logo review artifact ready flag'],
+    ['catalog_identity_review_ready', 'catalog identity review ready flag'],
     ['addin_identity_reviewed', 'add-in first-run identity review'],
     ['addin_title_icon_type_reviewed', 'add-in title, icon, and type/category review'],
     ['addin_installable_surface_reviewed', 'add-in installable-software surface review'],
