@@ -315,6 +315,21 @@ or running developer build commands.
       explicit task-execution label such as `Active Tasks`, `Tasks Running`, or
       `Running Tasks`; bare `Running` is not acceptable because it can be
       confused with daemon health.
+- [ ] Rework the daemon main-window connected-document list so each document is
+      a compact summary block, not a verbose session/activity panel. The block
+      should primarily show the document name plus state (`active` or `dead`,
+      with `stale`/`reconnecting` only when recovery is in progress), version,
+      available tool count, queue depth, finished task count, and failed task
+      count. Remove inline recent-command history, verbose session IDs, and
+      expanded host metadata from the default document block because the
+      right-side Activity/Inspector pane already owns command history and
+      diagnostics. Session IDs may remain available only behind a details/copy
+      affordance with middle truncation.
+- [ ] Add scan-friendly document state indicators in the daemon main window.
+      Active/dead/stale/reconnecting states must use a stable icon, status dot,
+      or host-accent-compatible color marker next to the text label so users can
+      identify dead sessions quickly when many documents are listed. Color alone
+      is not enough; keep the text label for accessibility and tests.
 - [x] Add-in task pane product UI showing daemon connection, current document
       session, current task, and latest 20 task history entries for Word and
       Excel. Current evidence: `npm run check` in `src/office-ctl/word` and
