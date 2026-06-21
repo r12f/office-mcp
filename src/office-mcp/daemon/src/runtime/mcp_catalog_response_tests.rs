@@ -2,7 +2,7 @@ use super::McpCatalogResponder;
 use crate::addin_mgr::{
     AddInInfo, DocumentInfo, HostInfo, NewSessionInfo, RuntimeInfo, SessionRegistry,
 };
-use crate::mcp::ToolAccessPolicy;
+use crate::mcp::{AccessMode, ToolAccessPolicy};
 use serde_json::{Value, json};
 
 #[test]
@@ -39,6 +39,26 @@ fn tools_list_filters_daemon_disabled_tools() {
     assert!(!names.contains(&"word.get_text"));
     assert!(names.contains(&"word.get_outline"));
     assert!(names.contains(&"office.get_session_info"));
+}
+
+#[test]
+fn tools_list_filters_by_daemon_access_mode() {
+    let policy = ToolAccessPolicy::default().with_access_mode(AccessMode::Read);
+    let response = parse(&McpCatalogResponder::tools_list(&json!(1), &policy));
+    let names = response["result"]["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect::<Vec<_>>();
+
+    assert!(names.contains(&"office.list_sessions"));
+    assert!(names.contains(&"word.get_text"));
+    assert!(names.contains(&"excel.read_range"));
+    assert!(names.contains(&"powerpoint.list_slides"));
+    assert!(!names.contains(&"word.insert_paragraph"));
+    assert!(!names.contains(&"excel.write_range"));
+    assert!(!names.contains(&"powerpoint.delete_slide"));
 }
 
 #[test]

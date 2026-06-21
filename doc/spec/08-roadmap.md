@@ -649,13 +649,17 @@ every call is enforced first by daemon policy and then by the target session's
 `available_tools`, with actionable refresh hints when either layer rejects the
 call.
 
-Implementation progress: the first daemon-policy runtime slice adds an
+Implementation progress: the first daemon-policy runtime slices add an
 in-memory `ToolAccessPolicy` owned by the daemon runtime state. MCP
 `tools/list` is now filtered through that policy, and `tools/call` rejects a
 globally disabled forwarded tool before session lookup with
 `TOOL_NOT_AVAILABLE`, `refresh_tools: true`, and the unified `Tool <name> is
-disabled...` wording. Persistence, app/category/read-write-all controls, and
-daemon UI editing remain open items in this milestone.
+disabled...` wording. The policy now classifies Word, Excel, and PowerPoint
+tools by app, object/category, and read/mutating/destructive side effect, and
+supports `Read` / `Write` / `All` ceilings plus app, category, and individual
+tool switches for discovery filtering and dispatch enforcement. Persistence,
+daemon UI editing, and API endpoints for managing the policy remain open items
+in this milestone.
 
 ### M6.5.3 — Product identity, add-in metadata, and native tray polish
 
