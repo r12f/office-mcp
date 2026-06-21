@@ -633,6 +633,9 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.excel_runtime_evidence_ready = false;
+      broken.excel_runtime_evidence.smoke_details.marker_found = false;
+      (broken.excel_runtime_evidence.smoke_details as Record<string, unknown>).chart = {};
       broken.excel_taskpane.runtime_evidence_ready = false;
       broken.excel_taskpane.runtime_evidence.smoke_details.marker_found = false;
       (broken.excel_taskpane.runtime_evidence.smoke_details as Record<string, unknown>).chart = {};
@@ -1343,6 +1346,7 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       excel_first_run_identity_ready: passed,
       powerpoint_first_run_identity_ready: passed,
       word_runtime_evidence_ready: passed,
+      excel_runtime_evidence_ready: passed,
       powerpoint_runtime_evidence_ready: passed,
       ready: passed
     },
@@ -1382,6 +1386,8 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
     rendered_logo_review_ready: passed,
     word_runtime_evidence: wordRuntimeEvidence(passed),
     word_runtime_evidence_ready: passed,
+    excel_runtime_evidence: excelRuntimeEvidence(passed),
+    excel_runtime_evidence_ready: passed,
     daemon_main_window: {
       reviewed: passed,
       compact_status_details_reviewed: passed,

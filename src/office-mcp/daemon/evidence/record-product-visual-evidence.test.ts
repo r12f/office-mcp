@@ -174,6 +174,7 @@ test('product visual evidence recorder requires all product surfaces', () => {
     assert.equal((evidence.first_run_identity as Record<string, Record<string, unknown>>).word.icon_url, 'https://localhost:8765/assets/icon-32.png');
     assert.equal(evidence.rendered_logo_review_ready, true);
     assert.equal(evidence.word_runtime_evidence_ready, true);
+    assert.equal(evidence.excel_runtime_evidence_ready, true);
     assert.equal(evidence.powerpoint_runtime_evidence_ready, true);
     assert.equal(evidence.daemon_context_ready, true);
     assert.equal(evidence.passed, true);
@@ -585,12 +586,15 @@ test('product visual evidence recorder requires Excel runtime evidence', () => {
     const missing = runRecorder(output, screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-runtime-evidence-path', join(dir, 'missing-excel.json'));
     assert.notEqual(missing.status, 0);
     let evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.excel_runtime_evidence_ready, false);
+    assert.equal((evidence.product_identity_review as Record<string, unknown>).excel_runtime_evidence_ready, false);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).density_ready, false);
 
     const broken = runRecorder(join(dir, 'broken-excel-runtime-evidence.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-runtime-evidence-path', writeExcelRuntimeEvidence(dir, false));
     assert.notEqual(broken.status, 0);
     evidence = JSON.parse(outputText(broken.stdout)) as Record<string, unknown>;
+    assert.equal(evidence.excel_runtime_evidence_ready, false);
     assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
   });
 });

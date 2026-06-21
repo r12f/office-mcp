@@ -519,6 +519,7 @@ function validateProductVisualEvidence(): void {
   validateFirstRunIdentity(visual.first_run_identity);
   validateDaemonMainWindowVisualEvidence(visual.daemon_main_window);
   validateWordRuntimeEvidence(visual.word_runtime_evidence, visual.word_runtime_evidence_ready);
+  validateExcelRuntimeEvidence(visual.excel_runtime_evidence, visual.excel_runtime_evidence_ready);
   validatePowerPointRuntimeEvidence(visual.powerpoint_runtime_evidence, visual.powerpoint_runtime_evidence_ready);
   validateProductVisualOfficeToolE2e(visual.office_tool_e2e, visual.office_tool_e2e_ready);
   validateWordTaskpaneVisualEvidence(visual.word_taskpane);
@@ -652,6 +653,7 @@ function validateProductIdentityReview(review: unknown): void {
     ['excel_first_run_identity_ready', 'Excel first-run identity ready flag'],
     ['powerpoint_first_run_identity_ready', 'PowerPoint first-run identity ready flag'],
     ['word_runtime_evidence_ready', 'Word runtime evidence ready flag'],
+    ['excel_runtime_evidence_ready', 'Excel runtime evidence ready flag'],
     ['powerpoint_runtime_evidence_ready', 'PowerPoint runtime evidence ready flag'],
     ['ready', 'product identity review ready flag']
   ] as const) {
