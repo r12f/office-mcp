@@ -565,6 +565,17 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.manual_tray_evidence.primary_screenshot_matches_tray_icon = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Embedded manual tray evidence missing primary screenshot tray_icon binding flag/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.observations.word_ribbon_command = 'Raw task pane';
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -1270,6 +1281,17 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /Manual tray evidence screenshot path does not match tray_icon surface screenshot/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.primary_screenshot_matches_tray_icon = false;
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence missing primary screenshot tray_icon binding flag/);
     });
   });
 
@@ -2034,6 +2056,7 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     expected_menu_items: ['Status:', 'Clients:', 'Documents:', 'Show Office MCP Control', 'Quit Office MCP Control'],
     menu_contains_required_items: passed,
     screenshot_path: screenshotPath,
+    primary_screenshot_matches_tray_icon: passed,
     tray_surface_screenshot_paths: traySurfaceScreenshotPaths(screenshotPath),
     tray_surface_screenshots_exist: Object.fromEntries(trayVisualSurfaces().map((surface) => [surface, passed])),
     tray_surface_screenshots_ready: passed,

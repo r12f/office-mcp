@@ -621,6 +621,9 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
 }
 
 function validateManualTrayPrimaryScreenshotBinding(manual: Record<string, unknown>, label: string): void {
+  if (manual.primary_screenshot_matches_tray_icon !== true) {
+    failures.push(`${label} missing primary screenshot tray_icon binding flag.`);
+  }
   const traySurfacePaths = isRecord(manual.tray_surface_screenshot_paths) ? manual.tray_surface_screenshot_paths : undefined;
   if (typeof manual.screenshot_path === 'string' && typeof traySurfacePaths?.tray_icon === 'string' && normalizeScreenshotPath(manual.screenshot_path) !== normalizeScreenshotPath(traySurfacePaths.tray_icon)) {
     failures.push(`${label} screenshot path does not match tray_icon surface screenshot.`);
