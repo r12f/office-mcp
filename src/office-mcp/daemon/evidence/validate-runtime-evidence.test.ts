@@ -1276,6 +1276,19 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
   withEvidenceFile(ui, (uiPath) => {
     withManualTrayEvidence(true, (manualPath) => {
       const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
+      broken.tray_surface_screenshots_fresh_ready = false;
+      broken.tray_surface_screenshots_fresh.tray_icon = false;
+      broken.tray_surface_screenshot_metadata.tray_icon.fresh = false;
+      writeFileSync(manualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Manual tray evidence tray surface screenshots are not fresh/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withManualTrayEvidence(true, (manualPath) => {
+      const broken = JSON.parse(readFileSync(manualPath, 'utf8')) as ReturnType<typeof manualTrayReport>;
       broken.screenshot_path = broken.tray_surface_screenshot_paths.tray_native_menu;
       writeFileSync(manualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-manual-tray', '--manual-tray-evidence-path', manualPath);
@@ -2032,6 +2045,7 @@ function productVisualSurfaces(): string[] {
   ];
 }
 function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png') {
+  const traySurfacePaths = traySurfaceScreenshotPaths(screenshotPath);
   return {
     ok: passed,
     schema_version: 1,
@@ -2057,9 +2071,12 @@ function manualTrayReport(passed: boolean, screenshotPath = 'C:\\temp\\tray.png'
     menu_contains_required_items: passed,
     screenshot_path: screenshotPath,
     primary_screenshot_matches_tray_icon: passed,
-    tray_surface_screenshot_paths: traySurfaceScreenshotPaths(screenshotPath),
+    tray_surface_screenshot_paths: traySurfacePaths,
     tray_surface_screenshots_exist: Object.fromEntries(trayVisualSurfaces().map((surface) => [surface, passed])),
     tray_surface_screenshots_ready: passed,
+    tray_surface_screenshot_metadata: manualTrayScreenshotMetadataFor(traySurfacePaths, passed),
+    tray_surface_screenshots_fresh: Object.fromEntries(trayVisualSurfaces().map((surface) => [surface, passed])),
+    tray_surface_screenshots_fresh_ready: passed,
     tray_surface_screenshots_distinct: passed,
     screenshot_exists: passed,
     daemon_context: manualTrayDaemonContext() as ReturnType<typeof manualTrayDaemonContext> | undefined,
@@ -2075,7 +2092,31 @@ function productVisualManualTrayReport(passed: boolean, screenshots: Record<stri
 function manualTrayReportWithSurfaces(passed: boolean, screenshotPath: string, screenshots: Record<string, string>) {
   const report = manualTrayReport(passed, screenshotPath);
   report.tray_surface_screenshot_paths = screenshots;
+  report.tray_surface_screenshot_metadata = manualTrayScreenshotMetadataFor(screenshots, passed);
   return report;
+}
+
+function manualTrayScreenshotMetadataFor(screenshots: Record<string, string>, passed: boolean): Record<string, Record<string, unknown>> {
+  return Object.fromEntries(trayVisualSurfaces().map((surface) => {
+    const path = screenshots[surface];
+    if (!passed) return [surface, { path, ready: false, fresh: false }];
+    let stats;
+    try {
+      stats = statSync(path);
+    } catch {
+      return [surface, { path, ready: false, fresh: false }];
+    }
+    return [surface, {
+      path,
+      size_bytes: stats.size,
+      mtime: stats.mtime.toISOString(),
+      recorded_at: new Date().toISOString(),
+      age_ms: 0,
+      freshness_window_ms: 30 * 60 * 1000,
+      fresh: true,
+      ready: true
+    }];
+  }));
 }
 
 function traySurfaceScreenshotPaths(basePath: string): Record<string, string> {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -1484,6 +1484,7 @@ function writeManualTrayEvidence(dir: string, ready = true, status: 'Up' | 'Degr
   const traySurfaceScreenshotPaths = Object.fromEntries(TRAY_SURFACES.map((surface) => [surface.replaceAll('-', '_'), writeSurfaceScreenshot(dir, `${surface}.png`)]));
   const primaryScreenshotPath = traySurfaceScreenshotPaths.tray_icon;
   const traySurfaceScreenshotsExist = Object.fromEntries(TRAY_SURFACES.map((surface) => [surface.replaceAll('-', '_'), ready]));
+  const traySurfaceScreenshotsFresh = Object.fromEntries(TRAY_SURFACES.map((surface) => [surface.replaceAll('-', '_'), ready]));
   const path = join(dir, `manual-tray-${ready ? 'ready' : 'broken'}.json`);
   writeFileSync(path, JSON.stringify({
     schema_version: 1,
@@ -1508,12 +1509,32 @@ function writeManualTrayEvidence(dir: string, ready = true, status: 'Up' | 'Degr
     tray_surface_screenshot_paths: traySurfaceScreenshotPaths,
     tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
     tray_surface_screenshots_ready: ready,
+    tray_surface_screenshot_metadata: manualTrayScreenshotMetadataFor(traySurfaceScreenshotPaths, ready),
+    tray_surface_screenshots_fresh: traySurfaceScreenshotsFresh,
+    tray_surface_screenshots_fresh_ready: ready,
     tray_surface_screenshots_distinct: ready,
     daemon_context: manualTrayDaemonContext(ready, status),
     daemon_context_ready: ready,
     passed: ready
   }, null, 2));
   return path;
+}
+
+function manualTrayScreenshotMetadataFor(screenshots: Record<string, string>, ready: boolean): Record<string, Record<string, unknown>> {
+  return Object.fromEntries(Object.entries(screenshots).map(([surface, path]) => {
+    if (!ready) return [surface, { path, ready: false, fresh: false }];
+    const stats = statSync(path);
+    return [surface, {
+      path,
+      size_bytes: stats.size,
+      mtime: stats.mtime.toISOString(),
+      recorded_at: new Date().toISOString(),
+      age_ms: 0,
+      freshness_window_ms: 30 * 60 * 1000,
+      fresh: true,
+      ready: true
+    }];
+  }));
 }
 
 function writeCatalogIdentityReview(dir: string, ready = true): string {

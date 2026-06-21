@@ -958,13 +958,22 @@ function manualTrayEvidenceLooksReady(evidence: Record<string, unknown> | undefi
 }
 
 function manualTraySurfaceScreenshotsLookReady(evidence: Record<string, unknown>): boolean {
-  if (evidence.tray_surface_screenshots_ready !== true || evidence.tray_surface_screenshots_distinct !== true) return false;
+  if (evidence.tray_surface_screenshots_ready !== true || evidence.tray_surface_screenshots_fresh_ready !== true || evidence.tray_surface_screenshots_distinct !== true) return false;
   const paths = isRecord(evidence.tray_surface_screenshot_paths) ? evidence.tray_surface_screenshot_paths : undefined;
   const exists = isRecord(evidence.tray_surface_screenshots_exist) ? evidence.tray_surface_screenshots_exist : undefined;
-  if (!paths || !exists) return false;
+  const fresh = isRecord(evidence.tray_surface_screenshots_fresh) ? evidence.tray_surface_screenshots_fresh : undefined;
+  const metadata = isRecord(evidence.tray_surface_screenshot_metadata) ? evidence.tray_surface_screenshot_metadata : undefined;
+  if (!paths || !exists || !fresh || !metadata) return false;
   return ['tray_icon', 'tray_native_menu', 'tray_tooltip', 'tray_quit_confirmation'].every((surface) => {
     const path = paths[surface];
-    return exists[surface] === true && typeof path === 'string' && screenshotFileLooksLikeImage(resolve(path));
+    const item = metadata[surface];
+    return exists[surface] === true
+      && fresh[surface] === true
+      && typeof path === 'string'
+      && screenshotFileLooksLikeImage(resolve(path))
+      && isRecord(item)
+      && item.fresh === true
+      && item.ready === true;
   });
 }
 

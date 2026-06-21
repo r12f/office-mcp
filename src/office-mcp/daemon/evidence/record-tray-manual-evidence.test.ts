@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -158,6 +158,23 @@ test('manual tray evidence recorder rejects truncated screenshots', () => {
     assert.equal(evidence.screenshot_exists, true);
     assert.equal((evidence.tray_surface_screenshots_exist as Record<string, boolean>).tray_icon, false);
     assert.equal(evidence.tray_surface_screenshots_ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
+test('manual tray evidence recorder rejects stale screenshots', () => {
+  withTrayScreenshot((dir, screenshotPath) => {
+    const staleTrayIcon = writeSurfaceScreenshot(dir, 'stale-tray-icon.png');
+    const staleDate = new Date(Date.now() - 60 * 60 * 1000);
+    utimesSync(staleTrayIcon, staleDate, staleDate);
+    const daemonBin = writeFakeDaemon(dir);
+    const output = join(dir, 'stale-screenshot.json');
+    const result = runRecorder(output, screenshotPath, '--tooltip', 'Office MCP Control - Up - 0 clients - 0 documents', '--daemon-bin', daemonBin, '--shared-tray-surface-screenshot', staleTrayIcon, '--screenshot-freshness-window-ms', '1000');
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.tray_surface_screenshots_fresh_ready, false);
+    assert.equal((evidence.tray_surface_screenshots_fresh as Record<string, boolean>).tray_icon, false);
+    assert.equal((evidence.tray_surface_screenshot_metadata as Record<string, Record<string, unknown>>).tray_icon.fresh, false);
     assert.equal(evidence.passed, false);
   });
 });

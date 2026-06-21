@@ -454,6 +454,7 @@ function validateManualTrayEvidence(): void {
   }
   validateManualTrayPrimaryScreenshotBinding(manual, 'Manual tray evidence');
   validateManualTraySurfaceScreenshots(manual.tray_surface_screenshot_paths, manual.tray_surface_screenshots_exist, 'Manual tray evidence');
+  validateManualTrayScreenshotFreshness(manual.tray_surface_screenshot_paths, manual.tray_surface_screenshot_metadata, manual.tray_surface_screenshots_fresh, manual.tray_surface_screenshots_fresh_ready, manual.recorded_at, 'Manual tray evidence');
   if (manual.tray_surface_screenshots_ready !== true) failures.push('Manual tray evidence missing tray surface screenshots ready flag.');
   if (manual.tray_surface_screenshots_distinct !== true) failures.push('Manual tray evidence reuses one screenshot for multiple tray surfaces.');
   if (manual.daemon_context_ready !== true) {
@@ -597,6 +598,7 @@ function validateEmbeddedManualTrayEvidence(manual: unknown, ready: unknown): vo
   if (typeof manual.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(manual.screenshot_path))) failures.push('Embedded manual tray evidence screenshot file does not exist.');
   validateManualTrayPrimaryScreenshotBinding(manual, 'Embedded manual tray evidence');
   validateManualTraySurfaceScreenshots(manual.tray_surface_screenshot_paths, manual.tray_surface_screenshots_exist, 'Embedded manual tray evidence');
+  validateManualTrayScreenshotFreshness(manual.tray_surface_screenshot_paths, manual.tray_surface_screenshot_metadata, manual.tray_surface_screenshots_fresh, manual.tray_surface_screenshots_fresh_ready, manual.recorded_at, 'Embedded manual tray evidence');
   if (manual.tray_surface_screenshots_ready !== true) failures.push('Embedded manual tray evidence missing tray surface screenshots ready flag.');
   if (manual.tray_surface_screenshots_distinct !== true) failures.push('Embedded manual tray evidence reuses one screenshot for multiple tray surfaces.');
   if (manual.daemon_context_ready !== true) failures.push('Embedded manual tray evidence daemon context is not recorder-ready.');
@@ -718,6 +720,37 @@ function validateManualTraySurfaceScreenshots(paths: unknown, exists: unknown, l
       }
     }
     if (exists[surface] !== true) failures.push(`${label} missing ready flag for tray surface screenshot: ${surface}.`);
+  }
+}
+
+function validateManualTrayScreenshotFreshness(paths: unknown, metadata: unknown, freshFlags: unknown, ready: unknown, recordedAt: unknown, label: string): void {
+  if (ready !== true) failures.push(`${label} tray surface screenshots are not fresh for the recorded run.`);
+  if (!isRecord(paths) || !isRecord(metadata) || !isRecord(freshFlags)) {
+    failures.push(`${label} tray surface screenshot freshness metadata is malformed.`);
+    return;
+  }
+  const recordedAtMs = typeof recordedAt === 'string' ? Date.parse(recordedAt) : Number.NaN;
+  if (!Number.isFinite(recordedAtMs)) failures.push(`${label} missing valid recorded_at timestamp for screenshot freshness.`);
+  for (const surface of trayVisualSurfaces()) {
+    const path = paths[surface];
+    const item = metadata[surface];
+    if (!isRecord(item)) {
+      failures.push(`${label} missing tray surface screenshot freshness metadata: ${surface}.`);
+      continue;
+    }
+    const resolvedPath = typeof path === 'string' ? resolve(path) : undefined;
+    if (typeof item.path !== 'string' || !resolvedPath || resolve(item.path) !== resolvedPath) failures.push(`${label} tray surface screenshot freshness path mismatch: ${surface}.`);
+    if (item.ready !== true || item.fresh !== true || freshFlags[surface] !== true) failures.push(`${label} tray surface screenshot is stale: ${surface}.`);
+    if (typeof item.mtime !== 'string' || !Number.isFinite(Date.parse(item.mtime))) failures.push(`${label} tray surface screenshot missing valid mtime: ${surface}.`);
+    if (typeof item.recorded_at !== 'string' || !Number.isFinite(Date.parse(item.recorded_at))) failures.push(`${label} tray surface screenshot missing valid metadata recorded_at: ${surface}.`);
+    if (typeof item.age_ms !== 'number' || item.age_ms < 0) failures.push(`${label} tray surface screenshot missing non-negative age: ${surface}.`);
+    if (typeof item.freshness_window_ms !== 'number' || item.freshness_window_ms < 0) failures.push(`${label} tray surface screenshot missing freshness window: ${surface}.`);
+    if (typeof item.size_bytes !== 'number' || item.size_bytes <= 0) failures.push(`${label} tray surface screenshot missing file size: ${surface}.`);
+    if (Number.isFinite(recordedAtMs) && typeof item.mtime === 'string') {
+      const mtimeMs = Date.parse(item.mtime);
+      const windowMs = typeof item.freshness_window_ms === 'number' ? item.freshness_window_ms : 0;
+      if (!Number.isFinite(mtimeMs) || recordedAtMs - mtimeMs > windowMs) failures.push(`${label} tray surface screenshot is older than freshness window: ${surface}.`);
+    }
   }
 }
 

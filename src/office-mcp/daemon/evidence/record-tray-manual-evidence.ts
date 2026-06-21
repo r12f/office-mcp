@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,7 +33,14 @@ const screenshotExists = screenshotPath ? screenshotFileLooksLikeImage(resolve(s
 const traySurfaceScreenshotsExist = Object.fromEntries(
   Object.entries(traySurfaceScreenshots).map(([surface, path]) => [surface, typeof path === 'string' && screenshotFileLooksLikeImage(resolve(path))])
 );
+const traySurfaceScreenshotMetadata = Object.fromEntries(
+  Object.entries(traySurfaceScreenshots).map(([surface, path]) => [surface, screenshotMetadataFor(path)])
+);
+const traySurfaceScreenshotsFresh = Object.fromEntries(
+  Object.entries(traySurfaceScreenshotMetadata).map(([surface, metadata]) => [surface, metadata.fresh === true])
+);
 const traySurfaceScreenshotsReady = Object.values(traySurfaceScreenshotsExist).every(Boolean);
+const traySurfaceScreenshotsFreshReady = Object.values(traySurfaceScreenshotsFresh).every(Boolean);
 const traySurfaceScreenshotsDistinct = screenshotPathsAreDistinct(traySurfaceScreenshots);
 const primaryScreenshotMatchesTrayIcon = screenshotPathMatchesTrayIconSurface(screenshotPath, traySurfaceScreenshots.tray_icon);
 const tooltipLooksProductReady = typeof observedTooltip === 'string' && /^Office MCP Control - (Up|Degraded|Down) - \d+ clients - \d+ documents$/.test(observedTooltip);
@@ -41,7 +48,7 @@ const trayMenuSurfaceNative = trayMenuSurfaceKind === 'native';
 const daemonContext = daemonBin ? readDaemonContext(resolve(daemonBin)) : undefined;
 const daemonContextReady = daemonContextLooksReady(daemonContext);
 const nativeTrayInteractionReady = menuOpenedFromTrayIcon && nativeMenuAppearanceReviewed && menuAnchoredToTrayIcon && osNativeMenuBehaviorReviewed && keyboardMenuAccessReviewed && nativeQuitConfirmationReviewed;
-const passed = visibleIcon && rightClickMenu && nativeTrayInteractionReady && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && primaryScreenshotMatchesTrayIcon && traySurfaceScreenshotsReady && traySurfaceScreenshotsDistinct && daemonContextReady;
+const passed = visibleIcon && rightClickMenu && nativeTrayInteractionReady && trayMenuSurfaceNative && showUiOpened && menuContainsRequiredItems && tooltipLooksProductReady && screenshotExists && primaryScreenshotMatchesTrayIcon && traySurfaceScreenshotsReady && traySurfaceScreenshotsFreshReady && traySurfaceScreenshotsDistinct && daemonContextReady;
 
 const evidence = {
   schema_version: 1,
@@ -72,6 +79,9 @@ const evidence = {
   tray_surface_screenshot_paths: traySurfaceScreenshots,
   tray_surface_screenshots_exist: traySurfaceScreenshotsExist,
   tray_surface_screenshots_ready: traySurfaceScreenshotsReady,
+  tray_surface_screenshot_metadata: traySurfaceScreenshotMetadata,
+  tray_surface_screenshots_fresh: traySurfaceScreenshotsFresh,
+  tray_surface_screenshots_fresh_ready: traySurfaceScreenshotsFreshReady,
   tray_surface_screenshots_distinct: traySurfaceScreenshotsDistinct,
   daemon_context: daemonContext,
   daemon_context_ready: daemonContextReady,
@@ -122,6 +132,35 @@ function screenshotPathsAreDistinct(paths: Record<string, string | undefined>): 
 function screenshotPathMatchesTrayIconSurface(primaryPath: string | undefined, trayIconPath: string | undefined): boolean {
   if (!primaryPath || !trayIconPath) return false;
   return resolve(primaryPath).toLowerCase() === resolve(trayIconPath).toLowerCase();
+}
+
+function screenshotMetadataFor(path: string | undefined): Record<string, unknown> {
+  if (!path) return { ready: false, fresh: false, error: 'missing path' };
+  const resolvedPath = resolve(path);
+  try {
+    const stats = statSync(resolvedPath);
+    const recordedAtMs = Date.now();
+    const ageMs = Math.max(0, recordedAtMs - stats.mtimeMs);
+    const fresh = ageMs <= screenshotFreshnessWindowMs();
+    return {
+      path: resolvedPath,
+      size_bytes: stats.size,
+      mtime: stats.mtime.toISOString(),
+      recorded_at: new Date(recordedAtMs).toISOString(),
+      age_ms: ageMs,
+      freshness_window_ms: screenshotFreshnessWindowMs(),
+      fresh,
+      ready: fresh
+    };
+  } catch (error) {
+    return { path: resolvedPath, ready: false, fresh: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function screenshotFreshnessWindowMs(): number {
+  const value = readOption('--screenshot-freshness-window-ms') ?? process.env.OFFICE_MCP_SCREENSHOT_FRESHNESS_WINDOW_MS;
+  const parsed = value ? Number(value) : 30 * 60 * 1000;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 30 * 60 * 1000;
 }
 
 function normalizedOptionPath(name: string): string | undefined {
