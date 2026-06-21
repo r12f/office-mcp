@@ -207,6 +207,25 @@ test('product visual evidence recorder rejects stale screenshots', () => {
   });
 });
 
+test('product visual evidence recorder ties daemon main window review to its screenshot', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const missingScreenshots = { ...screenshots, 'daemon-main-window': join(dir, 'missing-daemon-main-window.png') };
+    const output = join(dir, 'missing-daemon-main-window.json');
+    const result = runRecorder(output, missingScreenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath);
+
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    const daemonMainWindow = evidence.daemon_main_window as Record<string, unknown>;
+    assert.equal((evidence.screenshots_exist as Record<string, unknown>).daemon_main_window, false);
+    assert.equal(daemonMainWindow.reviewed, true);
+    assert.equal(daemonMainWindow.screenshot_ready, false);
+    assert.equal(daemonMainWindow.ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 
 test('README manual tray evidence command matches current native tray gates', () => {
   const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');

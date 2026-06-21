@@ -230,7 +230,8 @@ const powerPointServerProtocolReady = typeof powerPointServerProtocolRow === 'st
 const powerPointDocumentStateReady = typeof powerPointDocumentState === 'string' && /^(Editable|Editable, unsaved changes|Read-only|Protected.*)$/i.test(powerPointDocumentState) && !/unknown/i.test(powerPointDocumentState);
 const powerPointTaskpaneDensityReady = powerPointCompactTopBlock && powerPointToolsPermissionsMerged && powerPointInlineSettings && powerPointServerProtocolReady && powerPointDocumentStateReady && powerPointRuntimeEvidenceReady;
 const currentScreenshotFeedbackReady = currentLogoScreenshotFeedbackReviewed && currentAddinScreenshotFeedbackReviewed && currentTrayScreenshotFeedbackReviewed;
-const daemonMainWindowReady = daemonMainWindowReviewed && daemonMainWindowCompactReviewed && daemonMainWindowThreeColumnReviewed;
+const daemonMainWindowScreenshotReady = screenshotsExist.daemon_main_window === true && screenshotsFresh.daemon_main_window === true && typeof observations.daemon_main_window === 'string' && observations.daemon_main_window.includes(productName);
+const daemonMainWindowReady = daemonMainWindowReviewed && daemonMainWindowCompactReviewed && daemonMainWindowThreeColumnReviewed && daemonMainWindowScreenshotReady;
 const productIdentityReviewReady = logoQualityReviewed && logoFutureOfficeControlReviewed && finalLogoUserSurfaceReviewed && currentLogoScreenshotFeedbackReviewed && renderedSizeLogoReviewed && renderedLogoReviewReady && catalogIdentityReviewReady && addinIdentityReviewed && addinTitleIconTypeReviewed && addinInstallableSurfaceReviewed && currentAddinScreenshotFeedbackReviewed && wordFirstRunIdentityReady && excelFirstRunIdentityReady && powerPointFirstRunIdentityReady && wordRuntimeEvidenceReady && excelRuntimeEvidenceReady && powerPointRuntimeEvidenceReady && trayProductPolishReviewed && trayNativeFirstImpressionReviewed && trayNormalWindowsLaunchReviewed && currentTrayScreenshotFeedbackReviewed;
 const passed = productTextReady && allScreenshotsExist && allScreenshotsFresh && trayTooltipReady && catalogTypeReady && catalogIdentityReviewReady && catalogIconVisible && trayMenuNative && trayMenuSurfaceNative && trayIconVisible && quitConfirmationVisible && manualTrayEvidenceReady && officeToolE2eReady && wordTaskpaneDensityReady && excelTaskpaneDensityReady && powerPointTaskpaneDensityReady && daemonMainWindowReady && productIdentityReviewReady && renderedLogoReviewReady && wordRuntimeEvidenceReady && excelRuntimeEvidenceReady && powerPointRuntimeEvidenceReady && daemonContextReady;
 
@@ -295,6 +296,11 @@ const evidence = {
     reviewed: daemonMainWindowReviewed,
     compact_status_details_reviewed: daemonMainWindowCompactReviewed,
     three_column_layout_reviewed: daemonMainWindowThreeColumnReviewed,
+    screenshot_path: screenshotPaths.daemon_main_window,
+    screenshot_exists: screenshotsExist.daemon_main_window,
+    screenshot_fresh: screenshotsFresh.daemon_main_window,
+    observation: observations.daemon_main_window,
+    screenshot_ready: daemonMainWindowScreenshotReady,
     ready: daemonMainWindowReady
   },
   first_run_identity: {

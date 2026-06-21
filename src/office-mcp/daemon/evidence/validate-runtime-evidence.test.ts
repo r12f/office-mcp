@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { tinyPng } from './image-evidence.js';
 
@@ -614,6 +614,27 @@ test('runtime evidence validator can require product visual evidence', () => {
       assert.match(outputText(result.stdout), /daemon main window compact status\/details review/);
       assert.match(outputText(result.stdout), /daemon main window three-column layout review/);
       assert.match(outputText(result.stdout), /daemon main window ready flag/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.daemon_main_window.screenshot_exists = false;
+      broken.daemon_main_window.screenshot_fresh = false;
+      broken.daemon_main_window.screenshot_ready = false;
+      broken.daemon_main_window.screenshot_path = join(dirname(visualPath), 'missing-daemon-main-window.png');
+      broken.daemon_main_window.observation = 'Daemon console visible';
+      broken.daemon_main_window.ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /daemon main window screenshot existence flag/);
+      assert.match(outputText(result.stdout), /daemon main window fresh screenshot flag/);
+      assert.match(outputText(result.stdout), /daemon main window screenshot ready flag/);
+      assert.match(outputText(result.stdout), /invalid daemon main window screenshot/);
+      assert.match(outputText(result.stdout), /daemon main window product observation/);
     });
   });
 
@@ -1393,6 +1414,11 @@ function productVisualReport(passed: boolean, screenshots: Record<string, string
       reviewed: passed,
       compact_status_details_reviewed: passed,
       three_column_layout_reviewed: passed,
+      screenshot_path: screenshots.daemon_main_window,
+      screenshot_exists: passed,
+      screenshot_fresh: passed,
+      observation: 'Office MCP Control daemon main window visible with compact status details',
+      screenshot_ready: passed,
       ready: passed
     },
     powerpoint_runtime_evidence: powerPointRuntimeEvidence(passed),

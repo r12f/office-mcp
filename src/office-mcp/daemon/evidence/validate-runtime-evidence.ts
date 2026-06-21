@@ -811,9 +811,18 @@ function validateDaemonMainWindowVisualEvidence(mainWindow: unknown): void {
     ['reviewed', 'daemon main window product review'],
     ['compact_status_details_reviewed', 'daemon main window compact status/details review'],
     ['three_column_layout_reviewed', 'daemon main window three-column layout review'],
+    ['screenshot_exists', 'daemon main window screenshot existence flag'],
+    ['screenshot_fresh', 'daemon main window fresh screenshot flag'],
+    ['screenshot_ready', 'daemon main window screenshot ready flag'],
     ['ready', 'daemon main window ready flag']
   ] as const) {
     if (mainWindow[key] !== true) failures.push(`Product visual evidence missing ${label}.`);
+  }
+  if (typeof mainWindow.screenshot_path !== 'string' || !screenshotFileLooksLikeImage(resolve(mainWindow.screenshot_path))) {
+    failures.push('Product visual evidence missing or invalid daemon main window screenshot.');
+  }
+  if (typeof mainWindow.observation !== 'string' || !mainWindow.observation.includes('Office MCP Control')) {
+    failures.push('Product visual evidence missing daemon main window product observation.');
   }
 }
 
