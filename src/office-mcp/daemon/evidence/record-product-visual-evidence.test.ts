@@ -949,9 +949,19 @@ test('product visual evidence recorder requires Office tool E2E reports', () => 
     assert.equal(passing.status, 0, outputText(passing.stdout) + outputText(passing.stderr));
     evidence = JSON.parse(readFileSync(join(dir, 'office-tool-e2e-ready.json'), 'utf8')) as Record<string, unknown>;
     assert.equal(evidence.office_tool_e2e_ready, true);
-    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).word.ready, true);
-    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).excel.ready, true);
-    assert.equal((evidence.office_tool_e2e as Record<string, Record<string, unknown>>).powerpoint.ready, true);
+    const officeToolE2e = evidence.office_tool_e2e as Record<string, Record<string, unknown>>;
+    assert.equal(officeToolE2e.word.ready, true);
+    assert.deepEqual(officeToolE2e.word.daemon, { endpoint: 'http://127.0.0.1:8765/mcp' });
+    assert.deepEqual(officeToolE2e.word.document, { path: 'word-fixture' });
+    assert.deepEqual(officeToolE2e.word.session, { session_id: 'word-session', available_tool_count: 2 });
+    assert.equal(officeToolE2e.excel.ready, true);
+    assert.deepEqual(officeToolE2e.excel.daemon, { endpoint: 'http://127.0.0.1:8765/mcp' });
+    assert.deepEqual(officeToolE2e.excel.document, { path: 'excel-fixture' });
+    assert.deepEqual(officeToolE2e.excel.session, { session_id: 'excel-session', available_tool_count: 2 });
+    assert.equal(officeToolE2e.powerpoint.ready, true);
+    assert.deepEqual(officeToolE2e.powerpoint.daemon, { endpoint: 'http://127.0.0.1:8765/mcp' });
+    assert.deepEqual(officeToolE2e.powerpoint.document, { path: 'powerpoint-fixture' });
+    assert.deepEqual(officeToolE2e.powerpoint.session, { session_id: 'powerpoint-session', available_tool_count: 2 });
   });
 });
 

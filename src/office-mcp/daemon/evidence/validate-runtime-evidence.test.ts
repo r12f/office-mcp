@@ -1013,6 +1013,24 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      delete (broken.office_tool_e2e.word as Record<string, unknown>).daemon;
+      delete (broken.office_tool_e2e.word as Record<string, unknown>).document;
+      delete (broken.office_tool_e2e.word as Record<string, unknown>).session;
+      broken.office_tool_e2e.word.ready = false;
+      broken.office_tool_e2e_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Product visual Office tool E2E Word report missing daemon endpoint/);
+      assert.match(outputText(result.stdout), /Product visual Office tool E2E Word report missing document path/);
+      assert.match(outputText(result.stdout), /Product visual Office tool E2E Word report missing session id/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.office_tool_e2e.powerpoint.session.session_id = 'different-powerpoint-tool-session';
       broken.office_tool_e2e.powerpoint.ready = false;
       broken.office_tool_e2e_ready = false;
@@ -1972,6 +1990,8 @@ function embeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tool
     kind: 'office_tool_e2e_report',
     report_host: host,
     passed,
+    daemon: { endpoint: 'http://127.0.0.1:8765/mcp' },
+    document: { path: `${hostKey}-fixture` },
     session: { session_id: sessionId, available_tool_count: tools.length },
     addin_activation: { activated: passed, activator: 'office-ui-activator', activation_path: passed ? 'official-sideload' : undefined },
     lifecycle_counts: {

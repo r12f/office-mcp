@@ -1199,6 +1199,7 @@ function validateEmbeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoin
   if (evidence.kind !== 'office_tool_e2e_report') failures.push(`Product visual Office tool E2E ${host} report has unsupported kind: ${evidence.kind ?? 'missing'}`);
   if (evidence.report_host !== host && evidence.host !== host) failures.push(`Product visual Office tool E2E ${host} report host mismatch.`);
   if (evidence.passed !== true) failures.push(`Product visual Office tool E2E ${host} report did not pass.`);
+  validateOfficeToolE2eIdentity(`Product visual Office tool E2E ${host} report`, evidence.daemon, evidence.document, evidence.session);
   validateOfficeToolE2eLifecycle(`Product visual Office tool E2E ${host} report`, evidence.lifecycle_counts);
   validateOfficeToolE2eActivation(`Product visual Office tool E2E ${host} report`, evidence.addin_activation);
   validateOfficeToolE2eCleanup(`Product visual Office tool E2E ${host} report`, evidence.cleanup);
@@ -1209,6 +1210,12 @@ function validateEmbeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoin
   if (!sameStrings(advertisedTools, sessionTools)) failures.push(`Product visual Office tool E2E ${host} report session tools do not match advertised tools.`);
   if (!sameStrings(advertisedTools, executedTools)) failures.push(`Product visual Office tool E2E ${host} report executed tools do not match advertised tools.`);
   validateOfficeToolRuns(`Product visual Office tool E2E ${host} report`, advertisedTools, evidence.tool_runs);
+}
+
+function validateOfficeToolE2eIdentity(label: string, daemon: unknown, document: unknown, session: unknown): void {
+  if (!isRecord(daemon) || typeof daemon.endpoint !== 'string' || daemon.endpoint.length === 0) failures.push(`${label} missing daemon endpoint.`);
+  if (!isRecord(document) || typeof document.path !== 'string' || document.path.length === 0) failures.push(`${label} missing document path.`);
+  if (!isRecord(session) || typeof session.session_id !== 'string' || session.session_id.length === 0) failures.push(`${label} missing session id.`);
 }
 
 function validateWordTaskpaneVisualEvidence(taskpane: unknown): void {
