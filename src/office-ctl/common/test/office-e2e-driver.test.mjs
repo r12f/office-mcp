@@ -1478,6 +1478,10 @@ setTimeout(() => {}, 10000);
 
 test('Office E2E driver rejects add-in activation until a concrete activator is provided', () => {
   const dir = mkdtempSync(join(tmpdir(), 'office-mcp-driver-empty-session-'));
+  const activationLogPath = join(dir, 'empty-session-activation.log');
+  const daemonLogPath = join(dir, 'empty-session-daemon.log');
+  writeFileSync(activationLogPath, 'visible controls: MCP Control Registering...\n');
+  writeFileSync(daemonLogPath, 'registered add-in runtime host_app="word" had_session=false\n');
   const serverPath = join(dir, 'empty-session-server.mjs');
   writeFileSync(serverPath, `
 import { createServer } from 'node:http';
@@ -1504,8 +1508,26 @@ server.listen(0, '127.0.0.1', () => {
   return firstStdoutLine(server).then((line) => {
     try {
       const { endpoint } = JSON.parse(line);
-      const result = runDriver({ host: 'Word', step: 'waitForSession', context: { daemon: { endpoint }, document: { path: 'missing.docx' }, timeoutMs: 1 } });
+      const result = runDriver({
+        host: 'Word',
+        step: 'waitForSession',
+        context: {
+          daemon: { endpoint, addinOrigin: 'https://localhost:8765', addinEndpoint: 'wss://localhost:8765/addin', logPath: daemonLogPath },
+          document: { path: 'missing.docx', activationLogPath }
+        }
+      });
       assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /Timed out waiting 10000 ms/);
+      assert.match(result.stderr, /phase=addin-session-register/);
+      assert.match(result.stderr, /document=missing\.docx/);
+      assert.match(result.stderr, /mcp_endpoint=http:\/\/127\.0\.0\.1:/);
+      assert.match(result.stderr, /addin_origin=https:\/\/localhost:8765/);
+      assert.match(result.stderr, /addin_endpoint=wss:\/\/localhost:8765\/addin/);
+      assert.match(result.stderr, /latest_sessions=\[\]/);
+      assert.match(result.stderr, /activation_log_path=.*empty-session-activation\.log/);
+      assert.match(result.stderr, /activation_log_tail=.*MCP Control Registering/);
+      assert.match(result.stderr, /daemon_log_path=.*empty-session-daemon\.log/);
+      assert.match(result.stderr, /daemon_log_tail=.*registered add-in runtime/);
       assert.match(result.stderr, /Open MCP Control in Word/);
     } finally {
       server.kill();

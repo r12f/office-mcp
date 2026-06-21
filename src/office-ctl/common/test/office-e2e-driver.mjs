@@ -10,6 +10,7 @@ const REPO_ROOT = resolve(DRIVER_DIR, '../../../..');
 const DAEMON_EXE = resolve(REPO_ROOT, 'target/debug/office-mcp-daemon.exe');
 const DEFAULT_WINDOWS_ACTIVATOR = resolve(REPO_ROOT, 'src/office-ctl/common/scripts/activate-office-mcp-addin.ps1');
 const DEFAULT_TIMEOUT_MS = 120000;
+const DEFAULT_SESSION_TIMEOUT_MS = 10000;
 const mcpSessionIds = new Map();
 
 const request = await readRequest();
@@ -289,7 +290,7 @@ function officeWindowMode(host) {
 async function waitForSession(host, context) {
   const daemon = context.daemon || {};
   const document = context.document || {};
-  const timeoutMs = Number(context.timeoutMs || process.env.OFFICE_MCP_E2E_SESSION_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
+  const timeoutMs = Number(context.timeoutMs || process.env.OFFICE_MCP_E2E_SESSION_TIMEOUT_MS || DEFAULT_SESSION_TIMEOUT_MS);
   const started = Date.now();
   let latest = [];
   while (Date.now() - started <= timeoutMs) {
@@ -304,7 +305,7 @@ async function waitForSession(host, context) {
     }
     await sleep(1000);
   }
-  throw new Error(`Timed out waiting ${timeoutMs} ms for ${host} add-in session for ${document.path || 'test document'}. Open MCP Control in ${host}, ensure it connects to the daemon, then rerun npm run e2e:tools with OFFICE_MCP_RUN_E2E=1.`);
+  throw new Error(`Timed out waiting ${timeoutMs} ms for ${host} add-in session for ${document.path || 'test document'}. ${sessionWaitDiagnostic({ host, daemon, document, latest })} Open MCP Control in ${host}, ensure it connects to the daemon, then rerun npm run e2e:tools with OFFICE_MCP_RUN_E2E=1.`);
 }
 
 async function activateAddin(host, context) {
@@ -425,6 +426,44 @@ function activatorLogDetail(path) {
   if (!path || !existsSync(path)) return '';
   const text = readText(path);
   return text ? ` activator log: ${text.slice(-8000)}` : '';
+}
+
+function sessionWaitDiagnostic({ host, daemon = {}, document = {}, latest = [] }) {
+  const fields = [
+    'phase=addin-session-register',
+    `host=${normalizeHost(host)}`,
+    `document=${document.path || 'test document'}`,
+    `mcp_endpoint=${daemon.endpoint || ''}`,
+    `addin_origin=${daemon.addinOrigin || ''}`,
+    `addin_endpoint=${daemon.addinEndpoint || ''}`,
+    `latest_sessions=${safeJson(latest)}`
+  ];
+  if (document.activationLogPath) {
+    fields.push(`activation_log_path=${document.activationLogPath}`);
+    fields.push(`activation_log_tail=${fileTail(document.activationLogPath)}`);
+  }
+  if (daemon.logPath) {
+    fields.push(`daemon_log_path=${daemon.logPath}`);
+    fields.push(`daemon_log_tail=${fileTail(daemon.logPath)}`);
+  }
+  return fields.join(' ');
+}
+
+function fileTail(path, maxLength = 4000) {
+  if (!path || !existsSync(path)) return '';
+  return compactDiagnosticText(readText(path).slice(-maxLength));
+}
+
+function compactDiagnosticText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function safeJson(value) {
+  try {
+    return compactDiagnosticText(JSON.stringify(value));
+  } catch {
+    return 'unserializable';
+  }
 }
 
 function activatorFailureDetail(path) {
