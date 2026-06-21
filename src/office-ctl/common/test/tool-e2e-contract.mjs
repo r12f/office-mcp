@@ -319,6 +319,7 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
       if (document) {
         report.lifecycle_counts.cleanup_document += 1;
         report.cleanup = summarizeCleanup(await driver.cleanupDocument(document, { host, daemon, session }));
+        assertCleanupProof(host, report.cleanup);
       }
     } catch (error) {
       cleanupError = error;
@@ -439,6 +440,14 @@ function summarizeCleanup(cleanup) {
     deleted_path_count: Array.isArray(cleanup.deletedPaths) ? cleanup.deletedPaths.length : undefined,
     skipped: typeof cleanup.skipped === 'string' ? cleanup.skipped : undefined
   };
+}
+
+function assertCleanupProof(host, cleanup) {
+  if (!cleanup || typeof cleanup !== 'object') throw new Error(`${host} E2E cleanup proof is missing.`);
+  if (typeof cleanup.skipped === 'string' && cleanup.skipped.length > 0) throw new Error(`${host} E2E cleanup skipped: ${cleanup.skipped}`);
+  if (cleanup.closed_by_driver !== true) throw new Error(`${host} E2E cleanup did not close the driver-owned document.`);
+  if (cleanup.deleted !== true) throw new Error(`${host} E2E cleanup did not delete the driver-owned document.`);
+  if (typeof cleanup.deleted_path_count !== 'number' || cleanup.deleted_path_count < 1) throw new Error(`${host} E2E cleanup missing deleted path proof.`);
 }
 
 function summarizeToolResult(result) {

@@ -133,6 +133,7 @@ test('shared Office tool E2E loop drives daemon, document, setup, calls, verific
     },
     async cleanupDocument(document) {
       events.push(`cleanupDocument:${document.path}`);
+      return cleanupProof(document.path);
     },
     async stopDaemon() {
       events.push('stopDaemon');
@@ -246,7 +247,7 @@ test('shared Office tool E2E loop uses activator-returned document path for sess
     async setupContent() {},
     async callTool() { return { ok: true }; },
     async verifyResult() {},
-    async cleanupDocument(document) { events.push(`cleanup:${document.path}:${document.activationLogPath}`); },
+    async cleanupDocument(document) { events.push(`cleanup:${document.path}:${document.activationLogPath}`); return cleanupProof(document.path); },
     async stopDaemon() {}
   };
 
@@ -286,7 +287,7 @@ test('shared Office tool E2E loop writes failed report evidence before rethrowin
     async verifyResult() {
       throw new Error('verification failed');
     },
-    async cleanupDocument() {},
+    async cleanupDocument() { return cleanupProof(); },
     async stopDaemon() {}
   };
 
@@ -335,7 +336,7 @@ test('shared Office tool E2E loop records per-tool run metadata without body tex
     async verifyResult(toolCase, _result, _session, context) {
       records.push({ phase: 'verify', tool: toolCase.tool, run: context.run.id, requestId: context.run.requestId });
     },
-    async cleanupDocument() {},
+    async cleanupDocument() { return cleanupProof(); },
     async stopDaemon() {}
   };
 
@@ -373,7 +374,7 @@ test('shared Office tool E2E loop preserves concrete readback verifier metadata'
     async verifyResult(toolCase) {
       verifiers.push(toolCase.verify);
     },
-    async cleanupDocument() {},
+    async cleanupDocument() { return cleanupProof(); },
     async stopDaemon() {}
   };
   const cases = {
@@ -423,7 +424,7 @@ test('shared Office tool E2E loop carries setup bindings into call and verify st
     async verifyResult(_toolCase, _result, session) {
       observed.push(['verify', session.bindings.table.shape_id]);
     },
-    async cleanupDocument() {},
+    async cleanupDocument() { return cleanupProof(); },
     async stopDaemon() {}
   };
 
@@ -575,7 +576,7 @@ test('shared Office tool E2E loop fails when session tools and case table differ
     async setupContent() {},
     async callTool() {},
     async verifyResult() {},
-    async cleanupDocument() {},
+    async cleanupDocument() { return cleanupProof(); },
     async stopDaemon() {}
   };
   const cases = {
@@ -604,7 +605,7 @@ test('shared Office tool E2E loop fails when daemon tools/list exposes an uncove
     async setupContent() {},
     async callTool() {},
     async verifyResult() {},
-    async cleanupDocument() {},
+    async cleanupDocument() { return cleanupProof(); },
     async stopDaemon() {}
   };
 
@@ -648,6 +649,7 @@ test('shared Office tool E2E loop still cleans up when a verifier fails', async 
     },
     async cleanupDocument() {
       events.push('cleanupDocument');
+      return cleanupProof('fixture.docx');
     },
     async stopDaemon() {
       events.push('stopDaemon');
@@ -683,6 +685,31 @@ test('shared Office tool E2E loop still stops daemon when cleanup fails', async 
   assert.deepEqual(events, ['startDaemon', 'listTools', 'createDocument', 'waitForSession', 'reset', 'setup', 'call', 'verify', 'cleanupDocument', 'stopDaemon']);
 });
 
+test('shared Office tool E2E loop rejects weak cleanup proof', async () => {
+  const events = [];
+  const driver = {
+    async startDaemon() { events.push('startDaemon'); },
+    async listTools() { events.push('listTools'); return ['word.read']; },
+    async createDocument() { events.push('createDocument'); return { path: 'fixture.docx' }; },
+    async waitForSession() { events.push('waitForSession'); return { sessionId: 'session-1', availableTools: ['word.read'] }; },
+    async resetContent() { events.push('reset'); },
+    async setupContent() { events.push('setup'); },
+    async callTool() { events.push('call'); return { ok: true }; },
+    async verifyResult() { events.push('verify'); },
+    async cleanupDocument() {
+      events.push('cleanupDocument');
+      return { closedByDriver: false, deleted: false, deletedPaths: [], skipped: 'manual-debug' };
+    },
+    async stopDaemon() { events.push('stopDaemon'); }
+  };
+
+  await assert.rejects(
+    () => runOfficeToolE2e({ host: 'Word', cases: { 'word.read': e2eCase('word.read') }, driver }),
+    /Word E2E cleanup skipped: manual-debug/
+  );
+  assert.deepEqual(events, ['startDaemon', 'listTools', 'createDocument', 'waitForSession', 'reset', 'setup', 'call', 'verify', 'cleanupDocument', 'stopDaemon']);
+});
+
 test('shared Office tool E2E loop accepts setup-declared host capability skips', async () => {
   const events = [];
   const driver = {
@@ -694,7 +721,7 @@ test('shared Office tool E2E loop accepts setup-declared host capability skips',
     async setupContent() { events.push('setup'); return { bindings: { __accepted_error_code: 'HOST_CAPABILITY_UNAVAILABLE' } }; },
     async callTool() { events.push('call'); return { ok: true }; },
     async verifyResult() { events.push('verify'); },
-    async cleanupDocument() { events.push('cleanupDocument'); },
+    async cleanupDocument() { events.push('cleanupDocument'); return cleanupProof('deck.pptx'); },
     async stopDaemon() { events.push('stopDaemon'); }
   };
 
@@ -737,7 +764,7 @@ const responses = {
   setupContent: { setup: true },
   callTool: { ok: true },
   verifyResult: { verified: true },
-  cleanupDocument: { cleaned: true },
+  cleanupDocument: { closedByDriver: true, deleted: true, deletedPaths: ['external.docx'] },
   stopDaemon: { stopped: true }
 };
 process.stdout.write(JSON.stringify(responses[request.step] || {}));
@@ -820,4 +847,8 @@ function restoreEnv(name, value) {
   } else {
     process.env[name] = value;
   }
+}
+
+function cleanupProof(path = 'fixture.docx') {
+  return { closedByDriver: true, deleted: true, deletedPaths: [path] };
 }
