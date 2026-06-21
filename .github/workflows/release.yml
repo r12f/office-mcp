@@ -166,6 +166,13 @@ jobs:
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-msi.ps1 -Version ${{ steps.version.outputs.version }} -SkipNpmInstall
 
+      - name: Generate catalog identity review
+        shell: pwsh
+        run: |
+          node .\src\office-ctl\common\scripts\record-catalog-identity-review.mjs `
+            --catalog-path artifacts\msi-stage\addin-catalog `
+            --output artifacts\catalog-identity-review.json
+
       - name: Stage release artifacts
         id: stage
         shell: pwsh
@@ -189,6 +196,14 @@ jobs:
           $review = Get-Content -LiteralPath $renderedLogoReview -Raw | ConvertFrom-Json
           if ($review.ready -ne $true) {
             throw "Rendered logo review is not ready: $renderedLogoReview"
+          }
+          $catalogIdentityReview = 'artifacts\catalog-identity-review.json'
+          if (-not (Test-Path -LiteralPath $catalogIdentityReview)) {
+            throw "Catalog identity review artifact is missing: $catalogIdentityReview"
+          }
+          $catalogReview = Get-Content -LiteralPath $catalogIdentityReview -Raw | ConvertFrom-Json
+          if ($catalogReview.ready -ne $true) {
+            throw "Catalog identity review is not ready: $catalogIdentityReview"
           }
           $required = @(
             'artifacts\msi-stage\office-mcp-daemon.exe',
@@ -214,7 +229,8 @@ jobs:
             Get-FileHash -Algorithm SHA256 -LiteralPath @(
               (Split-Path -Leaf $releaseMsi),
               'logo-rendered-size-review.json',
-              'logo-rendered-size-review.png'
+              'logo-rendered-size-review.png',
+              'catalog-identity-review.json'
             ) |
               ForEach-Object { "$($_.Hash.ToLowerInvariant())  $($_.Path | Split-Path -Leaf)" } |
               Set-Content -LiteralPath SHA256SUMS -Encoding ascii
@@ -225,6 +241,7 @@ jobs:
           "checksums=artifacts\SHA256SUMS" >> $env:GITHUB_OUTPUT
           "rendered_logo_review=$renderedLogoReview" >> $env:GITHUB_OUTPUT
           "rendered_logo_sheet=$renderedLogoSheet" >> $env:GITHUB_OUTPUT
+          "catalog_identity_review=$catalogIdentityReview" >> $env:GITHUB_OUTPUT
 
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4
@@ -235,6 +252,7 @@ jobs:
             ${{ steps.stage.outputs.checksums }}
             ${{ steps.stage.outputs.rendered_logo_review }}
             ${{ steps.stage.outputs.rendered_logo_sheet }}
+            ${{ steps.stage.outputs.catalog_identity_review }}
 
       - name: Create GitHub release draft
         if: github.ref_type == 'tag'
@@ -247,4 +265,5 @@ jobs:
             ${{ steps.stage.outputs.checksums }}
             ${{ steps.stage.outputs.rendered_logo_review }}
             ${{ steps.stage.outputs.rendered_logo_sheet }}
+            ${{ steps.stage.outputs.catalog_identity_review }}
           body_path: RELEASE_NOTES.md
