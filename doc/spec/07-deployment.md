@@ -198,6 +198,10 @@ certificate_path = ""            # installer-managed default
 private_key_path = ""            # ACL restricted to the current user
 # These certificate fields are HTTPS/WSS transport settings.
 
+# session_grace_sec defaults to 60 and is capped by the daemon at 300 seconds.
+# Closed document sessions are deleted after this grace period; they are not
+# retained as historical sessions.
+
 # ─── daemon only ─────────────────────────────────────────────────────────
 [mcp_http]
 # MCP Streamable HTTP frontend the daemon exposes for MCP clients.

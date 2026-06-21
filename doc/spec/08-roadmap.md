@@ -330,6 +330,15 @@ or running developer build commands.
       or host-accent-compatible color marker next to the text label so users can
       identify dead sessions quickly when many documents are listed. Color alone
       is not enough; keep the text label for accessibility and tests.
+- [ ] Enforce closed-session cleanup across daemon runtime state. A closed,
+      disconnected, stale, or otherwise dead Office document session may remain
+      visible only during the reconnect grace window. The default grace is 60
+      seconds and the effective value must be capped at 300 seconds even when
+      config or environment variables request more. After the grace expires,
+      remove the session from the registry so it disappears from
+      `office.list_sessions`, `office.get_session_info`, daemon document cards,
+      and tray document counts. Do not keep historical session cards; command
+      history is the history surface.
 - [x] Add-in task pane product UI showing daemon connection, current document
       session, current task, and latest 20 task history entries for Word and
       Excel. Current evidence: `npm run check` in `src/office-ctl/word` and

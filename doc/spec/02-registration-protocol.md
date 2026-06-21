@@ -135,6 +135,14 @@ Success:
 }
 ```
 
+`session_grace_sec` is the maximum reconnect grace period for a closed or
+disconnected Office document session. The default is 60 seconds. The daemon
+MUST cap the effective value at 300 seconds even if a config file or environment
+override asks for a longer retention window. After the grace period expires, the
+session is deleted from the daemon registry and must no longer appear in
+`office.list_sessions`, `office.get_session_info`, daemon UI document lists, or
+tray document counts.
+
 Error (e.g. protocol version skew, malformed register):
 
 ```json

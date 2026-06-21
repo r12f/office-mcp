@@ -406,8 +406,12 @@ own `session.added`.
 2. Daemon marks affected sessions `stale`; in-flight calls reject with
    `SESSION_LOST`.
 3. Session is held in `stale` for `session_grace_sec` (config) to allow a
-   transient channel failure in the same runtime to reconnect.
-4. On grace timeout, session is removed.
+   transient channel failure in the same runtime to reconnect. The default is
+   60 seconds and the effective value MUST be capped at 300 seconds.
+4. On grace timeout, session is removed from the registry and must disappear
+   from `office.list_sessions`, daemon UI document lists, and tray document
+   counts. The daemon does not keep closed document sessions as historical
+   sessions; command history remains the only history surface.
 
 If Office restarts or reopens the document in a new runtime, it receives a new
 session ID; it does not reclaim the stale session.
