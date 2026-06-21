@@ -860,6 +860,20 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
+      broken.office_tool_e2e.powerpoint.session.session_id = 'different-powerpoint-tool-session';
+      broken.office_tool_e2e.powerpoint.ready = false;
+      broken.office_tool_e2e_ready = false;
+      broken.passed = false;
+      writeFileSync(visualPath, JSON.stringify(broken, null, 2));
+      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /PowerPoint Office tool E2E report session does not match runtime evidence session/);
+    });
+  });
+
+  withEvidenceFile(ui, (uiPath) => {
+    withProductVisualEvidence(true, (visualPath) => {
+      const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.daemon_context = manualTrayDaemonContext(undefined, false);
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
@@ -1705,14 +1719,17 @@ function powerPointRuntimeEvidence(passed: boolean) {
 }
 
 function embeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tools: string[], passed: boolean) {
+  const hostKey = host.toLowerCase();
+  const sessionId = officeToolE2eSessionId(host);
   return {
-    path: `C:\\Code\\office-mcp\\artifacts\\office-tool-e2e-${host.toLowerCase()}.json`,
+    path: `C:\\Code\\office-mcp\\artifacts\\office-tool-e2e-${hostKey}.json`,
     ok: passed,
     host,
     schema_version: 1,
     kind: 'office_tool_e2e_report',
     report_host: host,
     passed,
+    session: { session_id: sessionId, available_tool_count: tools.length },
     addin_activation: { activated: passed, activator: 'office-ui-activator' },
     lifecycle_counts: {
       start_daemon: 1,
@@ -1735,6 +1752,12 @@ function embeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tool
     })),
     ready: passed
   };
+}
+
+function officeToolE2eSessionId(host: 'Word' | 'Excel' | 'PowerPoint'): string {
+  if (host === 'Word') return '00000000-1111-2222-3333-444444444444';
+  if (host === 'Excel') return '11111111-2222-3333-4444-555555555555';
+  return '22222222-3333-4444-5555-666666666666';
 }
 
 function renderedLogoReview(passed: boolean, sheetPath: string) {

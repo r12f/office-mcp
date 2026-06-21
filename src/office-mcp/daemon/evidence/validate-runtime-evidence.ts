@@ -528,6 +528,9 @@ function validateProductVisualEvidence(): void {
   validateTaskpaneRuntimeBinding('Word', visual.word_runtime_evidence, visual.word_taskpane);
   validateTaskpaneRuntimeBinding('Excel', visual.excel_runtime_evidence, visual.excel_taskpane);
   validateTaskpaneRuntimeBinding('PowerPoint', visual.powerpoint_runtime_evidence, visual.powerpoint_taskpane);
+  validateOfficeToolE2eRuntimeBinding('Word', visual.word_runtime_evidence, visual.office_tool_e2e);
+  validateOfficeToolE2eRuntimeBinding('Excel', visual.excel_runtime_evidence, visual.office_tool_e2e);
+  validateOfficeToolE2eRuntimeBinding('PowerPoint', visual.powerpoint_runtime_evidence, visual.office_tool_e2e);
   if (visual.daemon_context_ready !== true) {
     failures.push('Product visual evidence daemon context is not recorder-ready.');
   }
@@ -1079,6 +1082,18 @@ function sessionIdFromRuntimeEvidence(runtime: unknown): string | undefined {
   if (!isRecord(runtime)) return undefined;
   const session = isRecord(runtime.session) ? runtime.session : undefined;
   return typeof session?.session_id === 'string' ? session.session_id : undefined;
+}
+
+function validateOfficeToolE2eRuntimeBinding(label: 'Word' | 'Excel' | 'PowerPoint', runtime: unknown, officeToolE2e: unknown): void {
+  const runtimeSessionId = sessionIdFromRuntimeEvidence(runtime);
+  const reports = isRecord(officeToolE2e) ? officeToolE2e : undefined;
+  const key = label.toLowerCase();
+  const report = reports && isRecord(reports[key]) ? reports[key] : undefined;
+  const session = report && isRecord(report.session) ? report.session : undefined;
+  const e2eSessionId = typeof session?.session_id === 'string' ? session.session_id : undefined;
+  if (!runtimeSessionId || !e2eSessionId || runtimeSessionId !== e2eSessionId) {
+    failures.push(`Product visual evidence ${label} Office tool E2E report session does not match runtime evidence session.`);
+  }
 }
 
 function validateExcelRuntimeEvidence(evidence: unknown, ready: unknown): void {
