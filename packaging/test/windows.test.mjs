@@ -195,3 +195,21 @@ test('README documents installation from GitHub Releases', () => {
   assert.match(readme, /log/i);
   assert.match(readme, /uninstall/i);
 });
+
+test('Release notes document the Windows installer pre-release gate', () => {
+  const repoRoot = join(PACKAGING_ROOT, '..');
+  const releaseNotes = readFileSync(join(repoRoot, 'RELEASE_NOTES.md'), 'utf8');
+
+  assert.match(releaseNotes, /# Release Notes/);
+  assert.match(releaseNotes, /## 0\.1\.0/);
+  assert.match(releaseNotes, /office-mcp-setup-0\.1\.0-x64\.msi/);
+  assert.match(releaseNotes, /SHA256SUMS/);
+  assert.match(releaseNotes, /unsigned/i);
+  assert.match(releaseNotes, /draft/i);
+  assert.match(releaseNotes, /pre-release/i);
+  assert.match(releaseNotes, /Windows desktop/i);
+  assert.match(releaseNotes, /Office MCP Control/);
+  assert.match(releaseNotes, /tray evidence/i);
+  assert.match(releaseNotes, /installer smoke evidence/i);
+  assert.match(releaseNotes, /live Office evidence/i);
+});
