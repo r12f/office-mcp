@@ -7,29 +7,31 @@ pub(crate) fn redact_text(value: &str) -> String {
 }
 
 fn redact_bearer_tokens(value: &str) -> String {
-    let parts = value.split_whitespace().collect::<Vec<_>>();
-    let mut output = Vec::with_capacity(parts.len());
+    let parts = split_text_tokens(value);
+    let mut output = String::with_capacity(value.len());
     let mut redact_next = false;
-    for part in parts {
+    for (part, separator) in parts {
         if redact_next {
-            output.push("[redacted]".to_string());
+            output.push_str("[redacted]");
+            output.push_str(separator);
             redact_next = false;
             continue;
         }
         if part.eq_ignore_ascii_case("bearer") {
-            output.push("Bearer".to_string());
+            output.push_str("Bearer");
             redact_next = true;
         } else {
-            output.push(part.to_string());
+            output.push_str(part);
         }
+        output.push_str(separator);
     }
-    output.join(" ")
+    output
 }
 
 fn redact_key_value_secret(value: &str) -> String {
-    value
-        .split_whitespace()
-        .map(|part| {
+    let mut output = String::with_capacity(value.len());
+    for (part, separator) in split_text_tokens(value) {
+        let redacted = || {
             let Some((key, _secret)) = part.split_once('=') else {
                 return part.to_string();
             };
@@ -41,9 +43,26 @@ fn redact_key_value_secret(value: &str) -> String {
             } else {
                 part.to_string()
             }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
+        };
+        output.push_str(&redacted());
+        output.push_str(separator);
+    }
+    output
+}
+
+fn split_text_tokens(value: &str) -> Vec<(&str, &str)> {
+    let mut tokens = Vec::new();
+    let mut rest = value;
+    while !rest.is_empty() {
+        let token_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+        let token = &rest[..token_end];
+        let separator_end = rest[token_end..]
+            .find(|character: char| !character.is_whitespace())
+            .map_or(rest.len(), |index| token_end + index);
+        tokens.push((token, &rest[token_end..separator_end]));
+        rest = &rest[separator_end..];
+    }
+    tokens
 }
 
 fn redact_base64_data(value: &str) -> String {

@@ -22,7 +22,7 @@ pub(crate) fn seeded_state(options: UiStateOptions) -> RuntimeSeedState {
     let mut ui_state = UiStateStore::with_options(options);
     ui_state.set_health(
         UiHealth::Degraded,
-        Some("Certificate reload failed. Check the configured local PFX path."),
+        Some("Certificate reload failed. Check the configured local PFX path.\nAdd-in channel refused the previous Word registration because the TLS certificate could not be reloaded from the configured file.\nOpen the daemon log file for the full structured event and verify the config file path before retrying."),
     );
     let client_id = ui_state.register_client(RegisterClientInput {
         client_id: Some("client-1".to_string()),

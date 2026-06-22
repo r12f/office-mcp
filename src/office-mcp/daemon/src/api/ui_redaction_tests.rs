@@ -17,6 +17,14 @@ fn redacts_key_value_secrets() {
 }
 
 #[test]
+fn preserves_diagnostic_line_breaks_while_redacting() {
+    assert_eq!(
+        redact_text("first line\npassword=secret\nAuthorization: bearer abc123"),
+        "first line\npassword=[redacted]\nAuthorization: Bearer [redacted]"
+    );
+}
+
+#[test]
 fn redacts_base64_payloads() {
     assert_eq!(
         redact_text("image=data:image/png;base64,iVBORw0KGgoAAA next=ok"),

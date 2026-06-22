@@ -118,7 +118,7 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(
         ".detail-log-value { display: grid; grid-template-columns: minmax(0, 1fr) auto;"
     ));
-    assert!(css.contains(".detail-log-value textarea { display: block; width: 100%; min-width: 0; min-height: 54px; max-height: 132px; resize: vertical; overflow: auto;"));
+    assert!(css.contains(".detail-log-value textarea { display: block; width: 100%; min-width: 0; min-height: 96px; max-height: 240px; resize: vertical; overflow: auto;"));
     assert!(css.contains("white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;"));
     assert!(!css.contains(".detail-log-value textarea { display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis;"));
     assert!(css.contains(".detail-copy, .detail-open { display: inline-flex; min-height: 24px;"));
@@ -163,7 +163,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("emptyState('No documents connected'"));
     assert!(js.contains("$('configPath').textContent = snapshot.daemon?.config_path || '-'"));
     assert!(js.contains("$('daemonMeta').textContent = 'Daemon state is live'"));
-    assert!(js.contains("$('lastError').value = snapshot.daemon?.last_error || 'None'"));
+    assert!(js.contains("setTextareaValue($('lastError'), snapshot.daemon?.last_error || 'None')"));
+    assert!(js.contains("function setTextareaValue(textarea, value)"));
+    assert!(js.contains("if (!textarea || textarea.value === value) return;"));
+    assert!(js.contains("textarea.setSelectionRange(Math.min(selectionStart, value.length), Math.min(selectionEnd, value.length))"));
     assert!(
         js.contains("const value = copy.dataset.copyValue || target?.value || target?.textContent")
     );

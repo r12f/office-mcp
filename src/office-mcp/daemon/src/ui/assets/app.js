@@ -87,7 +87,7 @@ function render() {
   $('daemonUptime').textContent = duration(snapshot.daemon?.uptime_ms || 0);
   $('configPath').textContent = snapshot.daemon?.config_path || '-';
   $('logPath').textContent = snapshot.daemon?.log_path || '-';
-  $('lastError').value = snapshot.daemon?.last_error || 'None';
+  setTextareaValue($('lastError'), snapshot.daemon?.last_error || 'None');
   renderToolAccess(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {});
   renderDocuments(snapshot.documents || {});
   renderClients(snapshot.clients || []);
@@ -314,6 +314,15 @@ function clearInspector() {
   document.querySelectorAll('.row[aria-selected="true"], tr[data-inspect][aria-selected="true"]').forEach((row) => row.setAttribute('aria-selected', 'false'));
   announce('Inspector cleared');
   return true;
+}
+
+function setTextareaValue(textarea, value) {
+  if (!textarea || textarea.value === value) return;
+  const focused = document.activeElement === textarea;
+  const selectionStart = textarea.selectionStart;
+  const selectionEnd = textarea.selectionEnd;
+  textarea.value = value;
+  if (focused) textarea.setSelectionRange(Math.min(selectionStart, value.length), Math.min(selectionEnd, value.length));
 }
 
 async function copyText(text, button) {
