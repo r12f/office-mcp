@@ -197,6 +197,12 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("title=\"${esc(doc.session_id || '-')}\""));
     assert!(js.contains("function documentConnectionLabel(status) { return status === 'active' || !status ? 'active' : 'dead'; }"));
     assert!(js.contains("function documentStateTone(status) { return status === 'active' || !status ? 'success' : 'danger'; }"));
+    assert!(js.contains("function statusLabel(value)"));
+    assert!(js.contains("if (value === 'success') return 'Succeeded';"));
+    assert!(js.contains("if (value === 'failure') return 'Failed';"));
+    assert!(js.contains("if (value === 'timeout') return 'Timed Out';"));
+    assert!(js.contains("if (value === 'cancelled') return 'Cancelled';"));
+    assert!(js.contains("value === 'timeout' ? 'warning'"));
     assert!(js.contains("Finished ${esc(metrics.finished)}"));
     assert!(js.contains("Failed ${esc(metrics.failed)}"));
     assert!(js.contains("function documentTaskMetrics(sessionId)"));

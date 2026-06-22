@@ -95,7 +95,8 @@ async function main(): Promise<void> {
     await pressKey(cdp, 'PageUp', 33);
     await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row")', 'document row PageUp moves focus toward the start');
     await assertEval(cdp, 'document.querySelector("#currentTasks").textContent.includes("Running") && document.querySelector("#taskCount").textContent.trim() === "1"', 'running task state renders');
-    await assertEval(cdp, 'document.querySelector("#history").textContent.includes("Success") && document.querySelector("#history").textContent.includes("Failure") && document.querySelector("#history").textContent.includes("TIMEOUT") && document.querySelector("#history").textContent.includes("CANCELLED")', 'history renders success failure timeout and cancelled states');
+    await assertEval(cdp, 'document.querySelector("#history").textContent.includes("Succeeded") && document.querySelector("#history").textContent.includes("Failed") && document.querySelector("#history").textContent.includes("Timed Out") && document.querySelector("#history").textContent.includes("Cancelled")', 'history renders spec status labels');
+    await assertEval(cdp, 'document.querySelector("#history .pill.warning")?.textContent.trim() === "Timed Out"', 'history timeout status uses warning tone');
     await assertEval(cdp, 'document.querySelector("#history tr[data-inspect]").getAttribute("tabindex") === "0" && document.querySelector("#history tr[data-inspect]").getAttribute("role") === "button"', 'history table rows are keyboard focusable buttons');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#history tr[data-inspect]").focus()' });
     await pressKey(cdp, 'ArrowDown', 40);
