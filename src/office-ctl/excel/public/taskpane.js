@@ -41,7 +41,9 @@
     setConnectionState: setSharedConnectionState,
     setCopyableMetadata,
     statusClass,
-    taskMetadataMarkup
+    taskMetadataMarkup,
+    taskStatusClass,
+    taskStatusLabel
   } = window.OfficeCtlMainUi;
 
   const AVAILABLE_TOOLS = [
@@ -1818,13 +1820,13 @@
   }
 
   function taskMarkup(task) {
-    const tone = task.status === 'success' ? 'status-success' : task.status === 'running' ? 'status-warning' : task.status === 'cancelled' ? 'status-neutral' : 'status-danger';
+    const tone = taskStatusClass(task.status || 'running');
     const metadata = taskMetadataMarkup(task, { escapeHtml, formatTime, redactText, valueLabel: boolLabel });
     const commandId = commandIdMarkup(task.requestId, { escapeHtml });
     return [
       '<div class="task-title">',
       `<span>${escapeHtml(task.tool)}</span>`,
-      `<span class="status-badge ${tone}">${escapeHtml(titleCase(task.status))}</span>`,
+      `<span class="status-badge ${tone}">${escapeHtml(taskStatusLabel(task.status || 'running'))}</span>`,
       '</div>',
       commandId,
       `<div class="task-meta">${escapeHtml(formatDuration(task.elapsedMs || 0))}</div>`,

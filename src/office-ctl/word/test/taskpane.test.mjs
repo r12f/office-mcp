@@ -477,6 +477,11 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /taskStore\.consumeCancellation\(requestId\)/);
   assert.match(js, /finishTask\(requestId, 'success'/);
   assert.match(js, /const metadata = taskMetadataMarkup\(task, \{ escapeHtml, formatTime, redactText, valueLabel: boolLabel \}\)/);
+  assert.match(js, /taskStatusClass/);
+  assert.match(js, /taskStatusLabel/);
+  assert.match(js, /const tone = taskStatusClass\(task\.status \|\| 'running'\)/);
+  assert.match(js, /<span class="status-badge \$\{tone\}">\$\{escapeHtml\(taskStatusLabel\(task\.status \|\| 'running'\)\)\}<\/span>/);
+  assert.doesNotMatch(functionBody(js, 'taskMarkup'), /titleCase\(task\.status\)/);
   assert.match(js, /storeEndpointOverride\(value\)/);
   assert.doesNotMatch(js, /settingsToggleEl/);
   assert.match(js, /document\.addEventListener\('click', handleMetadataCopy\)/);

@@ -121,6 +121,26 @@
     return 'status-neutral';
   }
 
+  function statusTitleCase(value) {
+    return String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  function taskStatusLabel(value) {
+    if (value === 'running') return 'Running';
+    if (value === 'success') return 'Succeeded';
+    if (value === 'failure') return 'Failed';
+    if (value === 'timeout') return 'Timed Out';
+    if (value === 'cancelled') return 'Cancelled';
+    return statusTitleCase(value);
+  }
+
+  function taskStatusClass(value) {
+    if (value === 'success') return 'status-success';
+    if (value === 'running' || value === 'timeout') return 'status-warning';
+    if (value === 'cancelled') return 'status-neutral';
+    return 'status-danger';
+  }
+
   function setConnectionState(elements, state, label) {
     const badge = elements?.badge;
     if (badge) {
@@ -165,6 +185,8 @@
     setCopyableMetadata,
     statusClass,
     documentStateLabel,
-    taskMetadataMarkup
+    taskMetadataMarkup,
+    taskStatusClass,
+    taskStatusLabel
   });
 })(globalThis);

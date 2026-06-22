@@ -3,7 +3,7 @@
   const PROTOCOL_VERSION = '1.0';
   const POWERPOINT_FILE_EXPORT_TIMEOUT_MS = 10000;
   const { boolLabel, escapeHtml, fileName, formatDuration, formatTime, titleCase, redactText } = window.OfficeCtlCommon;
-  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, isToolAllowedByCapabilityMode, middleTruncate, protectionLabel, renderRuntimeVersions, renderStaticMetadata, renderToolModeControl: renderSharedToolModeControl, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup } = window.OfficeCtlMainUi;
+  const { bindDetailsControl, commandIdMarkup, copyMetadataValue, documentStateLabel, isToolAllowedByCapabilityMode, middleTruncate, protectionLabel, renderRuntimeVersions, renderStaticMetadata, renderToolModeControl: renderSharedToolModeControl, setConnectionState: setSharedConnectionState, setCopyableMetadata, statusClass, taskMetadataMarkup, taskStatusClass, taskStatusLabel } = window.OfficeCtlMainUi;
   const {
     clearEndpointOverride,
     clearRegisterRequest,
@@ -1525,13 +1525,12 @@
   }
 
   function taskMarkup(task) {
-    const status = task.status ? titleCase(task.status) : 'Running';
-    const tone = task.status === 'success' ? 'status-success' : task.status === 'running' ? 'status-warning' : task.status === 'cancelled' ? 'status-neutral' : 'status-danger';
+    const tone = taskStatusClass(task.status || 'running');
     const elapsed = typeof task.elapsedMs === 'number' ? formatDuration(task.elapsedMs) : 'in progress';
     const metadata = taskMetadataMarkup(task, { escapeHtml, formatTime, redactText, valueLabel: boolLabel });
     const commandId = commandIdMarkup(task.requestId, { escapeHtml });
     const startedAt = task.startedAt ? `${escapeHtml(formatTime(task.startedAt))} / ` : '';
-    return `<article class="task-card"><div class="task-title"><span>${escapeHtml(task.tool)}</span><span class="status-badge ${tone}">${escapeHtml(status)}</span></div>${commandId}<div class="task-meta">${startedAt}${escapeHtml(elapsed)}</div>${metadata}</article>`;
+    return `<article class="task-card"><div class="task-title"><span>${escapeHtml(task.tool)}</span><span class="status-badge ${tone}">${escapeHtml(taskStatusLabel(task.status || 'running'))}</span></div>${commandId}<div class="task-meta">${startedAt}${escapeHtml(elapsed)}</div>${metadata}</article>`;
   }
 
   function scheduleReconnect() {

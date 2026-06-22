@@ -145,6 +145,23 @@ test('common main UI maps connection and task states to badge classes', () => {
   assert.equal(mainUi.statusClass('idle'), 'status-neutral');
 });
 
+test('common main UI maps task status labels and tones to UI spec text', () => {
+  const mainUi = loadMainUi();
+
+  assert.equal(mainUi.taskStatusLabel('running'), 'Running');
+  assert.equal(mainUi.taskStatusLabel('success'), 'Succeeded');
+  assert.equal(mainUi.taskStatusLabel('failure'), 'Failed');
+  assert.equal(mainUi.taskStatusLabel('timeout'), 'Timed Out');
+  assert.equal(mainUi.taskStatusLabel('cancelled'), 'Cancelled');
+  assert.equal(mainUi.taskStatusLabel('custom_state'), 'Custom State');
+
+  assert.equal(mainUi.taskStatusClass('running'), 'status-warning');
+  assert.equal(mainUi.taskStatusClass('success'), 'status-success');
+  assert.equal(mainUi.taskStatusClass('timeout'), 'status-warning');
+  assert.equal(mainUi.taskStatusClass('cancelled'), 'status-neutral');
+  assert.equal(mainUi.taskStatusClass('failure'), 'status-danger');
+});
+
 test('common main UI renders connection state consistently', () => {
   const mainUi = loadMainUi();
   const badge = { textContent: '', className: '' };
