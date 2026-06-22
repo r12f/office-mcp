@@ -63,7 +63,7 @@ async function main(): Promise<void> {
     await assertEval(cdp, '(() => { const session = document.querySelector("#documents .row.word .document-card-session")?.textContent || ""; return session.includes("Session ID") && session.includes("...") && !session.includes("11111111-1111-4111-8111-111111111111") && !session.includes("Version") && !session.includes("tools") && !session.includes("Queue"); })()', 'word document card session row contains only compact session identity');
     await assertEval(cdp, 'document.querySelector("#documents .row.word .document-card-session").dataset.copyValue === "11111111-1111-4111-8111-111111111111"', 'word document card session id is copyable');
     await assertEval(cdp, 'document.querySelector("#documents .row.word .document-card-session").title === "11111111-1111-4111-8111-111111111111"', 'word document card full session id remains available as tooltip');
-    await assertEval(cdp, 'document.querySelector("#documents .row.word")?.textContent.includes("Version 16.0")', 'word document card shows version');
+    await assertEval(cdp, '(() => { const text = document.querySelector("#documents .row.word")?.textContent || ""; return text.includes("Word 16.0") && !text.includes("Version -"); })()', 'word document card shows registered host version');
     await assertEval(cdp, 'document.querySelector("#documents .row.word")?.textContent.includes("2 tools")', 'word document card shows available tool count');
     await assertEval(cdp, 'document.querySelector("#documents .row.word")?.textContent.includes("Queue 0")', 'word document card shows queue depth');
     await assertEval(cdp, 'document.querySelector("#documents .row.word")?.textContent.includes("Finished 2")', 'word document card shows finished task count');
@@ -74,6 +74,7 @@ async function main(): Promise<void> {
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#appFilter").value = "excel"; document.querySelector("#appFilter").dispatchEvent(new Event("change"))' });
     await waitFor(cdp, 'document.querySelector("#documents .row.excel") !== null && document.querySelector("#documents .row.word") === null');
     await assertEval(cdp, 'document.querySelector("#documents").textContent.includes("Excel") && !document.querySelector("#documents").textContent.includes("Runtime Evidence.docx")', 'document app filter limits visible sessions');
+    await assertEval(cdp, '(() => { const text = document.querySelector("#documents .row.excel")?.textContent || ""; return text.includes("Excel 16.0") && !text.includes("Version -"); })()', 'excel document card shows registered host version');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#appFilter").value = "powerpoint"; document.querySelector("#appFilter").dispatchEvent(new Event("change"))' });
     await waitFor(cdp, 'document.querySelector("#documents").textContent.includes("No matching documents")');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#appFilter").value = "all"; document.querySelector("#appFilter").dispatchEvent(new Event("change"))' });

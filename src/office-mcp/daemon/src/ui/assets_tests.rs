@@ -196,12 +196,15 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("function renderDocumentCard(doc, app)"));
     assert!(js.contains("class=\"row document-card ${esc(app)}\""));
     assert!(js.contains("const sessionId = doc.session_id || '-'"));
+    assert!(js.contains("const hostVersion = `${title(doc.host?.app || app)} ${doc.host?.version || '-'}`"));
     assert!(js.contains(
         "class=\"document-card-session\" data-copy-value=\"${esc(sessionId)}\""
     ));
     assert!(js.contains("<span>Session ID</span><code>${esc(middleTruncate(sessionId, 24))}</code>"));
     assert!(!js.contains("Session ${esc(middleTruncate(doc.session_id, 18))}"));
     assert!(js.contains("title=\"${esc(sessionId)}\""));
+    assert!(js.contains("<span>${esc(hostVersion)}</span>"));
+    assert!(!js.contains("<span>Version ${esc(doc.host?.version || '-')}</span>"));
     assert!(js.contains("function documentConnectionLabel(status) { return status === 'active' || !status ? 'active' : 'dead'; }"));
     assert!(js.contains("function documentStateTone(status) { return status === 'active' || !status ? 'success' : 'danger'; }"));
     assert!(js.contains("function statusLabel(value)"));
