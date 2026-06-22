@@ -88,7 +88,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("class=\"detail-copy\" data-copy=\"configPath\""));
     assert!(html.contains("class=\"detail-copy\" data-copy=\"logPath\""));
     assert!(html.contains("class=\"detail-copy\" data-copy=\"lastError\""));
-    assert!(html.contains("<code id=\"lastError\" tabindex=\"0\">None</code>"));
+    assert!(html.contains("<textarea id=\"lastError\" readonly spellcheck=\"false\" aria-label=\"Last daemon error\">None</textarea>"));
+    assert!(!html.contains("<code id=\"lastError\""));
     assert!(!html.contains("class=\"detail-copy\" data-copy=\"logPath\" aria-label=\"Copy log path\"><code id=\"logPath\""));
     assert!(html.contains("id=\"appFilter\" name=\"app-filter\""));
     assert!(html.contains("aria-label=\"Filter documents by app\""));
@@ -105,6 +106,11 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
         ".detail-path-value { display: grid; grid-template-columns: minmax(0, 1fr) auto;"
     ));
     assert!(css.contains(".detail-path-value code { display: block; min-width: 0; white-space: normal; overflow-wrap: anywhere; user-select: text;"));
+    assert!(css.contains(
+        ".detail-log-value { display: grid; grid-template-columns: minmax(0, 1fr) auto;"
+    ));
+    assert!(css.contains(".detail-log-value textarea { display: block; width: 100%; min-width: 0; min-height: 54px; max-height: 132px; resize: vertical; overflow: auto;"));
+    assert!(css.contains("white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;"));
     assert!(css.contains(".detail-copy { display: inline-flex; min-height: 24px;"));
     assert!(css.contains(".id-copy { display: inline-flex; max-width: 100%; min-height: 32px;"));
     assert!(css.contains(".id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
@@ -124,7 +130,7 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     ));
     assert!(css.contains(".details { grid-column: 1 / -1;"));
     assert!(css.contains("border-top: 1px solid var(--border); padding-top: 8px;"));
-    assert!(css.contains(".details dl { display: grid; grid-template-columns: minmax(64px, .35fr) minmax(64px, .35fr) minmax(150px, .9fr) minmax(150px, .9fr) minmax(240px, 1.7fr);"));
+    assert!(css.contains(".details dl { display: grid; grid-template-columns: minmax(64px, .35fr) minmax(64px, .35fr) minmax(150px, .9fr) minmax(150px, .9fr) minmax(320px, 2.3fr);"));
     assert!(
         css.contains(".details dd { min-width: 0; overflow-wrap: anywhere; user-select: text;")
     );
@@ -144,6 +150,13 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(!css.contains("transition: all"));
     assert!(js.contains("emptyState('No documents connected'"));
     assert!(js.contains("$('configPath').textContent = snapshot.daemon?.config_path || '-'"));
+    assert!(js.contains("$('daemonMeta').textContent = 'Daemon state is live'"));
+    assert!(js.contains("$('lastError').value = snapshot.daemon?.last_error || 'None'"));
+    assert!(
+        js.contains("const value = copy.dataset.copyValue || target?.value || target?.textContent")
+    );
+    assert!(!js.contains("$('lastError').textContent"));
+    assert!(!js.contains("$('daemonMeta').textContent = snapshot.daemon?.last_error"));
     assert!(!js.contains("'Not configured'"));
     assert!(js.contains("renderToolAccess(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {})"));
     assert!(js.contains("function renderToolAccess(catalog, policy)"));

@@ -22,7 +22,8 @@ document.addEventListener('click', async (event) => {
   const copy = event.target.closest('[data-copy], [data-copy-value]');
   if (copy) {
     event.stopPropagation();
-    const value = copy.dataset.copyValue || $(copy.dataset.copy)?.textContent;
+    const target = copy.dataset.copy ? $(copy.dataset.copy) : null;
+    const value = copy.dataset.copyValue || target?.value || target?.textContent;
     await copyText(value, copy);
     return;
   }
@@ -64,7 +65,7 @@ function render() {
   const health = title(snapshot.daemon?.status || 'down');
   $('healthBadge').textContent = health;
   $('healthBadge').className = 'badge ' + tone(snapshot.daemon?.status);
-  $('daemonMeta').textContent = snapshot.daemon?.last_error || 'Daemon state is live';
+  $('daemonMeta').textContent = 'Daemon state is live';
   $('clientCount').textContent = fmt(snapshot.clients?.length || 0);
   $('documentCount').textContent = fmt(docs.length);
   $('taskCount').textContent = fmt(snapshot.current_tasks?.length || 0);
@@ -74,7 +75,7 @@ function render() {
   $('daemonUptime').textContent = duration(snapshot.daemon?.uptime_ms || 0);
   $('configPath').textContent = snapshot.daemon?.config_path || '-';
   $('logPath').textContent = snapshot.daemon?.log_path || '-';
-  $('lastError').textContent = snapshot.daemon?.last_error || 'None';
+  $('lastError').value = snapshot.daemon?.last_error || 'None';
   renderToolAccess(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {});
   renderDocuments(snapshot.documents || {});
   renderClients(snapshot.clients || []);
