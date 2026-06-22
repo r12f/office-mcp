@@ -5,7 +5,7 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
   <Id>33333333-aaaa-bbbb-cccc-444444444444</Id>
-  <Version>1.0.0.11</Version>
+  <Version>1.0.0.12</Version>
   <ProviderName>Office MCP Control</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Office MCP Control" />
@@ -25,7 +25,7 @@
     </Sets>
   </Requirements>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:8765/excel/taskpane.html?v=0.1.11" />
+    <SourceLocation DefaultValue="https://localhost:8765/excel/taskpane.html?v=0.1.12" />
   </DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
@@ -76,7 +76,7 @@
         <bt:Image id="Icon.80x80" DefaultValue="https://localhost:8765/assets/icon-80.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:8765/excel/taskpane.html?v=0.1.11" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:8765/excel/taskpane.html?v=0.1.12" />
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://github.com/office-mcp/office-mcp" />
       </bt:Urls>
       <bt:ShortStrings>
