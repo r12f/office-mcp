@@ -192,7 +192,7 @@ test('shared Office tool E2E loop writes lifecycle and per-tool report evidence'
     },
     async verifyResult() {},
     async cleanupDocument() {
-      return { closedByDriver: true, deleted: true, deletedPaths: ['fixture.docx'] };
+      return { closedByDriver: true, deleted: true, deletedPaths: ['fixture.docx', 'Word add-in 11111111 copy.docx'] };
     },
     async stopDaemon() {}
   };
@@ -217,7 +217,12 @@ test('shared Office tool E2E loop writes lifecycle and per-tool report evidence'
     cleanup_document: 1,
     stop_daemon: 1
   });
-  assert.deepEqual(report.cleanup, { closed_by_driver: true, deleted: true, deleted_path_count: 1 });
+  assert.deepEqual(report.cleanup, {
+    closed_by_driver: true,
+    deleted: true,
+    deleted_path_count: 2,
+    deleted_paths: ['fixture.docx', 'Word add-in 11111111 copy.docx']
+  });
   assert.deepEqual(report.advertised_tools, ['word.read', 'word.write']);
   assert.deepEqual(report.session_available_tools, ['word.read', 'word.write']);
   assert.deepEqual(report.executed_tools, ['word.read', 'word.write']);

@@ -454,6 +454,17 @@ test('runtime evidence validator can require Office tool E2E reports', () => {
       assert.match(outputText(result.stdout), /Word Office tool E2E report cleanup did not delete the driver-owned document/);
     });
   });
+
+  withEvidenceFile(report('passed'), (path) => {
+    withOfficeToolE2eReports(true, (reports) => {
+      const broken = JSON.parse(readFileSync(reports.word, 'utf8')) as Record<string, unknown>;
+      broken.cleanup = { closed_by_driver: true, deleted: true, deleted_path_count: 1 };
+      writeFileSync(reports.word, JSON.stringify(broken, null, 2));
+      const result = runValidator(path, '--require-office-tool-e2e', '--word-tool-e2e-report-path', reports.word, '--excel-tool-e2e-report-path', reports.excel, '--powerpoint-tool-e2e-report-path', reports.powerpoint);
+      assert.notEqual(result.status, 0);
+      assert.match(outputText(result.stdout), /Word Office tool E2E report cleanup missing deleted paths/);
+    });
+  });
 });
 
 test('README documents Office tool E2E report validation command', () => {
@@ -1579,7 +1590,12 @@ function officeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tools: strin
       cleanup_document: 1,
       stop_daemon: 1
     },
-    cleanup: { closed_by_driver: true, deleted: true, deleted_path_count: 1 },
+    cleanup: {
+      closed_by_driver: true,
+      deleted: true,
+      deleted_path_count: 1,
+      deleted_paths: [`${host.toLowerCase()}-fixture`]
+    },
     advertised_tools: tools,
     session_available_tools: tools,
     executed_tools: tools,
@@ -2018,7 +2034,12 @@ function embeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tool
       cleanup_document: 1,
       stop_daemon: 1
     },
-    cleanup: { closed_by_driver: passed, deleted: passed, deleted_path_count: passed ? 1 : 0 },
+    cleanup: {
+      closed_by_driver: passed,
+      deleted: passed,
+      deleted_path_count: passed ? 1 : 0,
+      deleted_paths: passed ? [`${hostKey}-fixture`] : []
+    },
     advertised_tools: tools,
     session_available_tools: tools,
     executed_tools: tools,

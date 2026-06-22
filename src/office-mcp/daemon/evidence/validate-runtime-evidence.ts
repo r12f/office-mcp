@@ -369,6 +369,9 @@ function validateOfficeToolE2eCleanup(label: string, cleanup: unknown): void {
   if (cleanup.closed_by_driver !== true) failures.push(`${label} cleanup did not close the driver-owned document.`);
   if (cleanup.deleted !== true) failures.push(`${label} cleanup did not delete the driver-owned document.`);
   if (typeof cleanup.deleted_path_count !== 'number' || cleanup.deleted_path_count < 1) failures.push(`${label} cleanup missing deleted path proof.`);
+  if (!Array.isArray(cleanup.deleted_paths) || cleanup.deleted_paths.filter((path) => typeof path === 'string' && path.length > 0).length < 1) {
+    failures.push(`${label} cleanup missing deleted paths.`);
+  }
 }
 
 function validateOfficeToolE2eLifecycle(label: string, lifecycle: unknown): void {

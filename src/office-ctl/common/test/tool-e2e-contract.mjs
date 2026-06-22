@@ -443,10 +443,14 @@ function summarizeSession(session) {
 
 function summarizeCleanup(cleanup) {
   if (!cleanup || typeof cleanup !== 'object') return undefined;
+  const deletedPaths = Array.isArray(cleanup.deletedPaths)
+    ? cleanup.deletedPaths.filter((path) => typeof path === 'string' && path.trim().length > 0)
+    : [];
   return {
     closed_by_driver: cleanup.closedByDriver === true,
     deleted: cleanup.deleted === true,
-    deleted_path_count: Array.isArray(cleanup.deletedPaths) ? cleanup.deletedPaths.length : undefined,
+    deleted_path_count: deletedPaths.length,
+    deleted_paths: [...new Set(deletedPaths)],
     skipped: typeof cleanup.skipped === 'string' ? cleanup.skipped : undefined
   };
 }
@@ -457,6 +461,7 @@ function assertCleanupProof(host, cleanup) {
   if (cleanup.closed_by_driver !== true) throw new Error(`${host} E2E cleanup did not close the driver-owned document.`);
   if (cleanup.deleted !== true) throw new Error(`${host} E2E cleanup did not delete the driver-owned document.`);
   if (typeof cleanup.deleted_path_count !== 'number' || cleanup.deleted_path_count < 1) throw new Error(`${host} E2E cleanup missing deleted path proof.`);
+  if (!Array.isArray(cleanup.deleted_paths) || cleanup.deleted_paths.length < 1) throw new Error(`${host} E2E cleanup missing deleted paths.`);
 }
 
 function summarizeToolResult(result) {
