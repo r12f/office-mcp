@@ -53,12 +53,13 @@ dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .endpoints { display: grid; gap: 6px; min-width: 0; }
 .copy { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: center; width: 100%; border: 1px solid var(--border); background: var(--raised); color: var(--text); border-radius: 7px; padding: 6px 8px; text-align: left; cursor: pointer; }
 .copy code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.detail-path-value { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: center; min-width: 0; }
+.detail-path dt { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.detail-path-value { display: block; min-width: 0; }
 .detail-path-value code { display: block; min-width: 0; white-space: normal; overflow-wrap: anywhere; user-select: text; }
 .detail-actions { display: inline-flex; gap: 2px; align-items: center; }
 .detail-log-value { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: start; min-width: 0; }
 .detail-log-value textarea { display: block; width: 100%; min-width: 0; min-height: 96px; max-height: 240px; resize: vertical; overflow: auto; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; background: var(--surface); color: var(--text); font: 12px/1.45 "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
-.detail-copy, .detail-open { display: inline-flex; min-height: 24px; align-items: center; padding: 0 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); text-align: center; cursor: pointer; }
+.detail-copy, .detail-open { display: inline-flex; min-height: 18px; align-items: center; padding: 0 4px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--muted); font-size: 10px; line-height: 1; text-align: center; cursor: pointer; }
 .id-copy { display: inline-flex; max-width: 100%; min-height: 32px; align-items: center; padding: 2px 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: inherit; vertical-align: middle; cursor: pointer; }
 .id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; }
 .detail-copy:hover, .detail-copy:focus-visible, .detail-open:hover, .detail-open:focus-visible, .id-copy:hover, .id-copy:focus-visible { border-color: var(--border); background: var(--raised); }
@@ -80,13 +81,15 @@ dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .row.excel { border-left-color: var(--excel); }
 .row.powerpoint { border-left-color: var(--powerpoint); }
 .row strong, .row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.document-card { gap: 5px; }
+.document-card { grid-template-columns: minmax(0, 1fr) auto; gap: 5px 8px; }
 .document-card-title { display: grid; grid-template-columns: auto minmax(9rem, 1fr) max-content; gap: 6px; align-items: center; }
-.document-card-session { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; align-items: baseline; color: var(--muted); font-size: 12px; }
-.document-card-session span { overflow: visible; text-overflow: clip; white-space: nowrap; }
+.document-card-title, .document-card-session, .document-card-meta { grid-column: 1 / -1; }
+.document-card-session { display: block; color: var(--text); font-size: 12px; }
 .document-card-session code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; color: var(--text); }
 .document-card-meta { display: flex; gap: 8px; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+.document-card-meta.document-card-footer { grid-column: 1; }
 .document-card-meta span { flex: 0 1 auto; }
+.document-card-uptime { grid-column: 2; justify-self: end; align-self: end; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .state-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
 .history-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); padding: 7px; text-align: left; cursor: pointer; }
 .history-row span:first-child { display: grid; gap: 2px; min-width: 0; }

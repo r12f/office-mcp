@@ -91,6 +91,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("<div class=\"details\" aria-label=\"Daemon details\">"));
     assert!(html.contains("</div>\n      </header>\n\n      <section class=\"workspace\">"));
     assert!(!html.contains("<section class=\"details\" aria-label=\"Daemon details\">"));
+    assert!(html.contains("<dt><span>Config file</span><span class=\"detail-actions\"><button type=\"button\" class=\"detail-copy\" data-copy=\"configPath\""));
+    assert!(html.contains("<dt><span>Log</span><span class=\"detail-actions\"><button type=\"button\" class=\"detail-copy\" data-copy=\"logPath\""));
     assert!(html.contains("class=\"detail-path-value\"><code id=\"configPath\" tabindex=\"0\""));
     assert!(html.contains("class=\"detail-path-value\"><code id=\"logPath\" tabindex=\"0\""));
     assert!(html.contains("class=\"detail-copy\" data-copy=\"configPath\""));
@@ -118,9 +120,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(!css.contains(".status-strip, .details, .panel { background"));
     assert!(css.contains("grid-template-columns: 32px auto minmax(0, 1fr)"));
     assert!(css.contains(".product-mark { width: 32px; height: 32px;"));
-    assert!(css.contains(
-        ".detail-path-value { display: grid; grid-template-columns: minmax(0, 1fr) auto;"
-    ));
+    assert!(css.contains(".detail-path dt { display: flex; align-items: center; justify-content: space-between;"));
+    assert!(css.contains(".detail-path-value { display: block; min-width: 0;"));
     assert!(css.contains(".detail-path-value code { display: block; min-width: 0; white-space: normal; overflow-wrap: anywhere; user-select: text;"));
     assert!(css.contains(".detail-actions { display: inline-flex; gap: 2px; align-items: center;"));
     assert!(css.contains(
@@ -132,15 +133,12 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".log-tail { display: block; width: 100%; min-width: 0; min-height: 180px; max-height: 360px; resize: vertical; overflow: auto;"));
     assert!(css.contains(".log-tail-meta { color: var(--muted); font-size: 12px; min-width: 0; overflow-wrap: anywhere; user-select: text;"));
     assert!(!css.contains(".detail-log-value textarea { display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis;"));
-    assert!(css.contains(".detail-copy, .detail-open { display: inline-flex; min-height: 24px;"));
+    assert!(css.contains(".detail-copy, .detail-open { display: inline-flex; min-height: 18px;"));
     assert!(css.contains(".id-copy { display: inline-flex; max-width: 100%; min-height: 32px;"));
     assert!(css.contains(".id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
-    assert!(css.contains(
-        ".document-card-session { display: grid; grid-template-columns: minmax(0, 1fr);"
-    ));
-    assert!(css.contains(
-        ".document-card-session span { overflow: visible; text-overflow: clip; white-space: nowrap;"
-    ));
+    assert!(css.contains(".document-card-session { display: block;"));
+    assert!(css.contains(".document-card-meta.document-card-footer { grid-column: 1;"));
+    assert!(css.contains(".document-card-uptime { grid-column: 2; justify-self: end; align-self: end;"));
     assert!(css.contains(".document-card-session code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains(".tool-access-panel { display: grid;"));
     assert!(css.contains(".segmented { display: inline-grid; grid-template-columns: repeat(3"));
@@ -237,7 +235,11 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains(
         "class=\"document-card-session\" data-copy-value=\"${esc(sessionId)}\""
     ));
-    assert!(js.contains("<span>Session ID</span><code>${esc(middleTruncate(sessionId, 24))}</code>"));
+    assert!(js.contains("<span class=\"document-card-session\" data-copy-value=\"${esc(sessionId)}\" title=\"${esc(sessionId)}\"><code>${esc(middleTruncate(sessionId, 24))}</code></span>"));
+    assert!(js.contains("<span class=\"document-card-uptime\" title=\"Session uptime\">${esc(sessionUptime(doc))}</span>"));
+    assert!(js.contains("function sessionUptime(doc)"));
+    assert!(js.contains("function sessionRegisteredAtMillis(value)"));
+    assert!(js.contains("if (text.startsWith('unix:')) return Number(text.slice(5)) * 1000;"));
     assert!(!js.contains("Session ${esc(middleTruncate(doc.session_id, 18))}"));
     assert!(js.contains("title=\"${esc(sessionId)}\""));
     assert!(js.contains("<span>${esc(hostVersion)}</span>"));

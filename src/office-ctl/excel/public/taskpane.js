@@ -1649,6 +1649,7 @@
     for (const group of TOOL_GROUPS) {
       const tools = group.tools.filter((tool) => AVAILABLE_TOOLS.includes(tool));
       if (tools.length === 0) continue;
+      const supportedInGroup = tools.filter((tool) => isToolSupported(tool));
       const allowedInGroup = tools.filter((tool) => isToolSupported(tool) && isToolAllowedByMode(tool));
       const enabledInGroup = tools.filter((tool) => effective.includes(tool));
       const groupEl = document.createElement('details');
@@ -1658,7 +1659,7 @@
         '<summary class="tool-group-title">',
         `<span>${escapeHtml(group.label)}</span>`,
         `<span class="tool-group-count">${enabledInGroup.length}/${tools.length}</span>`,
-        `<input class="group-toggle" type="checkbox" role="switch" data-tool-group="${escapeHtml(group.label)}" aria-label="Toggle ${escapeHtml(group.label)} tools" ${allowedInGroup.length > 0 && enabledInGroup.length === allowedInGroup.length ? 'checked' : ''} ${allowedInGroup.length === 0 ? 'disabled' : ''} />`,
+        `<input class="group-toggle" type="checkbox" role="switch" data-tool-group="${escapeHtml(group.label)}" aria-label="Toggle ${escapeHtml(group.label)} tools" ${allowedInGroup.length > 0 && enabledInGroup.length === allowedInGroup.length ? 'checked' : ''} ${supportedInGroup.length === 0 ? 'disabled' : ''} />`,
         '</summary>',
         `<div class="tool-permission-list">${tools.map(toolControlMarkup).join('')}</div>`
       ].join('');
@@ -1706,12 +1707,23 @@
     const group = TOOL_GROUPS.find((candidate) => candidate.label === event.currentTarget.dataset.toolGroup);
     if (!group) return;
     const enabled = event.currentTarget.checked;
+    if (enabled) toolPermissionMode = leastPermissiveModeForTools(group.tools, toolPermissionMode);
     for (const tool of group.tools) {
       if (AVAILABLE_TOOLS.includes(tool) && isToolSupported(tool) && isToolAllowedByMode(tool)) toolPermissions[tool] = enabled;
     }
+    if (enabled) saveToolPermissionMode();
     saveToolPermissions();
     renderToolSummary();
     sendSessionToolUpdate();
+  }
+
+  function leastPermissiveModeForTools(tools, currentMode) {
+    const sideEffects = tools
+      .filter((tool) => AVAILABLE_TOOLS.includes(tool) && isToolSupported(tool))
+      .map((tool) => TOOL_METADATA.get(tool)?.sideEffect || 'read');
+    if (sideEffects.every((sideEffect) => isToolAllowedByCapabilityMode(currentMode, sideEffect))) return currentMode;
+    if (sideEffects.some((sideEffect) => sideEffect === 'destructive')) return 'all';
+    return 'write';
   }
 
   function effectiveTools() {

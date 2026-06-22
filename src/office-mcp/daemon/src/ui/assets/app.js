@@ -254,7 +254,19 @@ function renderDocumentCard(doc, app) {
   const metrics = documentTaskMetrics(doc.session_id);
   const sessionId = doc.session_id || '-';
   const hostVersion = `${title(doc.host?.app || app)} ${doc.host?.version || '-'}`;
-  return `<button class="row document-card ${esc(app)}" type="button" data-key-activate data-focus-key="document:${esc(doc.session_id || label)}" data-inspect='${attr(doc)}' aria-label="Inspect ${esc(label)} ${esc(status)}"><span class="document-card-title"><span class="state-dot ${esc(documentStateTone(doc.status))}" aria-hidden="true"></span><strong title="${esc(label)}">${esc(label)}</strong><span class="pill ${esc(documentStateTone(doc.status))}">${esc(title(status))}</span></span><span class="document-card-session" data-copy-value="${esc(sessionId)}" title="${esc(sessionId)}"><span>Session ID</span><code>${esc(middleTruncate(sessionId, 24))}</code></span><span class="document-card-meta"><span>${esc(hostVersion)}</span><span>${esc(doc.available_tool_count || 0)} tools</span><span>Queue ${esc(doc.queue_depth || 0)}</span></span><span class="document-card-meta"><span>Finished ${esc(metrics.finished)}</span><span>Failed ${esc(metrics.failed)}</span></span></button>`;
+  return `<button class="row document-card ${esc(app)}" type="button" data-key-activate data-focus-key="document:${esc(doc.session_id || label)}" data-inspect='${attr(doc)}' aria-label="Inspect ${esc(label)} ${esc(status)}"><span class="document-card-title"><span class="state-dot ${esc(documentStateTone(doc.status))}" aria-hidden="true"></span><strong title="${esc(label)}">${esc(label)}</strong><span class="pill ${esc(documentStateTone(doc.status))}">${esc(title(status))}</span></span><span class="document-card-session" data-copy-value="${esc(sessionId)}" title="${esc(sessionId)}"><code>${esc(middleTruncate(sessionId, 24))}</code></span><span class="document-card-meta"><span>${esc(hostVersion)}</span><span>${esc(doc.available_tool_count || 0)} tools</span><span>Queue ${esc(doc.queue_depth || 0)}</span></span><span class="document-card-meta document-card-footer"><span>Finished ${esc(metrics.finished)}</span><span>Failed ${esc(metrics.failed)}</span></span><span class="document-card-uptime" title="Session uptime">${esc(sessionUptime(doc))}</span></button>`;
+}
+
+function sessionUptime(doc) {
+  const registeredAt = sessionRegisteredAtMillis(doc.registered_at);
+  if (!Number.isFinite(registeredAt)) return '0s';
+  return duration(Math.max(0, Date.now() - registeredAt));
+}
+
+function sessionRegisteredAtMillis(value) {
+  const text = String(value || '');
+  if (text.startsWith('unix:')) return Number(text.slice(5)) * 1000;
+  return Date.parse(text);
 }
 
 function documentTaskMetrics(sessionId) {
