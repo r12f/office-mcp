@@ -84,6 +84,8 @@ async function main(): Promise<void> {
     await assertEval(cdp, '[...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Active Tasks") && ![...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Running")', 'top metrics use explicit active task label');
     await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row.word") && document.querySelector("#inspectorLog").value.includes("Runtime Evidence.docx")', 'keyboard inspection preserves document row focus');
     await assertEval(cdp, 'document.querySelector("#documents .row.word")?.getAttribute("aria-selected") === "true" && [...document.querySelectorAll("#documents .row")].filter((row) => row.getAttribute("aria-selected") === "true").length === 1', 'inspected document row exposes selected state');
+    await cdp.send('Runtime.evaluate', { expression: 'render()' });
+    await assertEval(cdp, 'document.querySelector("#documents .row.word")?.getAttribute("aria-selected") === "true" && [...document.querySelectorAll("#documents .row")].filter((row) => row.getAttribute("aria-selected") === "true").length === 1', 'inspected document row preserves selected state after live render');
     await pressKey(cdp, 'Escape', 27);
     await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row.word") && document.querySelector("#inspectorLog").value.trim() === "Select a row."', 'Escape clears inspector without moving row focus');
     await pressKey(cdp, 'Enter', 13);

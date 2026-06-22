@@ -1,4 +1,4 @@
-const state = { snapshot: null, search: '', app: 'all', result: 'all', previousStatus: null };
+const state = { snapshot: null, search: '', app: 'all', result: 'all', previousStatus: null, selectedRowKey: null };
 const $ = (id) => document.getElementById(id);
 
 $('search').addEventListener('input', (event) => { state.search = event.target.value.toLowerCase(); render(); });
@@ -94,6 +94,7 @@ function render() {
   renderCommands('currentTasks', snapshot.current_tasks || [], true);
   const history = (snapshot.recent_commands || []).filter((command) => state.result === 'all' || command.status === state.result);
   renderCommands('history', history, false);
+  restoreSelectedRow();
   restoreRowFocus(focusKey);
 }
 
@@ -289,6 +290,7 @@ function rowNavigationIndex(key, index, count, pageStep) {
 }
 
 function inspectRow(element) {
+  state.selectedRowKey = element.dataset.focusKey || null;
   setSelectedInspectableRow(element);
   $('inspectorLog').value = JSON.stringify(JSON.parse(element.dataset.inspect), null, 2);
 }
@@ -298,10 +300,17 @@ function setSelectedInspectableRow(element) {
   scope?.querySelectorAll?.('.row, tr[data-inspect]').forEach((row) => row.setAttribute('aria-selected', row === element ? 'true' : 'false'));
 }
 
+function restoreSelectedRow() {
+  document.querySelectorAll('.row, tr[data-inspect]').forEach((row) => {
+    row.setAttribute('aria-selected', row.dataset.focusKey === state.selectedRowKey ? 'true' : 'false');
+  });
+}
+
 function clearInspector() {
   const inspector = $('inspectorLog');
   if (!inspector || inspector.value.trim() === 'Select a row.') return false;
   inspector.value = 'Select a row.';
+  state.selectedRowKey = null;
   document.querySelectorAll('.row[aria-selected="true"], tr[data-inspect][aria-selected="true"]').forEach((row) => row.setAttribute('aria-selected', 'false'));
   announce('Inspector cleared');
   return true;

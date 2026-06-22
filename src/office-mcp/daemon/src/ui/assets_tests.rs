@@ -175,9 +175,15 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(!js.contains("offsetParent !== null"));
     assert!(js.contains("function rowNavigationIndex(key, index, count, pageStep)"));
     assert!(js.contains("const focusKey = focusedRowKey()"));
+    assert!(js.contains("selectedRowKey: null"));
+    assert!(js.contains("restoreSelectedRow()"));
     assert!(js.contains("restoreRowFocus(focusKey)"));
     assert!(js.contains("function focusedRowKey()"));
     assert!(js.contains("function restoreRowFocus(focusKey)"));
+    assert!(js.contains("function restoreSelectedRow()"));
+    assert!(js.contains("row.dataset.focusKey === state.selectedRowKey ? 'true' : 'false'"));
+    assert!(js.contains("state.selectedRowKey = element.dataset.focusKey || null"));
+    assert!(js.contains("state.selectedRowKey = null"));
     assert!(js.contains("data-focus-key=\"document:${esc(doc.session_id || label)}\""));
     assert!(js.contains("data-focus-key=\"client:${esc(client.client_id || client.name)}\""));
     assert!(js.contains("data-focus-key=\"command:${esc(command.command_id || command.mcp_request_id || command.tool)}\""));
