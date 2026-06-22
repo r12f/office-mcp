@@ -70,8 +70,9 @@ dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .panel { min-width: 0; padding: 10px; overflow: auto; contain: layout paint; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .filter-row { display: grid; grid-template-columns: auto minmax(82px, 104px) auto minmax(120px, 1fr); gap: 6px; align-items: center; min-width: min(100%, 260px); }
+.activity-filters { display: grid; grid-template-columns: auto minmax(110px, 160px) auto minmax(112px, 150px); gap: 6px; align-items: center; min-width: min(100%, 340px); }
 .field-label { color: var(--muted); font-size: 11px; text-transform: uppercase; }
-#search, #appFilter { min-width: 0; border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; background: var(--surface); color: var(--text); }
+#search, #appFilter, #clientFilter, #resultFilter { min-width: 0; border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; background: var(--surface); color: var(--text); }
 .stack { display: grid; gap: 8px; margin-top: 10px; }
 .row { display: grid; gap: 3px; width: 100%; border: 1px solid var(--border); border-left: 3px solid var(--other); background: var(--raised); color: var(--text); border-radius: 7px; padding: 8px; text-align: left; cursor: pointer; min-width: 0; }
 .row:hover { border-color: var(--focus); }

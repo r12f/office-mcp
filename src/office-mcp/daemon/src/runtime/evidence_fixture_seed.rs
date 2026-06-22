@@ -29,6 +29,11 @@ pub(crate) fn seeded_state(options: UiStateOptions) -> RuntimeSeedState {
         transport: UiClientTransport::Http,
         name: Some("copilot-cli/1.0 token=secret-value".to_string()),
     });
+    let review_client_id = ui_state.register_client(RegisterClientInput {
+        client_id: Some("client-2".to_string()),
+        transport: UiClientTransport::StdioBridge,
+        name: Some("review-agent/2.0".to_string()),
+    });
     ui_state.start_command(StartCommandInput {
         client_id: Some(client_id.clone()),
         client_name: Some("copilot-cli/1.0".to_string()),
@@ -41,8 +46,16 @@ pub(crate) fn seeded_state(options: UiStateOptions) -> RuntimeSeedState {
     });
     for index in 0..12 {
         let command_id = ui_state.start_command(StartCommandInput {
-            client_id: Some(client_id.clone()),
-            client_name: Some("copilot-cli/1.0".to_string()),
+            client_id: Some(if index == 8 {
+                review_client_id.clone()
+            } else {
+                client_id.clone()
+            }),
+            client_name: Some(if index == 8 {
+                "review-agent/2.0".to_string()
+            } else {
+                "copilot-cli/1.0".to_string()
+            }),
             session_id: Some("11111111-1111-4111-8111-111111111111".to_string()),
             host_app: Some("word".to_string()),
             tool: if index % 2 == 0 {

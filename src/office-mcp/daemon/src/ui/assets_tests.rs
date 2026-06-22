@@ -101,6 +101,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(!html.contains("class=\"detail-copy\" data-copy=\"logPath\" aria-label=\"Copy log path\"><code id=\"logPath\""));
     assert!(html.contains("id=\"appFilter\" name=\"app-filter\""));
     assert!(html.contains("aria-label=\"Filter documents by app\""));
+    assert!(html.contains("class=\"activity-filters\" aria-label=\"Activity filters\""));
+    assert!(html.contains("id=\"clientFilter\" name=\"client-filter\""));
+    assert!(html.contains("aria-label=\"Filter activity by client\""));
+    assert!(html.contains("<option value=\"all\">All clients</option>"));
     assert!(html.contains("name=\"session-filter\""));
     assert!(html.contains("Title, app, session&hellip;"));
     assert!(!html.contains("session..."));
@@ -151,7 +155,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".accent { color: var(--accent); }"));
     assert!(css.contains(".row.powerpoint { border-left-color: var(--powerpoint); }"));
     assert!(css.contains(".filter-row { display: grid; grid-template-columns: auto minmax(82px, 104px) auto minmax(120px, 1fr);"));
-    assert!(css.contains("#search, #appFilter { min-width: 0;"));
+    assert!(css.contains(".activity-filters { display: grid; grid-template-columns: auto minmax(110px, 160px) auto minmax(112px, 150px);"));
+    assert!(css.contains("#search, #appFilter, #clientFilter, #resultFilter { min-width: 0;"));
     assert!(css.contains("minmax(0, 1fr)"));
     assert!(css.contains("content-visibility: auto"));
     assert!(css.contains(".empty strong"));
@@ -244,6 +249,13 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(!js.contains("Show details"));
     assert!(!js.contains("Hide details"));
     assert!(js.contains("state.app = event.target.value"));
+    assert!(js.contains("client: 'all'"));
+    assert!(js.contains("$('clientFilter').addEventListener('change'"));
+    assert!(js.contains("renderClientFilter(snapshot)"));
+    assert!(js.contains("function renderClientFilter(snapshot)"));
+    assert!(js.contains("function clientFilterOptions(snapshot)"));
+    assert!(js.contains("function clientMatches(command)"));
+    assert!(js.contains("clientMatches(command) && (running || state.result === 'all' || command.status === state.result)"));
     assert!(js.contains("if (state.app !== 'all' && app !== state.app) continue;"));
     assert!(js.contains("emptyState('No matching documents'"));
     assert!(js.contains("Open Word, Excel, or PowerPoint, then open Office MCP Control."));

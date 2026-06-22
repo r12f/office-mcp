@@ -8,11 +8,16 @@ fn seeded_ui_fixture_is_redacted_and_grouped() {
     let sessions = seed.registry.list_sessions();
     let snapshot = seed.ui_state.snapshot(&sessions, SystemTime::UNIX_EPOCH);
 
-    assert_eq!(snapshot.clients.len(), 1);
+    assert_eq!(snapshot.clients.len(), 2);
+    assert!(snapshot.clients.iter().any(|client| client.client_id == "client-2"));
     assert_eq!(snapshot.documents["word"].len(), 1);
     assert_eq!(snapshot.documents["excel"].len(), 1);
     assert_eq!(snapshot.current_tasks.len(), 1);
     assert_eq!(snapshot.recent_commands.len(), 10);
+    assert!(snapshot.recent_commands.iter().any(|command| {
+        command.client_id.as_deref() == Some("client-2")
+            && command.client_name.as_deref() == Some("review-agent/2.0")
+    }));
     assert_eq!(
         snapshot.daemon.config_path.as_deref(),
         Some("C:\\office-mcp\\config.toml")

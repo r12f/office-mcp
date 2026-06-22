@@ -50,6 +50,7 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#healthBadge").textContent.includes("Degraded")', 'degraded health badge renders');
     await assertEval(cdp, 'document.querySelector("#lastError").value.includes("Certificate reload failed")', 'degraded last error renders');
     await assertEval(cdp, 'document.querySelector("#clients .row") !== null && document.querySelector("#clients").textContent.includes("http")', 'client list renders');
+    await assertEval(cdp, '[...document.querySelectorAll("#clients .row")].length >= 2 && document.querySelector("#clients").textContent.includes("stdio-bridge")', 'client list renders multiple transports');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#clients .row").focus()' });
     await pressKey(cdp, 'Enter', 13);
     await assertEval(cdp, 'document.activeElement === document.querySelector("#clients .row") && document.querySelector("#inspectorLog").value.includes("client-1")', 'keyboard client inspection preserves row focus');
@@ -125,6 +126,11 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#resultFilter option[value=timeout]")?.textContent.trim() === "Timed Out"', 'history filter timeout label follows spec status text');
     await assertEval(cdp, 'document.querySelector("#history tr[data-inspect]").getAttribute("tabindex") === "0" && document.querySelector("#history tr[data-inspect]").getAttribute("role") === "button"', 'history table rows are keyboard focusable buttons');
     await assertEval(cdp, '(() => { const rows = [...document.querySelectorAll("#history tr[data-inspect]")]; const row = rows[0]; return rows.length >= 4 && row?.getAttribute("aria-posinset") === "1" && row?.getAttribute("aria-setsize") === String(rows.length) && row?.getAttribute("aria-selected") === "false"; })()', 'history rows expose row index count and unselected state');
+    await assertEval(cdp, '(() => { const options = [...document.querySelectorAll("#clientFilter option")].map((option) => option.textContent.trim()); return options.includes("All clients") && options.some((label) => label.includes("copilot-cli")) && options.some((label) => label.includes("review-agent")); })()', 'activity client filter lists connected clients');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#clientFilter").value = "client-2"; document.querySelector("#clientFilter").dispatchEvent(new Event("change"))' });
+    await assertEval(cdp, 'document.querySelector("#currentTasks").textContent.includes("No command is running") && document.querySelector("#history").textContent.includes("review-agent/2.0") && !document.querySelector("#history").textContent.includes("copilot-cli/1.0")', 'activity client filter limits current tasks and history');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#clientFilter").value = "all"; document.querySelector("#clientFilter").dispatchEvent(new Event("change"))' });
+    await waitFor(cdp, 'document.querySelector("#currentTasks tr[data-inspect]") !== null && document.querySelector("#history").textContent.includes("copilot-cli/1.0")');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#search").value = "running smoke task"; document.querySelector("#search").dispatchEvent(new Event("input"))' });
     await assertEval(cdp, 'document.querySelector("#currentTasks").textContent.includes("word.insert_paragraph") && document.querySelector("#history").textContent.includes("No command history yet")', 'text search filters activity to matching current tasks');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#search").value = "IRM_DENIED"; document.querySelector("#search").dispatchEvent(new Event("input"))' });

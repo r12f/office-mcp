@@ -1,8 +1,9 @@
-const state = { snapshot: null, search: '', app: 'all', result: 'all', previousStatus: null, selectedRowKey: null };
+const state = { snapshot: null, search: '', app: 'all', client: 'all', result: 'all', previousStatus: null, selectedRowKey: null };
 const $ = (id) => document.getElementById(id);
 
 $('search').addEventListener('input', (event) => { state.search = event.target.value.toLowerCase(); render(); });
 $('appFilter').addEventListener('change', (event) => { state.app = event.target.value; render(); });
+$('clientFilter').addEventListener('change', (event) => { state.client = event.target.value; render(); });
 $('resultFilter').addEventListener('change', (event) => { state.result = event.target.value; render(); });
 $('clearInspector').addEventListener('click', clearInspector);
 $('toolAccessMode').addEventListener('click', (event) => {
@@ -89,6 +90,7 @@ function render() {
   $('logPath').textContent = snapshot.daemon?.log_path || '-';
   setTextareaValue($('lastError'), snapshot.daemon?.last_error || 'None');
   renderToolAccess(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {});
+  renderClientFilter(snapshot);
   renderDocuments(snapshot.documents || {});
   renderClients(snapshot.clients || []);
   renderCommands('currentTasks', filterCommands(snapshot.current_tasks || [], true), true);
@@ -96,6 +98,22 @@ function render() {
   renderCommands('history', history, false);
   restoreSelectedRow();
   restoreRowFocus(focusKey);
+}
+
+function renderClientFilter(snapshot) {
+  const options = clientFilterOptions(snapshot);
+  if (state.client !== 'all' && !options.some((option) => option.value === state.client)) state.client = 'all';
+  $('clientFilter').innerHTML = options.map((option) => `<option value="${esc(option.value)}"${option.value === state.client ? ' selected' : ''}>${esc(option.label)}</option>`).join('');
+}
+
+function clientFilterOptions(snapshot) {
+  const clients = new Map();
+  for (const client of snapshot.clients || []) clients.set(client.client_id, client.name || client.client_id);
+  for (const command of [...(snapshot.current_tasks || []), ...(snapshot.recent_commands || [])]) {
+    const id = command.client_id || command.client_name;
+    if (id && !clients.has(id)) clients.set(id, command.client_name || id);
+  }
+  return [{ value: 'all', label: 'All clients' }, ...[...clients.entries()].map(([value, label]) => ({ value, label }))];
 }
 
 function renderToolAccess(catalog, policy) {
@@ -247,8 +265,10 @@ function renderCommands(target, commands, running) {
 }
 
 function filterCommands(commands, running) {
-  return commands.filter((command) => (running || state.result === 'all' || command.status === state.result) && matches(JSON.stringify(command)));
+  return commands.filter((command) => clientMatches(command) && (running || state.result === 'all' || command.status === state.result) && matches(JSON.stringify(command)));
 }
+
+function clientMatches(command) { return state.client === 'all' || command.client_id === state.client || command.client_name === state.client; }
 
 function annotateInspectableRows(scope) {
   const rows = [...(scope?.querySelectorAll?.('.row, tr[data-inspect]') || [])].filter((item) => !item.disabled);

@@ -65,13 +65,18 @@
         <section id="activity" class="panel activity" aria-labelledby="activityHeading">
           <div class="panel-head">
             <h2 id="activityHeading">Activity</h2>
-            <select id="resultFilter" name="result-filter" aria-label="Filter command history">
-              <option value="all">All results</option>
-              <option value="success">Succeeded</option>
-              <option value="failure">Failed</option>
-              <option value="timeout">Timed Out</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <div class="activity-filters" aria-label="Activity filters">
+              <label class="field-label" for="clientFilter">Client</label>
+              <select id="clientFilter" name="client-filter" aria-label="Filter activity by client"><option value="all">All clients</option></select>
+              <label class="field-label" for="resultFilter">Result</label>
+              <select id="resultFilter" name="result-filter" aria-label="Filter command history">
+                <option value="all">All results</option>
+                <option value="success">Succeeded</option>
+                <option value="failure">Failed</option>
+                <option value="timeout">Timed Out</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
           </div>
           <h3>Current tasks</h3>
           <div id="currentTasks" class="table-region"></div>
