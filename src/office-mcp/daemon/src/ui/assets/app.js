@@ -27,6 +27,12 @@ document.addEventListener('click', async (event) => {
     await copyText(value, copy);
     return;
   }
+  const diagnostic = event.target.closest('[data-open-diagnostic]');
+  if (diagnostic) {
+    event.stopPropagation();
+    await openDiagnostic(diagnostic.dataset.openDiagnostic, diagnostic);
+    return;
+  }
   const inspect = event.target.closest('[data-inspect]');
   if (inspect) inspectRow(inspect);
 });
@@ -230,6 +236,24 @@ async function copyText(text, button) {
   if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
   else fallbackCopy(text);
   announce('Copied ' + (button.querySelector('span')?.textContent || 'value'));
+}
+
+async function openDiagnostic(target, button) {
+  if (!target || button.disabled) return;
+  button.disabled = true;
+  try {
+    const response = await fetch('/ui/open-diagnostic', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target })
+    });
+    if (!response.ok) throw new Error(await response.text() || 'Failed to open diagnostic path');
+    announce('Opened ' + target + ' path');
+  } catch (error) {
+    announce(error.message || 'Failed to open diagnostic path');
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function emptyState(titleText, bodyText, codeText, copyLabel = 'Copy endpoint') {

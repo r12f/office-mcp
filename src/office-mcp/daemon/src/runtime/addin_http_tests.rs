@@ -8,9 +8,11 @@ use crate::mcp::{HttpMethod, ToolAccessPolicy};
 use crate::runtime::http_wire::WireHttpRequest;
 use crate::runtime::mcp_response::RuntimeSharedState;
 use crate::runtime::server_config::RuntimeServerConfig;
+use crate::runtime::ui_http::{DiagnosticOpenRequest, DiagnosticOpener};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[test]
@@ -188,6 +190,76 @@ fn tool_access_policy_update_rejects_foreign_origin() {
 }
 
 #[test]
+fn ui_open_diagnostic_opens_only_daemon_owned_config_or_log_paths() {
+    let opener = RecordingDiagnosticOpener::default();
+    let service = AddinHttpService::from_config_with_diagnostic_opener(
+        &RuntimeServerConfig::default(),
+        opener.clone(),
+    );
+    let ui_state = Arc::new(Mutex::new(UiStateStore::with_options(
+        crate::api::UiStateOptions {
+            log_path: Some("C:\\logs\\office-mcp.log".to_string()),
+            ..crate::api::UiStateOptions::default()
+        },
+    )));
+    let shared_state =
+        shared_state_with_config_path(Some("C:\\office-mcp\\config.toml".to_string()));
+    let mut config_request = request(
+        HttpMethod::Post,
+        "/ui/open-diagnostic",
+        BTreeMap::from([("origin".to_string(), "https://localhost:8765".to_string())]),
+    );
+    config_request.body = br#"{"target":"config"}"#.to_vec();
+    let mut log_request = request(
+        HttpMethod::Post,
+        "/ui/open-diagnostic",
+        BTreeMap::from([("origin".to_string(), "https://localhost:8765".to_string())]),
+    );
+    log_request.body = br#"{"target":"log"}"#.to_vec();
+    let mut arbitrary_request = request(
+        HttpMethod::Post,
+        "/ui/open-diagnostic",
+        BTreeMap::from([("origin".to_string(), "https://localhost:8765".to_string())]),
+    );
+    arbitrary_request.body = br#"{"target":"C:\\secret.txt"}"#.to_vec();
+
+    let config_response = service.route_request(&ui_state, &shared_state, &config_request);
+    let log_response = service.route_request(&ui_state, &shared_state, &log_request);
+    let arbitrary_response = service.route_request(&ui_state, &shared_state, &arbitrary_request);
+
+    assert_eq!(config_response.status, 200);
+    assert_eq!(log_response.status, 200);
+    assert_eq!(arbitrary_response.status, 400);
+    assert_eq!(
+        opener.opened(),
+        vec!["C:\\office-mcp\\config.toml", "C:\\logs\\office-mcp.log"]
+    );
+}
+
+#[test]
+fn ui_open_diagnostic_rejects_foreign_origin() {
+    let opener = RecordingDiagnosticOpener::default();
+    let service = AddinHttpService::from_config_with_diagnostic_opener(
+        &RuntimeServerConfig::default(),
+        opener.clone(),
+    );
+    let ui_state = Arc::new(Mutex::new(UiStateStore::new()));
+    let shared_state =
+        shared_state_with_config_path(Some("C:\\office-mcp\\config.toml".to_string()));
+    let mut request = request(
+        HttpMethod::Post,
+        "/ui/open-diagnostic",
+        BTreeMap::from([("origin".to_string(), "https://evil.example".to_string())]),
+    );
+    request.body = br#"{"target":"config"}"#.to_vec();
+
+    let response = service.route_request(&ui_state, &shared_state, &request);
+
+    assert_eq!(response.status, 403);
+    assert_eq!(opener.opened(), Vec::<String>::new());
+}
+
+#[test]
 fn addin_diagnostics_accepts_local_events_and_rejects_foreign_origins() {
     let mut allowed = request(
         HttpMethod::Post,
@@ -281,4 +353,35 @@ fn response_text(response: &crate::runtime::http_wire::WireHttpResponse) -> Stri
         .position(|window| window == b"\r\n\r\n")
         .map_or(&[][..], |index| &bytes[index + 4..]);
     String::from_utf8(body.to_vec()).expect("response body is UTF-8")
+}
+
+#[derive(Clone, Debug, Default)]
+struct RecordingDiagnosticOpener {
+    opened: Arc<Mutex<Vec<String>>>,
+    failures: Arc<AtomicUsize>,
+}
+
+impl RecordingDiagnosticOpener {
+    fn opened(&self) -> Vec<String> {
+        self.opened.lock().expect("opened paths").clone()
+    }
+}
+
+impl DiagnosticOpener for RecordingDiagnosticOpener {
+    fn open(&self, request: &DiagnosticOpenRequest) -> Result<(), String> {
+        if self
+            .failures
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |value| {
+                value.checked_sub(1)
+            })
+            .is_ok()
+        {
+            return Err("open failed".to_string());
+        }
+        self.opened
+            .lock()
+            .expect("opened paths")
+            .push(request.path.display().to_string());
+        Ok(())
+    }
 }

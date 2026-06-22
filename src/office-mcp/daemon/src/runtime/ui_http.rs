@@ -7,25 +7,47 @@ use crate::runtime::server_config::RuntimeServerConfig;
 use crate::runtime::static_response::StaticResponseService;
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(crate) struct UiHttpService {
     addin_origin: String,
     mcp_endpoint: String,
     addin_endpoint: String,
     assets: StaticResponseService,
+    diagnostic_opener: Arc<dyn DiagnosticOpener>,
 }
+
+impl PartialEq for UiHttpService {
+    fn eq(&self, other: &Self) -> bool {
+        self.addin_origin == other.addin_origin
+            && self.mcp_endpoint == other.mcp_endpoint
+            && self.addin_endpoint == other.addin_endpoint
+            && self.assets == other.assets
+    }
+}
+
+impl Eq for UiHttpService {}
 
 impl UiHttpService {
     #[must_use]
     pub(crate) fn from_config(config: &RuntimeServerConfig) -> Self {
+        Self::from_config_with_diagnostic_opener(config, SystemDiagnosticOpener)
+    }
+
+    #[must_use]
+    pub(crate) fn from_config_with_diagnostic_opener(
+        config: &RuntimeServerConfig,
+        diagnostic_opener: impl DiagnosticOpener + 'static,
+    ) -> Self {
         Self {
             addin_origin: config.addin_origin.clone(),
             mcp_endpoint: format!("http://{}:{}/mcp", config.mcp_host, config.mcp_port),
             addin_endpoint: format!("{}/addin", config.addin_origin),
             assets: StaticResponseService::new(config.addin_public_dir.clone()),
+            diagnostic_opener: Arc::new(diagnostic_opener),
         }
     }
 
@@ -53,6 +75,9 @@ impl UiHttpService {
         }
         if request.path == "/ui/tool-access-policy" && request.method == HttpMethod::Put {
             return Some(self.tool_access_policy_update_response(request, ui_state, shared_state));
+        }
+        if request.path == "/ui/open-diagnostic" && request.method == HttpMethod::Post {
+            return Some(self.open_diagnostic_response(request, ui_state, shared_state));
         }
         None
     }
@@ -140,6 +165,32 @@ impl UiHttpService {
         )
     }
 
+    fn open_diagnostic_response(
+        &self,
+        request: &WireHttpRequest,
+        ui_state: &Arc<Mutex<UiStateStore>>,
+        shared_state: &Arc<RuntimeSharedState>,
+    ) -> WireHttpResponse {
+        if !self.allows_origin(request) {
+            return WireHttpResponse::text(403, "Forbidden origin".to_string());
+        }
+        let target = match parse_open_diagnostic_target(&request.body) {
+            Ok(target) => target,
+            Err(message) => return WireHttpResponse::text(400, message),
+        };
+        let path = match diagnostic_path(target, ui_state, shared_state) {
+            Ok(path) => path,
+            Err(message) => return WireHttpResponse::text(404, message),
+        };
+        let request = DiagnosticOpenRequest { target, path };
+        if let Err(error) = self.diagnostic_opener.open(&request) {
+            tracing::error!(%error, target = request.target.as_str(), path = %request.path.display(), "failed to open daemon diagnostic path");
+            return WireHttpResponse::text(500, "Failed to open diagnostic path".to_string());
+        }
+        tracing::info!(target = request.target.as_str(), path = %request.path.display(), "opened daemon diagnostic path");
+        WireHttpResponse::json(200, BTreeMap::new(), r#"{"ok":true}"#.to_string())
+    }
+
     fn allows_origin(&self, request: &WireHttpRequest) -> bool {
         request
             .headers
@@ -162,6 +213,101 @@ impl UiHttpService {
             },
         )
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DiagnosticTarget {
+    Config,
+    Log,
+}
+
+impl DiagnosticTarget {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Config => "config",
+            Self::Log => "log",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DiagnosticOpenRequest {
+    pub(crate) target: DiagnosticTarget,
+    pub(crate) path: PathBuf,
+}
+
+pub(crate) trait DiagnosticOpener: Send + Sync + std::fmt::Debug {
+    fn open(&self, request: &DiagnosticOpenRequest) -> Result<(), String>;
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct SystemDiagnosticOpener;
+
+impl DiagnosticOpener for SystemDiagnosticOpener {
+    fn open(&self, request: &DiagnosticOpenRequest) -> Result<(), String> {
+        open_system_path(&request.path)
+    }
+}
+
+fn diagnostic_path(
+    target: DiagnosticTarget,
+    ui_state: &Arc<Mutex<UiStateStore>>,
+    shared_state: &Arc<RuntimeSharedState>,
+) -> Result<PathBuf, String> {
+    match target {
+        DiagnosticTarget::Config => shared_state
+            .config_path
+            .as_deref()
+            .map(PathBuf::from)
+            .ok_or_else(|| "Config path is not available".to_string()),
+        DiagnosticTarget::Log => ui_state
+            .lock()
+            .map_err(|_| "Failed to read UI state".to_string())?
+            .snapshot(&[], std::time::SystemTime::UNIX_EPOCH)
+            .daemon
+            .log_path
+            .map(PathBuf::from)
+            .ok_or_else(|| "Log path is not available".to_string()),
+    }
+}
+
+fn parse_open_diagnostic_target(body: &[u8]) -> Result<DiagnosticTarget, String> {
+    let value = serde_json::from_slice::<Value>(body).map_err(|error| error.to_string())?;
+    match value.get("target").and_then(Value::as_str) {
+        Some("config") => Ok(DiagnosticTarget::Config),
+        Some("log") => Ok(DiagnosticTarget::Log),
+        Some(other) => Err(format!("Unsupported diagnostic target: {other}")),
+        None => Err("Diagnostic target is required".to_string()),
+    }
+}
+
+fn open_system_path(path: &Path) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        Command::new("explorer.exe")
+            .arg(path)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+    #[allow(unreachable_code)]
+    Err("opening diagnostic paths is unsupported on this platform".to_string())
 }
 
 fn tool_access_config_from_policy(policy: &ToolAccessPolicy) -> ToolAccessConfig {

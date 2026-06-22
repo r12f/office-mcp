@@ -5,6 +5,8 @@ use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
 use crate::runtime::mcp_response::RuntimeSharedState;
 use crate::runtime::server_config::RuntimeServerConfig;
 use crate::runtime::static_response::StaticResponseService;
+#[cfg(test)]
+use crate::runtime::ui_http::DiagnosticOpener;
 use crate::runtime::ui_http::UiHttpService;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -19,10 +21,26 @@ pub(crate) struct AddinHttpService {
 impl AddinHttpService {
     #[must_use]
     pub(crate) fn from_config(config: &RuntimeServerConfig) -> Self {
+        Self::from_config_with_ui(config, UiHttpService::from_config(config))
+    }
+
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn from_config_with_diagnostic_opener(
+        config: &RuntimeServerConfig,
+        diagnostic_opener: impl DiagnosticOpener + 'static,
+    ) -> Self {
+        Self::from_config_with_ui(
+            config,
+            UiHttpService::from_config_with_diagnostic_opener(config, diagnostic_opener),
+        )
+    }
+
+    fn from_config_with_ui(config: &RuntimeServerConfig, ui: UiHttpService) -> Self {
         Self {
             addin_origin: config.addin_origin.clone(),
             assets: StaticResponseService::new(config.addin_public_dir.clone()),
-            ui: UiHttpService::from_config(config),
+            ui,
         }
     }
 
@@ -48,6 +66,11 @@ impl AddinHttpService {
             return response;
         }
         if request.method == HttpMethod::Put
+            && let Some(response) = self.ui.try_handle(request, ui_state, shared_state)
+        {
+            return response;
+        }
+        if request.method == HttpMethod::Post
             && let Some(response) = self.ui.try_handle(request, ui_state, shared_state)
         {
             return response;

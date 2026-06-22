@@ -72,6 +72,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("aria-label=\"Copy add-in endpoint\""));
     assert!(html.contains("aria-label=\"Copy config path\""));
     assert!(html.contains("aria-label=\"Copy log path\""));
+    assert!(html.contains("aria-label=\"Open config file location\""));
+    assert!(html.contains("aria-label=\"Open log file location\""));
+    assert!(html.contains("data-open-diagnostic=\"config\""));
+    assert!(html.contains("data-open-diagnostic=\"log\""));
     assert!(html.contains("id=\"toolAccessPanel\""));
     assert!(html.contains("Global Tool Access"));
     assert!(html.contains("id=\"toolAccessMode\""));
@@ -106,12 +110,13 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
         ".detail-path-value { display: grid; grid-template-columns: minmax(0, 1fr) auto;"
     ));
     assert!(css.contains(".detail-path-value code { display: block; min-width: 0; white-space: normal; overflow-wrap: anywhere; user-select: text;"));
+    assert!(css.contains(".detail-actions { display: inline-flex; gap: 2px; align-items: center;"));
     assert!(css.contains(
         ".detail-log-value { display: grid; grid-template-columns: minmax(0, 1fr) auto;"
     ));
     assert!(css.contains(".detail-log-value textarea { display: block; width: 100%; min-width: 0; min-height: 54px; max-height: 132px; resize: vertical; overflow: auto;"));
     assert!(css.contains("white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;"));
-    assert!(css.contains(".detail-copy { display: inline-flex; min-height: 24px;"));
+    assert!(css.contains(".detail-copy, .detail-open { display: inline-flex; min-height: 24px;"));
     assert!(css.contains(".id-copy { display: inline-flex; max-width: 100%; min-height: 32px;"));
     assert!(css.contains(".id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains(
@@ -126,7 +131,7 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".tool-access-list details { border: 1px solid var(--border);"));
     assert!(css.contains(".tool-access-toggle { display: inline-flex; width: 34px;"));
     assert!(css.contains(
-        ".detail-copy:hover, .detail-copy:focus-visible, .id-copy:hover, .id-copy:focus-visible"
+        ".detail-copy:hover, .detail-copy:focus-visible, .detail-open:hover, .detail-open:focus-visible, .id-copy:hover, .id-copy:focus-visible"
     ));
     assert!(css.contains(".details { grid-column: 1 / -1;"));
     assert!(css.contains("border-top: 1px solid var(--border); padding-top: 8px;"));
@@ -155,6 +160,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(
         js.contains("const value = copy.dataset.copyValue || target?.value || target?.textContent")
     );
+    assert!(js.contains("event.target.closest('[data-open-diagnostic]')"));
+    assert!(js.contains("fetch('/ui/open-diagnostic'"));
+    assert!(js.contains("method: 'POST'"));
+    assert!(js.contains("body: JSON.stringify({ target })"));
     assert!(!js.contains("$('lastError').textContent"));
     assert!(!js.contains("$('daemonMeta').textContent = snapshot.daemon?.last_error"));
     assert!(!js.contains("'Not configured'"));
