@@ -635,27 +635,40 @@ Word, Excel, and PowerPoint session.
       `/ui/state`, updates it via `PUT /ui/tool-access-policy`, and writes that
       UI update back to the daemon config file so restart applies the same
       policy.
-- [ ] Classify every Word, Excel, and PowerPoint tool by app, object/category,
+- [x] Classify every Word, Excel, and PowerPoint tool by app, object/category,
       and side-effect level so the daemon UI can display grouped controls. The
       UI must allow expanding/collapsing categories and independently toggling
       every app/category/tool without collapsing the group accidentally.
-- [ ] Filter MCP `tools/list` through the daemon global access policy. Disabled
+      Current evidence: `tool_metadata_covers_every_forwarded_office_tool`
+      proves every forwarded Word, Excel, and PowerPoint tool has daemon UI
+      metadata, while `npm run smoke:ui` validates grouped app/category/tool
+      controls and toggle clicks that do not collapse groups.
+- [x] Filter MCP `tools/list` through the daemon global access policy. Disabled
       tools must not be returned to clients, reducing context and preventing
       stale planning from tools the daemon will reject. Management tools such as
       `office.list_sessions` and `office.get_session_info` remain available
       unless a future explicit management-policy section says otherwise.
-- [ ] Enforce daemon policy before session preflight on every `tools/call`.
+      Current evidence: `tools_list_filters_daemon_disabled_tools`,
+      `tools_list_filters_by_daemon_access_mode`, and
+      `mcp_json_rpc_daemon_policy_filters_discovery_and_rejects_before_session_preflight`.
+- [x] Enforce daemon policy before session preflight on every `tools/call`.
       When a stale client calls a globally disabled tool, return
       `TOOL_NOT_AVAILABLE` with text beginning `Tool <name> is disabled by
       daemon access policy.`, telling the client to refresh `tools/list`, and
       structured `refresh_tools: true`. Do not forward the request to any add-in
-      session.
-- [ ] Keep session `available_tools` as the second access-control layer. After
+      session. Current evidence:
+      `mcp_json_rpc_daemon_policy_filters_discovery_and_rejects_before_session_preflight`
+      verifies the daemon-policy rejection and refresh hint before any session
+      preflight.
+- [x] Keep session `available_tools` as the second access-control layer. After
       daemon policy passes, if the target session does not expose the tool,
       return `TOOL_NOT_ENABLED_FOR_DOCUMENT` with the target `session_id`, text
       beginning `Tool <name> is disabled for this document session.`, a refresh
       instruction for `office.get_session_info` or `office.list_sessions`, and
-      structured `refresh_session_info: true`.
+      structured `refresh_session_info: true`. Current evidence:
+      `mcp_json_rpc_disabled_session_tool_uses_unified_error_wording` and
+      `invocation_preflight_returns_protocol_errors` verify the second-layer
+      session preflight code, wording, and refresh hint.
 - [x] Add daemon UI controls for the global policy. The UI must show app,
       category, and tool controls with `Read` / `Write` / `All` mode, and it
       must make clear that daemon policy is global while task-pane
