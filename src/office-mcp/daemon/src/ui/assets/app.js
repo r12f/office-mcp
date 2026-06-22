@@ -38,6 +38,7 @@ document.addEventListener('click', async (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (handleRowNavigation(event)) return;
   if (event.key !== 'Enter' && event.key !== ' ') return;
   const target = event.target.closest('[data-key-activate]');
   if (!target) return;
@@ -67,6 +68,7 @@ async function refresh() {
 function render() {
   const snapshot = state.snapshot;
   if (!snapshot) return;
+  const focusKey = focusedRowKey();
   const docs = Object.values(snapshot.documents || {}).flat();
   const health = title(snapshot.daemon?.status || 'down');
   $('healthBadge').textContent = health;
@@ -88,6 +90,7 @@ function render() {
   renderCommands('currentTasks', snapshot.current_tasks || [], true);
   const history = (snapshot.recent_commands || []).filter((command) => state.result === 'all' || command.status === state.result);
   renderCommands('history', history, false);
+  restoreRowFocus(focusKey);
 }
 
 function renderToolAccess(catalog, policy) {
@@ -204,7 +207,7 @@ function renderDocumentCard(doc, app) {
   const label = doc.document?.title || doc.document?.filename || 'Untitled';
   const status = documentConnectionLabel(doc.status);
   const metrics = documentTaskMetrics(doc.session_id);
-  return `<button class="row document-card ${esc(app)}" type="button" data-key-activate data-inspect='${attr(doc)}' aria-label="Inspect ${esc(label)} ${esc(status)}"><span class="document-card-title"><span class="state-dot ${esc(documentStateTone(doc.status))}" aria-hidden="true"></span><strong title="${esc(label)}">${esc(label)}</strong><span class="pill ${esc(documentStateTone(doc.status))}">${esc(title(status))}</span></span><span class="document-card-session" data-copy-value="${esc(doc.session_id || '-')}" title="${esc(doc.session_id || '-')}"><span>Session ID</span><code>${esc(doc.session_id || '-')}</code></span><span class="document-card-meta"><span>Version ${esc(doc.host?.version || '-')}</span><span>${esc(doc.available_tool_count || 0)} tools</span><span>Queue ${esc(doc.queue_depth || 0)}</span></span><span class="document-card-meta"><span>Finished ${esc(metrics.finished)}</span><span>Failed ${esc(metrics.failed)}</span></span></button>`;
+  return `<button class="row document-card ${esc(app)}" type="button" data-key-activate data-focus-key="document:${esc(doc.session_id || label)}" data-inspect='${attr(doc)}' aria-label="Inspect ${esc(label)} ${esc(status)}"><span class="document-card-title"><span class="state-dot ${esc(documentStateTone(doc.status))}" aria-hidden="true"></span><strong title="${esc(label)}">${esc(label)}</strong><span class="pill ${esc(documentStateTone(doc.status))}">${esc(title(status))}</span></span><span class="document-card-session" data-copy-value="${esc(doc.session_id || '-')}" title="${esc(doc.session_id || '-')}"><span>Session ID</span><code>${esc(doc.session_id || '-')}</code></span><span class="document-card-meta"><span>Version ${esc(doc.host?.version || '-')}</span><span>${esc(doc.available_tool_count || 0)} tools</span><span>Queue ${esc(doc.queue_depth || 0)}</span></span><span class="document-card-meta"><span>Finished ${esc(metrics.finished)}</span><span>Failed ${esc(metrics.failed)}</span></span></button>`;
 }
 
 function documentTaskMetrics(sessionId) {
@@ -217,7 +220,7 @@ function documentTaskMetrics(sessionId) {
 }
 
 function renderClients(clients) {
-  $('clients').innerHTML = clients.map((client) => `<button class="row" type="button" data-inspect='${attr(client)}'><strong>${esc(client.name || client.client_id)}</strong><span>${esc(client.transport)} | in flight ${esc(client.in_flight_request_count || 0)}</span></button>`).join('') || emptyState('No MCP clients connected', 'Connect an MCP client using this endpoint.', state.snapshot?.daemon?.mcp_endpoint, 'Copy MCP endpoint');
+  $('clients').innerHTML = clients.map((client) => `<button class="row" type="button" data-focus-key="client:${esc(client.client_id || client.name)}" data-inspect='${attr(client)}'><strong>${esc(client.name || client.client_id)}</strong><span>${esc(client.transport)} | in flight ${esc(client.in_flight_request_count || 0)}</span></button>`).join('') || emptyState('No MCP clients connected', 'Connect an MCP client using this endpoint.', state.snapshot?.daemon?.mcp_endpoint, 'Copy MCP endpoint');
 }
 
 function renderCommands(target, commands, running) {
@@ -225,8 +228,46 @@ function renderCommands(target, commands, running) {
     $(target).innerHTML = running ? emptyState('No command is running', 'New tool calls appear here while they are in flight.') : emptyState('No command history yet', 'Completed, failed, cancelled, and timed-out commands appear here.');
     return;
   }
-  const rows = commands.map((command) => `<tr tabindex="0" role="button" aria-label="Inspect ${esc(command.tool)} ${esc(title(command.status))}" data-key-activate data-inspect='${attr(command)}'><td><strong>${esc(command.tool)}</strong><br><small>${copyableId(command.command_id || command.mcp_request_id, 'Copy command ID')} / ${copyableId(command.session_id, 'Copy session ID')}</small></td><td>${esc(command.client_name || command.client_id || '-')}</td><td><span class="pill ${tone(command.status)}">${esc(title(command.status))}</span></td><td>${running ? duration(Date.now() - (command.started_at || Date.now())) : duration(command.elapsed_ms || 0)}</td><td>${esc(command.error?.office_mcp_code || '')}<br><small>${esc(command.error?.message || '')}</small></td></tr>`).join('');
+  const rows = commands.map((command) => `<tr tabindex="0" role="button" aria-label="Inspect ${esc(command.tool)} ${esc(title(command.status))}" data-key-activate data-focus-key="command:${esc(command.command_id || command.mcp_request_id || command.tool)}" data-inspect='${attr(command)}'><td><strong>${esc(command.tool)}</strong><br><small>${copyableId(command.command_id || command.mcp_request_id, 'Copy command ID')} / ${copyableId(command.session_id, 'Copy session ID')}</small></td><td>${esc(command.client_name || command.client_id || '-')}</td><td><span class="pill ${tone(command.status)}">${esc(title(command.status))}</span></td><td>${running ? duration(Date.now() - (command.started_at || Date.now())) : duration(command.elapsed_ms || 0)}</td><td>${esc(command.error?.office_mcp_code || '')}<br><small>${esc(command.error?.message || '')}</small></td></tr>`).join('');
   $(target).innerHTML = `<table><thead><tr><th>Tool</th><th>Client</th><th>Status</th><th>Time</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function handleRowNavigation(event) {
+  const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp'];
+  if (!keys.includes(event.key)) return false;
+  const target = event.target instanceof Element ? event.target : document.activeElement;
+  const row = target?.closest('.row, tr[data-inspect]');
+  if (!row) return false;
+  const scope = row.closest('#documents, #clients, #currentTasks, #history');
+  if (!scope) return false;
+  const rows = [...scope.querySelectorAll('.row, tr[data-inspect]')].filter((item) => !item.disabled);
+  const index = rows.indexOf(row);
+  if (index < 0) return false;
+  const pageStep = Math.max(1, Math.min(5, rows.length - 1));
+  const nextIndex = rowNavigationIndex(event.key, index, rows.length, pageStep);
+  event.preventDefault();
+  rows[nextIndex].focus();
+  return true;
+}
+
+function focusedRowKey() {
+  return document.activeElement?.closest?.('.row, tr[data-inspect]')?.dataset.focusKey || null;
+}
+
+function restoreRowFocus(focusKey) {
+  if (!focusKey) return;
+  const row = document.querySelector(`[data-focus-key="${cssEscape(focusKey)}"]`);
+  if (row) row.focus();
+}
+
+function rowNavigationIndex(key, index, count, pageStep) {
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  if (key === 'ArrowDown') return Math.min(count - 1, index + 1);
+  if (key === 'ArrowUp') return Math.max(0, index - 1);
+  if (key === 'PageDown') return Math.min(count - 1, index + pageStep);
+  if (key === 'PageUp') return Math.max(0, index - pageStep);
+  return index;
 }
 
 function inspectRow(element) { $('inspector').textContent = JSON.stringify(JSON.parse(element.dataset.inspect), null, 2); }
@@ -303,3 +344,4 @@ function announceStatus(status) { if (state.previousStatus === status) return; s
 function announce(message) { $('announcer').textContent = message; }
 function esc(value) { return String(value ?? '').replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]); }
 function attr(value) { return esc(JSON.stringify(value)).replace(/'/g, '&#39;'); }
+function cssEscape(value) { return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"'); }

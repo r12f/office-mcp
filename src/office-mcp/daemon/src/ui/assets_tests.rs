@@ -116,6 +116,7 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     ));
     assert!(css.contains(".detail-log-value textarea { display: block; width: 100%; min-width: 0; min-height: 54px; max-height: 132px; resize: vertical; overflow: auto;"));
     assert!(css.contains("white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;"));
+    assert!(!css.contains(".detail-log-value textarea { display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis;"));
     assert!(css.contains(".detail-copy, .detail-open { display: inline-flex; min-height: 24px;"));
     assert!(css.contains(".id-copy { display: inline-flex; max-width: 100%; min-height: 32px;"));
     assert!(css.contains(".id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
@@ -161,6 +162,19 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
         js.contains("const value = copy.dataset.copyValue || target?.value || target?.textContent")
     );
     assert!(js.contains("event.target.closest('[data-open-diagnostic]')"));
+    assert!(js.contains("function handleRowNavigation(event)"));
+    assert!(js.contains("['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp']"));
+    assert!(js.contains("row.closest('#documents, #clients, #currentTasks, #history')"));
+    assert!(js.contains("filter((item) => !item.disabled)"));
+    assert!(!js.contains("offsetParent !== null"));
+    assert!(js.contains("function rowNavigationIndex(key, index, count, pageStep)"));
+    assert!(js.contains("const focusKey = focusedRowKey()"));
+    assert!(js.contains("restoreRowFocus(focusKey)"));
+    assert!(js.contains("function focusedRowKey()"));
+    assert!(js.contains("function restoreRowFocus(focusKey)"));
+    assert!(js.contains("data-focus-key=\"document:${esc(doc.session_id || label)}\""));
+    assert!(js.contains("data-focus-key=\"client:${esc(client.client_id || client.name)}\""));
+    assert!(js.contains("data-focus-key=\"command:${esc(command.command_id || command.mcp_request_id || command.tool)}\""));
     assert!(js.contains("fetch('/ui/open-diagnostic'"));
     assert!(js.contains("method: 'POST'"));
     assert!(js.contains("body: JSON.stringify({ target })"));
