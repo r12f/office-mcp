@@ -769,11 +769,15 @@ function officeToolE2eActivationLooksReady(activation: unknown): boolean {
 }
 
 function officeToolE2eCleanupLooksReady(cleanup: unknown): boolean {
+  const deletedPaths = isRecord(cleanup) && Array.isArray(cleanup.deleted_paths)
+    ? cleanup.deleted_paths.filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
+    : [];
   return isRecord(cleanup)
     && cleanup.closed_by_driver === true
     && cleanup.deleted === true
     && typeof cleanup.deleted_path_count === 'number'
     && cleanup.deleted_path_count >= 1
+    && deletedPaths.length >= 1
     && typeof cleanup.skipped !== 'string';
 }
 

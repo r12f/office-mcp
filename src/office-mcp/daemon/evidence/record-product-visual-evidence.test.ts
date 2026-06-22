@@ -965,6 +965,40 @@ test('product visual evidence recorder requires Office tool E2E reports', () => 
   });
 });
 
+test('product visual evidence recorder requires Office tool E2E cleanup deleted paths', () => {
+  withScreenshots((dir, screenshots) => {
+    const daemonBin = writeFakeDaemon(dir);
+    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
+    const catalogIdentityReviewPath = writeCatalogIdentityReview(dir);
+    const wordToolE2eReportPath = writeOfficeToolE2eReport(dir, 'Word', true);
+    const wordToolE2e = JSON.parse(readFileSync(wordToolE2eReportPath, 'utf8')) as Record<string, unknown>;
+    wordToolE2e.cleanup = { closed_by_driver: true, deleted: true, deleted_path_count: 1 };
+    writeFileSync(wordToolE2eReportPath, JSON.stringify(wordToolE2e, null, 2));
+
+    const output = join(dir, 'office-tool-e2e-missing-deleted-paths.json');
+    const result = runRecorder(
+      output,
+      screenshots,
+      '--daemon-bin', daemonBin,
+      '--rendered-logo-review-path', renderedLogoReviewPath,
+      '--catalog-identity-review-path', catalogIdentityReviewPath,
+      '--word-tool-e2e-report-path', wordToolE2eReportPath,
+      '--excel-tool-e2e-report-path', writeOfficeToolE2eReport(dir, 'Excel', true),
+      '--powerpoint-tool-e2e-report-path', writeOfficeToolE2eReport(dir, 'PowerPoint', true),
+      '--word-runtime-evidence-path', writeWordRuntimeEvidence(dir),
+      '--excel-runtime-evidence-path', writeExcelRuntimeEvidence(dir),
+      '--powerpoint-runtime-evidence-path', writePowerPointRuntimeEvidence(dir)
+    );
+
+    assert.notEqual(result.status, 0);
+    const evidence = JSON.parse(readFileSync(output, 'utf8')) as Record<string, unknown>;
+    assert.equal(evidence.office_tool_e2e_ready, false);
+    const officeToolE2e = evidence.office_tool_e2e as Record<string, Record<string, unknown>>;
+    assert.equal(officeToolE2e.word.ready, false);
+    assert.equal(evidence.passed, false);
+  });
+});
+
 test('product visual evidence recorder requires Word task pane density review', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -1518,7 +1552,12 @@ function writeOfficeToolE2eReport(dir: string, host: 'Word' | 'Excel' | 'PowerPo
       cleanup_document: 1,
       stop_daemon: 1
     },
-    cleanup: { closed_by_driver: ready, deleted: ready, deleted_path_count: ready ? 1 : 0 },
+    cleanup: {
+      closed_by_driver: ready,
+      deleted: ready,
+      deleted_path_count: ready ? 1 : 0,
+      deleted_paths: ready ? [`${key}-fixture`] : []
+    },
     advertised_tools: tools,
     session_available_tools: tools,
     executed_tools: ready ? tools : tools.slice(0, -1),
