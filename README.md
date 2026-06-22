@@ -273,7 +273,10 @@ activator. Reports with `no-activator-configured` are useful for local manual
 debugging, but `npm run evidence:validate -- --require-office-tool-e2e` rejects
 them. Release-ready reports must also include the concrete add-in activator identity
 and a non-empty `activation_path`; weak activation proof such as only
-`activated: true` is rejected.
+`activated: true` is rejected. Cleanup proof must include `deleted_paths` with
+the concrete cleanup paths for the driver-owned original file and any Office
+sideload copies that were closed and deleted; a count-only cleanup report is not
+release-ready.
 
 ```powershell
 cd ..\..\office-ctl\word

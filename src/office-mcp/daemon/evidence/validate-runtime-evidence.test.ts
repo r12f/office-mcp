@@ -470,6 +470,7 @@ test('runtime evidence validator can require Office tool E2E reports', () => {
 test('README documents Office tool E2E report validation command', () => {
   const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
   const roadmap = readFileSync(resolve(process.cwd(), '../../../..', 'doc/spec/08-roadmap.md'), 'utf8');
+  const toolSpec = readFileSync(resolve(process.cwd(), '../../../..', 'doc/spec/03-mcp-tool-surface.md'), 'utf8');
   const commandLine = readme.split('\n').find((line) => line.includes('--require-office-tool-e2e') && line.includes('--word-tool-e2e-report-path')) ?? '';
 
   assert.match(readme, /OFFICE_MCP_RUN_E2E = '1'/);
@@ -485,6 +486,8 @@ test('README documents Office tool E2E report validation command', () => {
   assert.match(readme, /must not restart Office, recreate the document, or reconnect/);
   assert.match(readme, /one table-driven\s+loop across the host's complete tool catalog/);
   assert.match(readme, /office-tool-e2e-<host>\.json/);
+  assert.match(readme, /deleted_paths/);
+  assert.match(readme, /concrete cleanup paths/i);
   assert.match(commandLine, /npm run evidence:validate/);
   assert.match(commandLine, /--require-office-tool-e2e/);
   assert.match(commandLine, /--input .*runtime-evidence-word\.json/);
@@ -494,6 +497,10 @@ test('README documents Office tool E2E report validation command', () => {
   assert.match(roadmap, /activator identity/i);
   assert.match(roadmap, /activation_path/);
   assert.match(roadmap, /weak activation proof/i);
+  assert.match(roadmap, /deleted_paths/);
+  assert.match(roadmap, /concrete cleanup paths/i);
+  assert.match(toolSpec, /deleted_paths/);
+  assert.match(toolSpec, /driver-owned files were closed and deleted/i);
 });
 
 test('runtime evidence validator accepts UI runtime evidence gates', () => {

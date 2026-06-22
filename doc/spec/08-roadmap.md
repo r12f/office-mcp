@@ -1592,7 +1592,10 @@ channel, and MCP `tools/call` dispatch.
       `artifacts/office-tool-e2e-word.json`,
       `artifacts/office-tool-e2e-excel.json`, and
       `artifacts/office-tool-e2e-powerpoint.json`; final process and temp-file
-      checks found no E2E-created Word, Excel, or PowerPoint residue.
+      checks found no E2E-created Word, Excel, or PowerPoint residue. The E2E
+      reports now include `deleted_paths` so release validation and product
+      visual evidence can inspect the concrete cleanup paths for the
+      driver-owned original files and Office sideload copies, not only a count.
 - [x] Split the Office E2E timeout budget by lifecycle phase and fail fast on
       add-in/daemon connection failures. A single 120s `waitForSession` timeout
       is too coarse because it hides fast JavaScript/runtime failures behind a
@@ -1658,12 +1661,13 @@ tools in that single lifecycle. The runtime evidence validator now exposes
 `--require-office-tool-e2e` with explicit Word, Excel, and PowerPoint report
 paths, and rejects missing reports, non-passing reports, non-single lifecycle
 counts, skipped add-in activation, weak activation proof, incomplete executed
-tool lists, or failed per-tool verifiers.
+tool lists, missing concrete cleanup paths in `deleted_paths`, or failed
+per-tool verifiers.
 Product visual evidence now embeds the same Word, Excel, and PowerPoint tool
 E2E reports and fails release validation unless those embedded reports are
-ready, passing, exact-coverage, and single-lifecycle. This ties final UI/product
-screenshots to the same tool execution proof instead of allowing visual polish
-to pass without full advertised-tool coverage.
+ready, passing, exact-coverage, single-lifecycle, and include concrete cleanup
+paths. This ties final UI/product screenshots to the same tool execution proof
+instead of allowing visual polish to pass without full advertised-tool coverage.
 
 **Exit criterion**: A developer can run one command per Office host and see the
 daemon start, a blank document connect, every MCP tool execute against fixed
