@@ -98,6 +98,7 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#currentTasks .pill.accent")?.textContent.trim() === "Running"', 'running task status uses accent tone');
     await assertEval(cdp, 'document.querySelector("#history").textContent.includes("Succeeded") && document.querySelector("#history").textContent.includes("Failed") && document.querySelector("#history").textContent.includes("Timed Out") && document.querySelector("#history").textContent.includes("Cancelled")', 'history renders spec status labels');
     await assertEval(cdp, 'document.querySelector("#history .pill.warning")?.textContent.trim() === "Timed Out"', 'history timeout status uses warning tone');
+    await assertEval(cdp, 'document.querySelector("#resultFilter option[value=timeout]")?.textContent.trim() === "Timed Out"', 'history filter timeout label follows spec status text');
     await assertEval(cdp, 'document.querySelector("#history tr[data-inspect]").getAttribute("tabindex") === "0" && document.querySelector("#history tr[data-inspect]").getAttribute("role") === "button"', 'history table rows are keyboard focusable buttons');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#history tr[data-inspect]").focus()' });
     await pressKey(cdp, 'ArrowDown', 40);

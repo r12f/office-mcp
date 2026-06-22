@@ -84,6 +84,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("data-access-mode=\"all\""));
     assert!(html.contains("<div><dt>Active Tasks</dt><dd id=\"taskCount\">0</dd></div>"));
     assert!(!html.contains("<dt>Running</dt><dd id=\"taskCount\">"));
+    assert!(html.contains("<option value=\"timeout\">Timed Out</option>"));
+    assert!(!html.contains("<option value=\"timeout\">Timed out</option>"));
     assert!(html.contains("<div class=\"details\" aria-label=\"Daemon details\">"));
     assert!(html.contains("</div>\n      </header>\n\n      <section class=\"workspace\">"));
     assert!(!html.contains("<section class=\"details\" aria-label=\"Daemon details\">"));
