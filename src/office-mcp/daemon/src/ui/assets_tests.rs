@@ -185,6 +185,7 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("state.selectedRowKey = element.dataset.focusKey || null"));
     assert!(js.contains("state.selectedRowKey = null"));
     assert!(js.contains("data-focus-key=\"document:${esc(doc.session_id || label)}\""));
+    assert!(js.contains("type=\"button\" data-key-activate data-focus-key=\"client:${esc(client.client_id || client.name)}\""));
     assert!(js.contains("data-focus-key=\"client:${esc(client.client_id || client.name)}\""));
     assert!(js.contains("data-focus-key=\"command:${esc(command.command_id || command.mcp_request_id || command.tool)}\""));
     assert!(js.contains("fetch('/ui/open-diagnostic'"));

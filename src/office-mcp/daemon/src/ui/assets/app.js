@@ -228,7 +228,7 @@ function documentTaskMetrics(sessionId) {
 }
 
 function renderClients(clients) {
-  $('clients').innerHTML = clients.map((client) => `<button class="row" type="button" data-focus-key="client:${esc(client.client_id || client.name)}" data-inspect='${attr(client)}'><strong>${esc(client.name || client.client_id)}</strong><span>${esc(client.transport)} | in flight ${esc(client.in_flight_request_count || 0)}</span></button>`).join('') || emptyState('No MCP clients connected', 'Connect an MCP client using this endpoint.', state.snapshot?.daemon?.mcp_endpoint, 'Copy MCP endpoint');
+  $('clients').innerHTML = clients.map((client) => `<button class="row" type="button" data-key-activate data-focus-key="client:${esc(client.client_id || client.name)}" data-inspect='${attr(client)}'><strong>${esc(client.name || client.client_id)}</strong><span>${esc(client.transport)} | in flight ${esc(client.in_flight_request_count || 0)}</span></button>`).join('') || emptyState('No MCP clients connected', 'Connect an MCP client using this endpoint.', state.snapshot?.daemon?.mcp_endpoint, 'Copy MCP endpoint');
   annotateInspectableRows($('clients'));
 }
 

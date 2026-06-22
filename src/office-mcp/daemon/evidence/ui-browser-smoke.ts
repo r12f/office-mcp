@@ -50,6 +50,13 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#healthBadge").textContent.includes("Degraded")', 'degraded health badge renders');
     await assertEval(cdp, 'document.querySelector("#lastError").value.includes("Certificate reload failed")', 'degraded last error renders');
     await assertEval(cdp, 'document.querySelector("#clients .row") !== null && document.querySelector("#clients").textContent.includes("http")', 'client list renders');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#clients .row").focus()' });
+    await pressKey(cdp, 'Enter', 13);
+    await assertEval(cdp, 'document.activeElement === document.querySelector("#clients .row") && document.querySelector("#inspectorLog").value.includes("client-1")', 'keyboard client inspection preserves row focus');
+    await assertEval(cdp, 'document.querySelector("#clients .row")?.getAttribute("aria-selected") === "true" && [...document.querySelectorAll("#clients .row")].filter((row) => row.getAttribute("aria-selected") === "true").length === 1', 'inspected client row exposes selected state');
+    await cdp.send('Runtime.evaluate', { expression: 'render()' });
+    await assertEval(cdp, 'document.querySelector("#clients .row")?.getAttribute("aria-selected") === "true"', 'inspected client row preserves selected state after live render');
+    await pressKey(cdp, 'Escape', 27);
     await assertEval(cdp, 'document.querySelector("#documents .row.word") !== null', 'word document row renders');
     await assertEval(cdp, 'document.querySelector("#documents").textContent.includes("Excel") && document.querySelector("#documents .row.excel") !== null', 'excel document group renders');
     await assertEval(cdp, '(() => { const text = document.querySelector("#documents .row.excel")?.textContent || ""; return text.includes("Dead") && !/stale|reconnecting/i.test(text); })()', 'stale document card renders as dead without reconnect wording');
@@ -106,6 +113,13 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row")', 'document row PageUp moves focus toward the start');
     await assertEval(cdp, 'document.querySelector("#currentTasks").textContent.includes("Running") && document.querySelector("#taskCount").textContent.trim() === "1"', 'running task state renders');
     await assertEval(cdp, 'document.querySelector("#currentTasks .pill.accent")?.textContent.trim() === "Running"', 'running task status uses accent tone');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#currentTasks tr[data-inspect]").focus()' });
+    await pressKey(cdp, 'Enter', 13);
+    await assertEval(cdp, 'document.activeElement === document.querySelector("#currentTasks tr[data-inspect]") && document.querySelector("#inspectorLog").value.includes("word.insert_paragraph")', 'keyboard current task inspection preserves row focus');
+    await assertEval(cdp, 'document.querySelector("#currentTasks tr[data-inspect]")?.getAttribute("aria-selected") === "true" && [...document.querySelectorAll("#currentTasks tr[data-inspect]")].filter((row) => row.getAttribute("aria-selected") === "true").length === 1', 'inspected current task row exposes selected state');
+    await cdp.send('Runtime.evaluate', { expression: 'render()' });
+    await assertEval(cdp, 'document.querySelector("#currentTasks tr[data-inspect]")?.getAttribute("aria-selected") === "true"', 'inspected current task row preserves selected state after live render');
+    await pressKey(cdp, 'Escape', 27);
     await assertEval(cdp, 'document.querySelector("#history").textContent.includes("Succeeded") && document.querySelector("#history").textContent.includes("Failed") && document.querySelector("#history").textContent.includes("Timed Out") && document.querySelector("#history").textContent.includes("Cancelled")', 'history renders spec status labels');
     await assertEval(cdp, 'document.querySelector("#history .pill.warning")?.textContent.trim() === "Timed Out"', 'history timeout status uses warning tone');
     await assertEval(cdp, 'document.querySelector("#resultFilter option[value=timeout]")?.textContent.trim() === "Timed Out"', 'history filter timeout label follows spec status text');
