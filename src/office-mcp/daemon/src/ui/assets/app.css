@@ -52,15 +52,15 @@ dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .copy { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: center; width: 100%; border: 1px solid var(--border); background: var(--raised); color: var(--text); border-radius: 7px; padding: 6px 8px; text-align: left; cursor: pointer; }
 .copy code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-path-value { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: center; min-width: 0; }
-.detail-path-value code { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
+.detail-path-value code { display: block; min-width: 0; white-space: normal; overflow-wrap: anywhere; user-select: text; }
 .detail-copy { display: inline-flex; min-height: 24px; align-items: center; padding: 0 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); text-align: center; cursor: pointer; }
 .id-copy { display: inline-flex; max-width: 100%; min-height: 32px; align-items: center; padding: 2px 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: inherit; vertical-align: middle; cursor: pointer; }
 .id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; }
 .detail-copy:hover, .detail-copy:focus-visible, .id-copy:hover, .id-copy:focus-visible { border-color: var(--border); background: var(--raised); }
 .details { grid-column: 1 / -1; min-width: 0; border-top: 1px solid var(--border); padding-top: 8px; }
 .details dl { display: grid; grid-template-columns: minmax(64px, .35fr) minmax(64px, .35fr) minmax(150px, .9fr) minmax(150px, .9fr) minmax(240px, 1.7fr); gap: 8px 12px; align-items: start; }
-.details dd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.details .detail-path code { direction: rtl; text-align: left; }
+.details dd { min-width: 0; overflow-wrap: anywhere; user-select: text; }
+.details .detail-path code { direction: ltr; text-align: left; }
 .workspace { min-height: 0; display: grid; grid-template-columns: minmax(240px, 300px) minmax(420px, 1fr) minmax(280px, 360px); gap: 10px; }
 .panel { min-width: 0; padding: 10px; overflow: auto; contain: layout paint; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
