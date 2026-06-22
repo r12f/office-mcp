@@ -140,6 +140,9 @@ async function main(): Promise<void> {
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#documents .row.word").click()' });
     await assertEval(cdp, 'document.querySelector("#documents .doc-history") === null', 'document click does not open inline command history');
     await waitFor(cdp, 'document.querySelector("#inspectorLog").value.includes("Runtime Evidence.docx")');
+    await cdp.send('Runtime.evaluate', { expression: 'window.__inspectorBeforeSessionCopy = document.querySelector("#inspectorLog").value; window.__copiedText = null; document.querySelector("#documents .row.word .document-card-session").click();' });
+    await waitFor(cdp, 'window.__copiedText === "11111111-1111-4111-8111-111111111111"');
+    await assertEval(cdp, 'document.querySelector("#inspectorLog").value === window.__inspectorBeforeSessionCopy', 'document session id copy does not re-inspect the card');
     await cdp.send('Runtime.evaluate', { expression: 'window.__copiedText = null; document.querySelector("[data-copy=\\"inspectorLog\\"]").click();' });
     await waitFor(cdp, 'window.__copiedText && window.__copiedText.includes("Runtime Evidence.docx")');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#clearInspector").click()' });
