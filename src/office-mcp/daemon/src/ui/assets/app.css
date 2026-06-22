@@ -7,6 +7,7 @@
   --muted: #5f6b78;
   --border: #d7dde4;
   --focus: #4c8dff;
+  --accent: #2457d6;
   --success: #168a45;
   --warning: #8a5a00;
   --danger: #c9352b;
@@ -41,6 +42,7 @@ h3 { font-size: 13px; margin-top: 12px; color: var(--muted); }
 .badge { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 3px 8px; background: var(--raised); width: fit-content; }
 .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .success { color: var(--success); }
+.accent { color: var(--accent); }
 .warning { color: var(--warning); }
 .danger { color: var(--danger); }
 .neutral { color: var(--muted); }

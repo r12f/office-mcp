@@ -143,6 +143,8 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".details .detail-path code { direction: ltr; text-align: left;"));
     assert!(!css.contains(".details dd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains("--powerpoint: #b7472a;"));
+    assert!(css.contains("--accent:"));
+    assert!(css.contains(".accent { color: var(--accent); }"));
     assert!(css.contains(".row.powerpoint { border-left-color: var(--powerpoint); }"));
     assert!(css.contains(".filter-row { display: grid; grid-template-columns: auto minmax(82px, 104px) auto minmax(120px, 1fr);"));
     assert!(css.contains("#search, #appFilter { min-width: 0;"));
@@ -203,6 +205,7 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("if (value === 'timeout') return 'Timed Out';"));
     assert!(js.contains("if (value === 'cancelled') return 'Cancelled';"));
     assert!(js.contains("value === 'timeout' ? 'warning'"));
+    assert!(js.contains("value === 'running' ? 'accent'"));
     assert!(js.contains("Finished ${esc(metrics.finished)}"));
     assert!(js.contains("Failed ${esc(metrics.failed)}"));
     assert!(js.contains("function documentTaskMetrics(sessionId)"));

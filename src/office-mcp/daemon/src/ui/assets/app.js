@@ -339,7 +339,7 @@ function duration(ms) { if (!ms) return '0s'; const seconds = ms / 1000; if (sec
 function relative(value) { if (!value) return 'now'; const delta = Math.round((Number(value) - Date.now()) / 1000); const abs = Math.abs(delta); const unit = abs < 60 ? 'second' : abs < 3600 ? 'minute' : 'hour'; const divisor = unit === 'second' ? 1 : unit === 'minute' ? 60 : 3600; return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(Math.round(delta / divisor), unit); }
 function statusLabel(value) { if (value === 'success') return 'Succeeded'; if (value === 'failure') return 'Failed'; if (value === 'timeout') return 'Timed Out'; if (value === 'cancelled') return 'Cancelled'; return title(value); }
 function title(value) { return String(value || '').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()); }
-function tone(value) { return value === 'up' || value === 'success' ? 'success' : value === 'timeout' ? 'warning' : value === 'degraded' || value === 'running' ? 'warning' : value === 'down' || value === 'failure' ? 'danger' : 'neutral'; }
+function tone(value) { return value === 'up' || value === 'success' ? 'success' : value === 'running' ? 'accent' : value === 'timeout' ? 'warning' : value === 'degraded' ? 'warning' : value === 'down' || value === 'failure' ? 'danger' : 'neutral'; }
 function snapshotStatus(snapshot) { return snapshot?.daemon?.status || 'down'; }
 function announceStatus(status) { if (state.previousStatus === status) return; state.previousStatus = status; announce('Daemon status ' + title(status)); }
 function announce(message) { $('announcer').textContent = message; }
