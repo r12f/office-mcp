@@ -208,6 +208,8 @@ fn serves_daemon_ui_assets_over_addin_listener() {
     assert!(html.contains("id=\"clients\""));
     assert!(html.contains("id=\"daemonVersion\""));
     assert!(html.contains("id=\"daemonUptime\""));
+    assert!(html.contains("Config file"));
+    assert!(!html.contains("<dt>Config</dt>"));
     assert!(html.contains("data-copy=\"mcpEndpoint\""));
     assert!(html.contains("id=\"resultFilter\""));
     assert!(html.contains("textarea id=\"inspectorLog\""));
