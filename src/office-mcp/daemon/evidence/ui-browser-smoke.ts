@@ -67,6 +67,7 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#documents .row.word")?.textContent.includes("Queue 0")', 'word document card shows queue depth');
     await assertEval(cdp, 'document.querySelector("#documents .row.word")?.textContent.includes("Finished 2")', 'word document card shows finished task count');
     await assertEval(cdp, 'document.querySelector("#documents .row.word")?.textContent.includes("Failed 5")', 'word document card shows failed task count');
+    await assertEval(cdp, '(() => { const rows = [...document.querySelectorAll("#documents .row")]; const row = document.querySelector("#documents .row.word"); const index = rows.indexOf(row); return rows.length >= 2 && index >= 0 && row?.getAttribute("aria-posinset") === String(index + 1) && row?.getAttribute("aria-setsize") === String(rows.length) && row?.getAttribute("aria-selected") === "false"; })()', 'document rows expose row index count and unselected state');
     await assertEval(cdp, 'document.querySelector("#documents .doc-history") === null && !document.querySelector("#documents").textContent.includes("Show details") && !document.querySelector("#documents").textContent.includes("Hide details")', 'document list does not duplicate activity history');
     await assertEval(cdp, '(() => { const title = document.querySelector("#documents .row.word .document-card-title strong")?.getBoundingClientRect(); const card = document.querySelector("#documents .row.word")?.getBoundingClientRect(); return title && card && title.width >= Math.min(120, card.width * 0.45); })()', 'document title keeps primary card width');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#appFilter").value = "excel"; document.querySelector("#appFilter").dispatchEvent(new Event("change"))' });
@@ -80,6 +81,7 @@ async function main(): Promise<void> {
     await pressKey(cdp, 'Enter', 13);
     await assertEval(cdp, '[...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Active Tasks") && ![...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Running")', 'top metrics use explicit active task label');
     await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row.word") && document.querySelector("#inspectorLog").value.includes("Runtime Evidence.docx")', 'keyboard inspection preserves document row focus');
+    await assertEval(cdp, 'document.querySelector("#documents .row.word")?.getAttribute("aria-selected") === "true" && [...document.querySelectorAll("#documents .row")].filter((row) => row.getAttribute("aria-selected") === "true").length === 1', 'inspected document row exposes selected state');
     await pressKey(cdp, 'Escape', 27);
     await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row.word") && document.querySelector("#inspectorLog").value.trim() === "Select a row."', 'Escape clears inspector without moving row focus');
     await pressKey(cdp, 'Enter', 13);
@@ -104,6 +106,7 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#history .pill.warning")?.textContent.trim() === "Timed Out"', 'history timeout status uses warning tone');
     await assertEval(cdp, 'document.querySelector("#resultFilter option[value=timeout]")?.textContent.trim() === "Timed Out"', 'history filter timeout label follows spec status text');
     await assertEval(cdp, 'document.querySelector("#history tr[data-inspect]").getAttribute("tabindex") === "0" && document.querySelector("#history tr[data-inspect]").getAttribute("role") === "button"', 'history table rows are keyboard focusable buttons');
+    await assertEval(cdp, '(() => { const rows = [...document.querySelectorAll("#history tr[data-inspect]")]; const row = rows[0]; return rows.length >= 4 && row?.getAttribute("aria-posinset") === "1" && row?.getAttribute("aria-setsize") === String(rows.length) && row?.getAttribute("aria-selected") === "false"; })()', 'history rows expose row index count and unselected state');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#history tr[data-inspect]").focus()' });
     await pressKey(cdp, 'ArrowDown', 40);
     await assertEval(cdp, 'document.activeElement === [...document.querySelectorAll("#history tr[data-inspect]")].at(1)', 'history row ArrowDown moves focus to next row');
@@ -151,6 +154,7 @@ async function main(): Promise<void> {
     await pressKey(cdp, 'Enter', 13);
     await waitFor(cdp, 'document.querySelector("#inspectorLog").value.includes("IRM_DENIED")');
     await assertEval(cdp, 'document.activeElement === document.querySelector("#history tr[data-inspect]")', 'keyboard table inspection preserves row focus');
+    await assertEval(cdp, 'document.querySelector("#history tr[data-inspect]")?.getAttribute("aria-selected") === "true" && [...document.querySelectorAll("#history tr[data-inspect]")].filter((row) => row.getAttribute("aria-selected") === "true").length === 1', 'inspected history row exposes selected state');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#resultFilter").value = "timeout"; document.querySelector("#resultFilter").dispatchEvent(new Event("change"))' });
     await waitFor(cdp, 'document.querySelector("#history").textContent.includes("TIMEOUT")');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#resultFilter").value = "cancelled"; document.querySelector("#resultFilter").dispatchEvent(new Event("change"))' });

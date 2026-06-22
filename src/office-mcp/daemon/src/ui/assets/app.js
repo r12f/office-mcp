@@ -205,6 +205,7 @@ function renderDocuments(groups) {
   }
   const filtered = state.search || state.app !== 'all';
   $('documents').innerHTML = rows.join('') || (filtered ? emptyState('No matching documents', 'Adjust the app or search filter.') : emptyState('No documents connected', 'Open Word, Excel, or PowerPoint, then open Office MCP Control.', state.snapshot?.daemon?.addin_endpoint, 'Copy add-in endpoint'));
+  annotateInspectableRows($('documents'));
 }
 
 function renderDocumentCard(doc, app) {
@@ -225,6 +226,7 @@ function documentTaskMetrics(sessionId) {
 
 function renderClients(clients) {
   $('clients').innerHTML = clients.map((client) => `<button class="row" type="button" data-focus-key="client:${esc(client.client_id || client.name)}" data-inspect='${attr(client)}'><strong>${esc(client.name || client.client_id)}</strong><span>${esc(client.transport)} | in flight ${esc(client.in_flight_request_count || 0)}</span></button>`).join('') || emptyState('No MCP clients connected', 'Connect an MCP client using this endpoint.', state.snapshot?.daemon?.mcp_endpoint, 'Copy MCP endpoint');
+  annotateInspectableRows($('clients'));
 }
 
 function renderCommands(target, commands, running) {
@@ -234,6 +236,16 @@ function renderCommands(target, commands, running) {
   }
   const rows = commands.map((command) => `<tr tabindex="0" role="button" aria-label="Inspect ${esc(command.tool)} ${esc(statusLabel(command.status))}" data-key-activate data-focus-key="command:${esc(command.command_id || command.mcp_request_id || command.tool)}" data-inspect='${attr(command)}'><td><strong>${esc(command.tool)}</strong><br><small>${copyableId(command.command_id || command.mcp_request_id, 'Copy command ID')} / ${copyableId(command.session_id, 'Copy session ID')}</small></td><td>${esc(command.client_name || command.client_id || '-')}</td><td><span class="pill ${tone(command.status)}">${esc(statusLabel(command.status))}</span></td><td>${running ? duration(Date.now() - (command.started_at || Date.now())) : duration(command.elapsed_ms || 0)}</td><td>${esc(command.error?.office_mcp_code || '')}<br><small>${esc(command.error?.message || '')}</small></td></tr>`).join('');
   $(target).innerHTML = `<table><thead><tr><th>Tool</th><th>Client</th><th>Status</th><th>Time</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table>`;
+  annotateInspectableRows($(target));
+}
+
+function annotateInspectableRows(scope) {
+  const rows = [...(scope?.querySelectorAll?.('.row, tr[data-inspect]') || [])].filter((item) => !item.disabled);
+  rows.forEach((row, index) => {
+    row.setAttribute('aria-posinset', String(index + 1));
+    row.setAttribute('aria-setsize', String(rows.length));
+    if (!row.hasAttribute('aria-selected')) row.setAttribute('aria-selected', 'false');
+  });
 }
 
 function handleRowNavigation(event) {
@@ -274,12 +286,21 @@ function rowNavigationIndex(key, index, count, pageStep) {
   return index;
 }
 
-function inspectRow(element) { $('inspectorLog').value = JSON.stringify(JSON.parse(element.dataset.inspect), null, 2); }
+function inspectRow(element) {
+  setSelectedInspectableRow(element);
+  $('inspectorLog').value = JSON.stringify(JSON.parse(element.dataset.inspect), null, 2);
+}
+
+function setSelectedInspectableRow(element) {
+  const scope = element.closest('#documents, #clients, #currentTasks, #history');
+  scope?.querySelectorAll?.('.row, tr[data-inspect]').forEach((row) => row.setAttribute('aria-selected', row === element ? 'true' : 'false'));
+}
 
 function clearInspector() {
   const inspector = $('inspectorLog');
   if (!inspector || inspector.value.trim() === 'Select a row.') return false;
   inspector.value = 'Select a row.';
+  document.querySelectorAll('.row[aria-selected="true"], tr[data-inspect][aria-selected="true"]').forEach((row) => row.setAttribute('aria-selected', 'false'));
   announce('Inspector cleared');
   return true;
 }
