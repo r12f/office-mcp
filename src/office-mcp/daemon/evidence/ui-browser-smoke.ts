@@ -125,6 +125,12 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#resultFilter option[value=timeout]")?.textContent.trim() === "Timed Out"', 'history filter timeout label follows spec status text');
     await assertEval(cdp, 'document.querySelector("#history tr[data-inspect]").getAttribute("tabindex") === "0" && document.querySelector("#history tr[data-inspect]").getAttribute("role") === "button"', 'history table rows are keyboard focusable buttons');
     await assertEval(cdp, '(() => { const rows = [...document.querySelectorAll("#history tr[data-inspect]")]; const row = rows[0]; return rows.length >= 4 && row?.getAttribute("aria-posinset") === "1" && row?.getAttribute("aria-setsize") === String(rows.length) && row?.getAttribute("aria-selected") === "false"; })()', 'history rows expose row index count and unselected state');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#search").value = "running smoke task"; document.querySelector("#search").dispatchEvent(new Event("input"))' });
+    await assertEval(cdp, 'document.querySelector("#currentTasks").textContent.includes("word.insert_paragraph") && document.querySelector("#history").textContent.includes("No command history yet")', 'text search filters activity to matching current tasks');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#search").value = "IRM_DENIED"; document.querySelector("#search").dispatchEvent(new Event("input"))' });
+    await assertEval(cdp, 'document.querySelector("#currentTasks").textContent.includes("No command is running") && document.querySelector("#history").textContent.includes("IRM_DENIED")', 'text search filters activity to matching command history');
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#search").value = ""; document.querySelector("#search").dispatchEvent(new Event("input"))' });
+    await waitFor(cdp, 'document.querySelector("#currentTasks tr[data-inspect]") !== null && document.querySelector("#history tr[data-inspect]") !== null');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#history tr[data-inspect]").focus()' });
     await pressKey(cdp, 'ArrowDown', 40);
     await assertEval(cdp, 'document.activeElement === [...document.querySelectorAll("#history tr[data-inspect]")].at(1)', 'history row ArrowDown moves focus to next row');

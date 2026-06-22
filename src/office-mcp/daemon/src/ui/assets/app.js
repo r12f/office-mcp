@@ -91,8 +91,8 @@ function render() {
   renderToolAccess(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {});
   renderDocuments(snapshot.documents || {});
   renderClients(snapshot.clients || []);
-  renderCommands('currentTasks', snapshot.current_tasks || [], true);
-  const history = (snapshot.recent_commands || []).filter((command) => state.result === 'all' || command.status === state.result);
+  renderCommands('currentTasks', filterCommands(snapshot.current_tasks || [], true), true);
+  const history = filterCommands(snapshot.recent_commands || [], false);
   renderCommands('history', history, false);
   restoreSelectedRow();
   restoreRowFocus(focusKey);
@@ -244,6 +244,10 @@ function renderCommands(target, commands, running) {
   const rows = commands.map((command) => `<tr tabindex="0" role="button" aria-label="Inspect ${esc(command.tool)} ${esc(statusLabel(command.status))}" data-key-activate data-focus-key="command:${esc(command.command_id || command.mcp_request_id || command.tool)}" data-inspect='${attr(command)}'><td><strong>${esc(command.tool)}</strong><br><small>${copyableId(command.command_id || command.mcp_request_id, 'Copy command ID')} / ${copyableId(command.session_id, 'Copy session ID')}</small></td><td>${esc(command.client_name || command.client_id || '-')}</td><td><span class="pill ${tone(command.status)}">${esc(statusLabel(command.status))}</span></td><td>${running ? duration(Date.now() - (command.started_at || Date.now())) : duration(command.elapsed_ms || 0)}</td><td>${esc(command.error?.office_mcp_code || '')}<br><small>${esc(command.error?.message || '')}</small></td></tr>`).join('');
   $(target).innerHTML = `<table><thead><tr><th>Tool</th><th>Client</th><th>Status</th><th>Time</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table>`;
   annotateInspectableRows($(target));
+}
+
+function filterCommands(commands, running) {
+  return commands.filter((command) => (running || state.result === 'all' || command.status === state.result) && matches(JSON.stringify(command)));
 }
 
 function annotateInspectableRows(scope) {

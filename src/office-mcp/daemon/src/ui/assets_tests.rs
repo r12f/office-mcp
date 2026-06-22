@@ -172,6 +172,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     );
     assert!(js.contains("event.target.closest('[data-open-diagnostic]')"));
     assert!(js.contains("function handleRowNavigation(event)"));
+    assert!(js.contains("renderCommands('currentTasks', filterCommands(snapshot.current_tasks || [], true), true)"));
+    assert!(js.contains("const history = filterCommands(snapshot.recent_commands || [], false)"));
+    assert!(js.contains("function filterCommands(commands, running)"));
+    assert!(js.contains("(running || state.result === 'all' || command.status === state.result) && matches(JSON.stringify(command))"));
     assert!(js.contains("['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp']"));
     assert!(js.contains("row.closest('#documents, #clients, #currentTasks, #history')"));
     assert!(js.contains("filter((item) => !item.disabled)"));
