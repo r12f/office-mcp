@@ -116,6 +116,36 @@ fn native_tray_menu_uses_platform_menu_primitives_not_web_surfaces() {
 }
 
 #[test]
+fn native_tray_icon_uses_generated_product_glyph_not_framework_default() {
+    let source = read_tray_source("native_tray.rs");
+    let product_icon = read_tray_source("product_icon.rs");
+
+    assert!(
+        source.contains(
+            "use crate::tray::product_icon::{ICON_HEIGHT, ICON_WIDTH, product_icon_rgba};"
+        )
+    );
+    assert!(source.contains(".with_icon(app_icon())"));
+    assert!(source.contains("Icon::from_rgba(product_icon_rgba(), ICON_WIDTH, ICON_HEIGHT)"));
+    assert!(source.contains("generated tray icon is valid"));
+    assert!(product_icon.contains("pub(crate) const ICON_WIDTH: u32 = 32;"));
+    assert!(product_icon.contains("pub(crate) const ICON_HEIGHT: u32 = 32;"));
+    assert!(product_icon.contains("[248, 216, 74, 255]"));
+
+    for forbidden in [
+        "from_path",
+        "from_resource",
+        "Default::default",
+        "include_bytes!",
+    ] {
+        assert!(
+            !source.contains(forbidden),
+            "native tray icon must use the generated product glyph, not {forbidden}"
+        );
+    }
+}
+
+#[test]
 fn native_tray_allows_background_event_loop_on_windows_and_linux() {
     let source = read_tray_source("native_tray.rs");
 
