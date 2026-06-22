@@ -218,6 +218,8 @@ async function main(): Promise<void> {
       await waitFor(cdp, 'document.querySelector("#healthBadge").textContent.includes("Up")');
       await assertEval(cdp, '[...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Active Tasks") && document.querySelector("#clientCount").textContent.trim() === "0" && document.querySelector("#documentCount").textContent.trim() === "0" && document.querySelector("#taskCount").textContent.trim() === "0"', 'empty state counters render zero with explicit task label');
       await assertEval(cdp, 'document.querySelector("#clients").textContent.includes("No MCP clients connected")', 'empty client state renders');
+      await assertEval(cdp, 'document.querySelector("#clients").textContent.includes("MCP endpoint") && document.querySelector("#clients").textContent.includes("Stdio bridge")', 'empty client state names both client connection options');
+      await assertEval(cdp, '(() => { const copies = [...document.querySelectorAll("#clients [data-copy-value]")].map((button) => button.dataset.copyValue); return copies.some((value) => value.startsWith("http://127.0.0.1:")) && copies.includes("office-mcp-daemon stdio"); })()', 'empty client state exposes copyable MCP endpoint and stdio bridge command');
       await assertEval(cdp, 'document.querySelector("#documents").textContent.includes("No documents connected")', 'empty document state renders');
       await assertEval(cdp, 'document.querySelector("#currentTasks").textContent.includes("No command is running") && document.querySelector("#history").textContent.includes("No command history yet")', 'empty task and history states render');
     } finally {

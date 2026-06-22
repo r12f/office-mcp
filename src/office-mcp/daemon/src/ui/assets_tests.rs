@@ -190,6 +190,12 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("data-focus-key=\"document:${esc(doc.session_id || label)}\""));
     assert!(js.contains("type=\"button\" data-key-activate data-focus-key=\"client:${esc(client.client_id || client.name)}\""));
     assert!(js.contains("data-focus-key=\"client:${esc(client.client_id || client.name)}\""));
+    assert!(js.contains("clientEmptyState(state.snapshot?.daemon?.mcp_endpoint)"));
+    assert!(js.contains("function clientEmptyState(mcpEndpoint)"));
+    assert!(js.contains("No MCP clients connected</strong>Connect an MCP client using either local transport."));
+    assert!(js.contains("emptyCopy(mcpEndpoint, 'Copy MCP endpoint', 'MCP endpoint')"));
+    assert!(js.contains("emptyCopy('office-mcp-daemon stdio', 'Copy stdio bridge command', 'Stdio bridge')"));
+    assert!(js.contains("function emptyCopy(codeText, copyLabel, label)"));
     assert!(js.contains("data-focus-key=\"command:${esc(command.command_id || command.mcp_request_id || command.tool)}\""));
     assert!(js.contains("fetch('/ui/open-diagnostic'"));
     assert!(js.contains("method: 'POST'"));
