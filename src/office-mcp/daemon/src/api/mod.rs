@@ -15,5 +15,6 @@ pub use state_model::{
     UiHealth, UiSnapshot, UiStateOptions,
 };
 pub use state_store::UiStateStore;
+pub(crate) use ui_redaction::redact_text_with_limit;
 pub use ui_snapshot_renderer::UiSnapshotRenderer;
 pub use ui_snapshot_service::{UiSnapshotEndpoints, UiSnapshotService};

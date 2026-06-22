@@ -97,6 +97,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(html.contains("class=\"detail-copy\" data-copy=\"logPath\""));
     assert!(html.contains("class=\"detail-copy\" data-copy=\"lastError\""));
     assert!(html.contains("<textarea id=\"lastError\" readonly spellcheck=\"false\" aria-label=\"Last daemon error\">None</textarea>"));
+    assert!(html.contains("id=\"logTailPanel\""));
+    assert!(html.contains("id=\"logTail\" class=\"log-tail\" readonly spellcheck=\"false\" aria-label=\"Daemon log tail\""));
+    assert!(html.contains("id=\"refreshLogTail\""));
+    assert!(html.contains("data-copy=\"logTail\""));
     assert!(!html.contains("<code id=\"lastError\""));
     assert!(!html.contains("class=\"detail-copy\" data-copy=\"logPath\" aria-label=\"Copy log path\"><code id=\"logPath\""));
     assert!(html.contains("id=\"appFilter\" name=\"app-filter\""));
@@ -124,6 +128,9 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     ));
     assert!(css.contains(".detail-log-value textarea { display: block; width: 100%; min-width: 0; min-height: 96px; max-height: 240px; resize: vertical; overflow: auto;"));
     assert!(css.contains("white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;"));
+    assert!(css.contains(".log-tail-panel { display: grid; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);"));
+    assert!(css.contains(".log-tail { display: block; width: 100%; min-width: 0; min-height: 180px; max-height: 360px; resize: vertical; overflow: auto;"));
+    assert!(css.contains(".log-tail-meta { color: var(--muted); font-size: 12px; min-width: 0; overflow-wrap: anywhere; user-select: text;"));
     assert!(!css.contains(".detail-log-value textarea { display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis;"));
     assert!(css.contains(".detail-copy, .detail-open { display: inline-flex; min-height: 24px;"));
     assert!(css.contains(".id-copy { display: inline-flex; max-width: 100%; min-height: 32px;"));
@@ -169,6 +176,11 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("$('configPath').textContent = snapshot.daemon?.config_path || '-'"));
     assert!(js.contains("$('daemonMeta').textContent = 'Daemon state is live'"));
     assert!(js.contains("setTextareaValue($('lastError'), snapshot.daemon?.last_error || 'None')"));
+    assert!(js.contains("$('refreshLogTail').addEventListener('click', refreshLogTail)"));
+    assert!(js.contains("refreshLogTail()"));
+    assert!(js.contains("fetch('/ui/log-tail'"));
+    assert!(js.contains("setTextareaValue($('logTail'), body.text || 'No log output yet.')"));
+    assert!(js.contains("$('logTailMeta').textContent"));
     assert!(js.contains("function setTextareaValue(textarea, value)"));
     assert!(js.contains("if (!textarea || textarea.value === value) return;"));
     assert!(js.contains("textarea.setSelectionRange(Math.min(selectionStart, value.length), Math.min(selectionEnd, value.length))"));

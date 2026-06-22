@@ -6,6 +6,7 @@ $('appFilter').addEventListener('change', (event) => { state.app = event.target.
 $('clientFilter').addEventListener('change', (event) => { state.client = event.target.value; render(); });
 $('resultFilter').addEventListener('change', (event) => { state.result = event.target.value; render(); });
 $('clearInspector').addEventListener('click', clearInspector);
+$('refreshLogTail').addEventListener('click', refreshLogTail);
 $('toolAccessMode').addEventListener('click', (event) => {
   const button = event.target.closest('[data-access-mode]');
   if (!button) return;
@@ -52,6 +53,7 @@ document.addEventListener('keydown', (event) => {
 });
 
 refresh();
+refreshLogTail();
 setInterval(refresh, 2000);
 
 async function refresh() {
@@ -197,6 +199,25 @@ async function updateToolAccessPolicy(policy) {
     announce('Updated global tool access');
   } catch (error) {
     announce(error.message || 'Tool access update failed');
+  }
+}
+
+async function refreshLogTail() {
+  const button = $('refreshLogTail');
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    const response = await fetch('/ui/log-tail', { cache: 'no-store' });
+    if (!response.ok) throw new Error(await response.text() || 'Log tail returned ' + response.status);
+    const body = await response.json();
+    setTextareaValue($('logTail'), body.text || 'No log output yet.');
+    $('logTailMeta').textContent = `${body.truncated ? 'Showing latest' : 'Showing'} ${fmt(body.bytes_read || 0)} bytes from ${body.path || 'daemon log'}.`;
+    announce('Daemon log tail refreshed');
+  } catch (error) {
+    setTextareaValue($('logTail'), error.message || 'Daemon log tail is unavailable.');
+    $('logTailMeta').textContent = 'Daemon log tail is unavailable.';
+  } finally {
+    button.disabled = false;
   }
 }
 

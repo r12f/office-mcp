@@ -32,6 +32,7 @@ fn fixture_config_uses_allocated_ports_and_certificate() {
     assert_eq!(config.addin.origin, "https://localhost:8766");
     assert_eq!(config.addin.pfx_path, "C:/certs/localhost.pfx");
     assert_eq!(config.addin.pfx_passphrase, "passphrase");
+    assert!(config.logging.file.ends_with("office-mcp-ui-fixture.log"));
     assert!(!config.audit.enabled);
 }
 

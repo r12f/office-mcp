@@ -1,4 +1,4 @@
-use crate::api::{UiSnapshotEndpoints, UiSnapshotService, UiStateStore};
+use crate::api::{redact_text_with_limit, UiSnapshotEndpoints, UiSnapshotService, UiStateStore};
 use crate::common::{DaemonConfigService, ToolAccessConfig};
 use crate::mcp::{AccessMode, HttpMethod, ToolAccessPolicy};
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
@@ -7,9 +7,14 @@ use crate::runtime::server_config::RuntimeServerConfig;
 use crate::runtime::static_response::StaticResponseService;
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
+
+const LOG_TAIL_MAX_BYTES: u64 = 64 * 1024;
+const LOG_TAIL_MAX_CHARS: usize = 64 * 1024;
 
 #[derive(Debug, Clone)]
 pub(crate) struct UiHttpService {
@@ -72,6 +77,9 @@ impl UiHttpService {
         }
         if request.path == "/ui/events" {
             return Some(self.ui_events_response(request, ui_state, shared_state));
+        }
+        if request.path == "/ui/log-tail" {
+            return Some(self.log_tail_response(request, ui_state, shared_state));
         }
         if request.path == "/ui/tool-access-policy" && request.method == HttpMethod::Put {
             return Some(self.tool_access_policy_update_response(request, ui_state, shared_state));
@@ -165,6 +173,36 @@ impl UiHttpService {
         )
     }
 
+    fn log_tail_response(
+        &self,
+        request: &WireHttpRequest,
+        ui_state: &Arc<Mutex<UiStateStore>>,
+        shared_state: &Arc<RuntimeSharedState>,
+    ) -> WireHttpResponse {
+        if !self.allows_origin(request) {
+            return WireHttpResponse::text(403, "Forbidden origin".to_string());
+        }
+        let path = match diagnostic_path(DiagnosticTarget::Log, ui_state, shared_state) {
+            Ok(path) => path,
+            Err(message) => return WireHttpResponse::text(404, message),
+        };
+        let tail = match read_log_tail(&path) {
+            Ok(tail) => tail,
+            Err(error) => {
+                tracing::warn!(%error, path = %path.display(), "failed to read daemon log tail");
+                return WireHttpResponse::text(404, "Log file is not readable".to_string());
+            }
+        };
+        let redacted = redact_text_with_limit(&tail.text, LOG_TAIL_MAX_CHARS);
+        let body = serde_json::json!({
+            "path": path.display().to_string(),
+            "text": redacted,
+            "truncated": tail.truncated,
+            "bytes_read": tail.bytes_read,
+        });
+        WireHttpResponse::json(200, BTreeMap::new(), body.to_string())
+    }
+
     fn open_diagnostic_response(
         &self,
         request: &WireHttpRequest,
@@ -213,6 +251,30 @@ impl UiHttpService {
             },
         )
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LogTail {
+    text: String,
+    truncated: bool,
+    bytes_read: usize,
+}
+
+fn read_log_tail(path: &Path) -> Result<LogTail, std::io::Error> {
+    let mut file = File::open(path)?;
+    let length = file.metadata()?.len();
+    let start = length.saturating_sub(LOG_TAIL_MAX_BYTES);
+    file.seek(SeekFrom::Start(start))?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    if start > 0 && let Some(index) = bytes.iter().position(|byte| *byte == b'\n') {
+        bytes.drain(..=index);
+    }
+    Ok(LogTail {
+        bytes_read: bytes.len(),
+        text: String::from_utf8_lossy(&bytes).into_owned(),
+        truncated: start > 0,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

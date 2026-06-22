@@ -154,6 +154,13 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#lastError").clientHeight >= 90', 'daemon details reserve readable height for last error');
     await cdp.send('Runtime.evaluate', { expression: 'const lastError = document.querySelector("#lastError"); lastError.focus(); lastError.setSelectionRange(0, lastError.value.length); window.__lastErrorSelectionBeforeRender = [lastError.selectionStart, lastError.selectionEnd]; render();' });
     await assertEval(cdp, '(() => { const node = document.querySelector("#lastError"); return document.activeElement === node && node.selectionStart === window.__lastErrorSelectionBeforeRender[0] && node.selectionEnd === window.__lastErrorSelectionBeforeRender[1] && node.selectionEnd === node.value.length; })()', 'daemon details preserve last error text selection across live render');
+    await waitFor(cdp, 'document.querySelector("#logTail").value.includes("office-mcp") || document.querySelector("#logTailMeta").textContent.includes("bytes")');
+    await assertEval(cdp, 'document.querySelector("#logTail").closest("button") === null && document.querySelector("[data-copy=\\"logTail\\"]").getAttribute("aria-label") === "Copy daemon log tail"', 'daemon log tail is selectable with a separate copy button');
+    await assertEval(cdp, '(() => { const style = getComputedStyle(document.querySelector("#logTail")); return style.whiteSpace !== "nowrap" && style.textOverflow !== "ellipsis" && style.userSelect !== "none" && style.overflowY !== "hidden"; })()', 'daemon log tail avoids clipped unselectable styling');
+    await cdp.send('Runtime.evaluate', { expression: 'const logTail = document.querySelector("#logTail"); logTail.focus(); logTail.setSelectionRange(0, Math.min(12, logTail.value.length)); window.__logTailSelectionBeforeRefresh = [logTail.selectionStart, logTail.selectionEnd];' });
+    await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#refreshLogTail").click()' });
+    await waitFor(cdp, 'document.querySelector("#refreshLogTail").disabled === false');
+    await assertEval(cdp, '(() => { const node = document.querySelector("#logTail"); return document.activeElement === node && node.selectionStart === window.__logTailSelectionBeforeRefresh[0] && node.selectionEnd === window.__logTailSelectionBeforeRefresh[1]; })()', 'daemon log tail preserves text selection across refresh');
     await assertEval(cdp, 'document.querySelector(".status-strip > .details") !== null && document.querySelector(".status-strip").nextElementSibling.classList.contains("workspace")', 'daemon details are grouped inside the compact status strip');
     await assertEval(cdp, '(() => { const header = document.querySelector(".status-strip").getBoundingClientRect(); const details = document.querySelector(".details").getBoundingClientRect(); const workspace = document.querySelector(".workspace").getBoundingClientRect(); return details.top >= header.top && details.bottom <= header.bottom && workspace.top - header.bottom <= 12; })()', 'daemon details stay attached inside the header without a detached block');
     await assertEval(cdp, 'document.querySelector("#toolAccessPanel") !== null && document.querySelector("#toolAccessPanel").textContent.includes("Global Tool Access")', 'global tool access panel renders');
@@ -186,6 +193,8 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#announcer").textContent.includes("Copied MCP")', 'copy control announces copied MCP endpoint');
     await cdp.send('Runtime.evaluate', { expression: 'window.__copiedText = null; document.querySelector("[data-copy=\\"lastError\\"]").click();' });
     await waitFor(cdp, 'window.__copiedText && window.__copiedText.includes("Certificate reload failed")');
+    await cdp.send('Runtime.evaluate', { expression: 'window.__copiedText = null; document.querySelector("[data-copy=\\"logTail\\"]").click();' });
+    await waitFor(cdp, 'window.__copiedText && window.__copiedText === document.querySelector("#logTail").value');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#resultFilter").value = "failure"; document.querySelector("#resultFilter").dispatchEvent(new Event("change"))' });
     await waitFor(cdp, 'document.querySelector("#history").textContent.includes("IRM_DENIED")');
     await assertEval(cdp, 'document.querySelector("#history").textContent.includes("IRM_DENIED")', 'failure details expose office_mcp_code');

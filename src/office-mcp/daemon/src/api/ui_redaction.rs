@@ -1,8 +1,12 @@
 pub(crate) fn redact_text(value: &str) -> String {
+    redact_text_with_limit(value, 500)
+}
+
+pub(crate) fn redact_text_with_limit(value: &str, max_chars: usize) -> String {
     let mut result = redact_bearer_tokens(value);
     result = redact_key_value_secret(&result);
     result = redact_base64_data(&result);
-    result.truncate(500);
+    result.truncate(max_chars);
     result
 }
 

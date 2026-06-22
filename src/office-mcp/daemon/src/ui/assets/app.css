@@ -126,6 +126,10 @@ tr[data-inspect]:hover td { background: color-mix(in srgb, var(--focus) 9%, tran
 .tool-access-tool { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 5px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
 .tool-access-tool code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px/1.4 "Cascadia Mono", Consolas, monospace; }
 .tool-access-effect { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.log-tail-panel { display: grid; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.log-tail-panel h3 { margin-top: 0; color: var(--text); }
+.log-tail-meta { color: var(--muted); font-size: 12px; min-width: 0; overflow-wrap: anywhere; user-select: text; }
+.log-tail { display: block; width: 100%; min-width: 0; min-height: 180px; max-height: 360px; resize: vertical; overflow: auto; border: 1px solid var(--border); border-radius: 7px; padding: 8px; background: var(--surface); color: var(--text); font: 12px/1.45 "Cascadia Mono", Consolas, monospace; white-space: pre; overflow-wrap: normal; user-select: text; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 @media (max-width: 1050px) {
   .status-strip, .workspace, .details dl { grid-template-columns: 1fr; }

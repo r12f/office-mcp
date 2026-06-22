@@ -88,7 +88,7 @@ pub(crate) fn fixture_config(
         },
         logging: LoggingConfig {
             level: ConfigLogLevel::Error,
-            file: String::new(),
+            file: default_fixture_log_path().display().to_string(),
         },
         tool_access: ToolAccessConfig::default(),
     }
@@ -96,6 +96,12 @@ pub(crate) fn fixture_config(
 
 fn default_fixture_config_path() -> PathBuf {
     std::env::temp_dir().join("office-mcp").join("config.toml")
+}
+
+fn default_fixture_log_path() -> PathBuf {
+    std::env::temp_dir()
+        .join("office-mcp")
+        .join("office-mcp-ui-fixture.log")
 }
 
 pub(crate) fn default_addin_public_dir() -> PathBuf {

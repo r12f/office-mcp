@@ -28,6 +28,7 @@ pub fn run_ui_fixture(options: UiFixtureOptions) -> Result<(), RuntimeServerErro
         &options.certificate_path,
         options.certificate_passphrase,
     );
+    write_fixture_log(&config.logging.file)?;
     let runtime_file = UiRuntimeFile::with_path(
         options.runtime_path,
         crate::ui::UiRuntimeInfo::from_config(&config),
@@ -72,6 +73,25 @@ pub fn run_ui_fixture(options: UiFixtureOptions) -> Result<(), RuntimeServerErro
         eprintln!("{error}");
     }
     result
+}
+
+fn write_fixture_log(path: &str) -> Result<(), RuntimeServerError> {
+    if path.is_empty() {
+        return Ok(());
+    }
+    let path = PathBuf::from(path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(
+        path,
+        concat!(
+            "2026-06-22T00:00:00Z INFO office-mcp UI fixture started\n",
+            "2026-06-22T00:00:01Z ERROR certificate_passphrase=secret-value redaction probe\n",
+            "2026-06-22T00:00:02Z INFO office-mcp daemon log tail ready\n"
+        ),
+    )?;
+    Ok(())
 }
 
 #[cfg(test)]

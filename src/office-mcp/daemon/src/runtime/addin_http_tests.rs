@@ -260,6 +260,56 @@ fn ui_open_diagnostic_rejects_foreign_origin() {
 }
 
 #[test]
+fn ui_log_tail_returns_bounded_selectable_redacted_log_text() {
+    let service = AddinHttpService::from_config(&RuntimeServerConfig::default());
+    let log_path = temp_log_path();
+    fs::write(
+        &log_path,
+        format!(
+            "old line should be trimmed\n{}\nerror token=secret-value\nnext step line\n",
+            "x".repeat(70_000)
+        ),
+    )
+    .expect("write log");
+    let ui_state = Arc::new(Mutex::new(UiStateStore::with_options(
+        crate::api::UiStateOptions {
+            log_path: Some(log_path.display().to_string()),
+            ..crate::api::UiStateOptions::default()
+        },
+    )));
+    let shared_state = shared_state();
+    let request = request(
+        HttpMethod::Get,
+        "/ui/log-tail",
+        BTreeMap::from([("origin".to_string(), "https://localhost:8765".to_string())]),
+    );
+
+    let response = service.route_request(&ui_state, &shared_state, &request);
+
+    assert_eq!(response.status, 200);
+    let body: serde_json::Value = serde_json::from_str(&response_text(&response)).expect("json");
+    let text = body["text"].as_str().expect("text");
+    assert!(text.len() <= 64 * 1024 + 64);
+    assert!(!text.contains("old line should be trimmed"));
+    assert!(text.contains("next step line"));
+    assert!(text.contains("[redacted]"));
+    assert!(!text.contains("secret-value"));
+    assert_eq!(body["truncated"], true);
+    let _ = fs::remove_file(log_path);
+}
+
+#[test]
+fn ui_log_tail_rejects_foreign_origin() {
+    let response = route(&request(
+        HttpMethod::Get,
+        "/ui/log-tail",
+        BTreeMap::from([("origin".to_string(), "https://evil.example".to_string())]),
+    ));
+
+    assert_eq!(response.status, 403);
+}
+
+#[test]
 fn addin_diagnostics_accepts_local_events_and_rejects_foreign_origins() {
     let mut allowed = request(
         HttpMethod::Post,
@@ -329,6 +379,17 @@ fn shared_state_with_config_path(config_path: Option<String>) -> Arc<RuntimeShar
 fn temp_config_path() -> PathBuf {
     std::env::temp_dir().join(format!(
         "office-mcp-ui-tool-access-{}-{}.toml",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time")
+            .as_nanos()
+    ))
+}
+
+fn temp_log_path() -> PathBuf {
+    std::env::temp_dir().join(format!(
+        "office-mcp-ui-log-tail-{}-{}.log",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
