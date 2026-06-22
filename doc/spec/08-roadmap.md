@@ -299,7 +299,7 @@ or running developer build commands.
       success/failure details. Current evidence: `npm run check:ui` verifies
       collapsed/expanded document detail panels and per-document command
       history rendering in the daemon main window.
-- [ ] Rework the daemon main-window top details rail from the latest visible
+- [x] Rework the daemon main-window top details rail from the latest visible
       build feedback. The current `Config: Not configured` field is ambiguous:
       the UI must show the effective config file path, just like the `Log` file
       path, with middle truncation and copy/open affordances. A normal default
@@ -314,7 +314,12 @@ or running developer build commands.
       top metrics must also rename the ambiguous `Running` counter to an
       explicit task-execution label such as `Active Tasks`, `Tasks Running`, or
       `Running Tasks`; bare `Running` is not acceptable because it can be
-      confused with daemon health.
+      confused with daemon health. Current evidence: `npm run smoke:ui` proves
+      effective config/log paths render without `Not configured`, path text is
+      selectable and not wrapped by a button, separate copy buttons are present,
+      `Last error` receives the widest details column, the details rail remains
+      attached to the compact status strip, and the metric label is `Active
+      Tasks` rather than bare `Running`.
 - [x] Rework the daemon main-window connected-document list so each document is
       a compact summary block, not a verbose session/activity panel. The block
       should primarily show the document name plus a middle-truncated session
