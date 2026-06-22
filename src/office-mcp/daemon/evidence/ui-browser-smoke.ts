@@ -79,7 +79,7 @@ async function main(): Promise<void> {
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#documents .row.word").focus()' });
     await pressKey(cdp, 'Enter', 13);
     await assertEval(cdp, '[...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Active Tasks") && ![...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Running")', 'top metrics use explicit active task label');
-    await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row.word") && document.querySelector("#inspector").textContent.includes("Runtime Evidence.docx")', 'keyboard inspection preserves document row focus');
+    await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row.word") && document.querySelector("#inspectorLog").value.includes("Runtime Evidence.docx")', 'keyboard inspection preserves document row focus');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#documents .row").focus()' });
     await pressKey(cdp, 'ArrowDown', 40);
     await assertEval(cdp, 'document.activeElement === [...document.querySelectorAll("#documents .row")].at(1)', 'document row ArrowDown moves focus to next row');
@@ -127,12 +127,15 @@ async function main(): Promise<void> {
     await waitFor(cdp, 'window.__OFFICE_MCP_UI__?.daemon?.tool_access_policy?.disabled_tools?.includes("word.update_table")');
     await assertEval(cdp, 'document.querySelector(\'#toolAccessList [data-tool-name="word.update_table"]\').closest("details[data-tool-category]").open', 'tool toggle does not collapse global tool access category');
     await assertEval(cdp, 'getComputedStyle(document.querySelector(".workspace")).gridTemplateColumns.split(" ").length >= 3', 'desktop layout uses three columns');
+    await cdp.send('Runtime.evaluate', { expression: 'Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text) => { window.__copiedText = text; } } });' });
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#documents .row.word").click()' });
     await assertEval(cdp, 'document.querySelector("#documents .doc-history") === null', 'document click does not open inline command history');
-    await waitFor(cdp, 'document.querySelector("#inspector").textContent.includes("Runtime Evidence.docx")');
+    await waitFor(cdp, 'document.querySelector("#inspectorLog").value.includes("Runtime Evidence.docx")');
+    await cdp.send('Runtime.evaluate', { expression: 'window.__copiedText = null; document.querySelector("[data-copy=\\"inspectorLog\\"]").click();' });
+    await waitFor(cdp, 'window.__copiedText && window.__copiedText.includes("Runtime Evidence.docx")');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#clearInspector").click()' });
-    await waitFor(cdp, 'document.querySelector("#inspector").textContent.trim() === "Select a row."');
-    await cdp.send('Runtime.evaluate', { expression: 'window.__copiedText = null; Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text) => { window.__copiedText = text; } } }); document.querySelector("[data-copy=\\"mcpEndpoint\\"]").click();' });
+    await waitFor(cdp, 'document.querySelector("#inspectorLog").value.trim() === "Select a row."');
+    await cdp.send('Runtime.evaluate', { expression: 'window.__copiedText = null; document.querySelector("[data-copy=\\"mcpEndpoint\\"]").click();' });
     await waitFor(cdp, 'window.__copiedText && window.__copiedText.startsWith("http://127.0.0.1:")');
     await assertEval(cdp, 'document.querySelector("#announcer").textContent.includes("Copied MCP")', 'copy control announces copied MCP endpoint');
     await cdp.send('Runtime.evaluate', { expression: 'window.__copiedText = null; document.querySelector("[data-copy=\\"lastError\\"]").click();' });
@@ -142,7 +145,7 @@ async function main(): Promise<void> {
     await assertEval(cdp, 'document.querySelector("#history").textContent.includes("IRM_DENIED")', 'failure details expose office_mcp_code');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#history tr[data-inspect]").focus()' });
     await pressKey(cdp, 'Enter', 13);
-    await waitFor(cdp, 'document.querySelector("#inspector").textContent.includes("IRM_DENIED")');
+    await waitFor(cdp, 'document.querySelector("#inspectorLog").value.includes("IRM_DENIED")');
     await assertEval(cdp, 'document.activeElement === document.querySelector("#history tr[data-inspect]")', 'keyboard table inspection preserves row focus');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#resultFilter").value = "timeout"; document.querySelector("#resultFilter").dispatchEvent(new Event("change"))' });
     await waitFor(cdp, 'document.querySelector("#history").textContent.includes("TIMEOUT")');

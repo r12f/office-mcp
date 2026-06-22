@@ -210,12 +210,16 @@ fn serves_daemon_ui_assets_over_addin_listener() {
     assert!(html.contains("id=\"daemonUptime\""));
     assert!(html.contains("data-copy=\"mcpEndpoint\""));
     assert!(html.contains("id=\"resultFilter\""));
+    assert!(html.contains("textarea id=\"inspectorLog\""));
+    assert!(html.contains("data-copy=\"inspectorLog\""));
 
     let css = addin_roundtrip("GET /ui/app.css HTTP/1.1\r\nHost: localhost\r\n\r\n");
     assert!(css.starts_with("HTTP/1.1 200 OK"));
     assert!(css.contains("prefers-color-scheme"));
     assert!(css.contains("forced-colors"));
     assert!(css.contains("prefers-reduced-motion"));
+    assert!(css.contains(".inspector-log"));
+    assert!(css.contains("overflow: auto"));
 
     let js = addin_roundtrip("GET /ui/app.js HTTP/1.1\r\nHost: localhost\r\n\r\n");
     assert!(js.starts_with("HTTP/1.1 200 OK"));
@@ -225,6 +229,7 @@ fn serves_daemon_ui_assets_over_addin_listener() {
     assert!(js.contains("RelativeTimeFormat"));
     assert!(js.contains("config_path"));
     assert!(js.contains("last_error"));
+    assert!(js.contains("$('inspectorLog').value"));
     assert!(js.contains("emptyState('No documents connected'"));
     assert!(js.contains("fallbackCopy"));
 }

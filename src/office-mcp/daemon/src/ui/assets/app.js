@@ -4,7 +4,7 @@ const $ = (id) => document.getElementById(id);
 $('search').addEventListener('input', (event) => { state.search = event.target.value.toLowerCase(); render(); });
 $('appFilter').addEventListener('change', (event) => { state.app = event.target.value; render(); });
 $('resultFilter').addEventListener('change', (event) => { state.result = event.target.value; render(); });
-$('clearInspector').addEventListener('click', () => { $('inspector').textContent = 'Select a row.'; announce('Inspector cleared'); });
+$('clearInspector').addEventListener('click', () => { $('inspectorLog').value = 'Select a row.'; announce('Inspector cleared'); });
 $('toolAccessMode').addEventListener('click', (event) => {
   const button = event.target.closest('[data-access-mode]');
   if (!button) return;
@@ -270,7 +270,7 @@ function rowNavigationIndex(key, index, count, pageStep) {
   return index;
 }
 
-function inspectRow(element) { $('inspector').textContent = JSON.stringify(JSON.parse(element.dataset.inspect), null, 2); }
+function inspectRow(element) { $('inspectorLog').value = JSON.stringify(JSON.parse(element.dataset.inspect), null, 2); }
 
 async function copyText(text, button) {
   if (!text || text === '-') return;
