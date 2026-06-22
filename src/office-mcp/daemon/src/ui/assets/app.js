@@ -4,7 +4,7 @@ const $ = (id) => document.getElementById(id);
 $('search').addEventListener('input', (event) => { state.search = event.target.value.toLowerCase(); render(); });
 $('appFilter').addEventListener('change', (event) => { state.app = event.target.value; render(); });
 $('resultFilter').addEventListener('change', (event) => { state.result = event.target.value; render(); });
-$('clearInspector').addEventListener('click', () => { $('inspectorLog').value = 'Select a row.'; announce('Inspector cleared'); });
+$('clearInspector').addEventListener('click', clearInspector);
 $('toolAccessMode').addEventListener('click', (event) => {
   const button = event.target.closest('[data-access-mode]');
   if (!button) return;
@@ -38,6 +38,10 @@ document.addEventListener('click', async (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && clearInspector()) {
+    event.preventDefault();
+    return;
+  }
   if (handleRowNavigation(event)) return;
   if (event.key !== 'Enter' && event.key !== ' ') return;
   const target = event.target.closest('[data-key-activate]');
@@ -271,6 +275,14 @@ function rowNavigationIndex(key, index, count, pageStep) {
 }
 
 function inspectRow(element) { $('inspectorLog').value = JSON.stringify(JSON.parse(element.dataset.inspect), null, 2); }
+
+function clearInspector() {
+  const inspector = $('inspectorLog');
+  if (!inspector || inspector.value.trim() === 'Select a row.') return false;
+  inspector.value = 'Select a row.';
+  announce('Inspector cleared');
+  return true;
+}
 
 async function copyText(text, button) {
   if (!text || text === '-') return;

@@ -80,6 +80,10 @@ async function main(): Promise<void> {
     await pressKey(cdp, 'Enter', 13);
     await assertEval(cdp, '[...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Active Tasks") && ![...document.querySelectorAll(".metrics dt")].some((node) => node.textContent.trim() === "Running")', 'top metrics use explicit active task label');
     await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row.word") && document.querySelector("#inspectorLog").value.includes("Runtime Evidence.docx")', 'keyboard inspection preserves document row focus');
+    await pressKey(cdp, 'Escape', 27);
+    await assertEval(cdp, 'document.activeElement === document.querySelector("#documents .row.word") && document.querySelector("#inspectorLog").value.trim() === "Select a row."', 'Escape clears inspector without moving row focus');
+    await pressKey(cdp, 'Enter', 13);
+    await waitFor(cdp, 'document.querySelector("#inspectorLog").value.includes("Runtime Evidence.docx")');
     await cdp.send('Runtime.evaluate', { expression: 'document.querySelector("#documents .row").focus()' });
     await pressKey(cdp, 'ArrowDown', 40);
     await assertEval(cdp, 'document.activeElement === [...document.querySelectorAll("#documents .row")].at(1)', 'document row ArrowDown moves focus to next row');

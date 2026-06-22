@@ -230,6 +230,8 @@ fn serves_daemon_ui_assets_over_addin_listener() {
     assert!(js.contains("config_path"));
     assert!(js.contains("last_error"));
     assert!(js.contains("$('inspectorLog').value"));
+    assert!(js.contains("clearInspector"));
+    assert!(js.contains("event.key === 'Escape'"));
     assert!(js.contains("emptyState('No documents connected'"));
     assert!(js.contains("fallbackCopy"));
 }
