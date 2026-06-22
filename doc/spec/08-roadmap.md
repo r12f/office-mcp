@@ -302,21 +302,27 @@ or running developer build commands.
 - [x] Rework the daemon main-window top details rail from the latest visible
       build feedback. The current `Config: Not configured` field is ambiguous:
       the UI must show the effective config file path, just like the `Log` file
-      path, with middle truncation and copy/open affordances. A normal default
-      configuration must not display `Not configured`; show the default config
-      file path that would be read or written, or omit the field from the first
-      row and explain the deployment-specific reason in diagnostics/details.
+      path, as selectable text with copy/open affordances. Long config/log paths
+      may wrap or use a bounded visual abbreviation, but must not be reduced to
+      an unselectable ellipsis-only fragment. A normal default configuration
+      must not display `Not configured`; show the default config file path that
+      would be read or written, or omit the field from the first row and explain
+      the deployment-specific reason in diagnostics/details.
       The details rail must also reduce the width allocated to compact metadata
-      such as `Version` and `Uptime`, keep `Log` truncatable with copy/open
-      affordance, and reserve the widest flexible diagnostic area for `Last
+      such as `Version` and `Uptime`, keep diagnostic values selectable and
+      copyable, and reserve the widest flexible diagnostic area for `Last
       Error` so degraded/down states can show useful error text without being
-      squeezed by low-priority metadata. The
+      squeezed by low-priority metadata. `Last error` must be selectable,
+      copyable, and able to wrap; an ellipsis-only or copy-only error display is
+      not acceptable. The
       top metrics must also rename the ambiguous `Running` counter to an
       explicit task-execution label such as `Active Tasks`, `Tasks Running`, or
       `Running Tasks`; bare `Running` is not acceptable because it can be
       confused with daemon health. Current evidence: `npm run smoke:ui` proves
       effective config/log paths render without `Not configured`, path text is
       selectable and not wrapped by a button, separate copy buttons are present,
+      Config/Log paths and `Last error` values are selectable and copyable,
+      `Last error` can wrap instead of being an ellipsis-only fragment,
       `Last error` receives the widest details column, the details rail remains
       attached to the compact status strip, and the metric label is `Active
       Tasks` rather than bare `Running`.

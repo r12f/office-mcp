@@ -246,6 +246,19 @@ test('UI browser smoke follows the current inline task pane settings contract', 
   assert.doesNotMatch(source, /textContent\.includes\("Enabled"\)/);
 });
 
+test('daemon UI spec keeps diagnostic detail values selectable and copyable', () => {
+  const uiSpec = readFileSync(resolve(process.cwd(), '../../../../doc/spec/09-ui.md'), 'utf8');
+  const roadmap = readFileSync(resolve(process.cwd(), '../../../../doc/spec/08-roadmap.md'), 'utf8');
+
+  assert.match(uiSpec, /top daemon details rail[\s\S]*selectable text/i);
+  assert.match(uiSpec, /Config[\s\S]*Log[\s\S]*Last Error[\s\S]*copy/i);
+  assert.match(uiSpec, /Log[\s\S]*wrap/i);
+  assert.match(uiSpec, /Last Error[\s\S]*must not be ellipsis-only/i);
+  assert.match(roadmap, /Config\/Log paths and `Last error` values are selectable/i);
+  assert.doesNotMatch(uiSpec, /`Log` can use a medium flexible\s+column with truncation/i);
+  assert.doesNotMatch(roadmap, /keep `Log` truncatable/i);
+});
+
 test('add-in communication specs stay metadata-only at the local boundary', () => {
   const specPaths = [
     '../../../../doc/spec/02-registration-protocol.md',
