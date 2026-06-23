@@ -143,6 +143,27 @@ jobs:
         working-directory: src/office-ctl/powerpoint
         run: npm run check
 
+      - name: Prepare daemon test certificate
+        shell: pwsh
+        run: |
+          $pfxPath = 'src/office-mcp/daemon/.office-mcp-localhost.pfx'
+          $cert = New-SelfSignedCertificate `
+            -DnsName 'localhost' `
+            -CertStoreLocation 'Cert:\CurrentUser\My' `
+            -KeyAlgorithm RSA `
+            -KeyLength 2048 `
+            -KeyExportPolicy Exportable `
+            -NotAfter (Get-Date).AddDays(2)
+          try {
+            $secure = ConvertTo-SecureString -String 'office-mcp-localhost' -Force -AsPlainText
+            Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $secure | Out-Null
+          } finally {
+            Remove-Item -LiteralPath "Cert:\CurrentUser\My\$($cert.Thumbprint)" -Force -ErrorAction SilentlyContinue
+          }
+          if (-not (Test-Path -LiteralPath $pfxPath)) {
+            throw "Daemon test certificate was not created: $pfxPath"
+          }
+
       - name: Run daemon tests
         working-directory: src/office-mcp
         run: cargo test -p office-mcp-daemon

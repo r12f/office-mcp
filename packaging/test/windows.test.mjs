@@ -169,6 +169,11 @@ test('GitHub release workflow publishes the Windows installer artifacts', () => 
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/excel[\s\S]*npm run check/);
   assert.match(workflow, /Run PowerPoint add-in checks/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/powerpoint[\s\S]*npm run check/);
+  assert.match(workflow, /Prepare daemon test certificate/);
+  assert.match(workflow, /New-SelfSignedCertificate/);
+  assert.match(workflow, /src\/office-mcp\/daemon\/\.office-mcp-localhost\.pfx/);
+  assert.match(workflow, /Export-PfxCertificate/);
+  assert.match(workflow, /Remove-Item -LiteralPath "Cert:\\CurrentUser\\My\\\$\(\$cert\.Thumbprint\)"/);
   assert.match(workflow, /Run daemon tests/);
   assert.match(workflow, /cargo test -p office-mcp-daemon/);
   assert.match(workflow, /build-windows-msi\.ps1 -Version \$\{\{ steps\.version\.outputs\.version \}\} -SkipNpmInstall/);
