@@ -3,7 +3,8 @@ param(
   [string]$RepoRoot = "",
   [string]$BaseUrl = "https://localhost:8765",
   [string]$DaemonStatusCommand = "",
-  [string]$TrustedCatalogRegistryKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp",
+  [string]$TrustedCatalogId = "{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}",
+  [string]$TrustedCatalogRegistryRoot = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs",
   [switch]$ClearOfficeCache,
   [switch]$SkipOfficeCache,
   [switch]$SkipRegistry
@@ -140,16 +141,29 @@ function Remove-DeveloperDebugRegistration {
   }
 }
 
-function Assert-TrustedCatalogRegistryKey {
+function Assert-TrustedCatalogId {
+  param(
+    [Parameter(Mandatory = $true)][string]$Id
+  )
+
+  if ($Id -notmatch '^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$') {
+    throw "TrustedCatalogId must be a GUID enclosed in braces."
+  }
+  if ($Id -match '[\r\n]') {
+    throw "TrustedCatalogId must be a single registry value."
+  }
+}
+
+function Assert-TrustedCatalogRegistryRoot {
   param(
     [Parameter(Mandatory = $true)][string]$Path
   )
 
   if ($Path -notmatch '^HKCU:\\') {
-    throw "TrustedCatalogRegistryKey must be under HKCU."
+    throw "TrustedCatalogRegistryRoot must be under HKCU."
   }
   if ($Path -match '[\r\n]') {
-    throw "TrustedCatalogRegistryKey must be a single registry path."
+    throw "TrustedCatalogRegistryRoot must be a single registry path."
   }
 }
 
@@ -267,11 +281,16 @@ foreach ($officeHost in $hosts) {
 }
 
 if (-not $SkipRegistry) {
-  Assert-TrustedCatalogRegistryKey -Path $TrustedCatalogRegistryKey
+  Assert-TrustedCatalogId -Id $TrustedCatalogId
+  Assert-TrustedCatalogRegistryRoot -Path $TrustedCatalogRegistryRoot
   $catalogUrl = ConvertTo-OfficeCatalogRegistryUrl -Path $CatalogPath
-  $key = $TrustedCatalogRegistryKey
+  $key = "$TrustedCatalogRegistryRoot\$TrustedCatalogId"
+  $legacyKey = "$TrustedCatalogRegistryRoot\office-mcp"
+  if (Test-Path -LiteralPath $legacyKey) {
+    Remove-Item -LiteralPath $legacyKey -Recurse -Force
+  }
   New-Item -Path $key -Force | Out-Null
-  Set-ItemProperty -Path $key -Name Id -Value "office-mcp"
+  Set-ItemProperty -Path $key -Name Id -Value $TrustedCatalogId
   Set-ItemProperty -Path $key -Name Url -Value $catalogUrl
   Set-ItemProperty -Path $key -Name Flags -Value 1 -Type DWord
   foreach ($officeHost in $hosts) {

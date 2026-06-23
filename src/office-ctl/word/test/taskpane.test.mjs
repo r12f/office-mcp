@@ -71,7 +71,10 @@ test('Office catalog registration wrapper delegates to shared Office catalog scr
   assert.match(commonScript, /Word manifest:/);
   assert.match(commonScript, /Excel manifest:/);
   assert.match(commonScript, /PowerPoint manifest:/);
-  assert.match(commonScript, /TrustedCatalogs\\office-mcp/);
+  assert.match(commonScript, /TrustedCatalogId = "\{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57\}"/);
+  assert.match(commonScript, /TrustedCatalogRegistryRoot = "HKCU:\\Software\\Microsoft\\Office\\16\.0\\WEF\\TrustedCatalogs"/);
+  assert.match(commonScript, /\$TrustedCatalogRegistryRoot\\\$TrustedCatalogId/);
+  assert.match(commonScript, /\$TrustedCatalogRegistryRoot\\office-mcp/);
   assert.match(commonScript, /ClearOfficeCache/);
   assert.match(commonScript, /SkipOfficeCache/);
   assert.match(commonScript, /Remove-CustomUiValidationCache/);
@@ -299,7 +302,10 @@ test('Office catalog registration can sync its origin from running daemon status
 
 test('Office catalog registration writes a shared folder URL to the trusted catalog registry', () => {
   const catalogPath = mkdtempSync(join(tmpdir(), 'office-mcp-catalog-registry-'));
-  const registryKey = 'HKCU:\\Software\\office-mcp-tests\\TrustedCatalogs\\office-mcp';
+  const registryRoot = 'HKCU:\\Software\\office-mcp-tests\\TrustedCatalogs';
+  const catalogId = '{01234567-89AB-CDEF-0123-456789ABCDEF}';
+  const registryKey = `${registryRoot}\\${catalogId}`;
+  const legacyRegistryKey = `${registryRoot}\\office-mcp`;
 
   try {
     const result = spawnSync(
@@ -310,18 +316,24 @@ test('Office catalog registration writes a shared folder URL to the trusted cata
         'Bypass',
         '-Command',
         [
-          `& '${join(ADDIN_ROOT, '..', 'common', 'scripts', 'register-office-catalog.ps1')}' -CatalogPath '${catalogPath}' -BaseUrl https://localhost:8778 -TrustedCatalogRegistryKey '${registryKey}' -SkipOfficeCache`,
+          `New-Item '${legacyRegistryKey}' -Force | Out-Null`,
+          `& '${join(ADDIN_ROOT, '..', 'common', 'scripts', 'register-office-catalog.ps1')}' -CatalogPath '${catalogPath}' -BaseUrl https://localhost:8778 -TrustedCatalogId '${catalogId}' -TrustedCatalogRegistryRoot '${registryRoot}' -SkipOfficeCache`,
           `$entry = Get-ItemProperty '${registryKey}'`,
+          `$legacyExists = Test-Path '${legacyRegistryKey}'`,
+          'Write-Output "REGISTRY_ID=$($entry.Id)"',
           'Write-Output "REGISTRY_URL=$($entry.Url)"',
-          `Remove-Item '${registryKey}' -Recurse -Force`
+          'Write-Output "LEGACY_EXISTS=$legacyExists"',
+          `Remove-Item '${registryRoot}' -Recurse -Force`
         ].join('; ')
       ],
       { cwd: join(ADDIN_ROOT, '..', '..', '..'), encoding: 'utf8' }
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /REGISTRY_ID=\{01234567-89AB-CDEF-0123-456789ABCDEF\}/);
     assert.match(result.stdout, /REGISTRY_URL=\\\\localhost\\[A-Z]\$\\/);
     assert.match(result.stdout, new RegExp(catalogPath.split(/[\\/]/).at(-1)));
+    assert.match(result.stdout, /LEGACY_EXISTS=False/);
     assert.doesNotMatch(result.stdout, /REGISTRY_URL=[A-Z]:\\/i);
   } finally {
     rmSync(catalogPath, { force: true, recursive: true });

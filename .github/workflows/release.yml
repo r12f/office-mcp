@@ -201,12 +201,20 @@ jobs:
         run: |
           $version = '${{ steps.version.outputs.version }}'
           $releaseMsi = "artifacts\office-mcp-setup-$version-x64.msi"
+          $releaseZip = "artifacts\office-mcp-windows-portable-$version-x64.zip"
           if (-not (Test-Path -LiteralPath $releaseMsi)) {
             throw "MSI artifact was not produced: $releaseMsi"
+          }
+          if (-not (Test-Path -LiteralPath $releaseZip)) {
+            throw "Portable ZIP artifact was not produced: $releaseZip"
           }
           $msi = Get-Item -LiteralPath $releaseMsi
           if ($msi.Length -lt 1000000) {
             throw "MSI artifact is unexpectedly small: $($msi.Length) bytes"
+          }
+          $zip = Get-Item -LiteralPath $releaseZip
+          if ($zip.Length -lt 1000000) {
+            throw "Portable ZIP artifact is unexpectedly small: $($zip.Length) bytes"
           }
           $renderedLogoReview = 'artifacts\logo-rendered-size-review.json'
           $renderedLogoSheet = 'artifacts\logo-rendered-size-review.png'
@@ -229,6 +237,10 @@ jobs:
           }
           $required = @(
             'artifacts\msi-stage\office-mcp-daemon.exe',
+            'artifacts\msi-stage\README-install.txt',
+            'artifacts\msi-stage\install-user.ps1',
+            'artifacts\msi-stage\start-daemon.ps1',
+            'artifacts\msi-stage\uninstall-user.ps1',
             'artifacts\msi-stage\office-mcp\ui\index.html',
             'artifacts\msi-stage\office-ctl\common\addin-channel.js',
             'artifacts\msi-stage\office-ctl\word\public\taskpane.js',
@@ -250,6 +262,7 @@ jobs:
           try {
             Get-FileHash -Algorithm SHA256 -LiteralPath @(
               (Split-Path -Leaf $releaseMsi),
+              (Split-Path -Leaf $releaseZip),
               'logo-rendered-size-review.json',
               'logo-rendered-size-review.png',
               'catalog-identity-review.json'
@@ -260,6 +273,7 @@ jobs:
             Pop-Location
           }
           "msi=$releaseMsi" >> $env:GITHUB_OUTPUT
+          "portable_zip=$releaseZip" >> $env:GITHUB_OUTPUT
           "checksums=artifacts\SHA256SUMS" >> $env:GITHUB_OUTPUT
           "rendered_logo_review=$renderedLogoReview" >> $env:GITHUB_OUTPUT
           "rendered_logo_sheet=$renderedLogoSheet" >> $env:GITHUB_OUTPUT
@@ -271,6 +285,7 @@ jobs:
           name: office-mcp-windows-installer-${{ steps.version.outputs.version }}
           path: |
             ${{ steps.stage.outputs.msi }}
+            ${{ steps.stage.outputs.portable_zip }}
             ${{ steps.stage.outputs.checksums }}
             ${{ steps.stage.outputs.rendered_logo_review }}
             ${{ steps.stage.outputs.rendered_logo_sheet }}
@@ -284,6 +299,7 @@ jobs:
           prerelease: true
           files: |
             ${{ steps.stage.outputs.msi }}
+            ${{ steps.stage.outputs.portable_zip }}
             ${{ steps.stage.outputs.checksums }}
             ${{ steps.stage.outputs.rendered_logo_review }}
             ${{ steps.stage.outputs.rendered_logo_sheet }}

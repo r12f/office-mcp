@@ -125,6 +125,10 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
     "addin-catalog\office-mcp-powerpoint.xml",
     "office-mcp-env.ps1",
     "office-mcp-install-user.ps1",
+    "install-user.ps1",
+    "uninstall-user.ps1",
+    "start-daemon.ps1",
+    "README-install.txt",
     "config.toml",
     "office-mcp-daemon.ps1",
     "office-mcp-tray.ps1",
@@ -174,8 +178,18 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
   }
 
   $installUserScript = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-install-user.ps1")
-  if ($installUserScript -notmatch "ConvertTo-OfficeCatalogUrl" -or $installUserScript -notmatch "\\\\localhost" -or $installUserScript -notmatch "export-localhost-dev-cert\.ps1" -or $installUserScript -notmatch "-CreateIfMissing") {
-    throw "MSI user configuration script must register a UNC Office catalog and create the localhost certificate."
+  if ($installUserScript -notmatch "ConvertTo-OfficeCatalogUrl" -or $installUserScript -notmatch "\\\\localhost" -or $installUserScript -notmatch "export-localhost-dev-cert\.ps1" -or $installUserScript -notmatch "-CreateIfMissing" -or $installUserScript -notmatch "6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57") {
+    throw "MSI user configuration script must register a GUID-based UNC Office catalog and create the localhost certificate."
+  }
+}
+
+function New-PortableZip([string]$StageRoot, [string]$OutputPath) {
+  if (Test-Path -LiteralPath $OutputPath) {
+    Remove-Item -LiteralPath $OutputPath -Force
+  }
+  Compress-Archive -Path (Join-Path $StageRoot '*') -DestinationPath $OutputPath -Force
+  if (-not (Test-Path -LiteralPath $OutputPath)) {
+    throw "Portable ZIP was not created: $OutputPath"
   }
 }
 
@@ -189,6 +203,7 @@ $excelAddinRoot = Join-Path $repoRoot "src\office-ctl\excel"
 $powerPointAddinRoot = Join-Path $repoRoot "src\office-ctl\powerpoint"
 $wxsPath = Join-Path $repoRoot "packaging\wix\Product.wxs"
 $outputPath = Join-Path $OutputDir "office-mcp-setup-$Version-x64.msi"
+$zipOutputPath = Join-Path $OutputDir "office-mcp-windows-portable-$Version-x64.zip"
 $stageRoot = Join-Path $OutputDir "msi-stage"
 $generatedWxsPath = Join-Path $OutputDir "msi-payload.wxs"
 
@@ -370,9 +385,14 @@ function ConvertTo-OfficeCatalogUrl {
 
 $catalogPath = Join-Path $installRoot 'addin-catalog'
 $catalogUrl = ConvertTo-OfficeCatalogUrl -Path $catalogPath
-$catalogKey = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp'
+$catalogId = '{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}'
+$catalogKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\$catalogId"
+$legacyCatalogKey = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp'
+if (Test-Path -LiteralPath $legacyCatalogKey) {
+  Remove-Item -LiteralPath $legacyCatalogKey -Recurse -Force
+}
 New-Item -Path $catalogKey -Force | Out-Null
-Set-ItemProperty -Path $catalogKey -Name Id -Value 'office-mcp'
+Set-ItemProperty -Path $catalogKey -Name Id -Value $catalogId
 Set-ItemProperty -Path $catalogKey -Name Url -Value $catalogUrl
 Set-ItemProperty -Path $catalogKey -Name Flags -Value 1 -Type DWord
 
@@ -385,6 +405,77 @@ if (-not (Test-Path -LiteralPath $pfxPath)) {
 @'
 $ErrorActionPreference = 'Stop'
 $installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+& (Join-Path $installRoot 'office-mcp-install-user.ps1')
+Write-Output "Office MCP Control user install completed."
+Write-Output "Install root: $installRoot"
+Write-Output "Catalog folder: $(Join-Path $installRoot 'addin-catalog')"
+Write-Output "Daemon launcher: $(Join-Path $installRoot 'start-daemon.ps1')"
+'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "install-user.ps1")
+
+@'
+$ErrorActionPreference = 'Stop'
+$installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $installRoot 'office-mcp-env.ps1')
+$daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
+& $daemonExe daemon run
+'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "start-daemon.ps1")
+
+@'
+$ErrorActionPreference = 'Stop'
+$catalogId = '{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}'
+$catalogKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\$catalogId"
+$legacyCatalogKey = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp'
+foreach ($key in @($catalogKey, $legacyCatalogKey)) {
+  if (Test-Path -LiteralPath $key) {
+    Remove-Item -LiteralPath $key -Recurse -Force
+  }
+}
+$runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+Remove-ItemProperty -LiteralPath $runKey -Name 'office-mcp' -Force -ErrorAction SilentlyContinue
+Write-Output 'Office MCP Control user registry entries removed.'
+'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "uninstall-user.ps1")
+
+@"
+Office MCP Control portable Windows package
+
+This folder is the install directory. No hidden copy step is required.
+
+Contents:
+- office-mcp-daemon.exe: native daemon, tray host, and MCP server.
+- office-mcp\ui\: daemon control panel assets.
+- office-ctl\word, office-ctl\excel, office-ctl\powerpoint: Office add-in bundles.
+- addin-catalog\: Word, Excel, and PowerPoint shared-folder catalog manifests.
+- scripts\export-localhost-dev-cert.ps1: creates/exports the localhost HTTPS certificate.
+- install-user.ps1: registers the current user's Office trusted catalog and creates the localhost certificate if needed.
+- start-daemon.ps1: starts the daemon from this folder.
+- uninstall-user.ps1: removes Office MCP Control user registry entries.
+
+What install-user.ps1 changes:
+- Writes HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}
+  - Id = {6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}
+  - Url = the UNC path for this folder's addin-catalog directory
+  - Flags = 1, which means Show in Menu
+- Removes the old invalid HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp key if present.
+- Creates .office-mcp-localhost.pfx in this folder if it is missing.
+- Uses CurrentUser certificate stores only.
+
+Install:
+1. Extract the zip to the folder where you want Office MCP Control to live.
+2. Close Word, Excel, and PowerPoint.
+3. Run PowerShell from this folder:
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\install-user.ps1
+4. Start the daemon:
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\start-daemon.ps1
+5. Reopen Office and use Home > Add-ins > Advanced > Shared Folder to add Office MCP Control if Office does not show it automatically.
+
+Default endpoints:
+- MCP: http://127.0.0.1:8800/mcp
+- Add-in UI/WSS origin: https://localhost:8765
+"@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "README-install.txt")
+
+@'
+$ErrorActionPreference = 'Stop'
+$installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $installRoot 'office-mcp-env.ps1')
 $daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
 & $daemonExe @args
@@ -392,6 +483,7 @@ $daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
 
 New-WixPayloadFragment -StageRoot $stageRoot -OutputPath $generatedWxsPath
 Assert-MsiStagePayload -StageRoot $stageRoot -GeneratedWxsPath $generatedWxsPath
+New-PortableZip -StageRoot $stageRoot -OutputPath $zipOutputPath
 
 Push-Location $repoRoot
 try {
@@ -408,3 +500,4 @@ if (-not (Test-Path $outputPath)) {
 }
 
 Write-Output "Built $outputPath"
+Write-Output "Built $zipOutputPath"

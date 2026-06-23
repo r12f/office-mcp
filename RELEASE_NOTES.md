@@ -5,7 +5,8 @@
 Office MCP Control 0.1.0 is the first Windows desktop installer pre-release.
 It packages the native Rust daemon, daemon UI assets, Word/Excel/PowerPoint
 add-in bundles, trusted catalog manifests, launcher scripts, product icons, and
-the Windows tray entry point into `office-mcp-setup-0.1.0-x64.msi`.
+the Windows tray entry point into `office-mcp-setup-0.1.0-x64.msi` and the
+auditable portable package `office-mcp-windows-portable-0.1.0-x64.zip`.
 
 This release is published as a draft pre-release until signing status, tray
 evidence, installer smoke evidence, and required live Office evidence are
@@ -15,11 +16,15 @@ Artifacts are unsigned unless the release page states otherwise.
 Expected assets:
 
 - `office-mcp-setup-0.1.0-x64.msi`
+- `office-mcp-windows-portable-0.1.0-x64.zip`
 - `SHA256SUMS`
 
 Validation gates before promoting the release:
 
 - Windows desktop install completes without requiring a source checkout.
+- The portable zip contains `README-install.txt`, `install-user.ps1`,
+  `start-daemon.ps1`, and `uninstall-user.ps1` so users can inspect the install
+  location and user-level registry/certificate changes before running them.
 - Office MCP Control appears from the tray and opens the daemon UI.
 - Word, Excel, and PowerPoint can load Office MCP Control from the Shared Folder
   catalog when Office does not auto-show the add-in.

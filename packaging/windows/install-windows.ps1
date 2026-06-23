@@ -119,10 +119,15 @@ Copy-Item -Recurse -Force -Path (Join-Path $powerPointAddinRoot "public") -Desti
 $trayLauncherPath = Join-Path $InstallRoot "office-mcp-tray.ps1"
 Copy-Item -Force -Path (Join-Path $repoRoot "packaging\windows\office-mcp-tray.ps1") -Destination $trayLauncherPath
 
-$catalogKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp"
+$catalogId = "{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}"
+$catalogKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\$catalogId"
+$legacyCatalogKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp"
 $catalogUrl = ConvertTo-OfficeCatalogUrl -Path $catalogPath
+if (Test-Path -LiteralPath $legacyCatalogKey) {
+  Remove-Item -LiteralPath $legacyCatalogKey -Recurse -Force
+}
 New-Item -Path $catalogKey -Force | Out-Null
-Set-ItemProperty -Path $catalogKey -Name Id -Value "office-mcp"
+Set-ItemProperty -Path $catalogKey -Name Id -Value $catalogId
 Set-ItemProperty -Path $catalogKey -Name Url -Value $catalogUrl
 Set-ItemProperty -Path $catalogKey -Name Flags -Value 1 -Type DWord
 

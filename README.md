@@ -129,39 +129,56 @@ under `artifacts/`, not as parallel source packages at the root.
 Windows desktop is the v1 installer target. macOS, Linux, Office on the web,
 and managed AppSource deployment are still tracked as later distribution paths.
 
-1. Open the latest GitHub Releases page and download
-   `office-mcp-setup-<ver>-x64.msi` plus `SHA256SUMS`.
-2. Optionally verify the installer checksum:
+1. Open the latest GitHub Releases page and download either
+   `office-mcp-windows-portable-<ver>-x64.zip` or
+   `office-mcp-setup-<ver>-x64.msi`, plus `SHA256SUMS`.
+2. Optionally verify the package checksum:
 
    ```powershell
+   Get-FileHash -Algorithm SHA256 .\office-mcp-windows-portable-<ver>-x64.zip
    Get-FileHash -Algorithm SHA256 .\office-mcp-setup-<ver>-x64.msi
    Get-Content .\SHA256SUMS
    ```
 
-3. Run the MSI. It installs the daemon, tray launcher, daemon UI assets, Office
-   add-in bundles, trusted Shared Folder catalog manifests, default config, and
-   product icons under `%LOCALAPPDATA%\office-mcp\`. It also configures the
-   daemon/tray to start at logon.
-4. Open the daemon UI from the tray menu with **Show Office MCP Control**, or
+3. For the portable package, extract the zip to the folder where Office MCP
+   Control should live, read `README-install.txt`, close Word/Excel/PowerPoint,
+   and run:
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\install-user.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\start-daemon.ps1
+   ```
+
+   The extracted folder is the install directory. `install-user.ps1` writes the
+   current-user Office Trusted Add-in Catalog registry entry under
+   `HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}`
+   and creates `.office-mcp-localhost.pfx` in the same folder when needed.
+4. For the MSI package, run the MSI. It installs the daemon, tray launcher,
+   daemon UI assets, Office add-in bundles, Shared Folder catalog manifests,
+   default config, and product icons under `%LOCALAPPDATA%\office-mcp\`. It also
+   configures the daemon/tray to start at logon. The MSI uses the same user
+   setup script and registry key as the portable package.
+5. Open the daemon UI from the tray menu with **Show Office MCP Control**, or
    run `office-mcp-daemon ui`. Check runtime status with:
 
    ```powershell
    office-mcp-daemon daemon status
    ```
 
-5. Restart Word, Excel, or PowerPoint if it was already open. If the add-in does
+6. Restart Word, Excel, or PowerPoint if it was already open. If the add-in does
    not appear automatically, open **Insert > My Add-ins > Shared Folder** and
    add **Office MCP Control**.
-6. Configure MCP clients to use the local Streamable HTTP endpoint:
+7. Configure MCP clients to use the local Streamable HTTP endpoint:
    `http://127.0.0.1:8800/mcp`. If the daemon config changes the MCP port, use
    the endpoint reported by `office-mcp-daemon config endpoints` or
    `office-mcp-daemon daemon status`.
-7. For debugging, collect the log path reported by `office-mcp-daemon daemon
+8. For debugging, collect the log path reported by `office-mcp-daemon daemon
    status` or shown in the daemon UI. The default log location is under the
    current user's local Office MCP data directory.
-8. Uninstall from Windows Apps & Features. If Office still lists the add-in,
-   remove **Office MCP Control** from Office's add-in manager or remove the
-   installed Shared Folder catalog entry.
+9. Uninstall the MSI from Windows Apps & Features. For the portable package, run
+   `uninstall-user.ps1` and then delete the extracted folder. If Office still
+   lists the add-in, remove **Office MCP Control** from Office's add-in manager
+   or remove the installed Shared Folder catalog entry.
 
 ## Run the MVP locally
 
