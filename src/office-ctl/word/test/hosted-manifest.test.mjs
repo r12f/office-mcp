@@ -47,6 +47,21 @@ test('hosted manifest renderer emits public office-mcp.dev URLs', () => {
   }
 });
 
+test('hosted manifest renderer wrappers exist for every Office host', () => {
+  const common = readFileSync(join(ADDIN_ROOT, '..', 'common', 'scripts', 'render-hosted-manifest.ps1'), 'utf8');
+  const word = readFileSync(join(ADDIN_ROOT, 'scripts', 'render-hosted-manifest.ps1'), 'utf8');
+  const excel = readFileSync(join(ADDIN_ROOT, '..', 'excel', 'scripts', 'render-hosted-manifest.ps1'), 'utf8');
+  const powerpoint = readFileSync(join(ADDIN_ROOT, '..', 'powerpoint', 'scripts', 'render-hosted-manifest.ps1'), 'utf8');
+
+  assert.match(common, /TaskpanePath/);
+  assert.match(word, /common\\scripts\\render-hosted-manifest\.ps1/);
+  assert.match(word, /-TaskpanePath "\/taskpane\.html"/);
+  assert.match(excel, /common\\scripts\\render-hosted-manifest\.ps1/);
+  assert.match(excel, /-TaskpanePath "\/excel\/taskpane\.html"/);
+  assert.match(powerpoint, /common\\scripts\\render-hosted-manifest\.ps1/);
+  assert.match(powerpoint, /-TaskpanePath "\/powerpoint\/taskpane\.html"/);
+});
+
 test('hosted manifest renderer rejects loopback and non-HTTPS origins', () => {
   const loopback = spawnSync(POWERSHELL, [
     '-NoProfile',

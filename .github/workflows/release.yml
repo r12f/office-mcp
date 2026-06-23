@@ -114,6 +114,7 @@ jobs:
             'packaging/windows/build-windows-msi.ps1',
             'packaging/windows/uninstall-windows.ps1',
             'packaging/windows/export-localhost-dev-cert.ps1',
+            'src/office-ctl/common/scripts/render-hosted-manifest.ps1',
             'src/office-ctl/word/scripts/render-hosted-manifest.ps1',
             'src/office-ctl/excel/scripts/render-hosted-manifest.ps1',
             'src/office-ctl/powerpoint/scripts/render-hosted-manifest.ps1'

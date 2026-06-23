@@ -159,6 +159,10 @@ test('GitHub release workflow publishes the Windows installer artifacts', () => 
   assert.match(workflow, /PSParser/);
   assert.match(workflow, /packaging\/windows\/install-windows\.ps1/);
   assert.match(workflow, /packaging\/windows\/build-windows-msi\.ps1/);
+  assert.match(workflow, /src\/office-ctl\/common\/scripts\/render-hosted-manifest\.ps1/);
+  assert.match(workflow, /src\/office-ctl\/word\/scripts\/render-hosted-manifest\.ps1/);
+  assert.match(workflow, /src\/office-ctl\/excel\/scripts\/render-hosted-manifest\.ps1/);
+  assert.match(workflow, /src\/office-ctl\/powerpoint\/scripts\/render-hosted-manifest\.ps1/);
   assert.match(workflow, /Run Word add-in checks/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/word[\s\S]*npm run check/);
   assert.match(workflow, /Run Excel add-in checks/);
