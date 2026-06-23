@@ -1,9 +1,9 @@
 {
   "name": "office-mcp-packaging",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
-  "description": "Packaging checks for office-mcp installers and release templates.",
+  "description": "Packaging checks for office-mcp portable packages and release templates.",
   "scripts": {
     "check": "npm test",
     "test": "node --test test/*.test.mjs"

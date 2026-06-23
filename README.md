@@ -103,8 +103,8 @@ The repository root intentionally does not contain a top-level Node package.
 Run Rust daemon commands from the repository root, evidence/smoke commands from
 `src/office-mcp/daemon/evidence/`, add-in commands from `src/office-ctl/word/`,
 and packaging checks from `packaging/` so the daemon, evidence harnesses,
-Office add-in, and installers stay independently buildable and packageable.
-Historical feasibility spikes and generated installer/runtime evidence belong
+Office add-in, and release packages stay independently buildable and packageable.
+Historical feasibility spikes and generated package/runtime evidence belong
 under `artifacts/`, not as parallel source packages at the root.
 
 ## Design docs
@@ -438,7 +438,7 @@ The portable build stages the same split layout under `artifacts\portable-stage\
 `office-mcp-daemon.exe` for the Rust daemon runtime, daemon-owned UI assets for
 the daemon web console, `office-ctl/word/`, `office-ctl/excel/`, and
 `office-ctl/powerpoint/` for the Office task pane bundles,
-`scripts/` for installer helper scripts, and `addin-catalog/` for the sideload
+`scripts/` for install helper scripts, and `addin-catalog/` for the sideload
 manifests. It asserts that the Rust daemon, UI assets, add-in bundles, catalog
 manifests, and launcher scripts are present before building the final zip.
 

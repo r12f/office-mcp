@@ -206,7 +206,7 @@ jobs:
       - name: Verify portable zip artifact
         shell: pwsh
         run: |
-          $zip = Get-Item .\artifacts\office-mcp-windows-portable-0.1.0-x64.zip
+          $zip = Get-Item .\artifacts\office-mcp-windows-portable-0.1.1-x64.zip
           if ($zip.Length -lt 1000000) {
             throw "Portable ZIP artifact is unexpectedly small: $($zip.Length) bytes"
           }

@@ -56,7 +56,7 @@ existing MCP implementations do not provide together:
 4. **Boring transports.** Streamable HTTP for MCP; WSS + JSON-RPC 2.0 for
    add-in ↔ server. No bespoke binary frames, no SSE-only paths. Stdio-only
    clients use the bundled stdio-to-daemon bridge.
-5. **Local-first install.** Single Windows installer and no project-operated
+5. **Local-first install.** Transparent Windows portable package and no project-operated
    cloud service. Marketplace builds load the production Office.js library
    from Microsoft's CDN, so fully offline operation is not a v1 promise. See
    [01-architecture.md §0](01-architecture.md) for the full deployment model.

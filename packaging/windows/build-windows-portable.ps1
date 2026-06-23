@@ -1,5 +1,5 @@
-param(
-  [string]$Version = "0.1.0",
+﻿param(
+  [string]$Version = "0.1.1",
   [string]$OutputDir = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) "artifacts"),
   [switch]$SkipNpmInstall
 )

@@ -248,9 +248,9 @@ test('Release notes document the Windows portable pre-release gate', () => {
   const releaseNotes = readFileSync(join(repoRoot, 'RELEASE_NOTES.md'), 'utf8');
 
   assert.match(releaseNotes, /# Release Notes/);
-  assert.match(releaseNotes, /## 0\.1\.0/);
+  assert.match(releaseNotes, /## 0\.1\.1/);
   assert.doesNotMatch(releaseNotes, /office-mcp-setup|\.msi|MSI/i);
-  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.0-x64\.zip/);
+  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.1-x64\.zip/);
   assert.match(releaseNotes, /README-install\.txt/);
   assert.match(releaseNotes, /install-user\.ps1/);
   assert.match(releaseNotes, /start-daemon\.ps1/);
