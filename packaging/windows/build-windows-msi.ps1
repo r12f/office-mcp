@@ -124,6 +124,7 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
     "addin-catalog\office-mcp-excel.xml",
     "addin-catalog\office-mcp-powerpoint.xml",
     "office-mcp-env.ps1",
+    "office-mcp-install-user.ps1",
     "config.toml",
     "office-mcp-daemon.ps1",
     "office-mcp-tray.ps1",
@@ -170,6 +171,11 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
     if ($envScript -notmatch $envName) {
       throw "MSI environment script must set $envName."
     }
+  }
+
+  $installUserScript = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-install-user.ps1")
+  if ($installUserScript -notmatch "ConvertTo-OfficeCatalogUrl" -or $installUserScript -notmatch "\\\\localhost" -or $installUserScript -notmatch "export-localhost-dev-cert\.ps1" -or $installUserScript -notmatch "-CreateIfMissing") {
+    throw "MSI user configuration script must register a UNC Office catalog and create the localhost certificate."
   }
 }
 
@@ -331,11 +337,50 @@ $daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
 $pfxPath = Join-Path $installRoot '.office-mcp-localhost.pfx'
 
 if (-not (Test-Path -LiteralPath $pfxPath)) {
-  & (Join-Path $installRoot 'scripts\export-localhost-dev-cert.ps1') -OutputPath $pfxPath
+  & (Join-Path $installRoot 'scripts\export-localhost-dev-cert.ps1') -OutputPath $pfxPath -CreateIfMissing
 }
 
 & $daemonExe daemon run
 '@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "office-mcp-daemon.ps1")
+
+@'
+$ErrorActionPreference = 'Stop'
+$installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $installRoot 'office-mcp-env.ps1')
+
+function ConvertTo-OfficeCatalogUrl {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  $resolvedPath = [System.IO.Path]::GetFullPath($Path)
+  if ($resolvedPath.StartsWith('\', [System.StringComparison]::Ordinal)) {
+    return $resolvedPath
+  }
+
+  $root = [System.IO.Path]::GetPathRoot($resolvedPath)
+  if ([string]::IsNullOrWhiteSpace($root) -or $root.Length -lt 2 -or $root[1] -ne ':') {
+    throw "CatalogPath must be an absolute drive path or UNC path: $Path"
+  }
+
+  $drive = $root.Substring(0, 1).ToUpperInvariant()
+  $relativePath = $resolvedPath.Substring($root.Length).TrimStart('\', '/')
+  return "\\localhost\$drive`$\$relativePath"
+}
+
+$catalogPath = Join-Path $installRoot 'addin-catalog'
+$catalogUrl = ConvertTo-OfficeCatalogUrl -Path $catalogPath
+$catalogKey = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp'
+New-Item -Path $catalogKey -Force | Out-Null
+Set-ItemProperty -Path $catalogKey -Name Id -Value 'office-mcp'
+Set-ItemProperty -Path $catalogKey -Name Url -Value $catalogUrl
+Set-ItemProperty -Path $catalogKey -Name Flags -Value 1 -Type DWord
+
+$pfxPath = Join-Path $installRoot '.office-mcp-localhost.pfx'
+if (-not (Test-Path -LiteralPath $pfxPath)) {
+  & (Join-Path $installRoot 'scripts\export-localhost-dev-cert.ps1') -OutputPath $pfxPath -CreateIfMissing
+}
+'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "office-mcp-install-user.ps1")
 
 @'
 $ErrorActionPreference = 'Stop'

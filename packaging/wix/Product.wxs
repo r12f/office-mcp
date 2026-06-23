@@ -18,6 +18,17 @@
       <ComponentGroupRef Id="OfficeMcpPayloadComponents" />
       <ComponentRef Id="OfficeMcpRegistry" />
     </Feature>
+
+    <CustomAction
+      Id="ConfigureOfficeMcpUserState"
+      Directory="INSTALLFOLDER"
+      Execute="deferred"
+      Impersonate="yes"
+      ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]office-mcp-install-user.ps1&quot;" />
+
+    <InstallExecuteSequence>
+      <Custom Action="ConfigureOfficeMcpUserState" After="InstallFiles" Condition="NOT REMOVE" />
+    </InstallExecuteSequence>
   </Package>
 
   <Fragment>
@@ -25,29 +36,11 @@
       <Component Id="OfficeMcpRegistry" Guid="86E90F37-0D2D-472E-8B8E-BF62399243BF">
         <RegistryValue
           Root="HKCU"
-          Key="Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp"
-          Name="Id"
-          Type="string"
-          Value="office-mcp"
-          KeyPath="yes" />
-        <RegistryValue
-          Root="HKCU"
-          Key="Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp"
-          Name="Url"
-          Type="string"
-          Value="[INSTALLFOLDER]addin-catalog" />
-        <RegistryValue
-          Root="HKCU"
-          Key="Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp"
-          Name="Flags"
-          Type="integer"
-          Value="1" />
-        <RegistryValue
-          Root="HKCU"
           Key="Software\Microsoft\Windows\CurrentVersion\Run"
           Name="office-mcp"
           Type="string"
-          Value="&quot;[INSTALLFOLDER]office-mcp-daemon.exe&quot; tray" />
+          Value="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]office-mcp-daemon.ps1&quot;"
+          KeyPath="yes" />
       </Component>
     </DirectoryRef>
   </Fragment>

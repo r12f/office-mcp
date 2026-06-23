@@ -1,6 +1,7 @@
 param(
   [string]$OutputPath = (Join-Path (Get-Location) ".office-mcp-localhost.pfx"),
-  [string]$Password = "office-mcp-localhost"
+  [string]$Password = "office-mcp-localhost",
+  [switch]$CreateIfMissing
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,7 +12,17 @@ $cert = Get-ChildItem Cert:\CurrentUser\My |
   Select-Object -First 1
 
 if (-not $cert) {
-  throw "No CurrentUser\My localhost certificate with a private key was found. Run 'dotnet dev-certs https' first."
+  if (-not $CreateIfMissing) {
+    throw "No CurrentUser\My localhost certificate with a private key was found. Run this helper with -CreateIfMissing to create one."
+  }
+
+  $cert = New-SelfSignedCertificate `
+    -DnsName "localhost" `
+    -CertStoreLocation "Cert:\CurrentUser\My" `
+    -KeyAlgorithm RSA `
+    -KeyLength 2048 `
+    -KeyExportPolicy Exportable `
+    -NotAfter (Get-Date).AddYears(2)
 }
 
 $trusted = Get-ChildItem Cert:\CurrentUser\Root |
@@ -19,7 +30,17 @@ $trusted = Get-ChildItem Cert:\CurrentUser\Root |
   Select-Object -First 1
 
 if (-not $trusted) {
-  throw "The localhost certificate is not trusted in CurrentUser\Root. Import it only after explicit approval."
+  if (-not $CreateIfMissing) {
+    throw "The localhost certificate is not trusted in CurrentUser\Root. Run this helper with -CreateIfMissing to trust it for the current user."
+  }
+
+  $rootStore = New-Object System.Security.Cryptography.X509Certificates.X509Store("Root", "CurrentUser")
+  try {
+    $rootStore.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+    $rootStore.Add($cert)
+  } finally {
+    $rootStore.Close()
+  }
 }
 
 $secure = ConvertTo-SecureString -String $Password -Force -AsPlainText

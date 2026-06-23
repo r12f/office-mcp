@@ -75,6 +75,11 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.doesNotMatch(buildScript, /Destination \(Join-Path \$stageCatalogRoot "office-mcp-excel\.xml"\)/);
   assert.doesNotMatch(buildScript, /Destination \(Join-Path \$stageCatalogRoot "office-mcp-powerpoint\.xml"\)/);
   assert.match(buildScript, /scripts\\export-localhost-dev-cert\.ps1/);
+  assert.match(buildScript, /office-mcp-install-user\.ps1/);
+  assert.match(buildScript, /ConvertTo-OfficeCatalogUrl/);
+  assert.match(buildScript, /return "\\\\localhost\\\$drive`\$\\\$relativePath"/);
+  assert.match(buildScript, /-CreateIfMissing/);
+  assert.match(buildScript, /office-mcp-daemon\.ps1[\s\S]*export-localhost-dev-cert\.ps1[\s\S]*-CreateIfMissing/);
   assert.match(buildScript, /Tray launcher must delegate to the native Rust tray host/);
   assert.doesNotMatch(buildScript, /node\\node\.exe/);
   assert.doesNotMatch(buildScript, /dist\\src\\cli\.js/);
@@ -108,8 +113,11 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.match(installScript, /Tray launcher:/);
   assert.match(installScript, /New-ScheduledTaskAction[\s\S]*office-mcp-daemon\.exe[\s\S]*tray/);
   assert.match(productWxs, /Windows\\CurrentVersion\\Run/);
-  assert.match(productWxs, /office-mcp-daemon\.exe&quot; tray/);
-  assert.doesNotMatch(productWxs, /office-mcp-daemon\.ps1/);
+  assert.match(productWxs, /office-mcp-daemon\.ps1/);
+  assert.match(productWxs, /ConfigureOfficeMcpUserState/);
+  assert.match(productWxs, /office-mcp-install-user\.ps1/);
+  assert.doesNotMatch(productWxs, /Value="\[INSTALLFOLDER\]addin-catalog"/);
+  assert.doesNotMatch(productWxs, /office-mcp-daemon\.exe&quot; tray/);
   assert.doesNotMatch(productWxs, /office-mcp-tray\.ps1/);
   assert.deepEqual([...icon32.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.equal(icon32.readUInt32BE(16), 32);
@@ -121,6 +129,8 @@ test('Windows localhost certificate helper lives under packaging', () => {
 
   assert.match(helper, /Cert:\\CurrentUser\\My/);
   assert.match(helper, /Cert:\\CurrentUser\\Root/);
+  assert.match(helper, /New-SelfSignedCertificate/);
+  assert.match(helper, /CreateIfMissing/);
   assert.match(helper, /Export-PfxCertificate/);
   assert.doesNotMatch(helper, /Import-PfxCertificate/);
 });
