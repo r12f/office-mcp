@@ -113,6 +113,7 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.match(installScript, /Tray launcher:/);
   assert.match(installScript, /New-ScheduledTaskAction[\s\S]*office-mcp-daemon\.exe[\s\S]*tray/);
   assert.match(productWxs, /Windows\\CurrentVersion\\Run/);
+  assert.match(productWxs, /MajorUpgrade[\s\S]*AllowSameVersionUpgrades="yes"/);
   assert.match(productWxs, /office-mcp-daemon\.ps1/);
   assert.match(productWxs, /ConfigureOfficeMcpUserState/);
   assert.match(productWxs, /office-mcp-install-user\.ps1/);

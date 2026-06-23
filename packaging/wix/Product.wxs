@@ -7,7 +7,9 @@
     UpgradeCode="9A4F5F83-742B-44A7-98D7-7CCFE7CBA752"
     Scope="perUser">
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of office-mcp is already installed." />
+    <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
+      DowngradeErrorMessage="A newer version of office-mcp is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="LocalAppDataFolder">
