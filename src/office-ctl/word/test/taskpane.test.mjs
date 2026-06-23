@@ -73,6 +73,10 @@ test('Office catalog registration wrapper delegates to shared Office catalog scr
   assert.match(commonScript, /PowerPoint manifest:/);
   assert.match(commonScript, /TrustedCatalogs\\office-mcp/);
   assert.match(commonScript, /ClearOfficeCache/);
+  assert.match(commonScript, /SkipOfficeCache/);
+  assert.match(commonScript, /Remove-CustomUiValidationCache/);
+  assert.match(commonScript, /CustomUIValidationCache/);
+  assert.match(commonScript, /\$shouldClearOfficeCache = \(-not \$SkipOfficeCache\) -and \(\(-not \$SkipRegistry\) -or \$ClearOfficeCache\)/);
   assert.match(commonScript, /Close Office host processes before clearing add-in cache/);
   assert.match(commonScript, /SkipRegistry/);
   assert.match(commonScript, /Remove-DeveloperDebugRegistration/);
@@ -139,7 +143,7 @@ test('Office catalog registration script stages Office host manifests without re
     assert.match(excelManifest, /<SupportUrl DefaultValue="https:\/\/github\.com\/office-mcp\/office-mcp" \/>/);
     assert.match(excelManifest, /DefaultValue="Open Control Panel"/);
     assert.match(excelManifest, /Open the control panel to connect this Excel workbook/);
-    assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.11/);
+    assert.match(excelManifest, /https:\/\/localhost:8766\/excel\/taskpane\.html\?v=0\.1\.12/);
     assert.match(excelManifest, /<IconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-32\.png" \/>/);
     assert.match(excelManifest, /<HighResolutionIconUrl DefaultValue="https:\/\/localhost:8766\/assets\/icon-80\.png" \/>/);
     assert.match(excelManifest, /https:\/\/localhost:8766\/assets\/icon-32\.png/);
@@ -279,7 +283,7 @@ test('Office catalog registration can sync its origin from running daemon status
     assert.match(wordManifest, /https:\/\/localhost:8777\/word\/taskpane\.html\?v=0\.1\.18/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(wordManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
-    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.11/);
+    assert.match(excelManifest, /https:\/\/localhost:8777\/excel\/taskpane\.html\?v=0\.1\.12/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/assets\/icon-32\.png/);
     assert.match(excelManifest, /https:\/\/localhost:8777\/assets\/icon-80\.png/);
     assert.match(powerpointManifest, /https:\/\/localhost:8777\/powerpoint\/taskpane\.html\?v=0\.1\.4/);
@@ -306,7 +310,7 @@ test('Office catalog registration writes a shared folder URL to the trusted cata
         'Bypass',
         '-Command',
         [
-          `& '${join(ADDIN_ROOT, '..', 'common', 'scripts', 'register-office-catalog.ps1')}' -CatalogPath '${catalogPath}' -BaseUrl https://localhost:8778 -TrustedCatalogRegistryKey '${registryKey}'`,
+          `& '${join(ADDIN_ROOT, '..', 'common', 'scripts', 'register-office-catalog.ps1')}' -CatalogPath '${catalogPath}' -BaseUrl https://localhost:8778 -TrustedCatalogRegistryKey '${registryKey}' -SkipOfficeCache`,
           `$entry = Get-ItemProperty '${registryKey}'`,
           'Write-Output "REGISTRY_URL=$($entry.Url)"',
           `Remove-Item '${registryKey}' -Recurse -Force`

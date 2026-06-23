@@ -5,10 +5,15 @@ param(
   [string]$DaemonStatusCommand = "",
   [string]$TrustedCatalogRegistryKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp",
   [switch]$ClearOfficeCache,
+  [switch]$SkipOfficeCache,
   [switch]$SkipRegistry
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($ClearOfficeCache -and $SkipOfficeCache) {
+  throw "ClearOfficeCache and SkipOfficeCache cannot be used together."
+}
 
 function Get-ParentPath {
   param(
@@ -200,6 +205,23 @@ function Remove-OfficeAddinCache {
   }
 }
 
+function Remove-CustomUiValidationCache {
+  param(
+    [Parameter(Mandatory = $true)][array]$Hosts
+  )
+
+  $cacheKey = "HKCU:\Software\Microsoft\Office\16.0\Common\CustomUIValidationCache"
+  if (-not (Test-Path -LiteralPath $cacheKey)) { return }
+
+  $cache = Get-ItemProperty -LiteralPath $cacheKey
+  foreach ($officeHost in $Hosts) {
+    $addinId = $officeHost.AddinId
+    $cache.PSObject.Properties |
+      Where-Object { $_.Name.StartsWith($addinId, [System.StringComparison]::OrdinalIgnoreCase) } |
+      ForEach-Object { Remove-ItemProperty -LiteralPath $cacheKey -Name $_.Name -Force }
+  }
+}
+
 function ConvertTo-OfficeCatalogUrl {
   param(
     [Parameter(Mandatory = $true)][string]$Path
@@ -259,9 +281,14 @@ if (-not $SkipRegistry) {
   $catalogUrl = ConvertTo-OfficeCatalogUrl -Path $CatalogPath
 }
 
-if ($ClearOfficeCache) {
+$shouldClearOfficeCache = (-not $SkipOfficeCache) -and ((-not $SkipRegistry) -or $ClearOfficeCache)
+if ($shouldClearOfficeCache) {
   Assert-OfficeHostsClosed -Hosts $hosts
+  foreach ($officeHost in $hosts) {
+    Remove-DeveloperDebugRegistration -AddinId $officeHost.AddinId
+  }
   Remove-OfficeAddinCache -Hosts $hosts
+  Remove-CustomUiValidationCache -Hosts $hosts
 }
 
 Write-Output "Registered Office trusted catalog: $CatalogPath"
@@ -270,4 +297,4 @@ Write-Output "Manifest origin: $BaseUrl"
 Write-Output "Word manifest: $(Join-Path $CatalogPath 'office-mcp-word.xml')"
 Write-Output "Excel manifest: $(Join-Path $CatalogPath 'office-mcp-excel.xml')"
 Write-Output "PowerPoint manifest: $(Join-Path $CatalogPath 'office-mcp-powerpoint.xml')"
-if ($ClearOfficeCache) { Write-Output "Cleared Office WEF add-in cache for office-mcp." }
+if ($shouldClearOfficeCache) { Write-Output "Cleared Office WEF add-in cache for office-mcp." }

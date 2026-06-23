@@ -378,6 +378,13 @@ cd ..
 powershell -ExecutionPolicy Bypass -File .\src\office-ctl\common\scripts\register-office-catalog.ps1
 ```
 
+The catalog registration script also clears stale Office WEF add-in caches for
+Office MCP Control so versioned task pane URLs refresh after upgrades. Close
+Word, Excel, and PowerPoint before running it; the script fails fast if those
+hosts are still open instead of leaving Office to reuse an older cached
+manifest. Use `-SkipOfficeCache` only for diagnostics where the current Office
+cache must be preserved.
+
 If another local process already owns `https://localhost:8765`, start the
 daemon with a different add-in port and render the catalog manifests for that
 same origin:
