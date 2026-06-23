@@ -25,74 +25,7 @@ function Reset-DirectoryInside([string]$Path, [string]$Parent) {
   New-Item -ItemType Directory -Force -Path $Path | Out-Null
 }
 
-function New-WixPayloadFragment([string]$StageRoot, [string]$OutputPath) {
-  $resolvedStageRoot = (Resolve-Path -LiteralPath $StageRoot).Path
-  $directories = New-Object System.Collections.Generic.List[string]
-  $refs = New-Object System.Collections.Generic.List[string]
-
-  Add-WixDirectory -BasePath $resolvedStageRoot -Path $resolvedStageRoot -Directories $directories -Refs $refs
-
-  $content = @()
-  $content += '<?xml version="1.0" encoding="UTF-8"?>'
-  $content += '<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">'
-  $content += '  <Fragment>'
-  $content += '    <DirectoryRef Id="INSTALLFOLDER">'
-  $content += $directories
-  $content += '    </DirectoryRef>'
-  $content += '  </Fragment>'
-  $content += '  <Fragment>'
-  $content += '    <ComponentGroup Id="OfficeMcpPayloadComponents">'
-  $content += $refs
-  $content += '    </ComponentGroup>'
-  $content += '  </Fragment>'
-  $content += '</Wix>'
-  $content | Set-Content -Encoding UTF8 -Path $OutputPath
-}
-
-function Add-WixDirectory(
-  [string]$BasePath,
-  [string]$Path,
-  [System.Collections.Generic.List[string]]$Directories,
-  [System.Collections.Generic.List[string]]$Refs
-) {
-  foreach ($childDir in Get-ChildItem -LiteralPath $Path -Directory | Sort-Object FullName) {
-    $dirId = "Dir_" + (Get-StableId $BasePath $childDir.FullName)
-    $name = ConvertTo-WixXml $childDir.Name
-    $Directories.Add("      <Directory Id=`"$dirId`" Name=`"$name`">")
-    Add-WixDirectory -BasePath $BasePath -Path $childDir.FullName -Directories $Directories -Refs $Refs
-    $Directories.Add("      </Directory>")
-  }
-
-  foreach ($file in Get-ChildItem -LiteralPath $Path -File | Sort-Object FullName) {
-    $componentId = "Cmp_" + (Get-StableId $BasePath $file.FullName)
-    $fileId = "File_" + (Get-StableId $BasePath ($file.FullName + ":file"))
-    $source = ConvertTo-WixXml $file.FullName
-    $name = ConvertTo-WixXml $file.Name
-    $Directories.Add("      <Component Id=`"$componentId`" Guid=`"*`">")
-    $Directories.Add("        <File Id=`"$fileId`" Source=`"$source`" Name=`"$name`" KeyPath=`"yes`" />")
-    $Directories.Add("      </Component>")
-    $Refs.Add("      <ComponentRef Id=`"$componentId`" />")
-  }
-}
-
-function Get-StableId([string]$BasePath, [string]$Path) {
-  $baseUri = [System.Uri]((Join-Path $BasePath "") -replace '\\', '/')
-  $pathUri = [System.Uri]($Path -replace '\\', '/')
-  $relative = [System.Uri]::UnescapeDataString($baseUri.MakeRelativeUri($pathUri).ToString()).ToLowerInvariant()
-  $bytes = [System.Text.Encoding]::UTF8.GetBytes($relative)
-  $sha = [System.Security.Cryptography.SHA1]::Create()
-  try {
-    return ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '')
-  } finally {
-    $sha.Dispose()
-  }
-}
-
-function ConvertTo-WixXml([string]$Value) {
-  return [System.Security.SecurityElement]::Escape($Value)
-}
-
-function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
+function Assert-PortableStagePayload([string]$StageRoot) {
   $requiredPaths = @(
     "office-mcp-daemon.exe",
     "office-mcp\ui\index.html",
@@ -138,7 +71,7 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
   foreach ($relativePath in $requiredPaths) {
     $path = Join-Path $StageRoot $relativePath
     if (-not (Test-Path -LiteralPath $path)) {
-      throw "MSI staging payload is missing required path: $relativePath"
+      throw "Portable staging payload is missing required path: $relativePath"
     }
   }
 
@@ -157,29 +90,22 @@ function Assert-MsiStagePayload([string]$StageRoot, [string]$GeneratedWxsPath) {
     throw "Tray launcher must delegate to the native Rust tray host."
   }
 
-  $generatedWxs = Get-Content -Raw -LiteralPath $GeneratedWxsPath
-  foreach ($needle in @("office-mcp-daemon.exe", "index.html", "app.js", "taskpane.js", "brand-mark.svg", "icon-32.png", "icon-80.png", "addin-catalog", "office-mcp-env.ps1", "office-mcp-daemon.ps1")) {
-    if (-not $generatedWxs.Contains($needle)) {
-      throw "Generated WiX payload is missing expected entry: $needle"
-    }
-  }
-
   $envScript = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-env.ps1")
   if ($envScript -notmatch "OFFICE_MCP_INSTALL_ROOT") {
-    throw "MSI environment script must set OFFICE_MCP_INSTALL_ROOT."
+    throw "Portable environment script must set OFFICE_MCP_INSTALL_ROOT."
   }
   if ($envScript -notmatch "OFFICE_MCP_CONFIG_PATH") {
-    throw "MSI environment script must set OFFICE_MCP_CONFIG_PATH."
+    throw "Portable environment script must set OFFICE_MCP_CONFIG_PATH."
   }
   foreach ($envName in @("OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PATH", "OFFICE_MCP_ADDIN_CHANNEL__PORT", "OFFICE_MCP_MCP_HTTP__PORT")) {
     if ($envScript -notmatch $envName) {
-      throw "MSI environment script must set $envName."
+      throw "Portable environment script must set $envName."
     }
   }
 
   $installUserScript = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-install-user.ps1")
   if ($installUserScript -notmatch "ConvertTo-OfficeCatalogUrl" -or $installUserScript -notmatch "\\\\localhost" -or $installUserScript -notmatch "export-localhost-dev-cert\.ps1" -or $installUserScript -notmatch "-CreateIfMissing" -or $installUserScript -notmatch "6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57") {
-    throw "MSI user configuration script must register a GUID-based UNC Office catalog and create the localhost certificate."
+    throw "Portable user configuration script must register a GUID-based UNC Office catalog and create the localhost certificate."
   }
 }
 
@@ -201,15 +127,8 @@ $commonRoot = Join-Path $repoRoot "src\office-ctl\common"
 $addinRoot = Join-Path $repoRoot "src\office-ctl\word"
 $excelAddinRoot = Join-Path $repoRoot "src\office-ctl\excel"
 $powerPointAddinRoot = Join-Path $repoRoot "src\office-ctl\powerpoint"
-$wxsPath = Join-Path $repoRoot "packaging\wix\Product.wxs"
-$outputPath = Join-Path $OutputDir "office-mcp-setup-$Version-x64.msi"
 $zipOutputPath = Join-Path $OutputDir "office-mcp-windows-portable-$Version-x64.zip"
-$stageRoot = Join-Path $OutputDir "msi-stage"
-$generatedWxsPath = Join-Path $OutputDir "msi-payload.wxs"
-
-if (-not (Test-Path $wxsPath)) {
-  throw "Missing WiX source file: $wxsPath"
-}
+$stageRoot = Join-Path $OutputDir "portable-stage"
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
@@ -481,23 +400,6 @@ $daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
 & $daemonExe @args
 '@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "office-mcp.ps1")
 
-New-WixPayloadFragment -StageRoot $stageRoot -OutputPath $generatedWxsPath
-Assert-MsiStagePayload -StageRoot $stageRoot -GeneratedWxsPath $generatedWxsPath
+Assert-PortableStagePayload -StageRoot $stageRoot
 New-PortableZip -StageRoot $stageRoot -OutputPath $zipOutputPath
-
-Push-Location $repoRoot
-try {
-  dotnet tool restore
-  Assert-LastExitCode "dotnet tool restore"
-  dotnet wix build $wxsPath $generatedWxsPath -arch x64 -d "RepoRoot=$repoRoot" -d "PackageVersion=$Version" -o $outputPath
-  Assert-LastExitCode "dotnet wix build"
-} finally {
-  Pop-Location
-}
-
-if (-not (Test-Path $outputPath)) {
-  throw "MSI was not created: $outputPath"
-}
-
-Write-Output "Built $outputPath"
 Write-Output "Built $zipOutputPath"

@@ -173,10 +173,11 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 - [x] Windows developer bootstrap script: validates build/manifest, registers
       trusted add-in catalog, exports an already trusted localhost PFX, and
       creates/removes a user logon Scheduled Task.
-- [x] Windows MSI build: packages the native Rust daemon executable, daemon UI
-      assets, add-in bundle, catalog manifest, and user autostart/catalog
-      registration. Native `office-mcp.exe` packaging and Scheduled Task
-      replacement remain production hardening items.
+- [x] Windows portable zip build: packages the native Rust daemon executable,
+      daemon UI assets, add-in bundles, catalog manifests, explicit user install
+      scripts, and launcher scripts. MSI packaging was removed from the release
+      path because the opaque installer UX was not acceptable for first-contact
+      trust.
 - [x] macOS Homebrew formula template and renderer for release tarballs. Actual
       tap publication waits for a signed GitHub Release artifact.
 - [x] Linux systemd user unit template and renderer for release packages. Actual
@@ -188,57 +189,56 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       bundle, checksums, and checklist. Partner Center submission and Microsoft
       validation review remain external gates.
 
-### M6.1 — GitHub Release installer pipeline and user install docs
+### M6.1 — GitHub Release portable package pipeline and user install docs
 
-User-reported distribution gap: the project has packaging scripts and a CI MSI
-smoke job, but it does not yet have a GitHub Release pipeline that publishes an
-installable package, and the README does not yet give non-developers a clear
-install path. A program that requires source checkout commands is not
-installable software.
+User-reported distribution gap: the project had packaging scripts but did not
+publish a transparent GitHub Release package, and the README did not give
+non-developers a clear install path. A program that requires source checkout
+commands is not installable software.
 
 - [x] Add `.github/workflows/release.yml` for version-tagged releases. The
       workflow must trigger on tags like `v0.1.0`, support a maintainer dry-run
-      `workflow_dispatch`, build the Windows MSI on `windows-latest`, upload
+      `workflow_dispatch`, build the Windows portable zip on `windows-latest`, upload
       artifacts for every run, and attach release assets only for tag builds.
       Current implementation uses the checked release workflow on tag pushes
-      and `workflow_dispatch`, uploads the MSI and `SHA256SUMS` on every run,
+      and `workflow_dispatch`, uploads the portable zip and `SHA256SUMS` on every run,
       and creates a draft pre-release only when `github.ref_type == 'tag'`.
 - [x] Make the release workflow reuse the existing packaging path instead of
       inventing another installer flow: install Rust, Node, add-in dependencies,
       evidence dependencies, and packaging dependencies; run packaging smoke
       checks; then call
-      `packaging/windows/build-windows-msi.ps1 -SkipNpmInstall`. Current
+      `packaging/windows/build-windows-portable.ps1 -SkipNpmInstall`. Current
       workflow installs Rust, Node, evidence dependencies, all host add-in
       dependencies, and packaging dependencies, runs add-in checks, daemon
       tests, daemon evidence checks, packaging checks, then invokes the existing
-      Windows MSI builder with `-SkipNpmInstall`.
-- [x] Add release-gate tests/checks that fail before publishing when the MSI is
+      Windows portable builder with `-SkipNpmInstall`.
+- [x] Add release-gate tests/checks that fail before publishing when the portable zip is
       missing, unexpectedly small, incorrectly named, or missing required
       payloads: native Rust daemon, daemon UI assets, shared Office add-in
       assets, Word/Excel/PowerPoint task pane bundles, catalog manifests,
       launcher scripts, and product icons. Current workflow stages artifacts
-      only after validating the versioned MSI name, minimum size, and required
+      only after validating the versioned portable zip name, minimum size, and required
       payload paths; `packaging/test/windows.test.mjs` statically locks these
       gates.
 - [x] Generate and publish `SHA256SUMS` for every release artifact. If signing
       is not implemented yet, unsigned pre-releases must be explicitly labeled
       as unsigned rather than silently looking production-signed. Current
-      workflow generates `SHA256SUMS`, uploads it with the MSI, and uses
+      workflow generates `SHA256SUMS`, uploads it with the portable zip, and uses
       `RELEASE_NOTES.md`, which labels 0.1.0 artifacts as unsigned.
 - [x] Keep releases draft or pre-release by default until release notes, manual
-      tray evidence, installer smoke evidence, and required live Office evidence
+      tray evidence, portable package smoke evidence, and required live Office evidence
       are attached or explicitly waived for that pre-release. Current workflow
       sets `draft: true`, `prerelease: true`, requires `RELEASE_NOTES.md` for
       tag releases, and publishes that file as the release body.
 - [x] Add a README user installation section before the source/developer setup.
-      It must explain how to download `office-mcp-setup-<ver>-x64.msi` from
-      GitHub Releases, verify checksums, run the MSI, restart/open Office,
+      It must explain how to download `office-mcp-windows-portable-<ver>-x64.zip` from
+      GitHub Releases, verify checksums, extract it, run `install-user.ps1`, restart/open Office,
       locate `Office MCP Control` in the Shared Folder catalog when needed,
       open the daemon UI from the tray or CLI, configure MCP clients to
       `http://127.0.0.1:8800/mcp`, find logs, and uninstall. Current README
       includes the user install section before developer setup.
 - [x] Add documentation tests or static checks that fail when README no longer
-      mentions GitHub Releases, the MSI asset name, checksum verification,
+      mentions GitHub Releases, the portable zip asset name, checksum verification,
       daemon UI/tray first-run verification, Office Shared Folder activation,
       MCP endpoint configuration, log collection, and uninstall steps. Current
       packaging static tests cover the release workflow, README install guide,
@@ -260,7 +260,7 @@ place, but a maintainer still needs to push a version tag or dispatch the
 workflow in GitHub Actions to capture the actual hosted Release artifact URL.
 
 **Exit criterion**: Pushing a version tag creates a GitHub Release draft or
-pre-release with a downloadable Windows MSI installer and checksums. A Windows
+pre-release with a downloadable Windows portable zip and checksums. A Windows
 desktop user can install from README instructions without cloning the repository
 or running developer build commands.
 
@@ -1260,10 +1260,10 @@ Current screenshot feedback to preserve for the next implementation goal:
       missing structured menu roles, web-rendered/custom menu substitutions in
       the evidence model, and debug-only primary menu commands. Final visual
       Windows proof remains tracked by the manual evidence items.
-- [x] Update MSI/package asset installation and manifest renderer tests so the
+- [x] Update package asset installation and manifest renderer tests so the
       generated logo/icon files and product metadata are packaged and referenced
       from the installed add-in catalog without loopback or missing-icon paths.
-      Current packaging tests assert MSI staging includes the generated assets,
+      Current packaging tests assert portable staging includes the generated assets,
       and AppSource packaging includes `assets/*` in the add-in bundle.
 - [x] Add automated tests for manifest metadata/icon URL substitution and asset
       presence, plus manual Windows evidence showing the ribbon command icon,
@@ -1359,8 +1359,8 @@ names, or Microsoft-owned marks.
       confirmation that the menu-bar/status-notifier icon is visible remains a
       release-host validation step, not an implementation blocker.
 - [x] Finish replacing Node packaging after Rust passes the parity suite on
-      Windows and the supported non-Windows packaging smoke gates. Windows MSI
-      and developer bootstrap stage the Rust daemon as the runtime; legacy Node
+      Windows and the supported non-Windows packaging smoke gates. Windows portable
+      package and developer bootstrap stage the Rust daemon as the runtime; legacy Node
       daemon content has been removed. CLI config loading honors
       `OFFICE_MCP_CONFIG_PATH`, which is required by installed launchers.
 - [x] Split Office add-in code into `src/office-ctl/common`,

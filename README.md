@@ -96,7 +96,7 @@ npm run check
 | `src/office-ctl/word/` | Word add-in package: XML manifest, task pane static bundle, add-in validation scripts, and Word catalog registration script. |
 | `src/office-ctl/excel/` | Excel add-in entry point and host-specific command surface. |
 | `src/office-ctl/powerpoint/` | PowerPoint add-in package: XML manifest, compact task pane static bundle, presentation-session registration, add-in validation scripts, and PowerPoint command handlers. |
-| `packaging/` | Cross-component packaging assets: Windows bootstrap scripts and WiX MSI source. |
+| `packaging/` | Cross-component packaging assets: Windows portable package scripts plus Homebrew/Linux templates. |
 | `doc/spec/` | Product and protocol design. |
 
 The repository root intentionally does not contain a top-level Node package.
@@ -126,23 +126,20 @@ under `artifacts/`, not as parallel source packages at the root.
 
 ## Install from GitHub Releases
 
-Windows desktop is the v1 installer target. macOS, Linux, Office on the web,
+Windows desktop is the v1 portable package target. macOS, Linux, Office on the web,
 and managed AppSource deployment are still tracked as later distribution paths.
 
-1. Open the latest GitHub Releases page and download either
-   `office-mcp-windows-portable-<ver>-x64.zip` or
-   `office-mcp-setup-<ver>-x64.msi`, plus `SHA256SUMS`.
+1. Open the latest GitHub Releases page and download
+   `office-mcp-windows-portable-<ver>-x64.zip` plus `SHA256SUMS`.
 2. Optionally verify the package checksum:
 
    ```powershell
    Get-FileHash -Algorithm SHA256 .\office-mcp-windows-portable-<ver>-x64.zip
-   Get-FileHash -Algorithm SHA256 .\office-mcp-setup-<ver>-x64.msi
    Get-Content .\SHA256SUMS
    ```
 
-3. For the portable package, extract the zip to the folder where Office MCP
-   Control should live, read `README-install.txt`, close Word/Excel/PowerPoint,
-   and run:
+3. Extract the zip to the folder where Office MCP Control should live, read
+   `README-install.txt`, close Word/Excel/PowerPoint, and run:
 
    ```powershell
    powershell -NoProfile -ExecutionPolicy Bypass -File .\install-user.ps1
@@ -153,32 +150,26 @@ and managed AppSource deployment are still tracked as later distribution paths.
    current-user Office Trusted Add-in Catalog registry entry under
    `HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}`
    and creates `.office-mcp-localhost.pfx` in the same folder when needed.
-4. For the MSI package, run the MSI. It installs the daemon, tray launcher,
-   daemon UI assets, Office add-in bundles, Shared Folder catalog manifests,
-   default config, and product icons under `%LOCALAPPDATA%\office-mcp\`. It also
-   configures the daemon/tray to start at logon. The MSI uses the same user
-   setup script and registry key as the portable package.
-5. Open the daemon UI from the tray menu with **Show Office MCP Control**, or
+4. Open the daemon UI from the tray menu with **Show Office MCP Control**, or
    run `office-mcp-daemon ui`. Check runtime status with:
 
    ```powershell
    office-mcp-daemon daemon status
    ```
 
-6. Restart Word, Excel, or PowerPoint if it was already open. If the add-in does
+5. Restart Word, Excel, or PowerPoint if it was already open. If the add-in does
    not appear automatically, open **Insert > My Add-ins > Shared Folder** and
    add **Office MCP Control**.
-7. Configure MCP clients to use the local Streamable HTTP endpoint:
+6. Configure MCP clients to use the local Streamable HTTP endpoint:
    `http://127.0.0.1:8800/mcp`. If the daemon config changes the MCP port, use
    the endpoint reported by `office-mcp-daemon config endpoints` or
    `office-mcp-daemon daemon status`.
-8. For debugging, collect the log path reported by `office-mcp-daemon daemon
+7. For debugging, collect the log path reported by `office-mcp-daemon daemon
    status` or shown in the daemon UI. The default log location is under the
    current user's local Office MCP data directory.
-9. Uninstall the MSI from Windows Apps & Features. For the portable package, run
-   `uninstall-user.ps1` and then delete the extracted folder. If Office still
-   lists the add-in, remove **Office MCP Control** from Office's add-in manager
-   or remove the installed Shared Folder catalog entry.
+8. To uninstall, run `uninstall-user.ps1` and then delete the extracted folder.
+   If Office still lists the add-in, remove **Office MCP Control** from Office's
+   add-in manager or remove the installed Shared Folder catalog entry.
 
 ## Run the MVP locally
 
@@ -237,7 +228,7 @@ instead of accepting older files from a previous run:
 cd .\src\office-mcp\daemon\evidence
 npm run evidence:record-tray-manual -- --daemon-bin C:\Code\office-mcp\target\debug\office-mcp-daemon.exe --visible-icon true --right-click-menu true --menu-opened-from-tray-icon true --native-menu-appearance-reviewed true --menu-anchored-to-tray-icon true --os-native-menu-behavior-reviewed true --keyboard-menu-access-reviewed true --native-quit-confirmation-reviewed true --menu-surface-kind native --show-ui-opened true --tooltip "Office MCP Control - Up - 0 clients - 0 documents" --menu-item "Status: Up" --menu-item "Clients: 0" --menu-item "Documents: 0" --menu-item "Show Office MCP Control" --menu-item "Quit Office MCP Control" --screenshot-path C:\path\to\tray-icon.png --tray-icon-screenshot C:\path\to\tray-icon.png --tray-native-menu-screenshot C:\path\to\tray-menu.png --tray-tooltip-screenshot C:\path\to\tray-tooltip.png --tray-quit-confirmation-screenshot C:\path\to\tray-quit.png --screenshot-freshness-window-ms 1800000
 node ..\..\..\office-ctl\common\scripts\record-rendered-logo-review.mjs --output ..\..\..\..\artifacts\logo-rendered-size-review.json --sheet ..\..\..\..\artifacts\logo-rendered-size-review.png
-node ..\..\..\office-ctl\common\scripts\record-catalog-identity-review.mjs --catalog-path ..\..\..\..\artifacts\msi-stage\addin-catalog --output ..\..\..\..\artifacts\catalog-identity-review.json
+node ..\..\..\office-ctl\common\scripts\record-catalog-identity-review.mjs --catalog-path ..\..\..\..\artifacts\portable-stage\addin-catalog --output ..\..\..\..\artifacts\catalog-identity-review.json
 npm run evidence:record-product-visual -- --daemon-bin C:\Code\office-mcp\target\debug\office-mcp-daemon.exe --manual-tray-evidence-path ..\..\..\..\artifacts\tray-manual-evidence.json --rendered-logo-review-path ..\..\..\..\artifacts\logo-rendered-size-review.json --catalog-identity-review-path ..\..\..\..\artifacts\catalog-identity-review.json --word-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-word.json --excel-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-excel.json --powerpoint-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-powerpoint.json --word-runtime-evidence-path ..\..\..\..\artifacts\runtime-evidence-word.json --excel-runtime-evidence-path ..\..\..\..\artifacts\runtime-evidence-excel.json --powerpoint-runtime-evidence-path ..\..\..\..\artifacts\runtime-evidence-powerpoint.json --word-ribbon-command "Office MCP Control ribbon command visible" --word-ribbon-command-screenshot C:\path\to\word-ribbon.png --word-catalog-entry "Office MCP Control catalog entry visible" --word-catalog-entry-screenshot C:\path\to\word-catalog.png --word-taskpane-title "Office MCP Control task pane visible" --word-taskpane-title-screenshot C:\path\to\word-taskpane.png --excel-ribbon-command "Office MCP Control ribbon command visible" --excel-ribbon-command-screenshot C:\path\to\excel-ribbon.png --excel-catalog-entry "Office MCP Control catalog entry visible" --excel-catalog-entry-screenshot C:\path\to\excel-catalog.png --excel-taskpane-title "Office MCP Control task pane visible" --excel-taskpane-title-screenshot C:\path\to\excel-taskpane.png --powerpoint-ribbon-command "Office MCP Control ribbon command visible" --powerpoint-ribbon-command-screenshot C:\path\to\powerpoint-ribbon.png --powerpoint-catalog-entry "Office MCP Control catalog entry visible" --powerpoint-catalog-entry-screenshot C:\path\to\powerpoint-catalog.png --powerpoint-taskpane-title "Office MCP Control task pane visible" --powerpoint-taskpane-title-screenshot C:\path\to\powerpoint-taskpane.png --daemon-main-window "Office MCP Control daemon main window visible with compact status details" --daemon-main-window-screenshot C:\path\to\daemon-main-window.png --logo-tray-size "Office MCP Control tray-size logo reviewed" --logo-tray-size-screenshot ..\..\..\..\artifacts\logo-rendered-size-review.png --logo-ribbon-size "Office MCP Control ribbon-size logo reviewed" --logo-ribbon-size-screenshot ..\..\..\..\artifacts\logo-rendered-size-review.png --logo-catalog-thumbnail "Office MCP Control catalog thumbnail logo reviewed" --logo-catalog-thumbnail-screenshot ..\..\..\..\artifacts\logo-rendered-size-review.png --logo-daemon-titlebar "Office MCP Control daemon title-bar logo reviewed" --logo-daemon-titlebar-screenshot ..\..\..\..\artifacts\logo-rendered-size-review.png --logo-installer-metadata "Office MCP Control installer metadata logo reviewed" --logo-installer-metadata-screenshot ..\..\..\..\artifacts\logo-rendered-size-review.png --tray-icon "Office MCP Control tray icon visible" --tray-icon-screenshot C:\path\to\tray-icon.png --tray-native-menu "Office MCP Control native tray menu visible" --tray-native-menu-screenshot C:\path\to\tray-menu.png --tray-tooltip "Office MCP Control - Up - 0 clients - 0 documents" --tray-tooltip-screenshot C:\path\to\tray-tooltip.png --tray-quit-confirmation "Office MCP Control quit confirmation visible" --tray-quit-confirmation-screenshot C:\path\to\tray-quit.png --catalog-icon-visible true --tray-icon-visible true --tray-menu-native true --quit-confirmation-visible true --logo-quality-reviewed true --logo-future-office-control-reviewed true --final-logo-user-surface-reviewed true --current-logo-screenshot-feedback-reviewed true --rendered-size-logo-reviewed true --addin-identity-reviewed true --addin-title-icon-type-reviewed true --addin-installable-surface-reviewed true --current-addin-screenshot-feedback-reviewed true --word-first-run-identity-reviewed true --excel-first-run-identity-reviewed true --powerpoint-first-run-identity-reviewed true --tray-product-polish-reviewed true --tray-native-first-impression-reviewed true --tray-normal-windows-launch-reviewed true --current-tray-screenshot-feedback-reviewed true --daemon-main-window-reviewed true --daemon-main-window-compact-reviewed true --daemon-main-window-three-column-reviewed true --word-compact-top-block true --word-tools-permissions-merged true --word-inline-settings true --word-server-protocol-row "Server 0.1.0 / Protocol 1.0" --word-document-state "Editable" --excel-compact-top-block true --excel-tools-permissions-merged true --excel-inline-settings true --excel-server-protocol-row "Server 0.1.0 / Protocol 1.0" --excel-document-state "Editable" --powerpoint-compact-top-block true --powerpoint-tools-permissions-merged true --powerpoint-inline-settings true --powerpoint-server-protocol-row "Server 0.1.0 / Protocol 1.0" --powerpoint-document-state "Editable" --screenshot-freshness-window-ms 1800000
 npm run evidence:validate-ui -- --input ..\..\..\..\artifacts\ui-runtime-evidence.json --require-manual-tray --manual-tray-evidence-path ..\..\..\..\artifacts\tray-manual-evidence.json --require-product-visual --product-visual-evidence-path ..\..\..\..\artifacts\product-visual-evidence.json
 ```
@@ -377,7 +368,7 @@ Claude Desktop-style config can be generated from the repository root with:
 cargo run -p office-mcp-daemon -- config claude-desktop
 ```
 
-For an MSI-installed copy, generate a config that points at the installed
+For a portable package copy, generate a config that points at the extracted
 PowerShell launcher instead of the source checkout:
 
 ```powershell
@@ -416,7 +407,7 @@ cargo run -p office-mcp-daemon -- daemon run
 
 The catalog URL shown by the script is the local folder path to use in Office's
 trusted add-in catalog settings if Office does not pick up the registry entry.
-The Windows bootstrap and MSI install a broader catalog under
+The Windows bootstrap and portable package install a broader catalog under
 `%LOCALAPPDATA%\office-mcp\addin-catalog\` with Word, Excel, and PowerPoint
 manifests placed directly at the catalog root as `office-mcp-word.xml`,
 `office-mcp-excel.xml`, and `office-mcp-powerpoint.xml`. After restarting
@@ -436,24 +427,23 @@ Undo that bootstrap with:
 powershell -ExecutionPolicy Bypass -File .\packaging\windows\uninstall-windows.ps1
 ```
 
-Build the Windows MSI artifact without mutating local Office or certificate
+Build the Windows portable artifact without mutating local Office or certificate
 state:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-msi.ps1 -SkipNpmInstall
+powershell -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-portable.ps1 -SkipNpmInstall
 ```
 
-The MSI build stages the same split layout under `artifacts\msi-stage\`:
+The portable build stages the same split layout under `artifacts\portable-stage\`:
 `office-mcp-daemon.exe` for the Rust daemon runtime, daemon-owned UI assets for
 the daemon web console, `office-ctl/word/`, `office-ctl/excel/`, and
 `office-ctl/powerpoint/` for the Office task pane bundles,
 `scripts/` for installer helper scripts, and `addin-catalog/` for the sideload
-manifests. It generates the WiX payload fragment and asserts that the Rust
-daemon, UI assets, add-in bundles, catalog manifests, and launcher scripts are
-present before building the final MSI.
+manifests. It asserts that the Rust daemon, UI assets, add-in bundles, catalog
+manifests, and launcher scripts are present before building the final zip.
 
 `office-mcp daemon start|stop` works with the developer Scheduled Task bootstrap
-and with the MSI launcher layout.
+and with the portable launcher layout.
 
 ## License
 

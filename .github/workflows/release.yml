@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   windows-installer:
-    name: Windows installer release artifact
+    name: Windows portable release artifact
     runs-on: windows-latest
 
     steps:
@@ -111,7 +111,7 @@ jobs:
         run: |
           $scripts = @(
             'packaging/windows/install-windows.ps1',
-            'packaging/windows/build-windows-msi.ps1',
+            'packaging/windows/build-windows-portable.ps1',
             'packaging/windows/uninstall-windows.ps1',
             'packaging/windows/export-localhost-dev-cert.ps1',
             'src/office-ctl/common/scripts/render-hosted-manifest.ps1',
@@ -184,15 +184,15 @@ jobs:
             --output artifacts\logo-rendered-size-review.json `
             --sheet artifacts\logo-rendered-size-review.png
 
-      - name: Build Windows MSI
+      - name: Build Windows portable zip
         shell: pwsh
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-msi.ps1 -Version ${{ steps.version.outputs.version }} -SkipNpmInstall
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-portable.ps1 -Version ${{ steps.version.outputs.version }} -SkipNpmInstall
 
       - name: Generate catalog identity review
         shell: pwsh
         run: |
           node .\src\office-ctl\common\scripts\record-catalog-identity-review.mjs `
-            --catalog-path artifacts\msi-stage\addin-catalog `
+            --catalog-path artifacts\portable-stage\addin-catalog `
             --output artifacts\catalog-identity-review.json
 
       - name: Stage release artifacts
@@ -200,17 +200,9 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
-          $releaseMsi = "artifacts\office-mcp-setup-$version-x64.msi"
           $releaseZip = "artifacts\office-mcp-windows-portable-$version-x64.zip"
-          if (-not (Test-Path -LiteralPath $releaseMsi)) {
-            throw "MSI artifact was not produced: $releaseMsi"
-          }
           if (-not (Test-Path -LiteralPath $releaseZip)) {
             throw "Portable ZIP artifact was not produced: $releaseZip"
-          }
-          $msi = Get-Item -LiteralPath $releaseMsi
-          if ($msi.Length -lt 1000000) {
-            throw "MSI artifact is unexpectedly small: $($msi.Length) bytes"
           }
           $zip = Get-Item -LiteralPath $releaseZip
           if ($zip.Length -lt 1000000) {
@@ -236,22 +228,22 @@ jobs:
             throw "Catalog identity review is not ready: $catalogIdentityReview"
           }
           $required = @(
-            'artifacts\msi-stage\office-mcp-daemon.exe',
-            'artifacts\msi-stage\README-install.txt',
-            'artifacts\msi-stage\install-user.ps1',
-            'artifacts\msi-stage\start-daemon.ps1',
-            'artifacts\msi-stage\uninstall-user.ps1',
-            'artifacts\msi-stage\office-mcp\ui\index.html',
-            'artifacts\msi-stage\office-ctl\common\addin-channel.js',
-            'artifacts\msi-stage\office-ctl\word\public\taskpane.js',
-            'artifacts\msi-stage\office-ctl\excel\public\taskpane.js',
-            'artifacts\msi-stage\office-ctl\powerpoint\public\taskpane.js',
-            'artifacts\msi-stage\addin-catalog\office-mcp-word.xml',
-            'artifacts\msi-stage\addin-catalog\office-mcp-excel.xml',
-            'artifacts\msi-stage\addin-catalog\office-mcp-powerpoint.xml',
-            'artifacts\msi-stage\scripts\export-localhost-dev-cert.ps1',
-            'artifacts\msi-stage\office-ctl\common\assets\icon-32.png',
-            'artifacts\msi-stage\office-ctl\common\assets\icon-80.png'
+            'artifacts\portable-stage\office-mcp-daemon.exe',
+            'artifacts\portable-stage\README-install.txt',
+            'artifacts\portable-stage\install-user.ps1',
+            'artifacts\portable-stage\start-daemon.ps1',
+            'artifacts\portable-stage\uninstall-user.ps1',
+            'artifacts\portable-stage\office-mcp\ui\index.html',
+            'artifacts\portable-stage\office-ctl\common\addin-channel.js',
+            'artifacts\portable-stage\office-ctl\word\public\taskpane.js',
+            'artifacts\portable-stage\office-ctl\excel\public\taskpane.js',
+            'artifacts\portable-stage\office-ctl\powerpoint\public\taskpane.js',
+            'artifacts\portable-stage\addin-catalog\office-mcp-word.xml',
+            'artifacts\portable-stage\addin-catalog\office-mcp-excel.xml',
+            'artifacts\portable-stage\addin-catalog\office-mcp-powerpoint.xml',
+            'artifacts\portable-stage\scripts\export-localhost-dev-cert.ps1',
+            'artifacts\portable-stage\office-ctl\common\assets\icon-32.png',
+            'artifacts\portable-stage\office-ctl\common\assets\icon-80.png'
           )
           foreach ($path in $required) {
             if (-not (Test-Path -LiteralPath $path)) {
@@ -261,7 +253,6 @@ jobs:
           Push-Location artifacts
           try {
             Get-FileHash -Algorithm SHA256 -LiteralPath @(
-              (Split-Path -Leaf $releaseMsi),
               (Split-Path -Leaf $releaseZip),
               'logo-rendered-size-review.json',
               'logo-rendered-size-review.png',
@@ -272,7 +263,6 @@ jobs:
           } finally {
             Pop-Location
           }
-          "msi=$releaseMsi" >> $env:GITHUB_OUTPUT
           "portable_zip=$releaseZip" >> $env:GITHUB_OUTPUT
           "checksums=artifacts\SHA256SUMS" >> $env:GITHUB_OUTPUT
           "rendered_logo_review=$renderedLogoReview" >> $env:GITHUB_OUTPUT
@@ -282,9 +272,8 @@ jobs:
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: office-mcp-windows-installer-${{ steps.version.outputs.version }}
+          name: office-mcp-windows-portable-${{ steps.version.outputs.version }}
           path: |
-            ${{ steps.stage.outputs.msi }}
             ${{ steps.stage.outputs.portable_zip }}
             ${{ steps.stage.outputs.checksums }}
             ${{ steps.stage.outputs.rendered_logo_review }}
@@ -298,7 +287,6 @@ jobs:
           draft: true
           prerelease: true
           files: |
-            ${{ steps.stage.outputs.msi }}
             ${{ steps.stage.outputs.portable_zip }}
             ${{ steps.stage.outputs.checksums }}
             ${{ steps.stage.outputs.rendered_logo_review }}

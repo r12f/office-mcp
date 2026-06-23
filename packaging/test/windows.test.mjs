@@ -39,10 +39,9 @@ test('Windows tray controller exposes required notification-area menu', () => {
   assert.doesNotMatch(script, /Start-ScheduledTask/);
 });
 
-test('Windows packaging includes the tray controller in installer payload', () => {
-  const buildScript = readFileSync(join(PACKAGING_ROOT, 'windows', 'build-windows-msi.ps1'), 'utf8');
+test('Windows packaging includes the tray controller in portable payload', () => {
+  const buildScript = readFileSync(join(PACKAGING_ROOT, 'windows', 'build-windows-portable.ps1'), 'utf8');
   const installScript = readFileSync(join(PACKAGING_ROOT, 'windows', 'install-windows.ps1'), 'utf8');
-  const productWxs = readFileSync(join(PACKAGING_ROOT, 'wix', 'Product.wxs'), 'utf8');
   const repoRoot = join(PACKAGING_ROOT, '..');
   const icon32 = readFileSync(join(repoRoot, 'src', 'office-ctl', 'common', 'assets', 'icon-32.png'));
   const icon80 = readFileSync(join(repoRoot, 'src', 'office-ctl', 'common', 'assets', 'icon-80.png'));
@@ -82,6 +81,8 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.match(buildScript, /README-install\.txt/);
   assert.match(buildScript, /office-mcp-windows-portable-\$Version-x64\.zip/);
   assert.match(buildScript, /Compress-Archive/);
+  assert.match(buildScript, /portable-stage/);
+  assert.doesNotMatch(buildScript, /office-mcp-setup|\.msi|dotnet wix|WiX|Wix|wixpdb/i);
   assert.match(buildScript, /ConvertTo-OfficeCatalogUrl/);
   assert.match(buildScript, /return "\\\\localhost\\\$drive`\$\\\$relativePath"/);
   assert.match(buildScript, /6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57/);
@@ -122,14 +123,6 @@ test('Windows packaging includes the tray controller in installer payload', () =
   assert.doesNotMatch(installScript, new RegExp(['npm run', 'daemon'].join(' ')));
   assert.match(installScript, /Tray launcher:/);
   assert.match(installScript, /New-ScheduledTaskAction[\s\S]*office-mcp-daemon\.exe[\s\S]*tray/);
-  assert.match(productWxs, /Windows\\CurrentVersion\\Run/);
-  assert.match(productWxs, /MajorUpgrade[\s\S]*AllowSameVersionUpgrades="yes"/);
-  assert.match(productWxs, /office-mcp-daemon\.ps1/);
-  assert.match(productWxs, /ConfigureOfficeMcpUserState/);
-  assert.match(productWxs, /office-mcp-install-user\.ps1/);
-  assert.doesNotMatch(productWxs, /Value="\[INSTALLFOLDER\]addin-catalog"/);
-  assert.doesNotMatch(productWxs, /office-mcp-daemon\.exe&quot; tray/);
-  assert.doesNotMatch(productWxs, /office-mcp-tray\.ps1/);
   assert.deepEqual([...icon32.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.equal(icon32.readUInt32BE(16), 32);
   assert.equal(icon80.readUInt32BE(16), 80);
@@ -146,7 +139,7 @@ test('Windows localhost certificate helper lives under packaging', () => {
   assert.doesNotMatch(helper, /Import-PfxCertificate/);
 });
 
-test('GitHub release workflow publishes the Windows installer artifacts', () => {
+test('GitHub release workflow publishes only the Windows portable artifacts', () => {
   const repoRoot = join(PACKAGING_ROOT, '..');
   const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'release.yml'), 'utf8');
 
@@ -168,7 +161,7 @@ test('GitHub release workflow publishes the Windows installer artifacts', () => 
   assert.match(workflow, /Generate catalog identity review/);
   assert.match(workflow, /record-catalog-identity-review\.mjs/);
   assert.match(workflow, /catalog-identity-review\.json/);
-  assert.match(workflow, /artifacts\\msi-stage\\addin-catalog/);
+  assert.match(workflow, /artifacts\\portable-stage\\addin-catalog/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/word[\s\S]*npm ci/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/excel[\s\S]*npm ci/);
   assert.match(workflow, /working-directory:\s*src\/office-ctl\/powerpoint[\s\S]*npm ci/);
@@ -179,7 +172,7 @@ test('GitHub release workflow publishes the Windows installer artifacts', () => 
   assert.match(workflow, /Check PowerShell scripts syntax/);
   assert.match(workflow, /PSParser/);
   assert.match(workflow, /packaging\/windows\/install-windows\.ps1/);
-  assert.match(workflow, /packaging\/windows\/build-windows-msi\.ps1/);
+  assert.match(workflow, /packaging\/windows\/build-windows-portable\.ps1/);
   assert.match(workflow, /src\/office-ctl\/common\/scripts\/render-hosted-manifest\.ps1/);
   assert.match(workflow, /src\/office-ctl\/word\/scripts\/render-hosted-manifest\.ps1/);
   assert.match(workflow, /src\/office-ctl\/excel\/scripts\/render-hosted-manifest\.ps1/);
@@ -197,16 +190,15 @@ test('GitHub release workflow publishes the Windows installer artifacts', () => 
   assert.match(workflow, /Remove-Item -LiteralPath "Cert:\\CurrentUser\\My\\\$\(\$cert\.Thumbprint\)"/);
   assert.match(workflow, /Run daemon tests/);
   assert.match(workflow, /cargo test -p office-mcp-daemon/);
-  assert.match(workflow, /build-windows-msi\.ps1 -Version \$\{\{ steps\.version\.outputs\.version \}\} -SkipNpmInstall/);
+  assert.match(workflow, /build-windows-portable\.ps1 -Version \$\{\{ steps\.version\.outputs\.version \}\} -SkipNpmInstall/);
   assert.match(workflow, /git diff --check/);
-  assert.match(workflow, /office-mcp-setup-\$version-x64\.msi/);
   assert.match(workflow, /office-mcp-windows-portable-\$version-x64\.zip/);
   assert.match(workflow, /portable_zip/);
   assert.match(workflow, /README-install\.txt/);
   assert.match(workflow, /install-user\.ps1/);
   assert.match(workflow, /start-daemon\.ps1/);
   assert.match(workflow, /uninstall-user\.ps1/);
-  assert.doesNotMatch(workflow, /office-mcp-setup-0\.1\.0-x64\.msi/);
+  assert.doesNotMatch(workflow, /office-mcp-setup|\.msi|\$\{\{ steps\.stage\.outputs\.msi \}\}/i);
   assert.match(workflow, /SHA256SUMS/);
   assert.match(workflow, /Get-FileHash[\s\S]*Split-Path -Leaf \$releaseZip[\s\S]*logo-rendered-size-review\.json[\s\S]*logo-rendered-size-review\.png[\s\S]*catalog-identity-review\.json/);
   assert.match(workflow, /RELEASE_NOTES\.md/);
@@ -234,7 +226,7 @@ test('README documents installation from GitHub Releases', () => {
   assert.match(readme, /Windows desktop/i);
   assert.match(readme, /GitHub Releases/);
   assert.match(readme, /office-mcp-windows-portable-<ver>-x64\.zip/);
-  assert.match(readme, /office-mcp-setup-<ver>-x64\.msi/);
+  assert.doesNotMatch(readme, /office-mcp-setup|\.msi|MSI/i);
   assert.match(readme, /README-install\.txt/);
   assert.match(readme, /install-user\.ps1/);
   assert.match(readme, /start-daemon\.ps1/);
@@ -251,13 +243,13 @@ test('README documents installation from GitHub Releases', () => {
   assert.match(readme, /uninstall/i);
 });
 
-test('Release notes document the Windows installer pre-release gate', () => {
+test('Release notes document the Windows portable pre-release gate', () => {
   const repoRoot = join(PACKAGING_ROOT, '..');
   const releaseNotes = readFileSync(join(repoRoot, 'RELEASE_NOTES.md'), 'utf8');
 
   assert.match(releaseNotes, /# Release Notes/);
   assert.match(releaseNotes, /## 0\.1\.0/);
-  assert.match(releaseNotes, /office-mcp-setup-0\.1\.0-x64\.msi/);
+  assert.doesNotMatch(releaseNotes, /office-mcp-setup|\.msi|MSI/i);
   assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.0-x64\.zip/);
   assert.match(releaseNotes, /README-install\.txt/);
   assert.match(releaseNotes, /install-user\.ps1/);
@@ -270,6 +262,6 @@ test('Release notes document the Windows installer pre-release gate', () => {
   assert.match(releaseNotes, /Windows desktop/i);
   assert.match(releaseNotes, /Office MCP Control/);
   assert.match(releaseNotes, /tray evidence/i);
-  assert.match(releaseNotes, /installer smoke evidence/i);
+  assert.match(releaseNotes, /portable package smoke evidence/i);
   assert.match(releaseNotes, /live Office evidence/i);
 });

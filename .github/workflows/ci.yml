@@ -142,7 +142,7 @@ jobs:
       - name: Check Windows bootstrap scripts syntax
         shell: pwsh
         run: |
-          $paths = @('packaging/windows/install-windows.ps1', 'packaging/windows/uninstall-windows.ps1', 'packaging/windows/build-windows-msi.ps1', 'packaging/windows/export-localhost-dev-cert.ps1', 'packaging/homebrew/render-formula.ps1', 'src/office-ctl/word/scripts/render-hosted-manifest.ps1', 'src/office-ctl/word/scripts/build-appsource-package.ps1')
+          $paths = @('packaging/windows/install-windows.ps1', 'packaging/windows/uninstall-windows.ps1', 'packaging/windows/build-windows-portable.ps1', 'packaging/windows/export-localhost-dev-cert.ps1', 'packaging/homebrew/render-formula.ps1', 'src/office-ctl/word/scripts/render-hosted-manifest.ps1', 'src/office-ctl/word/scripts/build-appsource-package.ps1')
           foreach ($path in $paths) {
             $errors = $null
             [System.Management.Automation.PSParser]::Tokenize((Get-Content -Raw $path), [ref]$errors) | Out-Null
@@ -152,8 +152,8 @@ jobs:
             }
           }
 
-  windows-msi:
-    name: Windows MSI packaging
+  windows-portable:
+    name: Windows portable packaging
     runs-on: windows-latest
 
     steps:
@@ -199,15 +199,15 @@ jobs:
         working-directory: packaging
         run: npm run check
 
-      - name: Build MSI
+      - name: Build portable zip
         shell: pwsh
-        run: powershell -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-msi.ps1 -SkipNpmInstall
+        run: powershell -ExecutionPolicy Bypass -File .\packaging\windows\build-windows-portable.ps1 -SkipNpmInstall
 
-      - name: Verify MSI artifact
+      - name: Verify portable zip artifact
         shell: pwsh
         run: |
-          $msi = Get-Item .\artifacts\office-mcp-setup-0.1.0-x64.msi
-          if ($msi.Length -lt 1000000) {
-            throw "MSI artifact is unexpectedly small: $($msi.Length) bytes"
+          $zip = Get-Item .\artifacts\office-mcp-windows-portable-0.1.0-x64.zip
+          if ($zip.Length -lt 1000000) {
+            throw "Portable ZIP artifact is unexpectedly small: $($zip.Length) bytes"
           }
-          Write-Output "Built $($msi.FullName) ($($msi.Length) bytes)"
+          Write-Output "Built $($zip.FullName) ($($zip.Length) bytes)"

@@ -7,11 +7,11 @@ each other.
 
 | Component | What it is | Where it lives | Updated how |
 |---|---|---|---|
-| `office-mcp` | Native Rust long-running daemon from `src/office-mcp/daemon`. | `%LOCALAPPDATA%\office-mcp\` (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | MSI / Homebrew tap |
-| `office-mcp-ui` | Web UI assets owned by `src/office-mcp/daemon/src/ui`, opened from the tray and served or bridged by the daemon. | Installed beside the daemon | MSI / Homebrew tap |
+| `office-mcp` | Native Rust long-running daemon from `src/office-mcp/daemon`. | User-selected extracted folder (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | Portable zip / Homebrew tap |
+| `office-mcp-ui` | Web UI assets owned by `src/office-mcp/daemon/src/ui`, opened from the tray and served or bridged by the daemon. | Installed beside the daemon | Portable zip / Homebrew tap |
 | `office-ctl` | Office add-in bundles from `src/office-ctl`: shared `common` code plus host entries such as `word` and `excel`. | Installed beside the daemon and served from its trusted local HTTPS origin | Installer / atomic local replacement |
 | Manifest | XML / JSON describing the add-in | Sideloaded via the trusted catalog by the installer; AppSource / M365 admin push for managed deployments | See §3 |
-| Bootstrap installer | MSI / .pkg / shell script | Downloaded from GitHub Releases | Per-release |
+| Bootstrap package | Portable zip / .pkg / shell script | Downloaded from GitHub Releases | Per-release |
 
 The target source tree is:
 
@@ -50,10 +50,10 @@ source URLs and activation settings.
 5. Insert → My Add-ins → Shared Folder → office-mcp → Add.
 ```
 
-The MSI optionally creates `%LOCALAPPDATA%\office-mcp\addin-catalog\` and
-pre-registers it as a trusted catalog (with the user's explicit consent at
-install time). Host manifests live directly under the catalog root with stable
-file names such as `addin-catalog\office-mcp-word.xml`,
+The Windows portable package includes `addin-catalog\` and `install-user.ps1`
+pre-registers it as a trusted catalog when the user runs the script. Host
+manifests live directly under the catalog root with stable file names such as
+`addin-catalog\office-mcp-word.xml`,
 `addin-catalog\office-mcp-excel.xml`, and
 `addin-catalog\office-mcp-powerpoint.xml` so Word, Excel, and PowerPoint can
 appear in Office's Shared Folder add-in picker without relying on recursive
@@ -244,14 +244,14 @@ are daemon process configuration, not web add-in storage.
 
 Installation has two prerequisites: the daemon must be installed and
 autostarted by the OS, and the add-in must be registered with Office. Both
-are done by the platform installer (MSI / .pkg / brew formula); the user
+are done by the platform package (portable zip / .pkg / brew formula); the user
 should never have to hand-edit autostart entries or sideload from a developer
 console for a production install.
 
 ### 6.1 Windows
 
 The repository includes a developer bootstrap script that performs the same
-user-scoped installation shape without building an MSI:
+user-scoped installation shape from a source checkout:
 
 ```
 powershell -ExecutionPolicy Bypass -File .\packaging\windows\install-windows.ps1
@@ -268,36 +268,34 @@ be removed with:
 powershell -ExecutionPolicy Bypass -File .\packaging\windows\uninstall-windows.ps1
 ```
 
-The current MSI build is a user-scoped installer for the native Rust daemon. It
-installs `office-mcp-daemon.exe`, daemon-owned UI assets, the add-in bundle,
-catalog manifest, default `config.toml`, and launcher scripts under
-`%LOCALAPPDATA%\office-mcp\`. The launchers set `OFFICE_MCP_CONFIG_PATH` to
-that installed config. The MSI also registers the Office trusted catalog and an
-HKCU `Run` entry that starts the tray launcher at logon. A later production
-packaging pass may replace the PowerShell launcher with a native
-`office-mcp.exe`, move mutable config to `%APPDATA%\office-mcp\`, and replace
-the `Run` entry with a Scheduled Task or service wrapper.
+The current Windows release package is a user-selected portable zip for the
+native Rust daemon. It contains `office-mcp-daemon.exe`, daemon-owned UI assets,
+the Word/Excel/PowerPoint add-in bundles, catalog manifests, default
+`config.toml`, product assets, and auditable launcher/install/uninstall scripts.
+The launchers set `OFFICE_MCP_CONFIG_PATH` to the extracted config. The user-run
+`install-user.ps1` registers the Office trusted catalog and creates or exports
+the localhost certificate. MSI packaging is not a release target.
 
-The production MSI remains the release packaging target. A checked-in MSI build
-script is not enough for user distribution: release builds MUST be produced by
-GitHub Actions from an immutable version tag and published as GitHub Release
-assets so a non-developer can download and install the product without cloning
-the repository.
+The production portable zip remains the Windows release packaging target. A
+checked-in build script is not enough for user distribution: release builds MUST
+be produced by GitHub Actions from an immutable version tag and published as
+GitHub Release assets so a non-developer can download and inspect the product
+without cloning the repository.
 
 The GitHub Release pipeline MUST:
 
 - Trigger on version tags such as `v0.1.0` and support an explicit
   `workflow_dispatch` dry run for maintainers.
-- Build the Windows MSI on `windows-latest` from the tagged source using
-  `packaging/windows/build-windows-msi.ps1 -SkipNpmInstall` after installing
-  Rust, Node, WiX packaging dependencies, and all add-in dependencies.
+- Build the Windows portable zip on `windows-latest` from the tagged source using
+  `packaging/windows/build-windows-portable.ps1 -SkipNpmInstall` after installing
+  Rust, Node, and all add-in dependencies.
 - Run the packaging smoke checks, PowerShell parser checks, manifest checks,
   daemon tests needed for packaging confidence, and `git diff --check` before
   publishing any artifact.
 - Produce versioned artifacts under `artifacts/`, including
-  `office-mcp-setup-<ver>-x64.msi`, `SHA256SUMS`, and later any tarballs,
+  `office-mcp-windows-portable-<ver>-x64.zip`, `SHA256SUMS`, and later any tarballs,
   hosted manifests, or add-in bundles that become supported release outputs.
-- Verify the MSI artifact is non-empty, has the expected versioned file name,
+- Verify the portable zip artifact is non-empty, has the expected versioned file name,
   contains the native Rust daemon, daemon UI assets, shared Office add-in
   assets, Word/Excel/PowerPoint task pane bundles, generated catalog manifests,
   launcher scripts, and installer icon assets.
@@ -310,18 +308,18 @@ The GitHub Release pipeline MUST:
 - Keep signing as a separate gate: if signing secrets are unavailable, the
   pipeline may publish unsigned pre-release artifacts but MUST label them as
   unsigned and MUST still publish `SHA256SUMS`.
-- Fail rather than publish when the version in the tag, MSI file name, package
+- Fail rather than publish when the version in the tag, portable zip file name, package
   metadata, and release notes disagree.
 
 The repository README MUST include a user-facing installation guide before the
 developer setup section. The guide MUST explain how to install from GitHub
 Releases, not only how to build from source. At minimum it must cover:
 
-- Supported platform status, with Windows desktop as the v1 installer target.
-- Downloading `office-mcp-setup-<ver>-x64.msi` from the latest GitHub Release.
+- Supported platform status, with Windows desktop as the v1 portable package target.
+- Downloading `office-mcp-windows-portable-<ver>-x64.zip` from the latest GitHub Release.
 - Verifying `SHA256SUMS` when desired.
-- Running the MSI, what it installs under `%LOCALAPPDATA%\office-mcp\`, and how
-  it starts the daemon/tray at logon.
+- Extracting the portable zip, reading `README-install.txt`, running
+  `install-user.ps1`, and starting the daemon with `start-daemon.ps1`.
 - Opening the daemon UI from the tray or `office-mcp-daemon ui` and checking
   `daemon status`.
 - Restarting Office if needed, opening Word/Excel/PowerPoint, and adding
@@ -330,24 +328,24 @@ Releases, not only how to build from source. At minimum it must cover:
 - Configuring MCP clients to use `http://127.0.0.1:8800/mcp` or the configured
   endpoint.
 - Where logs live and how to collect them for debugging.
-- How to uninstall from Windows Apps & Features or by removing the MSI-installed
-  package, including the separate Office add-in removal caveat.
+- How to uninstall with `uninstall-user.ps1` and delete the extracted folder,
+  including the separate Office add-in removal caveat.
 
 The Windows user flow remains:
 
-1. User installs `office-mcp-setup-x64.msi`. The installer:
-   - Drops the native Rust daemon executable to `%LOCALAPPDATA%\office-mcp\`.
+1. User extracts `office-mcp-windows-portable-<ver>-x64.zip`. The package:
+   - Places the native Rust daemon executable in the selected extracted folder.
    - Installs the generated product logo, tray icon, add-in command icons, and
      main-window UI assets.
    - Verifies the installed add-in catalog resolves product metadata and icon
      paths for Word, Excel, and PowerPoint before declaring installation
      complete once each host is packaged.
    - Installs the static add-in bundle beside the daemon.
-   - Exports a current-user trusted localhost certificate on first daemon start;
-     it does not import root certificates.
+   - Exports or creates a current-user trusted localhost certificate when the
+     user runs `install-user.ps1`; it does not require an opaque installer step.
    - Writes a default `config.toml` and points the launcher at it with
      `OFFICE_MCP_CONFIG_PATH`.
-   - Registers an autostart entry for the daemon launcher.
+   - Provides explicit launcher scripts for daemon startup.
    - Registers an add-in trusted catalog folder under
      `%LOCALAPPDATA%\office-mcp\addin-catalog\` and drops the Word, Excel, and
      PowerPoint manifests directly under that catalog root once each host is
@@ -427,7 +425,7 @@ or probe commands:
 
 ## 8. Uninstall
 
-`office-mcp uninstall` (or the MSI's uninstall) removes:
+`uninstall-user.ps1` removes:
 
 - Binaries
 - Scheduled task / launchd plist
@@ -443,7 +441,7 @@ The add-in must be removed separately via Office's add-in manager
 | File | Purpose |
 |---|---|
 | `office-mcp-<ver>-x64.exe` | Standalone Windows binary |
-| `office-mcp-setup-<ver>-x64.msi` | Windows MSI installer |
+| `office-mcp-windows-portable-<ver>-x64.zip` | Windows portable package |
 | `office-mcp-<ver>-x64.tar.gz` | Linux/macOS tarball |
 | `office-mcp-<ver>-aarch64-darwin.tar.gz` | Apple Silicon |
 | `manifest-<ver>.xml` | XML manifest for sideload |
