@@ -255,7 +255,7 @@ run:
 
 ```powershell
 npm run evidence:word
-npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-word.json --require-mutation --require-full-word-smoke --require-com-tracked-changes
+npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-word.json
 ```
 
 For live tool-level E2E evidence, enable the live driver and run one host loop
@@ -302,12 +302,11 @@ npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-word
 For a connected Excel workbook, run:
 
 ```powershell
-# Optional when the daemon MCP port is not 8800:
-# $env:OFFICE_MCP_MCP_ENDPOINT = 'http://127.0.0.1:8801/mcp'
-npm run evidence:excel
-npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-excel.json --require-excel-smoke
-npm run evidence:powerpoint
-npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-powerpoint.json --require-powerpoint-smoke
+cd ..\..\office-ctl\excel
+$env:OFFICE_MCP_RUN_E2E = '1'
+npm run e2e:tools
+cd ..\powerpoint
+npm run e2e:tools
 ```
 
 Against a representative protected document, add `--irm-document-path` for a
@@ -322,7 +321,7 @@ npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-irm.
 For another protected document, use the explicit form:
 
 ```powershell
-npm run evidence:runtime -- --endpoint http://127.0.0.1:8800/mcp --output ..\..\..\..\artifacts\runtime-evidence-irm.json --include-mutation --irm-document-path "C:\path\to\protected.docx" --irm-mode protected-read --wait-for-session-ms 120000
+npm run evidence:runtime -- --endpoint http://127.0.0.1:8800/mcp --output ..\..\..\..\artifacts\runtime-evidence-irm.json --irm-document-path "C:\path\to\protected.docx" --irm-mode protected-read --wait-for-session-ms 120000
 npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-irm.json --require-irm-preflight --require-irm
 ```
 

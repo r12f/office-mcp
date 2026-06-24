@@ -54,85 +54,6 @@ const requiredSurfaces = [
   'tray_quit_confirmation'
 ];
 
-const excelV1Tools = [
-  'excel.get_workbook_info',
-  'excel.list_sheets',
-  'excel.add_sheet',
-  'excel.update_sheet',
-  'excel.delete_sheet',
-  'excel.get_used_range',
-  'excel.read_range',
-  'excel.write_range',
-  'excel.clear_range',
-  'excel.find_replace_cells',
-  'excel.set_formula',
-  'excel.format_range',
-  'excel.sort_range',
-  'excel.apply_filter',
-  'excel.create_table',
-  'excel.update_table',
-  'excel.create_chart',
-  'excel.update_chart',
-  'excel.create_pivot_table',
-  'excel.update_pivot_table'
-];
-
-const powerPointV1Tools = [
-  'powerpoint.get_presentation_info',
-  'powerpoint.get_active_view',
-  'powerpoint.export_file',
-  'powerpoint.update_tags',
-  'powerpoint.list_slides',
-  'powerpoint.add_slide',
-  'powerpoint.update_slide',
-  'powerpoint.delete_slide',
-  'powerpoint.move_slide',
-  'powerpoint.export_slide',
-  'powerpoint.list_layouts',
-  'powerpoint.apply_layout',
-  'powerpoint.get_selection',
-  'powerpoint.set_selection',
-  'powerpoint.list_shapes',
-  'powerpoint.add_text_box',
-  'powerpoint.add_shape',
-  'powerpoint.insert_image',
-  'powerpoint.update_shape',
-  'powerpoint.read_text',
-  'powerpoint.replace_text',
-  'powerpoint.format_text',
-  'powerpoint.add_table',
-  'powerpoint.read_table',
-  'powerpoint.update_table'
-];
-
-const wordV1Tools = [
-  'word.get_text',
-  'word.get_outline',
-  'word.get_paragraph',
-  'word.find_text',
-  'word.get_selection',
-  'word.insert_paragraph',
-  'word.insert_table',
-  'word.insert_image',
-  'word.insert_page_break',
-  'word.insert_list',
-  'word.replace_text',
-  'word.update_paragraph',
-  'word.delete_range',
-  'word.apply_formatting',
-  'word.apply_style',
-  'word.read_table',
-  'word.update_table',
-  'word.list_content_controls',
-  'word.insert_content_control',
-  'word.update_content_control',
-  'word.delete_content_control',
-  'word.add_comment',
-  'word.resolve_comment',
-  'word.update_tracked_change',
-  'word.save'
-];
-
 const observations = Object.fromEntries(requiredSurfaces.map((surface) => [surface, observationFor(surface)]));
 const screenshotPaths = Object.fromEntries(requiredSurfaces.map((surface) => [surface, screenshotPathFor(surface)]));
 const screenshotsExist = Object.fromEntries(
@@ -586,102 +507,23 @@ function renderedLogoSurfaceSpecs(): Array<[string, number]> {
 }
 
 function readExcelRuntimeEvidence(path: string): Record<string, unknown> {
-  try {
-    const report = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
-    const gates = Array.isArray(report.gates) ? report.gates.filter(isRecord) : [];
-    const discovery = gates.find((gate) => gate.name === 'word.session_discovery' && gate.status === 'passed');
-    const smoke = gates.find((gate) => gate.name === 'excel.runtime_smoke' && gate.status === 'passed');
-    const session = excelSessionFromDiscovery(discovery, smoke);
-    const details = isRecord(smoke?.details) ? smoke.details : undefined;
-    return {
-      path,
-      ok: true,
-      schema_version: report.schema_version,
-      endpoint: report.endpoint,
-      generated_at: report.generated_at,
-      session,
-      smoke_details: details,
-      smoke_passed: Boolean(smoke),
-      ready: excelRuntimeDetailsLookReady(session, details)
-    };
-  } catch (error) {
-    return { path, ok: false, error: error instanceof Error ? error.message : String(error) };
-  }
-}
-
-function excelSessionFromDiscovery(discovery: Record<string, unknown> | undefined, smoke: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
-  const smokeDetails = isRecord(smoke?.details) ? smoke.details : undefined;
-  const smokeSessionId = typeof smokeDetails?.session_id === 'string' ? smokeDetails.session_id : undefined;
-  const discoveryDetails = isRecord(discovery?.details) ? discovery.details : undefined;
-  const sessions = Array.isArray(discoveryDetails?.sessions) ? discoveryDetails.sessions.filter(isRecord) : [];
-  return sessions.find((session) => session.app === 'excel' && (!smokeSessionId || session.session_id === smokeSessionId));
-}
-
-function excelRuntimeEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
-  if (!evidence) return false;
-  return evidence.ok === true && evidence.schema_version === 1 && evidence.smoke_passed === true && evidence.ready === true;
+  return readHostRuntimeEvidence('excel', path);
 }
 
 function readWordRuntimeEvidence(path: string): Record<string, unknown> {
-  try {
-    const report = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
-    const gates = Array.isArray(report.gates) ? report.gates.filter(isRecord) : [];
-    const discovery = gates.find((gate) => gate.name === 'word.session_discovery' && gate.status === 'passed');
-    const readSmoke = gates.find((gate) => gate.name === 'word.runtime_read_smoke' && gate.status === 'passed');
-    const mutationSmoke = gates.find((gate) => gate.name === 'word.runtime_mutation_smoke' && gate.status === 'passed');
-    const fullSmokePassed = ['word-core', 'word-formatting', 'word-review', 'word-resources', 'word-spec-args']
-      .every((mode) => gates.some((gate) => gate.name === `word.full_smoke.${mode}` && gate.status === 'passed'));
-    const comTrackedChangePassed = ['accept', 'reject']
-      .every((action) => gates.some((gate) => gate.name === `word.tracked_change_com.${action}` && gate.status === 'passed'));
-    const session = wordSessionFromDiscovery(discovery, report.session_id);
-    const readDetails = isRecord(readSmoke?.details) ? readSmoke.details : undefined;
-    const mutationDetails = isRecord(mutationSmoke?.details) ? mutationSmoke.details : undefined;
-    const details = {
-      session_id: report.session_id,
-      available_tool_count: readDetails?.available_tool_count,
-      available_tools: readDetails?.available_tools,
-      paragraph_0_text_length: readDetails?.paragraph_0_text_length,
-      document_text_length: readDetails?.document_text_length,
-      find_count: mutationDetails?.find_count,
-      full_smoke_passed: fullSmokePassed,
-      com_tracked_change_passed: comTrackedChangePassed
-    };
-    return {
-      path,
-      ok: true,
-      schema_version: report.schema_version,
-      endpoint: report.endpoint,
-      generated_at: report.generated_at,
-      session,
-      smoke_details: details,
-      smoke_passed: Boolean(readSmoke && mutationSmoke && fullSmokePassed && comTrackedChangePassed),
-      ready: wordRuntimeDetailsLookReady(session, details)
-    };
-  } catch (error) {
-    return { path, ok: false, error: error instanceof Error ? error.message : String(error) };
-  }
-}
-
-function wordSessionFromDiscovery(discovery: Record<string, unknown> | undefined, reportSessionId: unknown): Record<string, unknown> | undefined {
-  const discoveryDetails = isRecord(discovery?.details) ? discovery.details : undefined;
-  const sessions = Array.isArray(discoveryDetails?.sessions) ? discoveryDetails.sessions.filter(isRecord) : [];
-  const sessionId = typeof reportSessionId === 'string' ? reportSessionId : undefined;
-  return sessions.find((session) => session.app === 'word' && (!sessionId || session.session_id === sessionId));
-}
-
-function wordRuntimeEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
-  if (!evidence) return false;
-  return evidence.ok === true && evidence.schema_version === 1 && evidence.smoke_passed === true && evidence.ready === true;
+  return readHostRuntimeEvidence('word', path);
 }
 
 function readPowerPointRuntimeEvidence(path: string): Record<string, unknown> {
+  return readHostRuntimeEvidence('powerpoint', path);
+}
+
+function readHostRuntimeEvidence(app: 'word' | 'excel' | 'powerpoint', path: string): Record<string, unknown> {
   try {
     const report = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
     const gates = Array.isArray(report.gates) ? report.gates.filter(isRecord) : [];
     const discovery = gates.find((gate) => gate.name === 'word.session_discovery' && gate.status === 'passed');
-    const smoke = gates.find((gate) => gate.name === 'powerpoint.runtime_smoke' && gate.status === 'passed');
-    const session = powerPointSessionFromDiscovery(discovery, smoke);
-    const details = isRecord(smoke?.details) ? smoke.details : undefined;
+    const session = hostSessionFromDiscovery(discovery, app, report.session_id);
     return {
       path,
       ok: true,
@@ -689,28 +531,44 @@ function readPowerPointRuntimeEvidence(path: string): Record<string, unknown> {
       endpoint: report.endpoint,
       generated_at: report.generated_at,
       session,
-      smoke_details: details,
-      smoke_passed: Boolean(smoke),
-      ready: powerPointRuntimeDetailsLookReady(session, details)
+      ready: runtimeSessionLooksReady(app, session)
     };
   } catch (error) {
     return { path, ok: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
-function powerPointSessionFromDiscovery(discovery: Record<string, unknown> | undefined, smoke: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
-  const smokeDetails = isRecord(smoke?.details) ? smoke.details : undefined;
-  const smokeSessionId = typeof smokeDetails?.session_id === 'string' ? smokeDetails.session_id : undefined;
+function hostSessionFromDiscovery(discovery: Record<string, unknown> | undefined, app: 'word' | 'excel' | 'powerpoint', reportSessionId: unknown): Record<string, unknown> | undefined {
   const discoveryDetails = isRecord(discovery?.details) ? discovery.details : undefined;
   const sessions = Array.isArray(discoveryDetails?.sessions) ? discoveryDetails.sessions.filter(isRecord) : [];
-  return sessions.find((session) => session.app === 'powerpoint' && (!smokeSessionId || session.session_id === smokeSessionId));
+  const sessionId = typeof reportSessionId === 'string' ? reportSessionId : undefined;
+  return sessions.find((session) => session.app === app && (!sessionId || session.session_id === sessionId));
+}
+
+function runtimeSessionLooksReady(app: 'word' | 'excel' | 'powerpoint', session: Record<string, unknown> | undefined): boolean {
+  if (!session) return false;
+  const document = isRecord(session.document) ? session.document : undefined;
+  const host = isRecord(session.host) ? session.host : undefined;
+  return session.app === app
+    && session.status === 'active'
+    && typeof session.session_id === 'string'
+    && session.session_id.length > 0
+    && typeof document?.title === 'string'
+    && document.title.length > 0
+    && host?.app === app;
+}
+
+function excelRuntimeEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
+  return Boolean(evidence && evidence.ok === true && evidence.schema_version === 1 && evidence.ready === true);
+}
+
+function wordRuntimeEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
+  return Boolean(evidence && evidence.ok === true && evidence.schema_version === 1 && evidence.ready === true);
 }
 
 function powerPointRuntimeEvidenceLooksReady(evidence: Record<string, unknown> | undefined): boolean {
-  if (!evidence) return false;
-  return evidence.ok === true && evidence.schema_version === 1 && evidence.smoke_passed === true && evidence.ready === true;
+  return Boolean(evidence && evidence.ok === true && evidence.schema_version === 1 && evidence.ready === true);
 }
-
 function readOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', path: string): Record<string, unknown> {
   try {
     const report = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
@@ -808,114 +666,8 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
-function exactToolCatalogReady(count: unknown, tools: unknown, expected: string[]): boolean {
-  return count === expected.length && sameStrings(stringArray(tools), expected);
-}
-
 function sameStrings(left: string[], right: string[]): boolean {
   return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
-}
-
-function powerPointRuntimeDetailsLookReady(session: Record<string, unknown> | undefined, details: Record<string, unknown> | undefined): boolean {
-  if (!session || !details) return false;
-  const document = isRecord(session.document) ? session.document : undefined;
-  const host = isRecord(session.host) ? session.host : undefined;
-  const exportSupported = details.export_supported === true && details.export_mime_type === 'application/pdf' && typeof details.export_size === 'number';
-  const exportHostRejection = details.export_host_rejection === true;
-  const tableSupported = details.table_supported === true && isRecord(details.add_table) && typeof details.add_table.shape_id === 'string' && isRecord(details.read_table);
-  const tableHostRejection = details.table_host_rejection === true;
-  const categoryProofs = isRecord(details.tool_category_proofs) ? details.tool_category_proofs : undefined;
-  return session.app === 'powerpoint'
-    && session.status === 'active'
-    && typeof session.session_id === 'string'
-    && typeof details.session_id === 'string'
-    && session.session_id === details.session_id
-    && typeof document?.title === 'string'
-    && document.title.length > 0
-    && host?.app === 'powerpoint'
-    && exactToolCatalogReady(session.available_tool_count, details.available_tools, powerPointV1Tools)
-    && details.mutation_proved === true
-    && categoryProofs?.presentation === true
-    && categoryProofs?.slides === true
-    && categoryProofs?.layout === true
-    && categoryProofs?.shapes === true
-    && categoryProofs?.text === true
-    && categoryProofs?.tables === true
-    && isRecord(details.presentation_info)
-    && isRecord(details.active_view)
-    && isRecord(details.list_slides)
-    && isRecord(details.add_slide)
-    && typeof details.add_slide.slide_id === 'string'
-    && isRecord(details.add_text_box)
-    && isRecord(details.add_text_box.shape)
-    && isRecord(details.list_shapes)
-    && Array.isArray(details.list_shapes.shapes)
-    && isRecord(details.read_text)
-    && Array.isArray(details.read_text.items)
-    && isRecord(details.replace_text)
-    && Number(details.replace_text.replacements ?? 0) >= 1
-    && isRecord(details.format_text)
-    && details.format_text.formatted === true
-    && isRecord(details.layout)
-    && typeof details.layout.slide_id === 'string'
-    && isRecord(details.list_layouts)
-    && Array.isArray(details.list_layouts.masters)
-    && (tableSupported || tableHostRejection)
-    && (exportSupported || exportHostRejection);
-}
-
-function excelRuntimeDetailsLookReady(session: Record<string, unknown> | undefined, details: Record<string, unknown> | undefined): boolean {
-  if (!session || !details) return false;
-  const document = isRecord(session.document) ? session.document : undefined;
-  const host = isRecord(session.host) ? session.host : undefined;
-  return session.app === 'excel'
-    && session.status === 'active'
-    && typeof session.session_id === 'string'
-    && typeof details.session_id === 'string'
-    && session.session_id === details.session_id
-    && typeof document?.title === 'string'
-    && document.title.length > 0
-    && host?.app === 'excel'
-    && exactToolCatalogReady(session.available_tool_count, details.available_tools, excelV1Tools)
-    && details.marker_found === true
-    && isRecord(details.workbook_info)
-    && typeof details.sheet_list_count === 'number'
-    && isRecord(details.updated_sheet)
-    && isRecord(details.deleted_sheet) && details.deleted_sheet.deleted === true
-    && isRecord(details.used_range)
-    && isRecord(details.find_replace)
-    && isRecord(details.clear)
-    && isRecord(details.write) && details.write.wrote_values === true
-    && isRecord(details.formula) && details.formula.wrote_formula === true
-    && isRecord(details.format) && details.format.formatted === true
-    && isRecord(details.table) && typeof details.table.table === 'string'
-    && isRecord(details.table_update)
-    && isRecord(details.sort) && details.sort.sorted === true
-    && isRecord(details.filter) && details.filter.filtered === true
-    && isRecord(details.chart) && typeof details.chart.chart === 'string'
-    && isRecord(details.chart_update) && details.chart_update.updated === true
-    && isRecord(details.pivot_table) && typeof details.pivot_table.pivot_table === 'string'
-    && isRecord(details.pivot_update) && details.pivot_update.refreshed === true
-    && isRecord(details.sheet) && details.sheet.activated === true;
-}
-
-function wordRuntimeDetailsLookReady(session: Record<string, unknown> | undefined, details: Record<string, unknown> | undefined): boolean {
-  if (!session || !details) return false;
-  const document = isRecord(session.document) ? session.document : undefined;
-  const host = isRecord(session.host) ? session.host : undefined;
-  return session.app === 'word'
-    && session.status === 'active'
-    && typeof session.session_id === 'string'
-    && typeof document?.title === 'string'
-    && document.title.length > 0
-    && host?.app === 'word'
-    && exactToolCatalogReady(session.available_tool_count, details.available_tools, wordV1Tools)
-    && details.available_tool_count === wordV1Tools.length
-    && Number(details.paragraph_0_text_length ?? 0) > 0
-    && Number(details.document_text_length ?? 0) > 0
-    && Number(details.find_count ?? 0) >= 1
-    && details.full_smoke_passed === true
-    && details.com_tracked_change_passed === true;
 }
 
 function readManualTrayEvidence(path: string): Record<string, unknown> {

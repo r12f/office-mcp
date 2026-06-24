@@ -541,9 +541,9 @@ Automated evidence exists at two levels:
 
 - Rust daemon/unit evidence proves the Excel tool catalog is listed and that
   MCP calls are forwarded to an Excel add-in session.
-- Runtime evidence supports a live workbook smoke with
-  `npm run evidence:excel` from `src/office-mcp/daemon/evidence`, validated with
-  `npm run evidence:validate -- --require-excel-smoke`.
+- Office tool E2E evidence runs the complete Excel tool catalog in one live
+  workbook session with `npm run e2e:tools` from `src/office-ctl/excel` and
+  writes `artifacts/office-tool-e2e-excel.json`.
 
-Completion of the live Excel gate requires a connected Excel workbook and a
-passed `excel.runtime_smoke` report.
+Completion of the live Excel gate requires a passed `office_tool_e2e_report`
+validated by `npm run evidence:validate -- --require-office-tool-e2e`.

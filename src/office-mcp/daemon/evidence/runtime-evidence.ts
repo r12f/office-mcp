@@ -1,7 +1,7 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync, spawnSync } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -24,48 +24,15 @@ type EvidenceReport = {
   gates: EvidenceGate[];
 };
 
-type OfficeE2eDriverContext = Record<string, unknown>;
-
-type OfficeE2eSessionContext = {
-  daemon?: OfficeE2eDriverContext;
-  document?: OfficeE2eDriverContext;
-};
-
-type OfficeE2eHost = 'Word' | 'Excel' | 'PowerPoint';
-
 const evidenceRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(evidenceRoot, '../../../..');
-const tsxCli = resolve(evidenceRoot, 'node_modules/tsx/dist/cli.mjs');
-const defaultOfficeE2eDriver = resolve(repoRoot, 'src/office-ctl/common/test/office-e2e-driver.mjs');
-const officeE2eDriverPath = resolve(readOption('--office-e2e-driver') ?? process.env.OFFICE_MCP_E2E_DRIVER ?? defaultOfficeE2eDriver);
 const endpoint = readOption('--endpoint') ?? process.env.OFFICE_MCP_MCP_ENDPOINT ?? 'http://127.0.0.1:8800/mcp';
 const outputPath = resolve(readOption('--output') ?? join(repoRoot, 'artifacts/runtime-evidence.json'));
 const requestedSessionId = readOption('--session-id');
-const includeMutation = hasFlag('--include-mutation');
-const includeFullWordSmoke = hasFlag('--include-full-word-smoke');
-const useWordE2eSession = hasFlag('--word-e2e-session');
-const includeExcelSmoke = hasFlag('--include-excel-smoke');
-const useExcelE2eSession = hasFlag('--excel-e2e-session');
-const includePowerPointSmoke = hasFlag('--include-powerpoint-smoke');
-const usePowerPointE2eSession = hasFlag('--powerpoint-e2e-session');
-const includeComTrackedChanges = hasFlag('--include-com-tracked-changes');
-const includeTrackedChanges = hasFlag('--include-tracked-changes');
 const irmMode = readOption('--irm-mode') ?? 'none';
 const irmDocumentPath = readOption('--irm-document-path') ?? process.env.OFFICE_MCP_IRM_DOCUMENT_PATH;
 const waitForSessionMs = intOption('--wait-for-session-ms', 0);
 const agentClientEvidencePath = readOption('--agent-client-evidence-path') ?? process.env.OFFICE_MCP_AGENT_CLIENT_EVIDENCE_PATH;
-let wordSmokeDocumentUrl = process.env.OFFICE_MCP_SMOKE_DOCUMENT_URL ?? '';
-const wantsWordRuntime = Boolean(
-  requestedSessionId ||
-  irmDocumentPath ||
-  includeMutation ||
-  includeFullWordSmoke ||
-  includeComTrackedChanges ||
-  includeTrackedChanges ||
-  irmMode !== 'none' ||
-  agentClientEvidencePath
-);
-const wantsWordBaseline = !(includeExcelSmoke || includePowerPointSmoke) || wantsWordRuntime;
 
 const report: EvidenceReport = {
   schema_version: 1,
@@ -86,26 +53,14 @@ try {
     const waitResult = await runWaitForSessionGate(irmDocumentPath, waitForSessionMs);
     sessions = Array.isArray(waitResult.sessions) ? waitResult.sessions as Array<Record<string, unknown>> : sessions;
   }
-  if (includeExcelSmoke && !useExcelE2eSession && waitForSessionMs > 0 && !selectHostSessionId(sessions, 'excel')) {
-    const waitResult = await runWaitForHostSessionGate('excel', waitForSessionMs);
-    sessions = Array.isArray(waitResult.sessions) ? waitResult.sessions as Array<Record<string, unknown>> : sessions;
-  }
-  if (includePowerPointSmoke && !usePowerPointE2eSession && waitForSessionMs > 0 && !selectHostSessionId(sessions, 'powerpoint')) {
-    const waitResult = await runWaitForHostSessionGate('powerpoint', waitForSessionMs);
-    sessions = Array.isArray(waitResult.sessions) ? waitResult.sessions as Array<Record<string, unknown>> : sessions;
-  }
-  let sessionId = wantsWordBaseline ? requestedSessionId ?? selectWordSessionId(sessions, irmDocumentPath) : '';
-  const excelSessionId = selectHostSessionId(sessions, 'excel');
-  const powerPointSessionId = selectHostSessionId(sessions, 'powerpoint');
+
+  const sessionId = requestedSessionId ?? selectWordSessionId(sessions, irmDocumentPath);
   if (sessionId) report.session_id = sessionId;
 
-  if (useWordE2eSession) {
-    sessionId = await runWordE2eSessionSmoke();
-  } else if (!sessionId && wantsWordBaseline) {
+  if (!sessionId) {
     const reason = irmDocumentPath
       ? `No connected Word add-in session matched the requested IRM document path: ${irmDocumentPath}. Open that document and open Office MCP Control, then rerun this script.`
       : 'No connected Word add-in session. Open Word, open Office MCP Control, then rerun this script.';
-    addGate('word.runtime_smoke', 'blocked_by_runtime', { reason });
     addGate('agent_client_stdio_bridge', 'blocked_by_runtime', {
       reason: 'No connected Word add-in session to prove an agent client can call MCP.'
     });
@@ -114,31 +69,12 @@ try {
     addGate('irm_rights_matrix', 'blocked_by_runtime', {
       reason: irmDocumentPath ? reason : 'No connected IRM-protected Word session was provided.'
     });
-  } else if (sessionId) {
-    await runWordReadGate(sessionId);
-    if (includeMutation) await runWordMutationGate(sessionId);
-    if (includeFullWordSmoke) await runFullWordSmokeGate(sessionId);
+  } else {
     await runAgentClientBridgeGate(sessionId);
     await runClaudeDesktopInstallationGate();
     await runAgentClientPromptGate(agentClientEvidencePath);
-    if (includeTrackedChanges) await runTrackedChangeGate(sessionId);
-    if (includeComTrackedChanges) await runComTrackedChangeGate(sessionId);
     await runIrmGate(sessionId, irmMode, undefined, irmDocumentPath);
     if (irmDocumentPath) await runIrmDocumentPreflightGate(irmDocumentPath);
-  }
-  if (includeExcelSmoke) {
-    if (useExcelE2eSession) await runExcelE2eSessionSmoke();
-    else if (excelSessionId) await runExcelSmokeGate(excelSessionId);
-    else addGate('excel.runtime_smoke', 'blocked_by_runtime', {
-      reason: 'No connected Excel add-in session. Open Excel, open Office MCP Control, then rerun this script.'
-    });
-  }
-  if (includePowerPointSmoke) {
-    if (usePowerPointE2eSession) await runPowerPointE2eSessionSmoke();
-    else if (powerPointSessionId) await runPowerPointSmokeGate(powerPointSessionId);
-    else addGate('powerpoint.runtime_smoke', 'blocked_by_runtime', {
-      reason: 'No connected PowerPoint add-in session. Open PowerPoint, open Office MCP Control, then rerun this script.'
-    });
   }
 } catch (error) {
   addGate('runtime_evidence_harness', 'failed', { error: errorMessage(error) });
@@ -147,17 +83,6 @@ try {
   mkdirSync(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
-}
-
-async function runFullWordSmokeGate(sessionId: string): Promise<void> {
-  const modes = ['word-core', 'word-formatting', 'word-review', 'word-resources', 'word-spec-args'];
-  for (const mode of modes) {
-    await runGate(`word.full_smoke.${mode}`, async () => {
-      const output = runSmokeMode(mode, sessionId);
-      const parsed = JSON.parse(output) as Record<string, unknown>;
-      return { mode, output_bytes: Buffer.byteLength(output, 'utf8'), summary_keys: Object.keys(parsed) };
-    });
-  }
 }
 
 async function runSessionDiscoveryGate(): Promise<Record<string, unknown>> {
@@ -186,486 +111,6 @@ async function listSessionsDetails(): Promise<Record<string, unknown>> {
   return { sessions, session_count: sessions.length };
 }
 
-async function runComTrackedChangeGate(sessionId: string): Promise<void> {
-  for (const action of ['accept', 'reject']) {
-    await runGate(`word.tracked_change_com.${action}`, async () => {
-      const output = runSmokeMode('word-track-change-com', sessionId, action);
-      const parsed = JSON.parse(output) as { mutation?: { skipped?: boolean; action?: string } };
-      if (parsed.mutation?.skipped) throw new Error(`Tracked-change COM ${action} smoke skipped mutation.`);
-      return { action, output_bytes: Buffer.byteLength(output, 'utf8'), mutation_action: parsed.mutation?.action };
-    });
-  }
-}
-
-async function runWordReadGate(sessionId: string): Promise<void> {
-  await runGate('word.runtime_read_smoke', async () => {
-    const info = toolData(await client.callTool({ name: 'office.get_session_info', arguments: { session_id: sessionId } }));
-    const paragraph = toolData(await client.callTool({ name: 'word.get_paragraph', arguments: { session_id: sessionId, index: 0 } }));
-    const document = resourceData(await client.readResource({ uri: `office://word/${sessionId}/document?offset=0&limit=5` }));
-    return {
-      document_title: (info.document as { title?: string } | undefined)?.title,
-      available_tool_count: Array.isArray(info.available_tools) ? info.available_tools.length : undefined,
-      available_tools: Array.isArray(info.available_tools) ? info.available_tools.map(String) : undefined,
-      paragraph_0_text_length: String(paragraph.text ?? '').length,
-      document_text_length: String(document.text ?? '').length
-    };
-  });
-}
-
-async function runWordMutationGate(sessionId: string): Promise<void> {
-  await runGate('word.runtime_mutation_smoke', async () => {
-    const marker = `office-mcp runtime evidence ${Date.now()}`;
-    const insert = await client.callTool({
-      name: 'word.insert_paragraph',
-      arguments: { session_id: sessionId, text: marker, anchor: { kind: 'end_of_document' }, style: 'Normal' }
-    });
-    const find = toolData(await client.callTool({ name: 'word.find_text', arguments: { session_id: sessionId, query: marker, limit: 5 } }));
-    if (Number(find.count ?? 0) < 1) throw new Error('Inserted mutation marker was not found after insertion.');
-    return { marker, insert: toolData(insert), find_count: find.count };
-  });
-}
-
-async function runWaitForHostSessionGate(hostApp: string, timeoutMs: number): Promise<Record<string, unknown>> {
-  return await runGate(`${hostApp}.wait_for_session`, async () => {
-    const started = Date.now();
-    let latest: Record<string, unknown> = { sessions: [], session_count: 0 };
-    while (Date.now() - started <= timeoutMs) {
-      latest = await listSessionsDetails();
-      const sessions = Array.isArray(latest.sessions) ? latest.sessions as Array<Record<string, unknown>> : [];
-      const sessionId = selectHostSessionId(sessions, hostApp);
-      if (sessionId) return { ...latest, matched_session_id: sessionId, waited_ms: Date.now() - started };
-      await sleep(1000);
-    }
-    throw new Error(`Timed out waiting ${timeoutMs} ms for an active ${hostApp} session.`);
-  });
-}
-
-async function runExcelSmokeGate(sessionId: string): Promise<void> {
-  await runGate('excel.runtime_smoke', async () => {
-    const runId = Date.now();
-    const marker = `OfficeMCP${runId}`;
-    const sheetName = `Mcp${runId}`;
-    const renamedSheetName = `McpR${runId}`;
-    const cleanupSheetName = `McpC${runId}`;
-    const tableName = `OfficeMcpTable${runId}`;
-    const chartTitle = 'Office MCP Smoke Updated';
-    const pivotName = `OfficeMcpPivot${runId}`;
-    const info = await callToolData('office.get_session_info', { session_id: sessionId });
-    const availableTools = Array.isArray(info.available_tools) ? info.available_tools.map(String) : [];
-    const workbookInfo = await callToolData('excel.get_workbook_info', { session_id: sessionId });
-    const sheetListBefore = await callToolData('excel.list_sheets', { session_id: sessionId });
-    const sheet = await callToolData('excel.add_sheet', {
-      session_id: sessionId,
-      name: sheetName,
-      activate: true
-    });
-    const updatedSheet = await callToolData('excel.update_sheet', {
-      session_id: sessionId,
-      sheet: sheetName,
-      name: renamedSheetName,
-      tab_color: '#4472C4',
-      activate: true
-    });
-    const cleanupSheet = await callToolData('excel.add_sheet', {
-      session_id: sessionId,
-      name: cleanupSheetName,
-      activate: false
-    });
-    const deletedSheet = await callToolData('excel.delete_sheet', {
-      session_id: sessionId,
-      sheet: cleanupSheetName
-    });
-    const readBefore = await callToolData('excel.read_range', { session_id: sessionId, sheet: renamedSheetName, address: 'A1:B2' });
-    const write = await callToolData('excel.write_range', {
-      session_id: sessionId,
-      sheet: renamedSheetName,
-      address: 'A1:C5',
-      values: [
-        ['Label', 'Region', 'Value'],
-        [marker, 'West', 42],
-        [`${marker}B`, 'East', 24],
-        [`${marker}C`, 'West', 12],
-        ['Total', 'All', 0]
-      ]
-    });
-    const formula = await callToolData('excel.set_formula', { session_id: sessionId, sheet: renamedSheetName, address: 'C5', formula: '=SUM(C2:C4)' });
-    const format = await callToolData('excel.format_range', {
-      session_id: sessionId,
-      sheet: renamedSheetName,
-      address: 'A1:C5',
-      bold: true,
-      fill_color: '#DDEEFF',
-      number_format: 'General',
-      horizontal_alignment: 'center',
-      wrap_text: true
-    });
-    const usedRange = await callToolData('excel.get_used_range', {
-      session_id: sessionId,
-      sheet: renamedSheetName
-    });
-    const findReplace = await callToolData('excel.find_replace_cells', {
-      session_id: sessionId,
-      sheet: renamedSheetName,
-      address: 'A1:C5',
-      query: marker,
-      replacement: `${marker}Updated`,
-      complete_match: false,
-      match_case: true
-    });
-    const clear = await callToolData('excel.clear_range', {
-      session_id: sessionId,
-      sheet: renamedSheetName,
-      address: 'D1:D1',
-      apply_to: 'contents'
-    });
-    const table = await callToolData('excel.create_table', {
-      session_id: sessionId,
-      sheet: renamedSheetName,
-      address: 'A1:C5',
-      has_headers: true,
-      name: tableName
-    });
-    const tableUpdate = await callToolData('excel.update_table', {
-      session_id: sessionId,
-      table: tableName,
-      action: 'options',
-      show_filter_button: true,
-      show_banded_rows: true,
-      style: 'TableStyleMedium2'
-    });
-    const sort = await callToolData('excel.sort_range', {
-      session_id: sessionId,
-      target_type: 'table',
-      table: tableName,
-      fields: [{ key: 2, ascending: false }]
-    });
-    const filter = await callToolData('excel.apply_filter', {
-      session_id: sessionId,
-      target_type: 'table',
-      table: tableName,
-      column: 'Region',
-      criteria: { filter_on: 'values', values: ['West', 'All'] }
-    });
-    const chart = await callToolData('excel.create_chart', {
-      session_id: sessionId,
-      sheet: renamedSheetName,
-      address: 'A1:C5',
-      type: 'columnClustered',
-      title: 'Office MCP Smoke'
-    });
-    const chartName = String(chart.chart ?? '');
-    const chartUpdate = await callToolData('excel.update_chart', {
-      session_id: sessionId,
-      sheet: renamedSheetName,
-      chart: chartName,
-      action: 'title',
-      title: chartTitle,
-      visible: true
-    });
-    const pivotTable = await callToolData('excel.create_pivot_table', {
-      session_id: sessionId,
-      name: pivotName,
-      table: tableName,
-      destination: `${renamedSheetName}!E3`
-    });
-    const pivotUpdate = await callToolData('excel.update_pivot_table', {
-      session_id: sessionId,
-      pivot_table: pivotName,
-      action: 'refresh'
-    });
-    const readAfter = await callToolData('excel.read_range', { session_id: sessionId, sheet: renamedSheetName, address: 'A1:C5' });
-    const values = readAfter.values as unknown[][] | undefined;
-    if (!Array.isArray(values) || !String(values.flat().join(' ')).includes(`${marker}Updated`)) {
-      throw new Error('Excel smoke marker was not found after write_range.');
-    }
-    return {
-      session_id: sessionId,
-      sheet_name: renamedSheetName,
-      document_title: (info.document as { title?: string } | undefined)?.title,
-      available_tool_count: availableTools.length,
-      available_tools: availableTools,
-      workbook_info: {
-        sheet_count: workbookInfo.sheet_count,
-        table_count: workbookInfo.table_count,
-        active_sheet: workbookInfo.active_sheet
-      },
-      sheet_list_count: Array.isArray(sheetListBefore.sheets) ? sheetListBefore.sheets.length : undefined,
-      read_before_address: readBefore.address,
-      write,
-      formula,
-      format,
-      used_range: usedRange,
-      find_replace: findReplace,
-      clear,
-      table,
-      table_update: tableUpdate,
-      sort,
-      filter,
-      chart,
-      chart_update: chartUpdate,
-      pivot_table: pivotTable,
-      pivot_update: pivotUpdate,
-      sheet,
-      updated_sheet: updatedSheet,
-      cleanup_sheet: cleanupSheet,
-      deleted_sheet: deletedSheet,
-      marker_found: true
-    };
-  });
-}
-
-async function runExcelE2eSessionSmoke(): Promise<void> {
-  const context: OfficeE2eSessionContext = {};
-  let sessionId = '';
-  try {
-    await runGate('excel.e2e_session', async () => {
-      const daemon = await runOfficeE2eDriverStep('Excel', 'startDaemon', context);
-      context.daemon = daemon;
-      const document = await runOfficeE2eDriverStep('Excel', 'createDocument', context);
-      context.document = document;
-      const activation = await runOfficeE2eDriverStep('Excel', 'activateAddin', context);
-      applyActivatedDocument(document, activation);
-      const session = await runOfficeE2eDriverStep('Excel', 'waitForSession', context);
-      sessionId = String(session.sessionId ?? '');
-      if (!sessionId) throw new Error('Excel E2E driver did not return a sessionId.');
-      report.session_id = sessionId;
-      return {
-        session_id: sessionId,
-        driver: officeE2eDriverPath,
-        daemon_started_by_driver: daemon.startedByDriver,
-        document_path: document.path,
-        available_tool_count: Array.isArray(session.availableTools) ? session.availableTools.length : undefined
-      };
-    });
-    if (sessionId) await runExcelSmokeGate(sessionId);
-  } finally {
-    if (context.document) await runOfficeE2eDriverStep('Excel', 'cleanupDocument', context).catch((error) => {
-      addGate('excel.e2e_cleanup', 'failed', { error: errorMessage(error) });
-      return {};
-    });
-    if (context.daemon) await runOfficeE2eDriverStep('Excel', 'stopDaemon', context).catch((error) => {
-      addGate('excel.e2e_stop_daemon', 'failed', { error: errorMessage(error) });
-      return {};
-    });
-  }
-}
-
-async function runWordE2eSessionSmoke(): Promise<string> {
-  const context: OfficeE2eSessionContext = {};
-  let sessionId = '';
-  try {
-    await runGate('word.e2e_session', async () => {
-      const daemon = await runOfficeE2eDriverStep('Word', 'startDaemon', context);
-      context.daemon = daemon;
-      const document = await runOfficeE2eDriverStep('Word', 'createDocument', context);
-      context.document = document;
-      wordSmokeDocumentUrl = String(document.path ?? '');
-      const activation = await runOfficeE2eDriverStep('Word', 'activateAddin', context);
-      applyActivatedDocument(document, activation);
-      wordSmokeDocumentUrl = String(document.path ?? '');
-      const session = await runOfficeE2eDriverStep('Word', 'waitForSession', context);
-      sessionId = String(session.sessionId ?? '');
-      if (!sessionId) throw new Error('Word E2E driver did not return a sessionId.');
-      report.session_id = sessionId;
-      return {
-        session_id: sessionId,
-        driver: officeE2eDriverPath,
-        daemon_started_by_driver: daemon.startedByDriver,
-        document_path: document.path,
-        available_tool_count: Array.isArray(session.availableTools) ? session.availableTools.length : undefined
-      };
-    });
-    if (sessionId) {
-      await runWordReadGate(sessionId);
-      if (includeMutation) await runWordMutationGate(sessionId);
-      if (includeFullWordSmoke) await runFullWordSmokeGate(sessionId);
-      await runAgentClientBridgeGate(sessionId);
-      await runClaudeDesktopInstallationGate();
-      await runAgentClientPromptGate(agentClientEvidencePath);
-      if (includeTrackedChanges) await runTrackedChangeGate(sessionId);
-      if (includeComTrackedChanges) await runComTrackedChangeGate(sessionId);
-      await runIrmGate(sessionId, irmMode, undefined, irmDocumentPath);
-      if (irmDocumentPath) await runIrmDocumentPreflightGate(irmDocumentPath);
-    }
-    return sessionId;
-  } finally {
-    if (context.document) await runOfficeE2eDriverStep('Word', 'cleanupDocument', context).catch((error) => {
-      addGate('word.e2e_cleanup', 'failed', { error: errorMessage(error) });
-      return {};
-    });
-    if (context.daemon) await runOfficeE2eDriverStep('Word', 'stopDaemon', context).catch((error) => {
-      addGate('word.e2e_stop_daemon', 'failed', { error: errorMessage(error) });
-      return {};
-    });
-  }
-}
-
-async function runPowerPointE2eSessionSmoke(): Promise<void> {
-  const context: OfficeE2eSessionContext = {};
-  let sessionId = '';
-  try {
-    await runGate('powerpoint.e2e_session', async () => {
-      const daemon = await runOfficeE2eDriverStep('PowerPoint', 'startDaemon', context);
-      context.daemon = daemon;
-      const document = await runOfficeE2eDriverStep('PowerPoint', 'createDocument', context);
-      context.document = document;
-      const activation = await runOfficeE2eDriverStep('PowerPoint', 'activateAddin', context);
-      applyActivatedDocument(document, activation);
-      const session = await runOfficeE2eDriverStep('PowerPoint', 'waitForSession', context);
-      sessionId = String(session.sessionId ?? '');
-      if (!sessionId) throw new Error('PowerPoint E2E driver did not return a sessionId.');
-      report.session_id = sessionId;
-      return {
-        session_id: sessionId,
-        driver: officeE2eDriverPath,
-        daemon_started_by_driver: daemon.startedByDriver,
-        document_path: document.path,
-        available_tool_count: Array.isArray(session.availableTools) ? session.availableTools.length : undefined
-      };
-    });
-    if (sessionId) await runPowerPointSmokeGate(sessionId);
-  } finally {
-    if (context.document) await runOfficeE2eDriverStep('PowerPoint', 'cleanupDocument', context).catch((error) => {
-      addGate('powerpoint.e2e_cleanup', 'failed', { error: errorMessage(error) });
-      return {};
-    });
-    if (context.daemon) await runOfficeE2eDriverStep('PowerPoint', 'stopDaemon', context).catch((error) => {
-      addGate('powerpoint.e2e_stop_daemon', 'failed', { error: errorMessage(error) });
-      return {};
-    });
-  }
-}
-
-function applyActivatedDocument(document: OfficeE2eDriverContext, activation: OfficeE2eDriverContext): void {
-  const activatedPath = typeof activation.document_path === 'string' ? activation.document_path.trim() : '';
-  if (!activatedPath) return;
-  if (typeof document.original_path !== 'string' && typeof document.path === 'string') {
-    document.original_path = document.path;
-  }
-  document.path = activatedPath;
-}
-
-
-async function runPowerPointSmokeGate(sessionId: string): Promise<void> {
-  await runGate('powerpoint.runtime_smoke', async () => {
-    const marker = `Office MCP PowerPoint smoke ${Date.now()}`;
-    const replacement = `${marker} updated`;
-    const info = await callToolData('office.get_session_info', { session_id: sessionId });
-    const availableTools = Array.isArray(info.available_tools) ? info.available_tools.map(String) : [];
-    if (!availableTools.includes('powerpoint.export_file') || availableTools.includes('powerpoint.export_pdf')) {
-      throw new Error('PowerPoint runtime smoke session tools are not aligned with the v1 catalog.');
-    }
-    const presentationInfo = await callToolData('powerpoint.get_presentation_info', { session_id: sessionId, include_selection: true });
-    const activeView = await callToolData('powerpoint.get_active_view', { session_id: sessionId });
-    const slidesBefore = await callToolData('powerpoint.list_slides', { session_id: sessionId, include_tags: true });
-    const layouts = await callToolData('powerpoint.list_layouts', { session_id: sessionId });
-    const addSlide = await callToolData('powerpoint.add_slide', {
-      session_id: sessionId,
-      title: marker,
-      content: 'PowerPoint runtime smoke content'
-    });
-    const addTextBox = await callToolData('powerpoint.add_text_box', {
-      session_id: sessionId,
-      slide_id: String(addSlide.slide_id ?? ''),
-      text: `Shape ${marker}`,
-      left: 72,
-      top: 220,
-      width: 360,
-      height: 64
-    });
-    const shapeId = String((addTextBox.shape as Record<string, unknown> | undefined)?.shape_id ?? '');
-    const shapes = await callToolData('powerpoint.list_shapes', { session_id: sessionId, slide_id: String(addSlide.slide_id ?? '') });
-    const readText = await callToolData('powerpoint.read_text', { session_id: sessionId, slide_id: String(addSlide.slide_id ?? '') });
-    const replaceText = await callToolData('powerpoint.replace_text', {
-      session_id: sessionId,
-      search: marker,
-      replacement,
-      match_case: true
-    });
-    const formatText = shapeId ? await callToolData('powerpoint.format_text', {
-      session_id: sessionId,
-      slide_id: String(addSlide.slide_id ?? ''),
-      shape_id: shapeId,
-      bold: true,
-      font_size: 18
-    }) : { skipped: true, reason: 'No text box shape id returned.' };
-    const layout = await callToolData('powerpoint.apply_layout', {
-      session_id: sessionId,
-      slide_id: String(addSlide.slide_id ?? ''),
-      layout: 'TitleOnly'
-    });
-    const table = await callToolResult('powerpoint.add_table', {
-      session_id: sessionId,
-      slide_id: String(addSlide.slide_id ?? ''),
-      rows: 2,
-      columns: 2,
-      values: [['Office', 'MCP'], ['PowerPoint', 'Smoke']]
-    });
-    const tableData = toolData(table);
-    const tableSupported = !isToolError(table);
-    const tableHostRejection = isExplicitHostRejection(table, tableData);
-    if (!tableSupported && !tableHostRejection) throw new Error(`PowerPoint table creation failed without explicit host-capability rejection: ${JSON.stringify(tableData)}`);
-    const tableShapeId = String(tableData.shape_id ?? '');
-    const readTable = tableSupported && tableShapeId ? await callToolData('powerpoint.read_table', {
-      session_id: sessionId,
-      slide_id: String(addSlide.slide_id ?? ''),
-      shape_id: tableShapeId
-    }) : { host_rejection: tableHostRejection };
-    const file = await callToolResult('powerpoint.export_file', { session_id: sessionId, format: 'pdf', slice_size: 1048576 });
-    const fileData = toolData(file);
-    const exportSupported = !isToolError(file);
-    const exportHostRejection = isExplicitHostRejection(file, fileData);
-    if (!exportSupported && !exportHostRejection) throw new Error(`PowerPoint file export failed without explicit host-capability rejection: ${JSON.stringify(fileData)}`);
-    const categoryProofs = {
-      presentation: Boolean(presentationInfo && activeView && (exportSupported || exportHostRejection)),
-      slides: typeof addSlide.slide_id === 'string' && Array.isArray(slidesBefore.slides),
-      layout: typeof layout.slide_id === 'string' && Array.isArray(layouts.masters),
-      shapes: shapeId.length > 0 && Array.isArray(shapes.shapes),
-      text: Number(replaceText.replacements ?? 0) >= 1 && Array.isArray(readText.items),
-      tables: tableSupported ? isRecord(readTable) : tableHostRejection
-    };
-    return {
-      session_id: sessionId,
-      document_title: (info.document as { title?: string } | undefined)?.title,
-      available_tool_count: availableTools.length,
-      available_tools: availableTools,
-      presentation_info: presentationInfo,
-      active_view: activeView,
-      list_slides: slidesBefore,
-      list_layouts: layouts,
-      add_slide: addSlide,
-      add_text_box: addTextBox,
-      list_shapes: shapes,
-      read_text: readText,
-      replace_text: replaceText,
-      format_text: formatText,
-      layout,
-      add_table: tableData,
-      read_table: readTable,
-      marker,
-      replacement,
-      mutation_proved: typeof addSlide.slide_id === 'string' && Number(replaceText.replacements ?? 0) >= 1,
-      tool_category_proofs: categoryProofs,
-      export_supported: exportSupported,
-      export_host_rejection: exportHostRejection,
-      export_mime_type: exportSupported ? fileData.mime_type : undefined,
-      export_size: exportSupported ? fileData.size : undefined,
-      table_supported: tableSupported,
-      table_host_rejection: tableHostRejection
-    };
-  });
-}
-
-
-async function callToolResult(name: string, args: Record<string, unknown>): Promise<unknown> {
-  return await client.callTool({ name, arguments: args });
-}
-async function callToolData(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const result = await client.callTool({ name, arguments: args });
-  if (isToolError(result)) throw new Error(`${name} returned an MCP tool error: ${JSON.stringify(toolData(result))}`);
-  return toolData(result);
-}
-
 async function runAgentClientBridgeGate(sessionId: string): Promise<void> {
   await runGate('agent_client_stdio_bridge', async () => {
     const stdioClient = new Client({ name: 'office-mcp-agent-client-evidence', version: '0.1.0' });
@@ -675,9 +120,9 @@ async function runAgentClientBridgeGate(sessionId: string): Promise<void> {
       const data = toolData(await stdioClient.callTool({ name: 'office.list_sessions', arguments: {} }));
       const sessions = Array.isArray(data.sessions) ? data.sessions : [];
       if (sessions.length < 1) throw new Error('stdio bridge connected but returned no sessions.');
-      const paragraph = toolData(await stdioClient.callTool({ name: 'word.get_paragraph', arguments: { session_id: sessionId, index: 0 } }));
-      if (typeof paragraph.text !== 'string') throw new Error('stdio bridge could not read paragraph 0.');
-      return { session_count: sessions.length, paragraph_0_text: paragraph.text, paragraph_0_length: paragraph.text.length };
+      const info = toolData(await stdioClient.callTool({ name: 'office.get_session_info', arguments: { session_id: sessionId } }));
+      if (!isRecord(info.document)) throw new Error('stdio bridge could not read session metadata.');
+      return { session_count: sessions.length, document: info.document, host: info.host };
     } finally {
       await stdioClient.close();
     }
@@ -816,13 +261,6 @@ async function runIrmGate(sessionId: string, mode: string, irmPreflight?: Record
   });
 }
 
-async function runTrackedChangeGate(sessionId: string): Promise<void> {
-  await runGate('word.tracked_change_resource_smoke', async () => {
-    const data = resourceData(await client.readResource({ uri: `office://word/${sessionId}/track_changes` }));
-    return { change_count: Array.isArray(data.changes) ? data.changes.length : undefined };
-  });
-}
-
 async function runGate(name: string, run: () => Promise<Record<string, unknown>>): Promise<Record<string, unknown>> {
   const started = new Date().toISOString();
   try {
@@ -850,54 +288,12 @@ function toolData(result: unknown): Record<string, unknown> {
   return parsed?.data ?? parsed;
 }
 
-function resourceData(result: unknown): Record<string, unknown> {
-  const text = (result as { contents?: Array<{ text?: string }> }).contents?.[0]?.text;
-  return text ? JSON.parse(text) : {};
-}
-
 function isToolError(result: unknown): boolean {
   return (result as { isError?: boolean }).isError === true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isExplicitHostRejection(result: unknown, data: Record<string, unknown>): boolean {
-  return isToolError(result) && ['HOST_CAPABILITY_UNAVAILABLE', 'HOST_ERROR'].includes(String(data.office_mcp_code ?? data.code ?? ''));
-}
-
-function runSmokeMode(mode: string, sessionId: string, extraArg?: string): string {
-  const args = [resolve(evidenceRoot, 'mcp-smoke.ts'), endpoint, mode, sessionId];
-  if (extraArg) args.push(extraArg);
-  const raw = execFileSync(process.execPath, [tsxCli, ...args], {
-    cwd: evidenceRoot,
-    encoding: 'utf8',
-    maxBuffer: 20 * 1024 * 1024,
-    env: { ...process.env, OFFICE_MCP_SMOKE_DOCUMENT_URL: wordSmokeDocumentUrl }
-  });
-  const jsonStart = raw.indexOf('{');
-  if (jsonStart === -1) throw new Error(`Smoke mode ${mode} did not emit JSON.`);
-  return raw.slice(jsonStart);
-}
-
-async function runOfficeE2eDriverStep(host: OfficeE2eHost, step: string, context: OfficeE2eSessionContext): Promise<OfficeE2eDriverContext> {
-  const result = spawnSync(process.execPath, [officeE2eDriverPath], {
-    cwd: repoRoot,
-    input: JSON.stringify({ host, step, context }),
-    encoding: 'utf8',
-    maxBuffer: 20 * 1024 * 1024,
-    env: { ...process.env, OFFICE_MCP_MCP_ENDPOINT: endpoint }
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(`Office E2E driver ${host}.${step} failed with code ${result.status}: ${result.stderr || result.stdout}`);
-  }
-  const text = String(result.stdout || '').trim();
-  if (!text) return {};
-  const parsed = JSON.parse(text) as unknown;
-  if (!isRecord(parsed)) throw new Error(`Office E2E driver ${host}.${step} returned non-object JSON.`);
-  return parsed;
 }
 
 function selectWordSessionId(sessions: Array<Record<string, unknown>>, documentPath?: string): string {
@@ -913,14 +309,6 @@ function selectWordSessionId(sessions: Array<Record<string, unknown>>, documentP
   return String(wordSessions.find((session) => session.status === 'active')?.session_id ?? wordSessions[0]?.session_id ?? '');
 }
 
-function selectHostSessionId(sessions: Array<Record<string, unknown>>, hostApp: string): string {
-  const match = sessions.find((session) => {
-    const host = session.host as { app?: string } | undefined;
-    return String(host?.app ?? '').toLowerCase() === hostApp && session.status === 'active';
-  });
-  return String(match?.session_id ?? '');
-}
-
 function sessionInfoMatchesDocumentPath(sessionOrInfo: Record<string, unknown>, documentPath: string): boolean {
   const document = sessionOrInfo.document as { title?: string; filename?: string; url?: string } | undefined;
   const expectedName = basename(documentPath).toLowerCase();
@@ -932,10 +320,6 @@ function readOption(name: string): string | undefined {
   const index = process.argv.lastIndexOf(name);
   if (index === -1) return undefined;
   return process.argv[index + 1];
-}
-
-function hasFlag(name: string): boolean {
-  return process.argv.includes(name);
 }
 
 function intOption(name: string, fallback: number): number {

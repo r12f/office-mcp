@@ -270,11 +270,11 @@ Automated evidence should exist at two levels:
 
 - Rust daemon/unit evidence proves the PowerPoint tool catalog is listed and
   that MCP calls are forwarded to a PowerPoint add-in session.
-- Runtime evidence supports a live presentation smoke with
-  `npm run evidence:powerpoint` from `src/office-mcp/daemon/evidence`, validated
-  with `npm run evidence:validate -- --require-powerpoint-smoke`.
+- Office tool E2E evidence runs the complete PowerPoint tool catalog in one live
+  presentation session with `npm run e2e:tools` from
+  `src/office-ctl/powerpoint` and writes
+  `artifacts/office-tool-e2e-powerpoint.json`.
 
 Completion of the live PowerPoint gate requires a connected PowerPoint
-presentation and a passed `powerpoint.runtime_smoke` report covering at least
-one tool from Presentation, Slides, Layout, Shapes, Text, and Tables, plus
-export success or explicit host-capability rejection.
+presentation and a passed `office_tool_e2e_report` validated by
+`npm run evidence:validate -- --require-office-tool-e2e`.

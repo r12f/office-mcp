@@ -31,45 +31,23 @@ const manualTrayEvidencePath = readOption('--manual-tray-evidence-path') ?? proc
 const requireProductVisual = hasFlag('--require-product-visual');
 const productVisualEvidencePath = readOption('--product-visual-evidence-path') ?? process.env.OFFICE_MCP_PRODUCT_VISUAL_EVIDENCE_PATH;
 const requireIrm = hasFlag('--require-irm');
-const requireFullWordSmoke = hasFlag('--require-full-word-smoke');
-const requireExcelSmoke = hasFlag('--require-excel-smoke');
-const requirePowerPointSmoke = hasFlag('--require-powerpoint-smoke');
-const requireComTrackedChanges = hasFlag('--require-com-tracked-changes');
 const requireIrmPreflight = hasFlag('--require-irm-preflight');
 const requireClaudeDesktopInstallation = hasFlag('--require-claude-desktop-installation');
 const requireAgentClientPrompt = hasFlag('--require-agent-client-prompt');
-const requireMutation = hasFlag('--require-mutation');
 const requireOfficeToolE2e = hasFlag('--require-office-tool-e2e');
 const wordToolE2eReportPath = readOption('--word-tool-e2e-report-path') ?? process.env.OFFICE_MCP_WORD_TOOL_E2E_REPORT_PATH;
 const excelToolE2eReportPath = readOption('--excel-tool-e2e-report-path') ?? process.env.OFFICE_MCP_EXCEL_TOOL_E2E_REPORT_PATH;
 const powerPointToolE2eReportPath = readOption('--powerpoint-tool-e2e-report-path') ?? process.env.OFFICE_MCP_POWERPOINT_TOOL_E2E_REPORT_PATH;
 const report = JSON.parse(readFileSync(evidencePath, 'utf8')) as EvidenceReport;
-const requiresWordBaseline = !(requireExcelSmoke || requirePowerPointSmoke) ||
-  requireIrm ||
-  requireFullWordSmoke ||
-  requireComTrackedChanges ||
+const requiresWordBaseline = requireIrm ||
   requireIrmPreflight ||
   requireClaudeDesktopInstallation ||
   requireAgentClientPrompt ||
-  requireMutation;
+  !validateUi;
 
 const requiredPassed = [
   'word.session_discovery',
-  'word.runtime_read_smoke',
   'agent_client_stdio_bridge'
-];
-
-const fullWordSmokeGates = [
-  'word.full_smoke.word-core',
-  'word.full_smoke.word-formatting',
-  'word.full_smoke.word-review',
-  'word.full_smoke.word-resources',
-  'word.full_smoke.word-spec-args'
-];
-
-const comTrackedChangeGates = [
-  'word.tracked_change_com.accept',
-  'word.tracked_change_com.reject'
 ];
 
 const failures: string[] = [];
@@ -89,25 +67,6 @@ if (requiresWordBaseline) {
   }
 } else {
   requirePassedGate('word.session_discovery');
-}
-
-if (requireFullWordSmoke) {
-  for (const name of fullWordSmokeGates) requirePassedGate(name);
-}
-
-if (requireExcelSmoke) {
-  const gate = requirePassedGate('excel.runtime_smoke');
-  validateExcelSmokeGate(gate);
-}
-if (requirePowerPointSmoke) {
-  const gate = requirePassedGate('powerpoint.runtime_smoke');
-  validatePowerPointSmokeGate(gate);
-}
-
-if (requireMutation) requirePassedGate('word.runtime_mutation_smoke');
-
-if (requireComTrackedChanges) {
-  for (const name of comTrackedChangeGates) requirePassedGate(name);
 }
 
 if (requireIrmPreflight) requirePassedGate('irm_document_preflight');
@@ -137,14 +96,9 @@ if (failedGate) failures.push(`Gate ${failedGate.name} is ${failedGate.status}.`
 const summary = {
   ok: failures.length === 0,
   require_irm: requireIrm,
-  require_full_word_smoke: requireFullWordSmoke,
-  require_excel_smoke: requireExcelSmoke,
-  require_powerpoint_smoke: requirePowerPointSmoke,
-  require_com_tracked_changes: requireComTrackedChanges,
   require_irm_preflight: requireIrmPreflight,
   require_claude_desktop_installation: requireClaudeDesktopInstallation,
   require_agent_client_prompt: requireAgentClientPrompt,
-  require_mutation: requireMutation,
   require_office_tool_e2e: requireOfficeToolE2e,
   require_manual_tray: requireManualTray,
   office_tool_e2e_report_paths: requireOfficeToolE2e ? {
@@ -162,152 +116,6 @@ const summary = {
 console.log(JSON.stringify(summary, null, 2));
 if (failures.length > 0) process.exit(1);
 
-
-function validatePowerPointSmokeGate(gate: EvidenceGate | undefined): void {
-  if (!gate || gate.status !== 'passed') return;
-  const details = gate.details;
-  if (!isRecord(details)) {
-    failures.push('PowerPoint smoke gate missing details.');
-    return;
-  }
-  if (typeof details.session_id !== 'string' || details.session_id.length === 0) failures.push('PowerPoint smoke gate missing session_id.');
-  validateExactToolCatalog('PowerPoint smoke gate', details.available_tool_count, details.available_tools, powerPointV1Tools());
-  if (details.mutation_proved !== true) failures.push('PowerPoint smoke gate did not prove a mutation path.');
-  validatePowerPointCategoryProofs(details.tool_category_proofs, 'PowerPoint smoke gate');
-  if (!isRecord(details.presentation_info)) failures.push('PowerPoint smoke gate missing presentation info proof.');
-  if (!isRecord(details.active_view)) failures.push('PowerPoint smoke gate missing active view proof.');
-  if (!isRecord(details.list_slides)) failures.push('PowerPoint smoke gate missing list_slides proof.');
-  if (!isRecord(details.add_slide) || typeof details.add_slide.slide_id !== 'string') failures.push('PowerPoint smoke gate missing add_slide proof.');
-  if (!isRecord(details.add_text_box) || !isRecord(details.add_text_box.shape)) failures.push('PowerPoint smoke gate missing add_text_box proof.');
-  if (!isRecord(details.list_shapes) || !Array.isArray(details.list_shapes.shapes)) failures.push('PowerPoint smoke gate missing list_shapes proof.');
-  if (!isRecord(details.read_text) || !Array.isArray(details.read_text.items)) failures.push('PowerPoint smoke gate missing read_text proof.');
-  if (!isRecord(details.replace_text) || Number(details.replace_text.replacements ?? 0) < 1) failures.push('PowerPoint smoke gate missing replace_text proof.');
-  if (!isRecord(details.format_text) || details.format_text.formatted !== true) failures.push('PowerPoint smoke gate missing format_text proof.');
-  if (!isRecord(details.layout) || typeof details.layout.slide_id !== 'string') failures.push('PowerPoint smoke gate missing apply_layout proof.');
-  if (!isRecord(details.list_layouts) || !Array.isArray(details.list_layouts.masters)) failures.push('PowerPoint smoke gate missing list_layouts proof.');
-  const tableSupported = details.table_supported === true && isRecord(details.add_table) && typeof details.add_table.shape_id === 'string' && isRecord(details.read_table);
-  const tableHostRejection = details.table_host_rejection === true;
-  if (!tableSupported && !tableHostRejection) failures.push('PowerPoint smoke gate missing table success or explicit host-capability rejection.');
-  const exportSupported = details.export_supported === true && details.export_mime_type === 'application/pdf' && typeof details.export_size === 'number';
-  const exportHostRejection = details.export_host_rejection === true;
-  if (!exportSupported && !exportHostRejection) failures.push('PowerPoint smoke gate missing export_file success or explicit host-capability rejection.');
-}
-
-function validateExcelSmokeGate(gate: EvidenceGate | undefined): void {
-  if (!gate || gate.status !== 'passed') return;
-  const details = gate.details;
-  if (!isRecord(details)) {
-    failures.push('Excel smoke gate missing details.');
-    return;
-  }
-  if (typeof details.session_id !== 'string' || details.session_id.length === 0) failures.push('Excel smoke gate missing session_id.');
-  validateExactToolCatalog('Excel smoke gate', details.available_tool_count, details.available_tools, excelV1Tools());
-  if (details.marker_found !== true) failures.push('Excel smoke gate missing marker readback.');
-  if (!isRecord(details.workbook_info)) failures.push('Excel smoke gate missing get_workbook_info proof.');
-  if (typeof details.sheet_list_count !== 'number') failures.push('Excel smoke gate missing list_sheets proof.');
-  if (!isRecord(details.updated_sheet)) failures.push('Excel smoke gate missing update_sheet proof.');
-  if (!isRecord(details.deleted_sheet) || details.deleted_sheet.deleted !== true) failures.push('Excel smoke gate missing delete_sheet proof.');
-  if (!isRecord(details.used_range)) failures.push('Excel smoke gate missing get_used_range proof.');
-  if (!isRecord(details.find_replace)) failures.push('Excel smoke gate missing find_replace_cells proof.');
-  if (!isRecord(details.clear)) failures.push('Excel smoke gate missing clear_range proof.');
-  if (!isRecord(details.write) || details.write.wrote_values !== true) failures.push('Excel smoke gate missing write_range proof.');
-  if (!isRecord(details.formula) || details.formula.wrote_formula !== true) failures.push('Excel smoke gate missing set_formula proof.');
-  if (!isRecord(details.format) || details.format.formatted !== true) failures.push('Excel smoke gate missing format_range proof.');
-  if (!isRecord(details.table) || typeof details.table.table !== 'string') failures.push('Excel smoke gate missing create_table proof.');
-  if (!isRecord(details.table_update)) failures.push('Excel smoke gate missing update_table proof.');
-  if (!isRecord(details.sort) || details.sort.sorted !== true) failures.push('Excel smoke gate missing sort_range proof.');
-  if (!isRecord(details.filter) || details.filter.filtered !== true) failures.push('Excel smoke gate missing apply_filter proof.');
-  if (!isRecord(details.chart) || typeof details.chart.chart !== 'string') failures.push('Excel smoke gate missing create_chart proof.');
-  if (!isRecord(details.chart_update) || details.chart_update.updated !== true) failures.push('Excel smoke gate missing update_chart proof.');
-  if (!isRecord(details.pivot_table) || typeof details.pivot_table.pivot_table !== 'string') failures.push('Excel smoke gate missing create_pivot_table proof.');
-  if (!isRecord(details.pivot_update) || details.pivot_update.refreshed !== true) failures.push('Excel smoke gate missing update_pivot_table proof.');
-  if (!isRecord(details.sheet) || details.sheet.activated !== true) failures.push('Excel smoke gate missing add_sheet activation proof.');
-}
-
-function excelV1Tools(): string[] {
-  return [
-    'excel.get_workbook_info',
-    'excel.list_sheets',
-    'excel.add_sheet',
-    'excel.update_sheet',
-    'excel.delete_sheet',
-    'excel.get_used_range',
-    'excel.read_range',
-    'excel.write_range',
-    'excel.clear_range',
-    'excel.find_replace_cells',
-    'excel.set_formula',
-    'excel.format_range',
-    'excel.sort_range',
-    'excel.apply_filter',
-    'excel.create_table',
-    'excel.update_table',
-    'excel.create_chart',
-    'excel.update_chart',
-    'excel.create_pivot_table',
-    'excel.update_pivot_table'
-  ];
-}
-
-function powerPointV1Tools(): string[] {
-  return [
-    'powerpoint.get_presentation_info',
-    'powerpoint.get_active_view',
-    'powerpoint.export_file',
-    'powerpoint.update_tags',
-    'powerpoint.list_slides',
-    'powerpoint.add_slide',
-    'powerpoint.update_slide',
-    'powerpoint.delete_slide',
-    'powerpoint.move_slide',
-    'powerpoint.export_slide',
-    'powerpoint.list_layouts',
-    'powerpoint.apply_layout',
-    'powerpoint.get_selection',
-    'powerpoint.set_selection',
-    'powerpoint.list_shapes',
-    'powerpoint.add_text_box',
-    'powerpoint.add_shape',
-    'powerpoint.insert_image',
-    'powerpoint.update_shape',
-    'powerpoint.read_text',
-    'powerpoint.replace_text',
-    'powerpoint.format_text',
-    'powerpoint.add_table',
-    'powerpoint.read_table',
-    'powerpoint.update_table'
-  ];
-}
-
-function wordV1Tools(): string[] {
-  return [
-    'word.get_text',
-    'word.get_outline',
-    'word.get_paragraph',
-    'word.find_text',
-    'word.get_selection',
-    'word.insert_paragraph',
-    'word.insert_table',
-    'word.insert_image',
-    'word.insert_page_break',
-    'word.insert_list',
-    'word.replace_text',
-    'word.update_paragraph',
-    'word.delete_range',
-    'word.apply_formatting',
-    'word.apply_style',
-    'word.read_table',
-    'word.update_table',
-    'word.list_content_controls',
-    'word.insert_content_control',
-    'word.update_content_control',
-    'word.delete_content_control',
-    'word.add_comment',
-    'word.resolve_comment',
-    'word.update_tracked_change',
-    'word.save'
-  ];
-}
 
 function validateOfficeToolE2eReports(): void {
   validateOfficeToolE2eReport('Word', wordToolE2eReportPath);
@@ -415,25 +223,10 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
-function validateExactToolCatalog(label: string, count: unknown, tools: unknown, expected: string[]): void {
-  if (count !== expected.length) {
-    failures.push(`${label} missing ${expected.length}-tool available tool count.`);
-  }
-  if (!sameStrings(stringArray(tools), expected)) {
-    failures.push(`${label} available tools are not aligned with v1 catalog.`);
-  }
-}
-
 function sameStrings(left: string[], right: string[]): boolean {
   return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 }
 
-function validatePowerPointCategoryProofs(value: unknown, label: string): void {
-  const proofs = isRecord(value) ? value : undefined;
-  for (const category of ['presentation', 'slides', 'layout', 'shapes', 'text', 'tables']) {
-    if (proofs?.[category] !== true) failures.push(`${label} missing ${category} category proof.`);
-  }
-}
 function validateUiEvidence(): never {
   if (report.kind !== 'ui_runtime_evidence') failures.push(`Unsupported UI evidence kind: ${report.kind ?? 'missing'}`);
   for (const name of [
@@ -1105,81 +898,38 @@ function validateProductVisualObservations(observations: unknown, trayTooltip: u
 }
 
 function validatePowerPointRuntimeEvidence(evidence: unknown, ready: unknown): void {
-  if (ready !== true) failures.push('Product visual evidence missing PowerPoint runtime evidence ready flag.');
-  if (!isRecord(evidence)) {
-    failures.push('Product visual evidence missing PowerPoint runtime evidence details.');
-    return;
-  }
-  if (evidence.ok !== true) failures.push('Product visual PowerPoint runtime evidence was not read successfully.');
-  if (evidence.schema_version !== 1) failures.push(`Unsupported PowerPoint runtime evidence schema_version: ${evidence.schema_version}`);
-  if (evidence.smoke_passed !== true) failures.push('Product visual evidence missing passed PowerPoint runtime smoke gate.');
-  if (evidence.ready !== true) failures.push('Product visual PowerPoint runtime evidence is not ready.');
-  const session = evidence.session;
-  const details = evidence.smoke_details;
-  if (!isRecord(session) || !isRecord(details)) {
-    failures.push('Product visual PowerPoint runtime evidence missing session or smoke details.');
-    return;
-  }
-  const document = isRecord(session.document) ? session.document : undefined;
-  const host = isRecord(session.host) ? session.host : undefined;
-  if (session.app !== 'powerpoint' || session.status !== 'active') failures.push('Product visual PowerPoint runtime evidence missing active PowerPoint session.');
-  if (typeof session.session_id !== 'string' || details.session_id !== session.session_id) failures.push('Product visual PowerPoint runtime evidence session_id mismatch.');
-  if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual PowerPoint runtime evidence missing presentation title.');
-  if (host?.app !== 'powerpoint') failures.push('Product visual PowerPoint runtime evidence missing PowerPoint host metadata.');
-  validateExactToolCatalog('Product visual PowerPoint runtime evidence', session.available_tool_count, details.available_tools, powerPointV1Tools());
-  if (details.mutation_proved !== true) failures.push('Product visual PowerPoint runtime evidence did not prove mutation path.');
-  validatePowerPointCategoryProofs(details.tool_category_proofs, 'Product visual PowerPoint runtime evidence');
-  if (!isRecord(details.presentation_info)) failures.push('Product visual PowerPoint runtime evidence missing presentation info proof.');
-  if (!isRecord(details.active_view)) failures.push('Product visual PowerPoint runtime evidence missing active view proof.');
-  if (!isRecord(details.list_slides)) failures.push('Product visual PowerPoint runtime evidence missing list_slides proof.');
-  if (!isRecord(details.add_slide) || typeof details.add_slide.slide_id !== 'string') failures.push('Product visual PowerPoint runtime evidence missing add_slide proof.');
-  if (!isRecord(details.add_text_box) || !isRecord(details.add_text_box.shape)) failures.push('Product visual PowerPoint runtime evidence missing add_text_box proof.');
-  if (!isRecord(details.list_shapes) || !Array.isArray(details.list_shapes.shapes)) failures.push('Product visual PowerPoint runtime evidence missing list_shapes proof.');
-  if (!isRecord(details.read_text) || !Array.isArray(details.read_text.items)) failures.push('Product visual PowerPoint runtime evidence missing read_text proof.');
-  if (!isRecord(details.replace_text) || Number(details.replace_text.replacements ?? 0) < 1) failures.push('Product visual PowerPoint runtime evidence missing replace_text proof.');
-  if (!isRecord(details.format_text) || details.format_text.formatted !== true) failures.push('Product visual PowerPoint runtime evidence missing format_text proof.');
-  if (!isRecord(details.layout) || typeof details.layout.slide_id !== 'string') failures.push('Product visual PowerPoint runtime evidence missing apply_layout proof.');
-  if (!isRecord(details.list_layouts) || !Array.isArray(details.list_layouts.masters)) failures.push('Product visual PowerPoint runtime evidence missing list_layouts proof.');
-  const tableSupported = details.table_supported === true && isRecord(details.add_table) && typeof details.add_table.shape_id === 'string' && isRecord(details.read_table);
-  const tableHostRejection = details.table_host_rejection === true;
-  if (!tableSupported && !tableHostRejection) failures.push('Product visual PowerPoint runtime evidence missing table success or explicit host-capability rejection.');
-  const exportSupported = details.export_supported === true && details.export_mime_type === 'application/pdf' && typeof details.export_size === 'number';
-  const exportHostRejection = details.export_host_rejection === true;
-  if (!exportSupported && !exportHostRejection) failures.push('Product visual PowerPoint runtime evidence missing export_file success or explicit host-capability rejection.');
+  validateProductVisualRuntimeSession('PowerPoint', 'powerpoint', evidence, ready);
 }
 
 function validateWordRuntimeEvidence(evidence: unknown, ready: unknown): void {
-  if (ready !== true) failures.push('Product visual evidence missing Word runtime evidence ready flag.');
+  validateProductVisualRuntimeSession('Word', 'word', evidence, ready);
+}
+
+function validateExcelRuntimeEvidence(evidence: unknown, ready: unknown): void {
+  validateProductVisualRuntimeSession('Excel', 'excel', evidence, ready);
+}
+
+function validateProductVisualRuntimeSession(label: 'Word' | 'Excel' | 'PowerPoint', app: 'word' | 'excel' | 'powerpoint', evidence: unknown, ready: unknown): void {
+  if (ready !== true) failures.push(`Product visual evidence missing ${label} runtime evidence ready flag.`);
   if (!isRecord(evidence)) {
-    failures.push('Product visual evidence missing Word runtime evidence details.');
+    failures.push(`Product visual evidence missing ${label} runtime evidence details.`);
     return;
   }
-  if (evidence.ok !== true) failures.push('Product visual Word runtime evidence was not read successfully.');
-  if (evidence.schema_version !== 1) failures.push(`Unsupported Word runtime evidence schema_version: ${evidence.schema_version}`);
-  if (evidence.smoke_passed !== true) failures.push('Product visual evidence missing passed Word runtime smoke gates.');
-  if (evidence.ready !== true) failures.push('Product visual Word runtime evidence is not ready.');
+  if (evidence.ok !== true) failures.push(`Product visual ${label} runtime evidence was not read successfully.`);
+  if (evidence.schema_version !== 1) failures.push(`Unsupported ${label} runtime evidence schema_version: ${evidence.schema_version}`);
+  if (evidence.ready !== true) failures.push(`Product visual ${label} runtime evidence is not ready.`);
   const session = evidence.session;
-  const details = evidence.smoke_details;
-  if (!isRecord(session) || !isRecord(details)) {
-    failures.push('Product visual Word runtime evidence missing session or smoke details.');
+  if (!isRecord(session)) {
+    failures.push(`Product visual ${label} runtime evidence missing session details.`);
     return;
   }
   const document = isRecord(session.document) ? session.document : undefined;
   const host = isRecord(session.host) ? session.host : undefined;
-  if (session.app !== 'word' || session.status !== 'active') failures.push('Product visual Word runtime evidence missing active Word session.');
-  if (typeof session.session_id !== 'string') failures.push('Product visual Word runtime evidence missing session_id.');
-  if (typeof session.session_id !== 'string' || details.session_id !== session.session_id) failures.push('Product visual Word runtime evidence session_id mismatch.');
-  if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual Word runtime evidence missing document title.');
-  if (host?.app !== 'word') failures.push('Product visual Word runtime evidence missing Word host metadata.');
-  validateExactToolCatalog('Product visual Word runtime evidence', session.available_tool_count, details.available_tools, wordV1Tools());
-  if (details.available_tool_count !== wordV1Tools().length) failures.push('Product visual Word runtime evidence missing read smoke available tool count.');
-  if (Number(details.paragraph_0_text_length ?? 0) <= 0) failures.push('Product visual Word runtime evidence missing paragraph read proof.');
-  if (Number(details.document_text_length ?? 0) <= 0) failures.push('Product visual Word runtime evidence missing document read proof.');
-  if (Number(details.find_count ?? 0) < 1) failures.push('Product visual Word runtime evidence missing mutation readback.');
-  if (details.full_smoke_passed !== true) failures.push('Product visual Word runtime evidence missing full smoke proof.');
-  if (details.com_tracked_change_passed !== true) failures.push('Product visual Word runtime evidence missing COM tracked-change proof.');
+  if (session.app !== app || session.status !== 'active') failures.push(`Product visual ${label} runtime evidence missing active ${label} session.`);
+  if (typeof session.session_id !== 'string' || session.session_id.length === 0) failures.push(`Product visual ${label} runtime evidence missing session_id.`);
+  if (typeof document?.title !== 'string' || document.title.length === 0) failures.push(`Product visual ${label} runtime evidence missing document title.`);
+  if (host?.app !== app) failures.push(`Product visual ${label} runtime evidence missing ${label} host metadata.`);
 }
-
 function validateProductVisualOfficeToolE2e(evidence: unknown, ready: unknown): void {
   if (ready !== true) failures.push('Product visual evidence missing Office tool E2E ready flag.');
   if (!isRecord(evidence)) {
@@ -1282,51 +1032,6 @@ function validateOfficeToolE2eRuntimeBinding(label: 'Word' | 'Excel' | 'PowerPoi
   if (!runtimeSessionId || !e2eSessionId || runtimeSessionId !== e2eSessionId) {
     failures.push(`Product visual evidence ${label} Office tool E2E report session does not match runtime evidence session.`);
   }
-}
-
-function validateExcelRuntimeEvidence(evidence: unknown, ready: unknown): void {
-  if (ready !== true) failures.push('Product visual evidence missing Excel runtime evidence ready flag.');
-  if (!isRecord(evidence)) {
-    failures.push('Product visual evidence missing Excel runtime evidence details.');
-    return;
-  }
-  if (evidence.ok !== true) failures.push('Product visual Excel runtime evidence was not read successfully.');
-  if (evidence.schema_version !== 1) failures.push(`Unsupported Excel runtime evidence schema_version: ${evidence.schema_version}`);
-  if (evidence.smoke_passed !== true) failures.push('Product visual evidence missing passed Excel runtime smoke gate.');
-  if (evidence.ready !== true) failures.push('Product visual Excel runtime evidence is not ready.');
-  const session = evidence.session;
-  const details = evidence.smoke_details;
-  if (!isRecord(session) || !isRecord(details)) {
-    failures.push('Product visual Excel runtime evidence missing session or smoke details.');
-    return;
-  }
-  const document = isRecord(session.document) ? session.document : undefined;
-  const host = isRecord(session.host) ? session.host : undefined;
-  if (session.app !== 'excel' || session.status !== 'active') failures.push('Product visual Excel runtime evidence missing active Excel session.');
-  if (typeof session.session_id !== 'string' || details.session_id !== session.session_id) failures.push('Product visual Excel runtime evidence session_id mismatch.');
-  if (typeof document?.title !== 'string' || document.title.length === 0) failures.push('Product visual Excel runtime evidence missing workbook title.');
-  if (host?.app !== 'excel') failures.push('Product visual Excel runtime evidence missing Excel host metadata.');
-  validateExactToolCatalog('Product visual Excel runtime evidence', session.available_tool_count, details.available_tools, excelV1Tools());
-  if (details.marker_found !== true) failures.push('Product visual Excel runtime evidence missing marker readback.');
-  if (!isRecord(details.workbook_info)) failures.push('Product visual Excel runtime evidence missing get_workbook_info proof.');
-  if (typeof details.sheet_list_count !== 'number') failures.push('Product visual Excel runtime evidence missing list_sheets proof.');
-  if (!isRecord(details.updated_sheet)) failures.push('Product visual Excel runtime evidence missing update_sheet proof.');
-  if (!isRecord(details.deleted_sheet) || details.deleted_sheet.deleted !== true) failures.push('Product visual Excel runtime evidence missing delete_sheet proof.');
-  if (!isRecord(details.used_range)) failures.push('Product visual Excel runtime evidence missing get_used_range proof.');
-  if (!isRecord(details.find_replace)) failures.push('Product visual Excel runtime evidence missing find_replace_cells proof.');
-  if (!isRecord(details.clear)) failures.push('Product visual Excel runtime evidence missing clear_range proof.');
-  if (!isRecord(details.write) || details.write.wrote_values !== true) failures.push('Product visual Excel runtime evidence missing write_range proof.');
-  if (!isRecord(details.formula) || details.formula.wrote_formula !== true) failures.push('Product visual Excel runtime evidence missing set_formula proof.');
-  if (!isRecord(details.format) || details.format.formatted !== true) failures.push('Product visual Excel runtime evidence missing format_range proof.');
-  if (!isRecord(details.table) || typeof details.table.table !== 'string') failures.push('Product visual Excel runtime evidence missing create_table proof.');
-  if (!isRecord(details.table_update)) failures.push('Product visual Excel runtime evidence missing update_table proof.');
-  if (!isRecord(details.sort) || details.sort.sorted !== true) failures.push('Product visual Excel runtime evidence missing sort_range proof.');
-  if (!isRecord(details.filter) || details.filter.filtered !== true) failures.push('Product visual Excel runtime evidence missing apply_filter proof.');
-  if (!isRecord(details.chart) || typeof details.chart.chart !== 'string') failures.push('Product visual Excel runtime evidence missing create_chart proof.');
-  if (!isRecord(details.chart_update) || details.chart_update.updated !== true) failures.push('Product visual Excel runtime evidence missing update_chart proof.');
-  if (!isRecord(details.pivot_table) || typeof details.pivot_table.pivot_table !== 'string') failures.push('Product visual Excel runtime evidence missing create_pivot_table proof.');
-  if (!isRecord(details.pivot_update) || details.pivot_update.refreshed !== true) failures.push('Product visual Excel runtime evidence missing update_pivot_table proof.');
-  if (!isRecord(details.sheet) || details.sheet.activated !== true) failures.push('Product visual Excel runtime evidence missing add_sheet activation proof.');
 }
 
 function validateProductVisualDaemonContext(context: unknown): void {

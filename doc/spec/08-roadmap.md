@@ -27,7 +27,7 @@
 - [x] Consented Word runtime smoke test plus representative IRM rights matrix.
       `npm run evidence:word` now owns a self-contained live Word document
       lifecycle: it starts or reuses the daemon, creates a driver-owned
-      document, activates the add-in, records a `word.e2e_session` gate, runs
+      document, activates the add-in, uses the Office tool E2E report path and runs
       Word read/mutation/full-smoke/COM tracked-change evidence, cleans up the
       document, and writes `artifacts/runtime-evidence-word.json`. `npm run
       evidence:runtime` aliases that self-contained Word run. `npm run
@@ -1373,7 +1373,7 @@ names, or Microsoft-owned marks.
       flow, static daemon routing, and v1 `excel.*` command handlers are
       implemented. Real Excel runtime smoke evidence is covered by
       `artifacts/runtime-evidence-excel.json` and validated with
-      `npm run evidence:validate -- --require-excel-smoke`.
+      `npm run evidence:validate -- --require-office-tool-e2e`.
 
 **Exit criterion**: The Rust daemon can replace the Node daemon without changing
 the add-in protocol, MCP client behavior, evidence report schema, UI state
@@ -1698,10 +1698,9 @@ Microsoft workbook -> worksheet -> range -> table/chart/pivot object workflow.
 - [x] Add real Excel runtime smoke evidence against a live workbook.
       Current evidence: `npm run evidence:excel` now owns a self-contained live
       Excel workbook lifecycle: it starts or reuses the daemon, creates a
-      driver-owned workbook, activates the add-in, records an `excel.e2e_session`
-      gate, runs the full 20-tool `excel.runtime_smoke`, cleans up the workbook,
+      driver-owned workbook, activates the add-in, writes `artifacts/office-tool-e2e-excel.json` from one driver-owned workbook session,
       and writes `artifacts/runtime-evidence-excel.json`. Validation passes with
-      `npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-excel.json --require-excel-smoke`
+      `npm run evidence:validate -- --require-office-tool-e2e`
       against that self-contained live Excel workbook.
 
 #### M7.1 — Excel Core Tool Surface Refinement
@@ -1878,14 +1877,13 @@ chart, or PivotTable tools that duplicate an existing owner tool.
 - [x] Add final Excel v1 automated evidence: Rust forwarding/preflight tests, daemon
       catalog tests, Excel task pane contract tests, `npm run check` in
       `src/office-ctl/excel`, targeted daemon cargo tests, `git diff --check`,
-      and representative live Excel smoke evidence covering all implemented
+      and representative live Excel E2E evidence covering all implemented
       categories. Current automated evidence covers the full daemon catalog,
-      MCP forwarding/listing, Excel task pane contract, and a 20-tool runtime
-      evidence harness. Current live evidence is self-contained: `npm run
-      evidence:excel` records `excel.e2e_session` plus a passed 20-tool
-      `excel.runtime_smoke`, and `npm run evidence:validate -- --input
-      ..\..\..\..\artifacts\runtime-evidence-excel.json --require-excel-smoke`
-      passes against the regenerated artifact.
+      MCP forwarding/listing, Excel task pane contract, and a 20-tool Office
+      tool E2E loop. Current live evidence is self-contained: `npm run
+      evidence:excel` delegates to `src/office-ctl/excel` and writes
+      `artifacts/office-tool-e2e-excel.json`, and `npm run evidence:validate
+      -- --require-office-tool-e2e` validates the regenerated report.
 
 ### M8 — PowerPoint
 
@@ -1941,14 +1939,12 @@ Initial catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
       `npm run evidence:powerpoint`, which writes
       `artifacts/runtime-evidence-powerpoint.json`, owns a self-contained live
       PowerPoint presentation lifecycle, and validator gate
-      `npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-powerpoint.json --require-powerpoint-smoke`.
-      Current evidence: `artifacts/runtime-evidence-powerpoint.json` records a
-      passed `powerpoint.e2e_session` gate and a passed
-      `powerpoint.runtime_smoke` gate against that self-contained live
+      `npm run evidence:validate -- --require-office-tool-e2e`.
+      Current evidence: `artifacts/office-tool-e2e-powerpoint.json` records a
+      passed `office_tool_e2e_report` against that self-contained live
       PowerPoint presentation, and the validator passes
-      `--require-powerpoint-smoke` with
-      the refined 25-tool catalog, category proofs, mutation/readback, and
-      export success or explicit host-capability rejection checks.
+      `--require-office-tool-e2e` with the refined 25-tool catalog,
+      per-tool setup/readback proof, cleanup proof, and activation proof.
 
 #### M8.1 — PowerPoint Core Tool Surface Refinement
 
@@ -2047,8 +2043,7 @@ PowerPoint Designer, and macros.
       `npm run check` in `src/office-mcp/daemon/evidence`,
       `cargo test -p office-mcp-daemon`, `cargo fmt --check`, and
       `git diff --check`; the generated PowerPoint runtime evidence records a
-      self-contained `powerpoint.e2e_session` gate plus a passed
-      `powerpoint.runtime_smoke` gate with all 25 tools advertised and category
+      self-contained `office_tool_e2e_report` with all 25 tools advertised and per-tool
       proofs for Presentation, Slides, Layout, Shapes, Text, and Tables.
 
 ### M9 — Outlook (cautious)

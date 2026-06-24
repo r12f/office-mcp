@@ -48,85 +48,6 @@ const SURFACES = [
   'tray-quit-confirmation'
 ];
 
-const EXCEL_V1_TOOLS = [
-  'excel.get_workbook_info',
-  'excel.list_sheets',
-  'excel.add_sheet',
-  'excel.update_sheet',
-  'excel.delete_sheet',
-  'excel.get_used_range',
-  'excel.read_range',
-  'excel.write_range',
-  'excel.clear_range',
-  'excel.find_replace_cells',
-  'excel.set_formula',
-  'excel.format_range',
-  'excel.sort_range',
-  'excel.apply_filter',
-  'excel.create_table',
-  'excel.update_table',
-  'excel.create_chart',
-  'excel.update_chart',
-  'excel.create_pivot_table',
-  'excel.update_pivot_table'
-];
-
-const POWERPOINT_V1_TOOLS = [
-  'powerpoint.get_presentation_info',
-  'powerpoint.get_active_view',
-  'powerpoint.export_file',
-  'powerpoint.update_tags',
-  'powerpoint.list_slides',
-  'powerpoint.add_slide',
-  'powerpoint.update_slide',
-  'powerpoint.delete_slide',
-  'powerpoint.move_slide',
-  'powerpoint.export_slide',
-  'powerpoint.list_layouts',
-  'powerpoint.apply_layout',
-  'powerpoint.get_selection',
-  'powerpoint.set_selection',
-  'powerpoint.list_shapes',
-  'powerpoint.add_text_box',
-  'powerpoint.add_shape',
-  'powerpoint.insert_image',
-  'powerpoint.update_shape',
-  'powerpoint.read_text',
-  'powerpoint.replace_text',
-  'powerpoint.format_text',
-  'powerpoint.add_table',
-  'powerpoint.read_table',
-  'powerpoint.update_table'
-];
-
-const WORD_V1_TOOLS = [
-  'word.get_text',
-  'word.get_outline',
-  'word.get_paragraph',
-  'word.find_text',
-  'word.get_selection',
-  'word.insert_paragraph',
-  'word.insert_table',
-  'word.insert_image',
-  'word.insert_page_break',
-  'word.insert_list',
-  'word.replace_text',
-  'word.update_paragraph',
-  'word.delete_range',
-  'word.apply_formatting',
-  'word.apply_style',
-  'word.read_table',
-  'word.update_table',
-  'word.list_content_controls',
-  'word.insert_content_control',
-  'word.update_content_control',
-  'word.delete_content_control',
-  'word.add_comment',
-  'word.resolve_comment',
-  'word.update_tracked_change',
-  'word.save'
-];
-
 test('product visual evidence recorder requires all product surfaces', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -337,7 +258,7 @@ test('README Word runtime evidence command matches self-contained gate', () => {
 
   assert.match(readme, /npm run evidence:word/);
   assert.match(readme, /runtime-evidence-word\.json/);
-  assert.match(readme, /--require-mutation --require-full-word-smoke --require-com-tracked-changes/);
+  assert.doesNotMatch(readme, /--require-mutation|--require-full-word-smoke|--require-com-tracked-changes/);
   assert.doesNotMatch(readme, /runtime-evidence-full\.json/);
   assert.doesNotMatch(readme, /npm run evidence:runtime -- --endpoint http:\/\/127\.0\.0\.1:8800\/mcp --output .*runtime-evidence-full\.json/);
 });
@@ -856,48 +777,6 @@ test('product visual evidence recorder requires PowerPoint runtime evidence', ()
   });
 });
 
-test('product visual evidence recorder rejects runtime evidence with non-exact host catalogs', () => {
-  withScreenshots((dir, screenshots) => {
-    const daemonBin = writeFakeDaemon(dir);
-    const renderedLogoReviewPath = writeRenderedLogoReview(dir);
-
-    const wordPath = writeWordRuntimeEvidence(dir);
-    const word = JSON.parse(readFileSync(wordPath, 'utf8')) as Record<string, unknown>;
-    const wordRead = ((word.gates as Array<Record<string, unknown>>).find((gate) => gate.name === 'word.runtime_read_smoke')?.details ?? {}) as Record<string, unknown>;
-    wordRead.available_tool_count = 26;
-    wordRead.available_tools = [...WORD_V1_TOOLS, 'word.accept_change'];
-    writeFileSync(wordPath, JSON.stringify(word, null, 2));
-    const wordResult = runRecorder(join(dir, 'legacy-word-runtime.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--word-runtime-evidence-path', wordPath);
-    assert.notEqual(wordResult.status, 0);
-    let evidence = JSON.parse(outputText(wordResult.stdout)) as Record<string, unknown>;
-    assert.equal(evidence.word_runtime_evidence_ready, false);
-    assert.equal((evidence.word_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
-
-    const excelPath = writeExcelRuntimeEvidence(dir);
-    const excel = JSON.parse(readFileSync(excelPath, 'utf8')) as Record<string, unknown>;
-    const excelSmoke = ((excel.gates as Array<Record<string, unknown>>).find((gate) => gate.name === 'excel.runtime_smoke')?.details ?? {}) as Record<string, unknown>;
-    excelSmoke.available_tool_count = 21;
-    excelSmoke.available_tools = [...EXCEL_V1_TOOLS, 'excel.legacy_macro'];
-    writeFileSync(excelPath, JSON.stringify(excel, null, 2));
-    const excelResult = runRecorder(join(dir, 'legacy-excel-runtime.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--excel-runtime-evidence-path', excelPath);
-    assert.notEqual(excelResult.status, 0);
-    evidence = JSON.parse(outputText(excelResult.stdout)) as Record<string, unknown>;
-    assert.equal((evidence.excel_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
-
-    const powerPointPath = writePowerPointRuntimeEvidence(dir);
-    const powerpoint = JSON.parse(readFileSync(powerPointPath, 'utf8')) as Record<string, unknown>;
-    const powerpointSmoke = ((powerpoint.gates as Array<Record<string, unknown>>).find((gate) => gate.name === 'powerpoint.runtime_smoke')?.details ?? {}) as Record<string, unknown>;
-    powerpointSmoke.available_tool_count = 26;
-    powerpointSmoke.available_tools = [...POWERPOINT_V1_TOOLS, 'powerpoint.export_pdf'];
-    writeFileSync(powerPointPath, JSON.stringify(powerpoint, null, 2));
-    const powerpointResult = runRecorder(join(dir, 'legacy-powerpoint-runtime.json'), screenshots, '--daemon-bin', daemonBin, '--rendered-logo-review-path', renderedLogoReviewPath, '--powerpoint-runtime-evidence-path', powerPointPath);
-    assert.notEqual(powerpointResult.status, 0);
-    evidence = JSON.parse(outputText(powerpointResult.stdout)) as Record<string, unknown>;
-    assert.equal(evidence.powerpoint_runtime_evidence_ready, false);
-    assert.equal((evidence.powerpoint_taskpane as Record<string, unknown>).runtime_evidence_ready, false);
-  });
-});
-
 test('product visual evidence recorder requires Office tool E2E reports', () => {
   withScreenshots((dir, screenshots) => {
     const daemonBin = writeFakeDaemon(dir);
@@ -1356,173 +1235,40 @@ function writeManifest(dir: string, host: 'word' | 'excel' | 'powerpoint'): stri
 }
 
 function writeExcelRuntimeEvidence(dir: string, ready = true): string {
-  const path = join(dir, `excel-runtime-${ready ? 'ready' : 'broken'}.json`);
-  const sessionId = '11111111-2222-3333-4444-555555555555';
-  const sessions = ready ? [{
-    app: 'excel',
-    available_tool_count: 20,
-    document: { title: 'Excel Workbook' },
-    host: { app: 'excel', platform: 'pc', version: '16.0' },
-    session_id: sessionId,
-    status: 'active'
-  }] : [];
-  const smokeDetails = {
-    session_id: sessionId,
-    available_tool_count: ready ? 20 : 0,
-    available_tools: ready ? EXCEL_V1_TOOLS : [],
-    marker_found: ready,
-    workbook_info: ready ? { sheet_count: 2, table_count: 1 } : {},
-    sheet_list_count: ready ? 1 : undefined,
-    updated_sheet: ready ? { updated: true } : {},
-    deleted_sheet: { deleted: ready },
-    used_range: ready ? { address: 'Sheet1!A1:C5' } : {},
-    find_replace: ready ? { replaced: true, replaced_count: 1 } : {},
-    clear: ready ? { cleared: true } : {},
-    write: { wrote_values: ready },
-    formula: { wrote_formula: ready },
-    format: { formatted: ready },
-    table: ready ? { table: 'OfficeMcpTable' } : {},
-    table_update: ready ? { updated: true } : {},
-    sort: { sorted: ready },
-    filter: { filtered: ready },
-    chart: ready ? { chart: 'Chart 1' } : {},
-    chart_update: { updated: ready },
-    pivot_table: ready ? { pivot_table: 'OfficeMcpPivot' } : {},
-    pivot_update: { refreshed: ready },
-    sheet: { activated: ready }
-  };
-  writeFileSync(path, JSON.stringify({
-    schema_version: 1,
-    generated_at: new Date().toISOString(),
-    endpoint: 'http://127.0.0.1:8800/mcp',
-    gates: [
-      { name: 'word.session_discovery', status: 'passed', details: { sessions } },
-      { name: 'excel.runtime_smoke', status: ready ? 'passed' : 'failed', details: smokeDetails }
-    ]
-  }, null, 2));
-  return path;
+  return writeHostRuntimeEvidence(dir, 'excel', 'Excel Workbook', ready);
 }
 
 function writeWordRuntimeEvidence(dir: string, ready = true): string {
-  const path = join(dir, `word-runtime-${ready ? 'ready' : 'broken'}.json`);
-  const sessionId = '00000000-1111-2222-3333-444444444444';
-  const status = ready ? 'passed' : 'failed';
-  const report = {
-    schema_version: 1,
-    endpoint: 'http://127.0.0.1:8800/mcp',
-    generated_at: new Date().toISOString(),
-    session_id: sessionId,
-    gates: [
-      {
-        name: 'word.session_discovery',
-        status: 'passed',
-        details: {
-          sessions: [{
-            app: 'word',
-            status: 'active',
-            session_id: sessionId,
-            available_tool_count: 25,
-            document: { title: 'Word Document' },
-            host: { app: 'word', platform: 'pc', version: '16.0' }
-          }]
-        }
-      },
-      { name: 'word.e2e_session', status: 'passed', details: { session_id: sessionId, available_tool_count: 25, document_path: 'C:\\Temp\\word.docx' } },
-      { name: 'word.runtime_read_smoke', status, details: { available_tool_count: 25, available_tools: WORD_V1_TOOLS, paragraph_0_text_length: ready ? 23 : 0, document_text_length: ready ? 23 : 0 } },
-      { name: 'word.runtime_mutation_smoke', status, details: { marker: 'marker', insert: { inserted: ready }, find_count: ready ? 1 : 0 } },
-      { name: 'word.full_smoke.word-core', status, details: { mode: 'word-core' } },
-      { name: 'word.full_smoke.word-formatting', status, details: { mode: 'word-formatting' } },
-      { name: 'word.full_smoke.word-review', status, details: { mode: 'word-review' } },
-      { name: 'word.full_smoke.word-resources', status, details: { mode: 'word-resources' } },
-      { name: 'word.full_smoke.word-spec-args', status, details: { mode: 'word-spec-args' } },
-      { name: 'word.tracked_change_com.accept', status, details: { action: 'accept', mutation_action: ready ? 'accept' : undefined } },
-      { name: 'word.tracked_change_com.reject', status, details: { action: 'reject', mutation_action: ready ? 'reject' : undefined } }
-    ]
-  };
-  writeFileSync(path, JSON.stringify(report, null, 2));
-  return path;
+  return writeHostRuntimeEvidence(dir, 'word', 'Word Document', ready);
 }
 
 function writePowerPointRuntimeEvidence(dir: string, ready = true): string {
-  const path = join(dir, `powerpoint-runtime-${ready ? 'ready' : 'broken'}.json`);
-  const sessionId = '22222222-3333-4444-5555-666666666666';
+  return writeHostRuntimeEvidence(dir, 'powerpoint', 'PowerPoint Presentation', ready);
+}
+
+function writeHostRuntimeEvidence(dir: string, app: 'word' | 'excel' | 'powerpoint', title: string, ready = true): string {
+  const path = join(dir, `${app}-runtime-${ready ? 'ready' : 'broken'}.json`);
+  const sessionId = `${app}-runtime-session`;
   const sessions = ready ? [{
-    app: 'powerpoint',
-    available_tool_count: 25,
-    document: { title: 'PowerPoint Presentation' },
-    host: { app: 'powerpoint', platform: 'pc', version: '16.0' },
+    app,
+    status: 'active',
     session_id: sessionId,
-    status: 'active'
+    document: { title },
+    host: { app, platform: 'pc', version: '16.0' }
   }] : [];
-  const smokeDetails = {
-    session_id: sessionId,
-    available_tool_count: ready ? 25 : 0,
-    available_tools: ready ? [
-      'powerpoint.get_presentation_info',
-      'powerpoint.get_active_view',
-      'powerpoint.export_file',
-      'powerpoint.update_tags',
-      'powerpoint.list_slides',
-      'powerpoint.add_slide',
-      'powerpoint.update_slide',
-      'powerpoint.delete_slide',
-      'powerpoint.move_slide',
-      'powerpoint.export_slide',
-      'powerpoint.list_layouts',
-      'powerpoint.apply_layout',
-      'powerpoint.get_selection',
-      'powerpoint.set_selection',
-      'powerpoint.list_shapes',
-      'powerpoint.add_text_box',
-      'powerpoint.add_shape',
-      'powerpoint.insert_image',
-      'powerpoint.update_shape',
-      'powerpoint.read_text',
-      'powerpoint.replace_text',
-      'powerpoint.format_text',
-      'powerpoint.add_table',
-      'powerpoint.read_table',
-      'powerpoint.update_table'
-    ] : [],
-    presentation_info: ready ? { slide_count: 1 } : {},
-    active_view: ready ? { active_view: 'edit' } : {},
-    list_slides: ready ? { slides: [{ slide_id: 'slide-1', slide_index: 0 }] } : {},
-    add_slide: ready ? { slide_id: 'slide-1', slide_index: 0 } : {},
-    add_text_box: ready ? { shape: { shape_id: 'shape-1' } } : {},
-    list_shapes: ready ? { shapes: [{ shape_id: 'shape-1' }] } : {},
-    read_text: ready ? { items: [{ shape_id: 'shape-1', text: 'Office MCP' }] } : {},
-    replace_text: { replacements: ready ? 1 : 0 },
-    format_text: ready ? { shape_id: 'shape-1', formatted: true } : {},
-    list_layouts: ready ? { masters: [{ id: 'master-1', layouts: [{ id: 'layout-1' }] }] } : {},
-    layout: ready ? { slide_id: 'slide-1', slide_index: 0, layout_name: 'Title Only' } : {},
-    add_table: ready ? { shape_id: 'table-1' } : {},
-    read_table: ready ? { shape_id: 'table-1', values: [['Office']] } : {},
-    mutation_proved: ready,
-    tool_category_proofs: {
-      presentation: ready,
-      slides: ready,
-      layout: ready,
-      shapes: ready,
-      text: ready,
-      tables: ready
-    },
-    export_supported: false,
-    export_host_rejection: ready,
-    table_supported: ready,
-    table_host_rejection: false
-  };
   writeFileSync(path, JSON.stringify({
     schema_version: 1,
-    generated_at: new Date().toISOString(),
     endpoint: 'http://127.0.0.1:8800/mcp',
+    generated_at: new Date().toISOString(),
+    session_id: sessionId,
     gates: [
       { name: 'word.session_discovery', status: 'passed', details: { sessions } },
-      { name: 'powerpoint.runtime_smoke', status: ready ? 'passed' : 'failed', details: smokeDetails }
+      { name: 'agent_client_stdio_bridge', status: 'passed', details: { session_count: sessions.length } },
+      { name: 'irm_rights_matrix', status: 'skipped', details: { reason: 'fixture' } }
     ]
   }, null, 2));
   return path;
 }
-
 function writeOfficeToolE2eReport(dir: string, host: 'Word' | 'Excel' | 'PowerPoint', ready = true): string {
   const key = host.toLowerCase();
   const path = join(dir, `office-tool-e2e-${key}-${ready ? 'ready' : 'broken'}.json`);

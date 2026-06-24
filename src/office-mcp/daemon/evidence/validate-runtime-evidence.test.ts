@@ -10,85 +10,6 @@ import { tinyPng } from './image-evidence.js';
 const REPO_ROOT = resolve(process.cwd(), '../../../..');
 const ASSET_ROOT = resolve(REPO_ROOT, 'src/office-ctl/common/assets');
 
-const POWERPOINT_V1_TOOLS = [
-  'powerpoint.get_presentation_info',
-  'powerpoint.get_active_view',
-  'powerpoint.export_file',
-  'powerpoint.update_tags',
-  'powerpoint.list_slides',
-  'powerpoint.add_slide',
-  'powerpoint.update_slide',
-  'powerpoint.delete_slide',
-  'powerpoint.move_slide',
-  'powerpoint.export_slide',
-  'powerpoint.list_layouts',
-  'powerpoint.apply_layout',
-  'powerpoint.get_selection',
-  'powerpoint.set_selection',
-  'powerpoint.list_shapes',
-  'powerpoint.add_text_box',
-  'powerpoint.add_shape',
-  'powerpoint.insert_image',
-  'powerpoint.update_shape',
-  'powerpoint.read_text',
-  'powerpoint.replace_text',
-  'powerpoint.format_text',
-  'powerpoint.add_table',
-  'powerpoint.read_table',
-  'powerpoint.update_table'
-];
-
-const EXCEL_V1_TOOLS = [
-  'excel.get_workbook_info',
-  'excel.list_sheets',
-  'excel.add_sheet',
-  'excel.update_sheet',
-  'excel.delete_sheet',
-  'excel.get_used_range',
-  'excel.read_range',
-  'excel.write_range',
-  'excel.clear_range',
-  'excel.find_replace_cells',
-  'excel.set_formula',
-  'excel.format_range',
-  'excel.sort_range',
-  'excel.apply_filter',
-  'excel.create_table',
-  'excel.update_table',
-  'excel.create_chart',
-  'excel.update_chart',
-  'excel.create_pivot_table',
-  'excel.update_pivot_table'
-];
-
-const WORD_V1_TOOLS = [
-  'word.get_text',
-  'word.get_outline',
-  'word.get_paragraph',
-  'word.find_text',
-  'word.get_selection',
-  'word.insert_paragraph',
-  'word.insert_table',
-  'word.insert_image',
-  'word.insert_page_break',
-  'word.insert_list',
-  'word.replace_text',
-  'word.update_paragraph',
-  'word.delete_range',
-  'word.apply_formatting',
-  'word.apply_style',
-  'word.read_table',
-  'word.update_table',
-  'word.list_content_controls',
-  'word.insert_content_control',
-  'word.update_content_control',
-  'word.delete_content_control',
-  'word.add_comment',
-  'word.resolve_comment',
-  'word.update_tracked_change',
-  'word.save'
-];
-
 test('runtime evidence validator accepts required runtime gates and optional IRM skip', () => {
   withEvidenceFile(report('skipped'), (path) => {
     const result = runValidator(path);
@@ -106,171 +27,6 @@ test('runtime evidence validator can require IRM evidence', () => {
 
   withEvidenceFile(report('passed'), (path) => {
     const result = runValidator(path, '--require-irm');
-    assert.equal(result.status, 0, outputText(result.stderr));
-  });
-});
-
-test('runtime evidence validator can require full Word smoke evidence', () => {
-  withEvidenceFile(report('skipped'), (path) => {
-    const result = runValidator(path, '--require-full-word-smoke');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /Missing required gate: word\.full_smoke\.word-core/);
-  });
-
-  const full = report('skipped');
-  full.gates.push(
-    gate('word.full_smoke.word-core', 'passed'),
-    gate('word.full_smoke.word-formatting', 'passed'),
-    gate('word.full_smoke.word-review', 'passed'),
-    gate('word.full_smoke.word-resources', 'passed'),
-    gate('word.full_smoke.word-spec-args', 'passed')
-  );
-  withEvidenceFile(full, (path) => {
-    const result = runValidator(path, '--require-full-word-smoke');
-    assert.equal(result.status, 0, outputText(result.stderr));
-  });
-});
-
-test('runtime evidence validator can require Excel smoke evidence', () => {
-  withEvidenceFile(report('skipped'), (path) => {
-    const result = runValidator(path, '--require-excel-smoke');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /Missing required gate: excel\.runtime_smoke/);
-  });
-
-  const full = excelOnlyReport();
-  withEvidenceFile(full, (path) => {
-    const result = runValidator(path, '--require-excel-smoke');
-    assert.equal(result.status, 0, outputText(result.stderr));
-  });
-
-  const weak = excelOnlyReport();
-  const weakDiscovery = weak.gates[0].details as { sessions: Array<{ available_tool_count: number }> };
-  const weakSmoke = weak.gates[1].details as Record<string, unknown>;
-  weakDiscovery.sessions[0].available_tool_count = 7;
-  weakSmoke.available_tool_count = 7;
-  weakSmoke.available_tools = EXCEL_V1_TOOLS.slice(0, 7);
-  delete weakSmoke.sort;
-  delete weakSmoke.pivot_table;
-  withEvidenceFile(weak, (path) => {
-    const result = runValidator(path, '--require-excel-smoke');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /Excel smoke gate missing 20-tool available tool count/);
-    assert.match(outputText(result.stdout), /Excel smoke gate available tools are not aligned with v1 catalog/);
-    assert.match(outputText(result.stdout), /Excel smoke gate missing sort_range proof/);
-    assert.match(outputText(result.stdout), /Excel smoke gate missing create_pivot_table proof/);
-  });
-});
-
-test('runtime evidence validator rejects passed Excel smoke gates without v1 proof details', () => {
-  const weak = report('skipped');
-  weak.gates.push(gate('excel.runtime_smoke', 'passed'));
-  withEvidenceFile(weak, (path) => {
-    const result = runValidator(path, '--require-excel-smoke');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /Excel smoke gate missing session_id/);
-    assert.match(outputText(result.stdout), /Excel smoke gate missing 20-tool available tool count/);
-    assert.match(outputText(result.stdout), /Excel smoke gate missing marker readback/);
-  });
-});
-
-test('runtime evidence validator accepts Excel-only smoke without Word runtime gates', () => {
-  const excelOnly = excelOnlyReport();
-  withEvidenceFile(excelOnly, (path) => {
-    const result = runValidator(path, '--require-excel-smoke');
-    assert.equal(result.status, 0, outputText(result.stdout) + outputText(result.stderr));
-    const summary = JSON.parse(outputText(result.stdout)) as { ok: boolean; session_id?: string };
-    assert.equal(summary.ok, true);
-    assert.equal(summary.session_id, undefined);
-  });
-
-  excelOnly.gates = excelOnly.gates.filter((item) => item.name !== 'excel.runtime_smoke');
-  withEvidenceFile(excelOnly, (path) => {
-    const result = runValidator(path, '--require-excel-smoke');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /Missing required gate: excel\.runtime_smoke/);
-  });
-});
-
-test('runtime evidence validator can require PowerPoint smoke evidence', () => {
-  withEvidenceFile(report('skipped'), (path) => {
-    const result = runValidator(path, '--require-powerpoint-smoke');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /Missing required gate: powerpoint\.runtime_smoke/);
-  });
-
-  const full = powerpointOnlyReport();
-  withEvidenceFile(full, (path) => {
-    const result = runValidator(path, '--require-powerpoint-smoke');
-    assert.equal(result.status, 0, outputText(result.stdout) + outputText(result.stderr));
-    const summary = JSON.parse(outputText(result.stdout)) as { ok: boolean; session_id?: string; require_powerpoint_smoke?: boolean };
-    assert.equal(summary.ok, true);
-    assert.equal(summary.session_id, undefined);
-    assert.equal(summary.require_powerpoint_smoke, true);
-  });
-
-  full.gates[1].details.export_supported = false;
-  full.gates[1].details.export_host_rejection = false;
-  withEvidenceFile(full, (path) => {
-    const result = runValidator(path, '--require-powerpoint-smoke');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /export_file success or explicit host-capability rejection/);
-  });
-});
-
-test('runtime evidence validator rejects runtime smoke catalogs that only satisfy count lower bounds', () => {
-  const excel = excelOnlyReport();
-  const excelDetails = excel.gates[1].details as Record<string, unknown>;
-  excelDetails.available_tool_count = 21;
-  excelDetails.available_tools = [...EXCEL_V1_TOOLS, 'excel.legacy_macro'];
-  withEvidenceFile(excel, (path) => {
-    const result = runValidator(path, '--require-excel-smoke');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /Excel smoke gate available tools are not aligned with v1 catalog/);
-  });
-
-  const powerpoint = powerpointOnlyReport();
-  const powerpointDetails = powerpoint.gates[1].details as Record<string, unknown>;
-  powerpointDetails.available_tool_count = 26;
-  powerpointDetails.available_tools = [...POWERPOINT_V1_TOOLS, 'powerpoint.export_pdf'];
-  withEvidenceFile(powerpoint, (path) => {
-    const result = runValidator(path, '--require-powerpoint-smoke');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /PowerPoint smoke gate available tools are not aligned with v1 catalog/);
-  });
-});
-
-test('runtime evidence validator rejects product visual runtime evidence without exact host catalogs', () => {
-  withEvidenceFile(uiReport(), (uiPath) => {
-    withProductVisualEvidence(true, (visualPath) => {
-      const visual = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
-      const wordSession = visual.word_runtime_evidence.session as Record<string, unknown>;
-      const wordDetails = visual.word_runtime_evidence.smoke_details as Record<string, unknown>;
-      wordSession.available_tool_count = 26;
-      wordDetails.available_tool_count = 26;
-      wordDetails.available_tools = ['word.get_text'];
-      writeFileSync(visualPath, JSON.stringify(visual, null, 2));
-
-      const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
-      assert.notEqual(result.status, 0);
-      assert.match(outputText(result.stdout), /Product visual Word runtime evidence available tools are not aligned with v1 catalog/);
-    });
-  });
-});
-test('runtime evidence validator can require COM tracked-change evidence', () => {
-  withEvidenceFile(report('skipped'), (path) => {
-    const result = runValidator(path, '--require-com-tracked-changes');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /Missing required gate: word\.tracked_change_com\.accept/);
-  });
-
-  const full = report('skipped');
-  full.gates.push(
-    gate('word.tracked_change_com.accept', 'passed'),
-    gate('word.tracked_change_com.reject', 'passed')
-  );
-  withEvidenceFile(full, (path) => {
-    const result = runValidator(path, '--require-com-tracked-changes');
     assert.equal(result.status, 0, outputText(result.stderr));
   });
 });
@@ -327,22 +83,6 @@ test('runtime evidence validator can require agent client evidence', () => {
   withEvidenceFile(full, (path) => {
     const result = runValidator(path, '--require-agent-client-prompt');
     assert.equal(result.status, 0, outputText(result.stderr));
-  });
-});
-
-test('runtime evidence validator can require mutation evidence', () => {
-  const broken = report('passed');
-  broken.gates = broken.gates.filter((item) => item.name !== 'word.runtime_mutation_smoke');
-
-  withEvidenceFile(broken, (path) => {
-    const result = runValidator(path);
-    assert.equal(result.status, 0, outputText(result.stderr));
-  });
-
-  withEvidenceFile(broken, (path) => {
-    const result = runValidator(path, '--require-mutation');
-    assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /Missing required gate: word\.runtime_mutation_smoke/);
   });
 });
 
@@ -731,16 +471,14 @@ test('runtime evidence validator can require product visual evidence', () => {
       broken.word_runtime_evidence_ready = false;
       broken.product_identity_review.word_runtime_evidence_ready = false;
       broken.word_taskpane.runtime_evidence_ready = false;
-      broken.word_taskpane.runtime_evidence.smoke_details.find_count = 0;
-      (broken.word_taskpane.runtime_evidence.smoke_details as Record<string, unknown>).com_tracked_change_passed = false;
+      broken.word_taskpane.runtime_evidence.session.document = { title: '' };
       broken.word_taskpane.density_ready = false;
       broken.passed = false;
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /Word runtime evidence ready flag/);
-      assert.match(outputText(result.stdout), /Word runtime evidence missing mutation readback/);
-      assert.match(outputText(result.stdout), /Word runtime evidence missing COM tracked-change proof/);
+      assert.match(outputText(result.stdout), /Word runtime evidence missing document title/);
       assert.match(outputText(result.stdout), /Word task pane density pass flag/);
     });
   });
@@ -748,8 +486,8 @@ test('runtime evidence validator can require product visual evidence', () => {
   withEvidenceFile(ui, (uiPath) => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
-      broken.word_runtime_evidence.smoke_details.session_id = 'different-word-session';
-      broken.word_taskpane.runtime_evidence.smoke_details.session_id = 'different-word-session';
+      broken.word_runtime_evidence.session.session_id = 'word-session';
+      broken.word_taskpane.runtime_evidence.session.session_id = 'different-word-session';
       broken.word_runtime_evidence_ready = false;
       broken.word_taskpane.runtime_evidence_ready = false;
       broken.word_taskpane.density_ready = false;
@@ -757,7 +495,7 @@ test('runtime evidence validator can require product visual evidence', () => {
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
       assert.notEqual(result.status, 0);
-      assert.match(outputText(result.stdout), /Word runtime evidence session_id mismatch/);
+      assert.match(outputText(result.stdout), /Word task pane runtime evidence does not match top-level runtime evidence session/);
     });
   });
 
@@ -829,18 +567,15 @@ test('runtime evidence validator can require product visual evidence', () => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.excel_runtime_evidence_ready = false;
-      broken.excel_runtime_evidence.smoke_details.marker_found = false;
-      (broken.excel_runtime_evidence.smoke_details as Record<string, unknown>).chart = {};
+      broken.excel_runtime_evidence.session.host = { app: 'word', platform: 'pc', version: '16.0' };
       broken.excel_taskpane.runtime_evidence_ready = false;
-      broken.excel_taskpane.runtime_evidence.smoke_details.marker_found = false;
-      (broken.excel_taskpane.runtime_evidence.smoke_details as Record<string, unknown>).chart = {};
+      broken.excel_taskpane.runtime_evidence.session.host = { app: 'word', platform: 'pc', version: '16.0' };
       broken.excel_taskpane.density_ready = false;
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /Excel runtime evidence ready flag/);
-      assert.match(outputText(result.stdout), /Excel runtime evidence missing marker readback/);
-      assert.match(outputText(result.stdout), /Excel runtime evidence missing create_chart proof/);
+      assert.match(outputText(result.stdout), /Excel runtime evidence missing Excel host metadata/);
     });
   });
 
@@ -848,7 +583,6 @@ test('runtime evidence validator can require product visual evidence', () => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.excel_taskpane.runtime_evidence.session.session_id = 'different-excel-session';
-      broken.excel_taskpane.runtime_evidence.smoke_details.session_id = 'different-excel-session';
       broken.excel_taskpane.runtime_evidence_ready = false;
       broken.excel_taskpane.density_ready = false;
       broken.passed = false;
@@ -880,15 +614,13 @@ test('runtime evidence validator can require product visual evidence', () => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.powerpoint_runtime_evidence_ready = false;
       broken.product_identity_review.powerpoint_runtime_evidence_ready = false;
-      broken.powerpoint_runtime_evidence.smoke_details.mutation_proved = false;
-      broken.powerpoint_runtime_evidence.smoke_details.replace_text = { replacements: 0 };
+      broken.powerpoint_runtime_evidence.session.status = 'dead';
       broken.passed = false;
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /PowerPoint runtime evidence ready flag/);
-      assert.match(outputText(result.stdout), /PowerPoint runtime evidence did not prove mutation path/);
-      assert.match(outputText(result.stdout), /PowerPoint runtime evidence missing replace_text proof/);
+      assert.match(outputText(result.stdout), /PowerPoint runtime evidence missing active PowerPoint session/);
     });
   });
 
@@ -896,14 +628,14 @@ test('runtime evidence validator can require product visual evidence', () => {
     withProductVisualEvidence(true, (visualPath) => {
       const broken = JSON.parse(readFileSync(visualPath, 'utf8')) as ReturnType<typeof productVisualReport>;
       broken.powerpoint_taskpane.runtime_evidence_ready = false;
-      broken.powerpoint_taskpane.runtime_evidence.smoke_details.mutation_proved = false;
+      broken.powerpoint_taskpane.runtime_evidence.session.status = 'dead';
       broken.powerpoint_taskpane.density_ready = false;
       broken.passed = false;
       writeFileSync(visualPath, JSON.stringify(broken, null, 2));
       const result = runValidator(uiPath, '--ui', '--require-product-visual', '--product-visual-evidence-path', visualPath);
       assert.notEqual(result.status, 0);
       assert.match(outputText(result.stdout), /PowerPoint runtime evidence ready flag/);
-      assert.match(outputText(result.stdout), /PowerPoint runtime evidence did not prove mutation path/);
+      assert.match(outputText(result.stdout), /PowerPoint runtime evidence missing active PowerPoint session/);
       assert.match(outputText(result.stdout), /PowerPoint task pane density pass flag/);
     });
   });
@@ -1508,12 +1240,12 @@ test('runtime evidence validator can require manual Windows tray evidence', () =
 
 test('runtime evidence validator rejects missing or failed required gates', () => {
   const broken = report('passed');
-  broken.gates = broken.gates.filter((item) => item.name !== 'word.runtime_read_smoke');
+  broken.gates = broken.gates.filter((item) => item.name !== 'agent_client_stdio_bridge');
 
   withEvidenceFile(broken, (path) => {
     const result = runValidator(path);
     assert.notEqual(result.status, 0);
-    assert.match(outputText(result.stdout), /Missing required gate: word\.runtime_read_smoke/);
+    assert.match(outputText(result.stdout), /Missing required gate: agent_client_stdio_bridge/);
   });
 });
 
@@ -1627,8 +1359,6 @@ function report(irmStatus: 'passed' | 'skipped') {
     session_id: '24248c3e-11a9-48b8-a922-dc4f58dbb2de',
     gates: [
       gate('word.session_discovery', 'passed'),
-      gate('word.runtime_read_smoke', 'passed'),
-      gate('word.runtime_mutation_smoke', 'passed'),
       gate('agent_client_stdio_bridge', 'passed'),
       gate('irm_rights_matrix', irmStatus)
     ]
@@ -1893,130 +1623,34 @@ function catalogIdentityHost(host: string, passed: boolean) {
 }
 
 function excelRuntimeEvidence(passed: boolean) {
-  const sessionId = '11111111-2222-3333-4444-555555555555';
-  return {
-    ok: passed,
-    schema_version: 1,
-    endpoint: 'http://127.0.0.1:8800/mcp',
-    generated_at: new Date().toISOString(),
-    smoke_passed: passed,
-    ready: passed,
-    session: {
-      app: 'excel',
-      status: 'active',
-      session_id: sessionId,
-      available_tool_count: 20,
-      document: { title: 'Excel Workbook' },
-      host: { app: 'excel', platform: 'pc', version: '16.0' }
-    },
-    smoke_details: {
-      session_id: sessionId,
-      available_tools: EXCEL_V1_TOOLS,
-      marker_found: passed,
-      workbook_info: { sheet_count: 2, table_count: 1 },
-      sheet_list_count: 1,
-      updated_sheet: { updated: passed },
-      deleted_sheet: { deleted: passed },
-      used_range: { address: 'Sheet1!A1:C5' },
-      find_replace: { replaced: passed, replaced_count: 1 },
-      clear: { cleared: passed },
-      write: { wrote_values: passed },
-      formula: { wrote_formula: passed },
-      format: { formatted: passed },
-      table: { table: 'OfficeMcpTable' },
-      table_update: { updated: passed },
-      sort: { sorted: passed },
-      filter: { filtered: passed },
-      chart: { chart: 'Chart 1' },
-      chart_update: { updated: passed },
-      pivot_table: { pivot_table: 'OfficeMcpPivot' },
-      pivot_update: { refreshed: passed },
-      sheet: { activated: passed }
-    }
-  };
+  return runtimeEvidence('excel', 'Excel Workbook', passed);
 }
 
 function wordRuntimeEvidence(passed: boolean) {
-  const sessionId = '00000000-1111-2222-3333-444444444444';
-  return {
-    ok: passed,
-    schema_version: 1,
-    endpoint: 'http://127.0.0.1:8800/mcp',
-    generated_at: new Date().toISOString(),
-    session: {
-      app: 'word',
-      status: 'active',
-      session_id: sessionId,
-      available_tool_count: 25,
-      document: { title: 'Word Document' },
-      host: { app: 'word', platform: 'pc', version: '16.0' }
-    },
-    smoke_details: {
-      session_id: sessionId,
-      available_tool_count: 25,
-      available_tools: WORD_V1_TOOLS,
-      paragraph_0_text_length: passed ? 23 : 0,
-      document_text_length: passed ? 23 : 0,
-      find_count: passed ? 1 : 0,
-      full_smoke_passed: passed,
-      com_tracked_change_passed: passed
-    },
-    smoke_passed: passed,
-    ready: passed
-  };
+  return runtimeEvidence('word', 'Word Document', passed);
 }
 
 function powerPointRuntimeEvidence(passed: boolean) {
-  const sessionId = '22222222-3333-4444-5555-666666666666';
+  return runtimeEvidence('powerpoint', 'PowerPoint Presentation', passed);
+}
+
+function runtimeEvidence(app: 'word' | 'excel' | 'powerpoint', title: string, passed: boolean) {
+  const host = app === 'word' ? 'Word' : app === 'excel' ? 'Excel' : 'PowerPoint';
   return {
     ok: passed,
     schema_version: 1,
     endpoint: 'http://127.0.0.1:8800/mcp',
     generated_at: new Date().toISOString(),
-    smoke_passed: passed,
     ready: passed,
     session: {
-      app: 'powerpoint',
+      app,
       status: 'active',
-      session_id: sessionId,
-      available_tool_count: 25,
-      document: { title: 'PowerPoint Presentation' },
-      host: { app: 'powerpoint', platform: 'pc', version: '16.0' }
-    },
-    smoke_details: {
-      session_id: sessionId,
-      available_tool_count: 25,
-      available_tools: POWERPOINT_V1_TOOLS,
-      presentation_info: { slide_count: 1 },
-      active_view: { active_view: 'edit' },
-      list_slides: { slides: [{ slide_id: 'slide-1', slide_index: 0 }] },
-      add_slide: { slide_id: 'slide-1', slide_index: 0 },
-      add_text_box: { shape: { shape_id: 'shape-1' } },
-      list_shapes: { shapes: [{ shape_id: 'shape-1' }] },
-      read_text: { items: [{ shape_id: 'shape-1', text: 'Office MCP' }] },
-      replace_text: { replacements: passed ? 1 : 0 },
-      format_text: { shape_id: 'shape-1', formatted: passed },
-      list_layouts: { masters: [{ id: 'master-1', layouts: [{ id: 'layout-1' }] }] },
-      layout: { slide_id: 'slide-1', slide_index: 0, layout_name: 'Title Only' },
-      add_table: { shape_id: 'table-1' },
-      read_table: { shape_id: 'table-1', values: [['Office']] },
-      mutation_proved: passed,
-      tool_category_proofs: {
-        presentation: passed,
-        slides: passed,
-        layout: passed,
-        shapes: passed,
-        text: passed,
-        tables: passed
-      },
-      export_supported: false,
-      export_host_rejection: passed,
-      table_supported: passed,
-      table_host_rejection: false
+      session_id: officeToolE2eSessionId(host),
+      document: { title },
+      host: { app, platform: 'pc', version: '16.0' }
     }
   };
 }
-
 function embeddedOfficeToolE2eReport(host: 'Word' | 'Excel' | 'PowerPoint', tools: string[], passed: boolean) {
   const hostKey = host.toLowerCase();
   const sessionId = officeToolE2eSessionId(host);
@@ -2277,71 +1911,6 @@ function manualTrayDaemonContext(menuItems = ['Status: Up', 'Clients: 0', 'Docum
   };
 }
 
-function powerpointOnlyReport() {
-  const now = new Date().toISOString();
-  return {
-    schema_version: 1,
-    generated_at: now,
-    endpoint: 'http://127.0.0.1:8800/mcp',
-    gates: [
-      gate('word.session_discovery', 'passed', { sessions: [{ app: 'powerpoint', session_id: 'ppt-session' }] }),
-      gate('powerpoint.runtime_smoke', 'passed', {
-        session_id: 'ppt-session',
-        available_tool_count: 25,
-        available_tools: POWERPOINT_V1_TOOLS,
-        presentation_info: { slide_count: 1 },
-        active_view: { active_view: 'edit' },
-        list_slides: { slides: [{ slide_id: 'slide-1', slide_index: 0 }] },
-        add_slide: { slide_id: 'slide-1', slide_index: 0, added: true },
-        add_text_box: { shape: { shape_id: 'shape-1' } },
-        list_shapes: { shapes: [{ shape_id: 'shape-1' }] },
-        read_text: { items: [{ shape_id: 'shape-1', text: 'Office MCP' }] },
-        replace_text: { replacements: 1, touched_shapes: [{ slide_id: 'slide-1', shape_id: 'shape-1' }] },
-        format_text: { shape_id: 'shape-1', formatted: true },
-        list_layouts: { masters: [{ id: 'master-1', layouts: [{ id: 'layout-1' }] }] },
-        layout: { slide_id: 'slide-1', slide_index: 0, layout_name: 'Title Only' },
-        add_table: { shape_id: 'table-1' },
-        read_table: { shape_id: 'table-1', values: [['Office']] },
-        mutation_proved: true,
-        tool_category_proofs: {
-          presentation: true,
-          slides: true,
-          layout: true,
-          shapes: true,
-          text: true,
-          tables: true
-        },
-        export_supported: false,
-        export_host_rejection: true,
-        table_supported: true,
-        table_host_rejection: false
-      })
-    ]
-  };
-}
-function excelOnlyReport() {
-  const now = new Date().toISOString();
-  const sessionId = 'excel-session-1';
-  return {
-    schema_version: 1,
-    generated_at: now,
-    endpoint: 'http://127.0.0.1:8800/mcp',
-    gates: [
-      gate('word.session_discovery', 'passed', {
-        sessions: [{
-          app: 'excel',
-          status: 'active',
-          session_id: sessionId,
-          available_tool_count: 20,
-          document: { title: 'E2E workbook.xlsx' },
-          host: { app: 'excel', platform: 'pc', version: '16.0' }
-        }]
-      }),
-      gate('excel.runtime_smoke', 'passed', excelSmokeDetails(sessionId))
-    ]
-  };
-}
-
 function logoVisualSurfaces(): string[] {
   return [
     'logo_ribbon_size',
@@ -2349,36 +1918,6 @@ function logoVisualSurfaces(): string[] {
     'logo_daemon_titlebar',
     'logo_installer_metadata'
   ];
-}
-
-function excelSmokeDetails(sessionId: string) {
-  return {
-    session_id: sessionId,
-    document_title: 'E2E workbook.xlsx',
-    available_tool_count: 20,
-    available_tools: EXCEL_V1_TOOLS,
-    marker_found: true,
-    workbook_info: { active_sheet: 'Sheet1', sheet_count: 1, table_count: 0 },
-    sheet_list_count: 1,
-    read_before_address: 'Sheet1!A1:B2',
-    updated_sheet: { name: 'Renamed Sheet' },
-    deleted_sheet: { deleted: true },
-    used_range: { address: 'Renamed Sheet!A1:C5' },
-    find_replace: { replaced: 1 },
-    clear: { cleared: true },
-    write: { wrote_values: true },
-    formula: { wrote_formula: true },
-    format: { formatted: true },
-    table: { table: 'E2ETable' },
-    table_update: { updated: true },
-    sort: { sorted: true },
-    filter: { filtered: true },
-    chart: { chart: 'E2E Chart' },
-    chart_update: { updated: true },
-    pivot_table: { pivot_table: 'E2EPivot' },
-    pivot_update: { refreshed: true },
-    sheet: { activated: true }
-  };
 }
 
 function structuredMenu(menuItems: string[]) {
