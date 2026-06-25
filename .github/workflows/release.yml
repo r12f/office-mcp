@@ -249,6 +249,17 @@ jobs:
               throw "Release payload is missing required file: $path"
             }
           }
+          $forbidden = @(
+            'artifacts\portable-stage\office-mcp.ps1',
+            'artifacts\portable-stage\office-mcp-daemon.ps1',
+            'artifacts\portable-stage\office-mcp-tray.ps1',
+            'artifacts\portable-stage\office-mcp-env.ps1'
+          )
+          foreach ($path in $forbidden) {
+            if (Test-Path -LiteralPath $path) {
+              throw "Release payload must not include duplicate root launcher: $path"
+            }
+          }
           Push-Location artifacts
           try {
             Get-FileHash -Algorithm SHA256 -LiteralPath @(

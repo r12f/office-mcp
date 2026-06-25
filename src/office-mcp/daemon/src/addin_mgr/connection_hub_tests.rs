@@ -22,7 +22,7 @@ fn invoke_waits_for_matching_response_text() {
     let response_hub = Arc::clone(&hub);
 
     let handle = thread::spawn(move || {
-        let outbound = response_hub.take_outbound("connection-1");
+        let outbound = wait_for_outbound(&response_hub, "connection-1");
         assert_eq!(outbound, vec!["request".to_string()]);
         assert!(
             response_hub
@@ -41,6 +41,17 @@ fn invoke_waits_for_matching_response_text() {
     handle.join().expect("response thread");
 
     assert_eq!(response["result"]["ok"], true);
+}
+
+fn wait_for_outbound(hub: &AddinConnectionHub, connection_id: &str) -> Vec<String> {
+    for _ in 0..100 {
+        let outbound = hub.take_outbound(connection_id);
+        if !outbound.is_empty() {
+            return outbound;
+        }
+        thread::sleep(Duration::from_millis(1));
+    }
+    Vec::new()
 }
 
 #[test]

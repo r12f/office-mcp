@@ -39,14 +39,13 @@ test('Windows tray controller exposes required notification-area menu', () => {
   assert.doesNotMatch(script, /Start-ScheduledTask/);
 });
 
-test('Windows packaging includes the tray controller in portable payload', () => {
+test('Windows packaging includes the tray controller and simplified portable payload', () => {
   const buildScript = readFileSync(join(PACKAGING_ROOT, 'windows', 'build-windows-portable.ps1'), 'utf8');
   const installScript = readFileSync(join(PACKAGING_ROOT, 'windows', 'install-windows.ps1'), 'utf8');
   const repoRoot = join(PACKAGING_ROOT, '..');
   const icon32 = readFileSync(join(repoRoot, 'src', 'office-ctl', 'common', 'assets', 'icon-32.png'));
   const icon80 = readFileSync(join(repoRoot, 'src', 'office-ctl', 'common', 'assets', 'icon-80.png'));
 
-  assert.match(buildScript, /office-mcp-tray\.ps1/);
   assert.match(buildScript, /cargo build --release -p office-mcp-daemon/);
   assert.match(buildScript, /office-mcp-daemon\.exe/);
   assert.match(buildScript, /\$uiRoot = Join-Path \$rustDaemonRoot "src\\ui\\assets"/);
@@ -76,13 +75,19 @@ test('Windows packaging includes the tray controller in portable payload', () =>
   assert.match(buildScript, /scripts\\export-localhost-dev-cert\.ps1/);
   assert.match(buildScript, /install\.ps1/);
   assert.match(buildScript, /uninstall\.ps1/);
-  assert.match(buildScript, /office-mcp-tray\.ps1/);
-  assert.match(buildScript, /Start-Process[\s\S]*office-mcp-tray\.ps1|\$trayScript[\s\S]*Start-Process/);
+  assert.match(buildScript, /Start-Process[\s\S]*office-mcp-daemon\.exe|\$daemonExe[\s\S]*Start-Process/);
+  assert.match(buildScript, /ArgumentList 'tray'/);
   assert.match(buildScript, /WindowStyle Hidden/);
   assert.doesNotMatch(buildScript, /office-mcp-install-user\.ps1/);
   assert.doesNotMatch(buildScript, /install-user\.ps1/);
   assert.doesNotMatch(buildScript, /uninstall-user\.ps1/);
   assert.doesNotMatch(buildScript, /start-daemon\.ps1/);
+  assert.doesNotMatch(buildScript, /Copy-Item[\s\S]*office-mcp-tray\.ps1/);
+  assert.doesNotMatch(buildScript, /Set-Content[\s\S]*office-mcp-env\.ps1/);
+  assert.doesNotMatch(buildScript, /Set-Content[\s\S]*office-mcp-daemon\.ps1/);
+  assert.doesNotMatch(buildScript, /Set-Content[\s\S]*office-mcp\.ps1/);
+  assert.match(buildScript, /Portable staging payload must not expose duplicate root launcher/);
+  assert.match(buildScript, /OFFICE_MCP_CONFIG_PATH/);
   assert.match(buildScript, /README-install\.txt/);
   assert.match(buildScript, /office-mcp-windows-portable-\$Version-x64\.zip/);
   assert.match(buildScript, /Compress-Archive/);
@@ -94,8 +99,8 @@ test('Windows packaging includes the tray controller in portable payload', () =>
   assert.match(buildScript, /TrustedCatalogs\\\$catalogId/);
   assert.match(buildScript, /TrustedCatalogs\\office-mcp/);
   assert.match(buildScript, /-CreateIfMissing/);
-  assert.match(buildScript, /office-mcp-daemon\.ps1[\s\S]*export-localhost-dev-cert\.ps1[\s\S]*-CreateIfMissing/);
-  assert.match(buildScript, /Tray launcher must delegate to the native Rust tray host/);
+  assert.match(buildScript, /install\.ps1[\s\S]*export-localhost-dev-cert\.ps1[\s\S]*-CreateIfMissing/);
+  assert.doesNotMatch(buildScript, /Tray launcher must delegate to the native Rust tray host/);
   assert.doesNotMatch(buildScript, /node\\node\.exe/);
   assert.doesNotMatch(buildScript, /dist\\src\\cli\.js/);
   assert.doesNotMatch(buildScript, /reference-node\\scripts/);
@@ -202,6 +207,11 @@ test('GitHub release workflow publishes only the Windows portable artifacts', ()
   assert.match(workflow, /README-install\.txt/);
   assert.match(workflow, /install\.ps1/);
   assert.match(workflow, /uninstall\.ps1/);
+  assert.match(workflow, /office-mcp\.ps1/);
+  assert.match(workflow, /office-mcp-daemon\.ps1/);
+  assert.match(workflow, /office-mcp-tray\.ps1/);
+  assert.match(workflow, /office-mcp-env\.ps1/);
+  assert.match(workflow, /Release payload must not include duplicate root launcher/);
   assert.doesNotMatch(workflow, /install-user\.ps1/);
   assert.doesNotMatch(workflow, /start-daemon\.ps1/);
   assert.doesNotMatch(workflow, /uninstall-user\.ps1/);
@@ -238,9 +248,11 @@ test('README documents installation from GitHub Releases', () => {
   assert.match(readme, /powershell -NoProfile -ExecutionPolicy Bypass -File \.\\install\.ps1/);
   assert.match(readme, /install\.ps1/);
   assert.match(readme, /uninstall\.ps1/);
+  assert.match(readme, /office-mcp-daemon\.exe config claude-desktop --installed --install-root <extracted-folder>/);
   assert.doesNotMatch(readme, /install-user\.ps1/);
   assert.doesNotMatch(readme, /start-daemon\.ps1/);
   assert.doesNotMatch(readme, /uninstall-user\.ps1/);
+  assert.doesNotMatch(readme, /\.\\office-mcp\.ps1/);
   assert.match(readme, /6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57/);
   assert.match(readme, /SHA256SUMS/);
   assert.match(readme, /%LOCALAPPDATA%\\office-mcp\\/);

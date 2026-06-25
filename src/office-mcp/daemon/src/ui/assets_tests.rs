@@ -55,6 +55,7 @@ fn default_store_finds_repo_daemon_ui_assets() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     let store = UiAssetStore::default();
     let html =
@@ -120,7 +121,9 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(!css.contains(".status-strip, .details, .panel { background"));
     assert!(css.contains("grid-template-columns: 32px auto minmax(0, 1fr)"));
     assert!(css.contains(".product-mark { width: 32px; height: 32px;"));
-    assert!(css.contains(".detail-path dt { display: flex; align-items: center; justify-content: space-between;"));
+    assert!(css.contains(
+        ".detail-path dt { display: flex; align-items: center; justify-content: space-between;"
+    ));
     assert!(css.contains(".detail-path-value { display: block; min-width: 0;"));
     assert!(css.contains(".detail-path-value code { display: block; min-width: 0; white-space: normal; overflow-wrap: anywhere; user-select: text;"));
     assert!(css.contains(".detail-actions { display: inline-flex; gap: 2px; align-items: center;"));
@@ -138,7 +141,9 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(css.contains(".id-copy code { display: block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains(".document-card-session { display: block;"));
     assert!(css.contains(".document-card-meta.document-card-footer { grid-column: 1;"));
-    assert!(css.contains(".document-card-uptime { grid-column: 2; justify-self: end; align-self: end;"));
+    assert!(
+        css.contains(".document-card-uptime { grid-column: 2; justify-self: end; align-self: end;")
+    );
     assert!(css.contains(".document-card-session code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"));
     assert!(css.contains(".tool-access-panel { display: grid;"));
     assert!(css.contains(".segmented { display: inline-grid; grid-template-columns: repeat(3"));
@@ -187,7 +192,9 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     );
     assert!(js.contains("event.target.closest('[data-open-diagnostic]')"));
     assert!(js.contains("function handleRowNavigation(event)"));
-    assert!(js.contains("renderCommands('currentTasks', filterCommands(snapshot.current_tasks || [], true), true)"));
+    assert!(js.contains(
+        "renderCommands('currentTasks', filterCommands(snapshot.current_tasks || [], true), true)"
+    ));
     assert!(js.contains("const history = filterCommands(snapshot.recent_commands || [], false)"));
     assert!(js.contains("function filterCommands(commands, running)"));
     assert!(js.contains("(running || state.result === 'all' || command.status === state.result) && matches(JSON.stringify(command))"));
@@ -211,9 +218,13 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("data-focus-key=\"client:${esc(client.client_id || client.name)}\""));
     assert!(js.contains("clientEmptyState(state.snapshot?.daemon?.mcp_endpoint)"));
     assert!(js.contains("function clientEmptyState(mcpEndpoint)"));
-    assert!(js.contains("No MCP clients connected</strong>Connect an MCP client using either local transport."));
+    assert!(js.contains(
+        "No MCP clients connected</strong>Connect an MCP client using either local transport."
+    ));
     assert!(js.contains("emptyCopy(mcpEndpoint, 'Copy MCP endpoint', 'MCP endpoint')"));
-    assert!(js.contains("emptyCopy('office-mcp-daemon stdio', 'Copy stdio bridge command', 'Stdio bridge')"));
+    assert!(js.contains(
+        "emptyCopy('office-mcp-daemon stdio', 'Copy stdio bridge command', 'Stdio bridge')"
+    ));
     assert!(js.contains("function emptyCopy(codeText, copyLabel, label)"));
     assert!(js.contains("data-focus-key=\"command:${esc(command.command_id || command.mcp_request_id || command.tool)}\""));
     assert!(js.contains("fetch('/ui/open-diagnostic'"));
@@ -231,10 +242,10 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(js.contains("function renderDocumentCard(doc, app)"));
     assert!(js.contains("class=\"row document-card ${esc(app)}\""));
     assert!(js.contains("const sessionId = doc.session_id || '-'"));
-    assert!(js.contains("const hostVersion = `${title(doc.host?.app || app)} ${doc.host?.version || '-'}`"));
     assert!(js.contains(
-        "class=\"document-card-session\" data-copy-value=\"${esc(sessionId)}\""
+        "const hostVersion = `${title(doc.host?.app || app)} ${doc.host?.version || '-'}`"
     ));
+    assert!(js.contains("class=\"document-card-session\" data-copy-value=\"${esc(sessionId)}\""));
     assert!(js.contains("<span class=\"document-card-session\" data-copy-value=\"${esc(sessionId)}\" title=\"${esc(sessionId)}\"><code>${esc(middleTruncate(sessionId, 24))}</code></span>"));
     assert!(js.contains("<span class=\"document-card-uptime\" title=\"Session uptime\">${esc(sessionUptime(doc))}</span>"));
     assert!(js.contains("function sessionUptime(doc)"));

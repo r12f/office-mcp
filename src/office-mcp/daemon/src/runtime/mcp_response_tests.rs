@@ -101,7 +101,7 @@ fn forwarded_response_invokes_mcp_runtime() {
 fn shared_state() -> Arc<RuntimeSharedState> {
     Arc::new(RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
-        session_grace: std::time::Duration::from_secs(60),
+        session_grace: std::time::Duration::from_mins(1),
         addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
         connection_hub: Arc::new(AddinConnectionHub::new()),
         command_router: Arc::new(Mutex::new(CommandRouter::new())),

@@ -375,15 +375,14 @@ cargo run -p office-mcp-daemon -- config claude-desktop
 ```
 
 For a portable package copy, generate a config that points at the extracted
-PowerShell launcher instead of the source checkout:
+daemon executable instead of the source checkout:
 
 ```powershell
-.\office-mcp.ps1 config claude-desktop --installed
+.\office-mcp-daemon.exe config claude-desktop --installed --install-root <extracted-folder>
 ```
 
-The installed launcher sets `OFFICE_MCP_INSTALL_ROOT`, so the generated config
-points back to the current install directory. Use `--install-root <path>` only
-when generating config for another install location.
+The generated config points the MCP client at `office-mcp-daemon.exe` and sets
+the portable runtime environment for that client process.
 
 Register the shared-folder catalog for source-checkout development:
 
@@ -446,10 +445,10 @@ the daemon web console, `office-ctl/word/`, `office-ctl/excel/`, and
 `office-ctl/powerpoint/` for the Office task pane bundles,
 `scripts/` for certificate helper scripts, and `addin-catalog/` for the sideload
 manifests. It asserts that the Rust daemon, UI assets, add-in bundles, catalog
-manifests, and launcher scripts are present before building the final zip.
+manifests, `install.ps1`, and `uninstall.ps1` are present before building the
+final zip.
 
-`office-mcp daemon start|stop` works with the developer Scheduled Task bootstrap
-and with the portable launcher layout.
+`office-mcp daemon start|stop` works with the developer Scheduled Task bootstrap.
 
 ## License
 

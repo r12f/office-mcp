@@ -4,7 +4,7 @@
 
 Office MCP Control 0.1.1 is the first Windows desktop portable-only pre-release.
 It packages the native Rust daemon, daemon UI assets, Word/Excel/PowerPoint
-add-in bundles, trusted catalog manifests, launcher scripts, product icons, and
+add-in bundles, trusted catalog manifests, install/uninstall scripts, product icons, and
 the Windows tray entry point into the auditable portable package
 `office-mcp-windows-portable-0.1.1-x64.zip`.
 

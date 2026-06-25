@@ -175,10 +175,10 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       creates/removes a user logon Scheduled Task.
 - [x] Windows portable zip build: packages the native Rust daemon executable,
       daemon UI assets, add-in bundles, catalog manifests, explicit user install
-      scripts, and launcher scripts. MSI packaging was removed from the release
+      scripts, and product assets. MSI packaging was removed from the release
       path because the opaque installer UX was not acceptable for first-contact
       trust.
-- [ ] Simplify the Windows portable zip root so the user-facing entries are
+- [x] Simplify the Windows portable zip root so the user-facing entries are
       `office-mcp-daemon.exe`, `install.ps1`, and `uninstall.ps1`. Remove
       duplicate daemon launcher scripts such as `office-mcp.ps1`,
       `office-mcp-daemon.ps1`, and `office-mcp-tray.ps1`; `install.ps1` should
@@ -222,10 +222,10 @@ commands is not installable software.
       missing, unexpectedly small, incorrectly named, or missing required
       payloads: native Rust daemon, daemon UI assets, shared Office add-in
       assets, Word/Excel/PowerPoint task pane bundles, catalog manifests,
-      launcher scripts, and product icons. Current workflow stages artifacts
+      install/uninstall scripts, and product icons. Current workflow stages artifacts
       only after validating the versioned portable zip name, minimum size, and required
-      payload paths; `packaging/test/windows.test.mjs` statically locks these
-      gates.
+      payload paths, and fails if duplicate root launcher scripts re-enter the
+      package; `packaging/test/windows.test.mjs` statically locks these gates.
 - [x] Generate and publish `SHA256SUMS` for every release artifact. If signing
       is not implemented yet, unsigned pre-releases must be explicitly labeled
       as unsigned rather than silently looking production-signed. Current

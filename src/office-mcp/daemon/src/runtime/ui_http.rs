@@ -1,4 +1,4 @@
-use crate::api::{redact_text_with_limit, UiSnapshotEndpoints, UiSnapshotService, UiStateStore};
+use crate::api::{UiSnapshotEndpoints, UiSnapshotService, UiStateStore, redact_text_with_limit};
 use crate::common::{DaemonConfigService, ToolAccessConfig};
 use crate::mcp::{AccessMode, HttpMethod, ToolAccessPolicy};
 use crate::runtime::http_wire::{WireHttpRequest, WireHttpResponse};
@@ -267,7 +267,9 @@ fn read_log_tail(path: &Path) -> Result<LogTail, std::io::Error> {
     file.seek(SeekFrom::Start(start))?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
-    if start > 0 && let Some(index) = bytes.iter().position(|byte| *byte == b'\n') {
+    if start > 0
+        && let Some(index) = bytes.iter().position(|byte| *byte == b'\n')
+    {
         bytes.drain(..=index);
     }
     Ok(LogTail {

@@ -142,10 +142,10 @@ fn tool_access_policy_update_persists_config_file() {
     let config_path = temp_config_path();
     fs::write(
         &config_path,
-        r#"
+        r"
 [mcp_http]
 port = 8800
-"#,
+",
     )
     .expect("write config");
     let shared_state = shared_state_with_config_path(Some(config_path.display().to_string()));
@@ -365,7 +365,7 @@ fn shared_state() -> Arc<RuntimeSharedState> {
 fn shared_state_with_config_path(config_path: Option<String>) -> Arc<RuntimeSharedState> {
     Arc::new(RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
-        session_grace: std::time::Duration::from_secs(60),
+        session_grace: std::time::Duration::from_mins(1),
         addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
         connection_hub: Arc::new(AddinConnectionHub::new()),
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
