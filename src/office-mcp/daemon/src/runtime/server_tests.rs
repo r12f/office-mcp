@@ -362,7 +362,7 @@ fn real_tls_websocket_forwards_mcp_tool_call_and_returns_response() {
     let acceptor = server.config.tls_acceptor().expect("tls acceptor");
     let shared_state = Arc::new(RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
-        session_grace: std::time::Duration::from_secs(60),
+        session_grace: std::time::Duration::from_mins(1),
         addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
         connection_hub: Arc::new(AddinConnectionHub::new()),
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
@@ -470,7 +470,7 @@ fn real_tls_websocket_protocol_error_sends_close_frame() {
     let acceptor = server.config.tls_acceptor().expect("tls acceptor");
     let shared_state = Arc::new(RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
-        session_grace: std::time::Duration::from_secs(60),
+        session_grace: std::time::Duration::from_mins(1),
         addin_channel: Arc::new(Mutex::new(AddinChannelServer::new())),
         connection_hub: Arc::new(AddinConnectionHub::new()),
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
@@ -525,7 +525,7 @@ fn real_tls_websocket_heartbeat_ping_accepts_pong_response() {
     let acceptor = server.config.tls_acceptor().expect("tls acceptor");
     let shared_state = Arc::new(RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
-        session_grace: std::time::Duration::from_secs(60),
+        session_grace: std::time::Duration::from_mins(1),
         addin_channel: Arc::new(Mutex::new(AddinChannelServer::with_config(
             server.config.addin_channel_config(),
         ))),
@@ -704,7 +704,7 @@ fn addin_tls_roundtrip(request: &str) -> String {
         let connection_hub = Arc::new(AddinConnectionHub::new());
         let shared_state = Arc::new(RuntimeSharedState {
             registry,
-            session_grace: std::time::Duration::from_secs(60),
+            session_grace: std::time::Duration::from_mins(1),
             addin_channel,
             connection_hub,
             command_router: Arc::new(Mutex::new(CommandRouter::new())),

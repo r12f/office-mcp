@@ -9,7 +9,12 @@ fn seeded_ui_fixture_is_redacted_and_grouped() {
     let snapshot = seed.ui_state.snapshot(&sessions, SystemTime::UNIX_EPOCH);
 
     assert_eq!(snapshot.clients.len(), 2);
-    assert!(snapshot.clients.iter().any(|client| client.client_id == "client-2"));
+    assert!(
+        snapshot
+            .clients
+            .iter()
+            .any(|client| client.client_id == "client-2")
+    );
     assert_eq!(snapshot.documents["word"].len(), 1);
     assert_eq!(snapshot.documents["excel"].len(), 1);
     assert_eq!(snapshot.current_tasks.len(), 1);

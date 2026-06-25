@@ -64,26 +64,34 @@ impl ClaudeDesktopConfigBuilder {
                     .install_root
                     .clone()
                     .unwrap_or_else(|| default_windows_install_root(&self.env));
-                let launcher = windows_child_path(&root, "office-mcp.ps1");
+                let daemon = windows_child_path(&root, "office-mcp-daemon.exe");
+                let config_path = windows_child_path(&root, "config.toml");
+                let certificate_path = windows_child_path(&root, ".office-mcp-localhost.pfx");
                 format!(
                     concat!(
                         "{{\n",
                         "  \"mcpServers\": {{\n",
                         "    \"office-mcp\": {{\n",
-                        "      \"command\": \"powershell.exe\",\n",
-                        "      \"args\": [\n",
-                        "        \"-NoProfile\",\n",
-                        "        \"-ExecutionPolicy\",\n",
-                        "        \"Bypass\",\n",
-                        "        \"-File\",\n",
-                        "        \"{}\",\n",
-                        "        \"stdio\"\n",
-                        "      ]\n",
+                        "      \"command\": \"{}\",\n",
+                        "      \"args\": [\"stdio\"],\n",
+                        "      \"env\": {{\n",
+                        "        \"OFFICE_MCP_INSTALL_ROOT\": \"{}\",\n",
+                        "        \"OFFICE_MCP_CONFIG_PATH\": \"{}\",\n",
+                        "        \"OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PATH\": \"{}\",\n",
+                        "        \"OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PASSPHRASE\": \"office-mcp-localhost\",\n",
+                        "        \"OFFICE_MCP_ADDIN_CHANNEL__BIND\": \"localhost\",\n",
+                        "        \"OFFICE_MCP_ADDIN_CHANNEL__PORT\": \"8765\",\n",
+                        "        \"OFFICE_MCP_MCP_HTTP__BIND\": \"127.0.0.1\",\n",
+                        "        \"OFFICE_MCP_MCP_HTTP__PORT\": \"8800\"\n",
+                        "      }}\n",
                         "    }}\n",
                         "  }}\n",
                         "}}"
                     ),
-                    json_escape(&launcher)
+                    json_escape(&daemon),
+                    json_escape(&root.display().to_string()),
+                    json_escape(&config_path),
+                    json_escape(&certificate_path)
                 )
             }
         }

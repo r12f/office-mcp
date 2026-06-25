@@ -56,14 +56,10 @@ function Assert-PortableStagePayload([string]$StageRoot) {
     "addin-catalog\office-mcp-word.xml",
     "addin-catalog\office-mcp-excel.xml",
     "addin-catalog\office-mcp-powerpoint.xml",
-    "office-mcp-env.ps1",
     "install.ps1",
     "uninstall.ps1",
     "README-install.txt",
-    "config.toml",
-    "office-mcp-daemon.ps1",
-    "office-mcp-tray.ps1",
-    "office-mcp.ps1"
+    "config.toml"
   )
 
   foreach ($relativePath in $requiredPaths) {
@@ -73,31 +69,9 @@ function Assert-PortableStagePayload([string]$StageRoot) {
     }
   }
 
-  $daemonLauncher = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-daemon.ps1")
-  if ($daemonLauncher -notmatch "office-mcp-env\.ps1" -or $daemonLauncher -notmatch "office-mcp-daemon\.exe" -or $daemonLauncher -notmatch "daemon run") {
-    throw "Daemon launcher must use the packaged Rust daemon and run it."
-  }
-
-  $cliLauncher = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp.ps1")
-  if ($cliLauncher -notmatch "office-mcp-env\.ps1" -or $cliLauncher -notmatch "office-mcp-daemon\.exe" -or $cliLauncher -notmatch "@args") {
-    throw "CLI launcher must use the packaged Rust daemon and forward arguments."
-  }
-
-  $trayLauncher = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-tray.ps1")
-  if ($trayLauncher -notmatch "office-mcp-daemon\.exe" -or $trayLauncher -notmatch "tray" -or $trayLauncher -notmatch "--probe") {
-    throw "Tray launcher must delegate to the native Rust tray host."
-  }
-
-  $envScript = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-env.ps1")
-  if ($envScript -notmatch "OFFICE_MCP_INSTALL_ROOT") {
-    throw "Portable environment script must set OFFICE_MCP_INSTALL_ROOT."
-  }
-  if ($envScript -notmatch "OFFICE_MCP_CONFIG_PATH") {
-    throw "Portable environment script must set OFFICE_MCP_CONFIG_PATH."
-  }
-  foreach ($envName in @("OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PATH", "OFFICE_MCP_ADDIN_CHANNEL__PORT", "OFFICE_MCP_MCP_HTTP__PORT")) {
-    if ($envScript -notmatch $envName) {
-      throw "Portable environment script must set $envName."
+  foreach ($forbiddenRootScript in @("office-mcp.ps1", "office-mcp-daemon.ps1", "office-mcp-tray.ps1", "office-mcp-env.ps1")) {
+    if (Test-Path -LiteralPath (Join-Path $StageRoot $forbiddenRootScript)) {
+      throw "Portable staging payload must not expose duplicate root launcher: $forbiddenRootScript"
     }
   }
 
@@ -105,8 +79,16 @@ function Assert-PortableStagePayload([string]$StageRoot) {
   if ($installScript -notmatch "ConvertTo-OfficeCatalogUrl" -or $installScript -notmatch "\\\\localhost" -or $installScript -notmatch "export-localhost-dev-cert\.ps1" -or $installScript -notmatch "-CreateIfMissing" -or $installScript -notmatch "6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57") {
     throw "Portable install script must register a GUID-based UNC Office catalog and create the localhost certificate."
   }
-  if ($installScript -notmatch "office-mcp-tray\.ps1" -or $installScript -notmatch "Start-Process" -or $installScript -notmatch "WindowStyle Hidden") {
-    throw "Portable install script must start the native tray daemon without a visible console."
+  foreach ($envName in @("OFFICE_MCP_INSTALL_ROOT", "OFFICE_MCP_CONFIG_PATH", "OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PATH", "OFFICE_MCP_ADDIN_CHANNEL__PORT", "OFFICE_MCP_MCP_HTTP__PORT")) {
+    if ($installScript -notmatch $envName) {
+      throw "Portable install script must set $envName."
+    }
+  }
+  if ($installScript -notmatch "office-mcp-daemon\.exe" -or $installScript -notmatch "Start-Process" -or $installScript -notmatch "'tray'" -or $installScript -notmatch "WindowStyle Hidden") {
+    throw "Portable install script must start the native tray daemon directly without a visible console."
+  }
+  if ($installScript -match "office-mcp-tray\.ps1" -or $installScript -match "office-mcp-env\.ps1") {
+    throw "Portable install script must not depend on duplicate launcher scripts."
   }
 }
 
@@ -217,7 +199,6 @@ Copy-Item -Recurse -Force -Path (Join-Path $excelAddinRoot "public") -Destinatio
 Copy-Item -Force -Path (Join-Path $powerPointAddinRoot "manifest.xml") -Destination $stagePowerPointAddinRoot
 Copy-Item -Recurse -Force -Path (Join-Path $powerPointAddinRoot "public") -Destination $stagePowerPointAddinRoot
 & (Join-Path $commonRoot "scripts\register-office-catalog.ps1") -RepoRoot $repoRoot -CatalogPath $stageCatalogRoot -BaseUrl "https://localhost:8765" -SkipRegistry
-Copy-Item -Force -Path (Join-Path $repoRoot "packaging\windows\office-mcp-tray.ps1") -Destination (Join-Path $stageRoot "office-mcp-tray.ps1")
 
 @'
 [addin_channel]
@@ -252,36 +233,24 @@ file = ""
 @'
 $ErrorActionPreference = 'Stop'
 $installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$pfxPath = Join-Path $installRoot '.office-mcp-localhost.pfx'
 
-$env:OFFICE_MCP_INSTALL_ROOT = $installRoot
-$env:OFFICE_MCP_CONFIG_PATH = Join-Path $installRoot 'config.toml'
-$env:OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PATH = $pfxPath
-$env:OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PASSPHRASE = 'office-mcp-localhost'
-$env:OFFICE_MCP_ADDIN_CHANNEL__BIND = 'localhost'
-$env:OFFICE_MCP_ADDIN_CHANNEL__PORT = '8765'
-$env:OFFICE_MCP_MCP_HTTP__BIND = '127.0.0.1'
-$env:OFFICE_MCP_MCP_HTTP__PORT = '8800'
-'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "office-mcp-env.ps1")
+function Set-OfficeMcpPortableEnvironment {
+  param(
+    [Parameter(Mandatory = $true)][string]$InstallRoot
+  )
 
-@'
-$ErrorActionPreference = 'Stop'
-$installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $installRoot 'office-mcp-env.ps1')
-$daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
-$pfxPath = Join-Path $installRoot '.office-mcp-localhost.pfx'
-
-if (-not (Test-Path -LiteralPath $pfxPath)) {
-  & (Join-Path $installRoot 'scripts\export-localhost-dev-cert.ps1') -OutputPath $pfxPath -CreateIfMissing
+  $pfxPath = Join-Path $InstallRoot '.office-mcp-localhost.pfx'
+  $env:OFFICE_MCP_INSTALL_ROOT = $InstallRoot
+  $env:OFFICE_MCP_CONFIG_PATH = Join-Path $InstallRoot 'config.toml'
+  $env:OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PATH = $pfxPath
+  $env:OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PASSPHRASE = 'office-mcp-localhost'
+  $env:OFFICE_MCP_ADDIN_CHANNEL__BIND = 'localhost'
+  $env:OFFICE_MCP_ADDIN_CHANNEL__PORT = '8765'
+  $env:OFFICE_MCP_MCP_HTTP__BIND = '127.0.0.1'
+  $env:OFFICE_MCP_MCP_HTTP__PORT = '8800'
 }
 
-& $daemonExe daemon run
-'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "office-mcp-daemon.ps1")
-
-@'
-$ErrorActionPreference = 'Stop'
-$installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $installRoot 'office-mcp-env.ps1')
+Set-OfficeMcpPortableEnvironment -InstallRoot $installRoot
 
 function ConvertTo-OfficeCatalogUrl {
   param(
@@ -321,7 +290,7 @@ if (-not (Test-Path -LiteralPath $pfxPath)) {
   & (Join-Path $installRoot 'scripts\export-localhost-dev-cert.ps1') -OutputPath $pfxPath -CreateIfMissing
 }
 
-$trayScript = Join-Path $installRoot 'office-mcp-tray.ps1'
+$daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
 $escapedRoot = [System.Text.RegularExpressions.Regex]::Escape($installRoot)
 $existingTray = Get-CimInstance Win32_Process -Filter "Name = 'office-mcp-daemon.exe'" -ErrorAction SilentlyContinue |
   Where-Object { $_.CommandLine -match $escapedRoot -and $_.CommandLine -match '(^|\s)tray(\s|$)' } |
@@ -330,8 +299,7 @@ $existingTray = Get-CimInstance Win32_Process -Filter "Name = 'office-mcp-daemon
 if ($existingTray) {
   Write-Output "Office MCP Control tray is already running. PID: $($existingTray.ProcessId)"
 } else {
-  $trayArguments = "-NoProfile -ExecutionPolicy Bypass -File `"$trayScript`""
-  Start-Process -FilePath 'powershell.exe' -ArgumentList $trayArguments -WorkingDirectory $installRoot -WindowStyle Hidden
+  Start-Process -FilePath $daemonExe -ArgumentList 'tray' -WorkingDirectory $installRoot -WindowStyle Hidden
   Write-Output 'Office MCP Control tray started.'
 }
 
@@ -391,14 +359,6 @@ Default endpoints:
 - MCP: http://127.0.0.1:8800/mcp
 - Add-in UI/WSS origin: https://localhost:8765
 "@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "README-install.txt")
-
-@'
-$ErrorActionPreference = 'Stop'
-$installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $installRoot 'office-mcp-env.ps1')
-$daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
-& $daemonExe @args
-'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "office-mcp.ps1")
 
 Assert-PortableStagePayload -StageRoot $stageRoot
 New-PortableZip -StageRoot $stageRoot -OutputPath $zipOutputPath

@@ -125,7 +125,6 @@ impl RuntimeServerConfig {
             heartbeat_interval: self.heartbeat_interval,
             heartbeat_timeout: self.heartbeat_timeout,
             max_pending_per_session: self.max_pending_per_session,
-            ..AddinChannelConfig::default()
         }
     }
 }
@@ -144,7 +143,7 @@ impl Default for RuntimeServerConfig {
             max_request_bytes: 16 * 1024 * 1024,
             max_ws_frame_bytes: 16 * 1024 * 1024,
             max_pending_per_session: 4,
-            session_grace: Duration::from_secs(60),
+            session_grace: Duration::from_mins(1),
             heartbeat_interval: Duration::from_secs(30),
             heartbeat_timeout: Duration::from_secs(10),
             requests_per_minute: 1000,

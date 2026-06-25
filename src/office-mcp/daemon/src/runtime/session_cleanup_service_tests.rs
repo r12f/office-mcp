@@ -9,7 +9,7 @@ use std::time::{Duration, SystemTime};
 #[test]
 fn run_once_prunes_expired_stale_sessions_without_client_request() {
     let config = RuntimeServerConfig {
-        session_grace: Duration::from_secs(300),
+        session_grace: Duration::from_mins(5),
         ..RuntimeServerConfig::default()
     };
     let shared_state = RuntimeSharedStateFactory::with_registry(
@@ -24,10 +24,8 @@ fn run_once_prunes_expired_stale_sessions_without_client_request() {
         assert!(registry.remove_runtime("instance-1", stale_since));
     }
 
-    let service = SessionCleanupService::for_session_grace(config.session_grace);
-
     assert_eq!(
-        service.run_once(&shared_state, stale_since + Duration::from_secs(299)),
+        SessionCleanupService::run_once(&shared_state, stale_since + Duration::from_secs(299)),
         0
     );
     assert!(
@@ -39,7 +37,7 @@ fn run_once_prunes_expired_stale_sessions_without_client_request() {
             .is_some()
     );
     assert_eq!(
-        service.run_once(&shared_state, stale_since + Duration::from_secs(301)),
+        SessionCleanupService::run_once(&shared_state, stale_since + Duration::from_secs(301)),
         1
     );
     assert!(

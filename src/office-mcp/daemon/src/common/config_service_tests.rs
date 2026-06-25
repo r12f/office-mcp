@@ -360,10 +360,10 @@ fn section_style_environment_variables_override_legacy_names() {
 #[test]
 fn session_grace_is_capped_at_five_minutes() {
     let path = temp_config(
-        r#"
+        r"
 [addin_channel]
 session_grace_sec = 999
-"#,
+",
     );
     let loaded = DaemonConfigService::with_env(env_map(HashMap::from([(
         "OFFICE_MCP_ADDIN_CHANNEL__SESSION_GRACE_SEC",

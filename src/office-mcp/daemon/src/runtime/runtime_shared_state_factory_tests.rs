@@ -62,7 +62,7 @@ fn factory_applies_registry_pending_limit_from_runtime_config() {
 #[test]
 fn shared_state_prunes_stale_sessions_after_configured_grace() {
     let config = RuntimeServerConfig {
-        session_grace: Duration::from_secs(300),
+        session_grace: Duration::from_mins(5),
         ..RuntimeServerConfig::default()
     };
     let shared_state = RuntimeSharedStateFactory::with_registry(
