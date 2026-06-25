@@ -57,10 +57,8 @@ function Assert-PortableStagePayload([string]$StageRoot) {
     "addin-catalog\office-mcp-excel.xml",
     "addin-catalog\office-mcp-powerpoint.xml",
     "office-mcp-env.ps1",
-    "office-mcp-install-user.ps1",
-    "install-user.ps1",
-    "uninstall-user.ps1",
-    "start-daemon.ps1",
+    "install.ps1",
+    "uninstall.ps1",
     "README-install.txt",
     "config.toml",
     "office-mcp-daemon.ps1",
@@ -103,9 +101,12 @@ function Assert-PortableStagePayload([string]$StageRoot) {
     }
   }
 
-  $installUserScript = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "office-mcp-install-user.ps1")
-  if ($installUserScript -notmatch "ConvertTo-OfficeCatalogUrl" -or $installUserScript -notmatch "\\\\localhost" -or $installUserScript -notmatch "export-localhost-dev-cert\.ps1" -or $installUserScript -notmatch "-CreateIfMissing" -or $installUserScript -notmatch "6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57") {
-    throw "Portable user configuration script must register a GUID-based UNC Office catalog and create the localhost certificate."
+  $installScript = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "install.ps1")
+  if ($installScript -notmatch "ConvertTo-OfficeCatalogUrl" -or $installScript -notmatch "\\\\localhost" -or $installScript -notmatch "export-localhost-dev-cert\.ps1" -or $installScript -notmatch "-CreateIfMissing" -or $installScript -notmatch "6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57") {
+    throw "Portable install script must register a GUID-based UNC Office catalog and create the localhost certificate."
+  }
+  if ($installScript -notmatch "office-mcp-tray\.ps1" -or $installScript -notmatch "Start-Process" -or $installScript -notmatch "WindowStyle Hidden") {
+    throw "Portable install script must start the native tray daemon without a visible console."
   }
 }
 
@@ -319,25 +320,27 @@ $pfxPath = Join-Path $installRoot '.office-mcp-localhost.pfx'
 if (-not (Test-Path -LiteralPath $pfxPath)) {
   & (Join-Path $installRoot 'scripts\export-localhost-dev-cert.ps1') -OutputPath $pfxPath -CreateIfMissing
 }
-'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "office-mcp-install-user.ps1")
 
-@'
-$ErrorActionPreference = 'Stop'
-$installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-& (Join-Path $installRoot 'office-mcp-install-user.ps1')
-Write-Output "Office MCP Control user install completed."
+$trayScript = Join-Path $installRoot 'office-mcp-tray.ps1'
+$escapedRoot = [System.Text.RegularExpressions.Regex]::Escape($installRoot)
+$existingTray = Get-CimInstance Win32_Process -Filter "Name = 'office-mcp-daemon.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -match $escapedRoot -and $_.CommandLine -match '(^|\s)tray(\s|$)' } |
+  Select-Object -First 1
+
+if ($existingTray) {
+  Write-Output "Office MCP Control tray is already running. PID: $($existingTray.ProcessId)"
+} else {
+  $trayArguments = "-NoProfile -ExecutionPolicy Bypass -File `"$trayScript`""
+  Start-Process -FilePath 'powershell.exe' -ArgumentList $trayArguments -WorkingDirectory $installRoot -WindowStyle Hidden
+  Write-Output 'Office MCP Control tray started.'
+}
+
+Write-Output 'Office MCP Control install completed.'
 Write-Output "Install root: $installRoot"
-Write-Output "Catalog folder: $(Join-Path $installRoot 'addin-catalog')"
-Write-Output "Daemon launcher: $(Join-Path $installRoot 'start-daemon.ps1')"
-'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "install-user.ps1")
-
-@'
-$ErrorActionPreference = 'Stop'
-$installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $installRoot 'office-mcp-env.ps1')
-$daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
-& $daemonExe daemon run
-'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "start-daemon.ps1")
+Write-Output "Catalog folder: $catalogPath"
+Write-Output "Catalog URL: $catalogUrl"
+Write-Output 'Open Word, Excel, or PowerPoint and add Office MCP Control from the Shared Folder catalog if it does not appear automatically.'
+'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "install.ps1")
 
 @'
 $ErrorActionPreference = 'Stop'
@@ -352,7 +355,7 @@ foreach ($key in @($catalogKey, $legacyCatalogKey)) {
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 Remove-ItemProperty -LiteralPath $runKey -Name 'office-mcp' -Force -ErrorAction SilentlyContinue
 Write-Output 'Office MCP Control user registry entries removed.'
-'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "uninstall-user.ps1")
+'@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "uninstall.ps1")
 
 @"
 Office MCP Control portable Windows package
@@ -365,11 +368,10 @@ Contents:
 - office-ctl\word, office-ctl\excel, office-ctl\powerpoint: Office add-in bundles.
 - addin-catalog\: Word, Excel, and PowerPoint shared-folder catalog manifests.
 - scripts\export-localhost-dev-cert.ps1: creates/exports the localhost HTTPS certificate.
-- install-user.ps1: registers the current user's Office trusted catalog and creates the localhost certificate if needed.
-- start-daemon.ps1: starts the daemon from this folder.
-- uninstall-user.ps1: removes Office MCP Control user registry entries.
+- install.ps1: registers the current user's Office trusted catalog, creates the localhost certificate if needed, and starts the tray daemon.
+- uninstall.ps1: removes Office MCP Control user registry entries.
 
-What install-user.ps1 changes:
+What install.ps1 changes:
 - Writes HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}
   - Id = {6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}
   - Url = the UNC path for this folder's addin-catalog directory
@@ -382,10 +384,8 @@ Install:
 1. Extract the zip to the folder where you want Office MCP Control to live.
 2. Close Word, Excel, and PowerPoint.
 3. Run PowerShell from this folder:
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\install-user.ps1
-4. Start the daemon:
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\start-daemon.ps1
-5. Reopen Office and use Home > Add-ins > Advanced > Shared Folder to add Office MCP Control if Office does not show it automatically.
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+4. Reopen Office and use Home > Add-ins > Advanced > Shared Folder to add Office MCP Control if Office does not show it automatically.
 
 Default endpoints:
 - MCP: http://127.0.0.1:8800/mcp

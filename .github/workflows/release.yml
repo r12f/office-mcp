@@ -230,9 +230,8 @@ jobs:
           $required = @(
             'artifacts\portable-stage\office-mcp-daemon.exe',
             'artifacts\portable-stage\README-install.txt',
-            'artifacts\portable-stage\install-user.ps1',
-            'artifacts\portable-stage\start-daemon.ps1',
-            'artifacts\portable-stage\uninstall-user.ps1',
+            'artifacts\portable-stage\install.ps1',
+            'artifacts\portable-stage\uninstall.ps1',
             'artifacts\portable-stage\office-mcp\ui\index.html',
             'artifacts\portable-stage\office-ctl\common\addin-channel.js',
             'artifacts\portable-stage\office-ctl\word\public\taskpane.js',

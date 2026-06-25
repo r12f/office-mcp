@@ -50,7 +50,7 @@ source URLs and activation settings.
 5. Insert → My Add-ins → Shared Folder → office-mcp → Add.
 ```
 
-The Windows portable package includes `addin-catalog\` and `install-user.ps1`
+The Windows portable package includes `addin-catalog\` and `install.ps1`
 pre-registers it as a trusted catalog when the user runs the script. Host
 manifests live directly under the catalog root with stable file names such as
 `addin-catalog\office-mcp-word.xml`,
@@ -273,8 +273,8 @@ native Rust daemon. It contains `office-mcp-daemon.exe`, daemon-owned UI assets,
 the Word/Excel/PowerPoint add-in bundles, catalog manifests, default
 `config.toml`, product assets, and auditable launcher/install/uninstall scripts.
 The launchers set `OFFICE_MCP_CONFIG_PATH` to the extracted config. The user-run
-`install-user.ps1` registers the Office trusted catalog and creates or exports
-the localhost certificate. MSI packaging is not a release target.
+`install.ps1` registers the Office trusted catalog, creates or exports the
+localhost certificate, and starts the tray daemon. MSI packaging is not a release target.
 
 The production portable zip remains the Windows release packaging target. A
 checked-in build script is not enough for user distribution: release builds MUST
@@ -318,8 +318,8 @@ Releases, not only how to build from source. At minimum it must cover:
 - Supported platform status, with Windows desktop as the v1 portable package target.
 - Downloading `office-mcp-windows-portable-<ver>-x64.zip` from the latest GitHub Release.
 - Verifying `SHA256SUMS` when desired.
-- Extracting the portable zip, reading `README-install.txt`, running
-  `install-user.ps1`, and starting the daemon with `start-daemon.ps1`.
+- Extracting the portable zip, reading `README-install.txt`, and running the
+  single install command `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`.
 - Opening the daemon UI from the tray or `office-mcp-daemon ui` and checking
   `daemon status`.
 - Restarting Office if needed, opening Word/Excel/PowerPoint, and adding
@@ -328,7 +328,7 @@ Releases, not only how to build from source. At minimum it must cover:
 - Configuring MCP clients to use `http://127.0.0.1:8800/mcp` or the configured
   endpoint.
 - Where logs live and how to collect them for debugging.
-- How to uninstall with `uninstall-user.ps1` and delete the extracted folder,
+- How to uninstall with `uninstall.ps1` and delete the extracted folder,
   including the separate Office add-in removal caveat.
 
 The Windows user flow remains:
@@ -342,10 +342,11 @@ The Windows user flow remains:
      complete once each host is packaged.
    - Installs the static add-in bundle beside the daemon.
    - Exports or creates a current-user trusted localhost certificate when the
-     user runs `install-user.ps1`; it does not require an opaque installer step.
+     user runs `install.ps1`; it does not require an opaque installer step.
    - Writes a default `config.toml` and points the launcher at it with
      `OFFICE_MCP_CONFIG_PATH`.
-   - Provides explicit launcher scripts for daemon startup.
+   - Starts the tray daemon from `install.ps1` so the user does not need a
+     separate daemon startup script during install.
    - Registers an add-in trusted catalog folder under
      `%LOCALAPPDATA%\office-mcp\addin-catalog\` and drops the Word, Excel, and
      PowerPoint manifests directly under that catalog root once each host is
@@ -425,7 +426,7 @@ or probe commands:
 
 ## 8. Uninstall
 
-`uninstall-user.ps1` removes:
+`uninstall.ps1` removes:
 
 - Binaries
 - Scheduled task / launchd plist

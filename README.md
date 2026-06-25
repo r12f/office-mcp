@@ -129,6 +129,12 @@ under `artifacts/`, not as parallel source packages at the root.
 Windows desktop is the v1 portable package target. macOS, Linux, Office on the web,
 and managed AppSource deployment are still tracked as later distribution paths.
 
+One-command install for the latest release:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command '$ErrorActionPreference="Stop"; $release=Invoke-RestMethod "https://api.github.com/repos/r12f/office-mcp/releases" | Where-Object { $_.assets.name -like "office-mcp-windows-portable-*-x64.zip" } | Select-Object -First 1; if (-not $release) { throw "No Windows portable release asset found." }; $asset=$release.assets | Where-Object { $_.name -like "office-mcp-windows-portable-*-x64.zip" } | Select-Object -First 1; $installRoot=Join-Path $env:LOCALAPPDATA ("office-mcp\" + $release.tag_name); $zipPath=Join-Path $env:TEMP $asset.name; Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath; New-Item -ItemType Directory -Force -Path $installRoot | Out-Null; Expand-Archive -LiteralPath $zipPath -DestinationPath $installRoot -Force; & (Join-Path $installRoot "install.ps1")'
+```
+
 1. Open the latest GitHub Releases page and download
    `office-mcp-windows-portable-<ver>-x64.zip` plus `SHA256SUMS`.
 2. Optionally verify the package checksum:
@@ -139,17 +145,18 @@ and managed AppSource deployment are still tracked as later distribution paths.
    ```
 
 3. Extract the zip to the folder where Office MCP Control should live, read
-   `README-install.txt`, close Word/Excel/PowerPoint, and run:
+   `README-install.txt`, close Word/Excel/PowerPoint, and run one command from
+   the extracted folder:
 
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\install-user.ps1
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\start-daemon.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
    ```
 
-   The extracted folder is the install directory. `install-user.ps1` writes the
+   The extracted folder is the install directory. `install.ps1` writes the
    current-user Office Trusted Add-in Catalog registry entry under
    `HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}`
-   and creates `.office-mcp-localhost.pfx` in the same folder when needed.
+   creates `.office-mcp-localhost.pfx` in the same folder when needed, and
+   starts the tray daemon.
 4. Open the daemon UI from the tray menu with **Show Office MCP Control**, or
    run `office-mcp-daemon ui`. Check runtime status with:
 
@@ -167,7 +174,7 @@ and managed AppSource deployment are still tracked as later distribution paths.
 7. For debugging, collect the log path reported by `office-mcp-daemon daemon
    status` or shown in the daemon UI. The default log location is under the
    current user's local Office MCP data directory.
-8. To uninstall, run `uninstall-user.ps1` and then delete the extracted folder.
+8. To uninstall, run `uninstall.ps1` and then delete the extracted folder.
    If Office still lists the add-in, remove **Office MCP Control** from Office's
    add-in manager or remove the installed Shared Folder catalog entry.
 
@@ -437,7 +444,7 @@ The portable build stages the same split layout under `artifacts\portable-stage\
 `office-mcp-daemon.exe` for the Rust daemon runtime, daemon-owned UI assets for
 the daemon web console, `office-ctl/word/`, `office-ctl/excel/`, and
 `office-ctl/powerpoint/` for the Office task pane bundles,
-`scripts/` for install helper scripts, and `addin-catalog/` for the sideload
+`scripts/` for certificate helper scripts, and `addin-catalog/` for the sideload
 manifests. It asserts that the Rust daemon, UI assets, add-in bundles, catalog
 manifests, and launcher scripts are present before building the final zip.
 

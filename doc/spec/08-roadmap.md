@@ -232,7 +232,7 @@ commands is not installable software.
       tag releases, and publishes that file as the release body.
 - [x] Add a README user installation section before the source/developer setup.
       It must explain how to download `office-mcp-windows-portable-<ver>-x64.zip` from
-      GitHub Releases, verify checksums, extract it, run `install-user.ps1`, restart/open Office,
+      GitHub Releases, verify checksums, extract it, run `install.ps1`, restart/open Office,
       locate `Office MCP Control` in the Shared Folder catalog when needed,
       open the daemon UI from the tray or CLI, configure MCP clients to
       `http://127.0.0.1:8800/mcp`, find logs, and uninstall. Current README

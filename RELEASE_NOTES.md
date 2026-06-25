@@ -26,9 +26,10 @@ Expected assets:
 Validation gates before promoting the release:
 
 - Windows desktop portable install completes without requiring a source checkout.
-- The portable zip contains `README-install.txt`, `install-user.ps1`,
-  `start-daemon.ps1`, and `uninstall-user.ps1` so users can inspect the install
-  location and user-level registry/certificate changes before running them.
+- The portable zip contains `README-install.txt`, `install.ps1`, and
+  `uninstall.ps1` so users can inspect the install location and user-level
+  registry/certificate changes before running them. `install.ps1` also starts
+  the tray daemon.
 - Office MCP Control appears from the tray and opens the daemon UI.
 - Word, Excel, and PowerPoint can load Office MCP Control from the Shared Folder
   catalog when Office does not auto-show the add-in.
