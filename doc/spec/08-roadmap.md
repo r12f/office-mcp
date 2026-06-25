@@ -178,6 +178,12 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       scripts, and launcher scripts. MSI packaging was removed from the release
       path because the opaque installer UX was not acceptable for first-contact
       trust.
+- [ ] Simplify the Windows portable zip root so the user-facing entries are
+      `office-mcp-daemon.exe`, `install.ps1`, and `uninstall.ps1`. Remove
+      duplicate daemon launcher scripts such as `office-mcp.ps1`,
+      `office-mcp-daemon.ps1`, and `office-mcp-tray.ps1`; `install.ps1` should
+      set process-scoped portable environment and directly launch
+      `office-mcp-daemon.exe tray`.
 - [x] macOS Homebrew formula template and renderer for release tarballs. Actual
       tap publication waits for a signed GitHub Release artifact.
 - [x] Linux systemd user unit template and renderer for release packages. Actual

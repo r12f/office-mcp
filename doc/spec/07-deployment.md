@@ -271,10 +271,14 @@ powershell -ExecutionPolicy Bypass -File .\packaging\windows\uninstall-windows.p
 The current Windows release package is a user-selected portable zip for the
 native Rust daemon. It contains `office-mcp-daemon.exe`, daemon-owned UI assets,
 the Word/Excel/PowerPoint add-in bundles, catalog manifests, default
-`config.toml`, product assets, and auditable launcher/install/uninstall scripts.
-The launchers set `OFFICE_MCP_CONFIG_PATH` to the extracted config. The user-run
+`config.toml`, product assets, and auditable `install.ps1` / `uninstall.ps1`
+scripts. The package MUST NOT expose multiple user-facing PowerShell launchers
+for the same native daemon. `office-mcp-daemon.exe` is the product binary; it
+owns the tray, daemon, UI, status, and MCP server subcommands. The user-run
 `install.ps1` registers the Office trusted catalog, creates or exports the
-localhost certificate, and starts the tray daemon. MSI packaging is not a release target.
+localhost certificate, sets any portable runtime environment needed for the
+child process, and directly starts `office-mcp-daemon.exe tray`. MSI packaging
+is not a release target.
 
 The production portable zip remains the Windows release packaging target. A
 checked-in build script is not enough for user distribution: release builds MUST
@@ -298,7 +302,10 @@ The GitHub Release pipeline MUST:
 - Verify the portable zip artifact is non-empty, has the expected versioned file name,
   contains the native Rust daemon, daemon UI assets, shared Office add-in
   assets, Word/Excel/PowerPoint task pane bundles, generated catalog manifests,
-  launcher scripts, and installer icon assets.
+  `install.ps1`, `uninstall.ps1`, and installer icon assets. It must fail if
+  duplicate user-facing daemon launcher scripts such as `office-mcp.ps1`,
+  `office-mcp-daemon.ps1`, or `office-mcp-tray.ps1` are present in the portable
+  package root.
 - Upload artifacts with `actions/upload-artifact` for every run and attach them
   to a GitHub Release with `softprops/action-gh-release` or `gh release` only
   when the run is for a version tag.
@@ -343,10 +350,12 @@ The Windows user flow remains:
    - Installs the static add-in bundle beside the daemon.
    - Exports or creates a current-user trusted localhost certificate when the
      user runs `install.ps1`; it does not require an opaque installer step.
-   - Writes a default `config.toml` and points the launcher at it with
-     `OFFICE_MCP_CONFIG_PATH`.
-   - Starts the tray daemon from `install.ps1` so the user does not need a
-     separate daemon startup script during install.
+   - Writes a default `config.toml` and points the daemon at it from
+     `install.ps1` with `OFFICE_MCP_CONFIG_PATH` or equivalent process-scoped
+     configuration.
+   - Starts the tray daemon by launching `office-mcp-daemon.exe tray` from
+     `install.ps1`, so the user does not need a separate daemon startup script
+     during install.
    - Registers an add-in trusted catalog folder under
      `%LOCALAPPDATA%\office-mcp\addin-catalog\` and drops the Word, Excel, and
      PowerPoint manifests directly under that catalog root once each host is
