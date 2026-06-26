@@ -183,7 +183,7 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       duplicate daemon launcher scripts such as `office-mcp.ps1`,
       `office-mcp-daemon.ps1`, and `office-mcp-tray.ps1`; `install.ps1` should
       set process-scoped portable environment and directly launch
-      `office-mcp-daemon.exe tray`.
+      `office-mcp-daemon.exe daemon run`.
 - [x] macOS Homebrew formula template and renderer for release tarballs. Actual
       tap publication waits for a signed GitHub Release artifact.
 - [x] Linux systemd user unit template and renderer for release packages. Actual

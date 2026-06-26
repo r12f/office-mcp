@@ -1,5 +1,5 @@
-﻿param(
-  [string]$Version = "0.1.1",
+param(
+  [string]$Version = "0.1.3",
   [string]$OutputDir = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) "artifacts"),
   [switch]$SkipNpmInstall
 )
@@ -84,8 +84,8 @@ function Assert-PortableStagePayload([string]$StageRoot) {
       throw "Portable install script must set $envName."
     }
   }
-  if ($installScript -notmatch "office-mcp-daemon\.exe" -or $installScript -notmatch "Start-Process" -or $installScript -notmatch "'tray'" -or $installScript -notmatch "WindowStyle Hidden") {
-    throw "Portable install script must start the native tray daemon directly without a visible console."
+  if ($installScript -notmatch "office-mcp-daemon\.exe" -or $installScript -notmatch "Start-Process" -or $installScript -notmatch "'daemon', 'run'" -or $installScript -notmatch "WindowStyle Hidden") {
+    throw "Portable install script must start the native daemon runtime without a visible console."
   }
   if ($installScript -match "office-mcp-tray\.ps1" -or $installScript -match "office-mcp-env\.ps1") {
     throw "Portable install script must not depend on duplicate launcher scripts."
@@ -292,15 +292,15 @@ if (-not (Test-Path -LiteralPath $pfxPath)) {
 
 $daemonExe = Join-Path $installRoot 'office-mcp-daemon.exe'
 $escapedRoot = [System.Text.RegularExpressions.Regex]::Escape($installRoot)
-$existingTray = Get-CimInstance Win32_Process -Filter "Name = 'office-mcp-daemon.exe'" -ErrorAction SilentlyContinue |
-  Where-Object { $_.CommandLine -match $escapedRoot -and $_.CommandLine -match '(^|\s)tray(\s|$)' } |
+$existingDaemon = Get-CimInstance Win32_Process -Filter "Name = 'office-mcp-daemon.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -match $escapedRoot -and $_.CommandLine -match 'daemon' -and $_.CommandLine -match 'run' } |
   Select-Object -First 1
 
-if ($existingTray) {
-  Write-Output "Office MCP Control tray is already running. PID: $($existingTray.ProcessId)"
+if ($existingDaemon) {
+  Write-Output "Office MCP Control daemon is already running. PID: $($existingDaemon.ProcessId)"
 } else {
-  Start-Process -FilePath $daemonExe -ArgumentList 'tray' -WorkingDirectory $installRoot -WindowStyle Hidden
-  Write-Output 'Office MCP Control tray started.'
+  Start-Process -FilePath $daemonExe -ArgumentList 'daemon', 'run' -WorkingDirectory $installRoot -WindowStyle Hidden
+  Write-Output 'Office MCP Control daemon started.'
 }
 
 Write-Output 'Office MCP Control install completed.'
@@ -336,7 +336,7 @@ Contents:
 - office-ctl\word, office-ctl\excel, office-ctl\powerpoint: Office add-in bundles.
 - addin-catalog\: Word, Excel, and PowerPoint shared-folder catalog manifests.
 - scripts\export-localhost-dev-cert.ps1: creates/exports the localhost HTTPS certificate.
-- install.ps1: registers the current user's Office trusted catalog, creates the localhost certificate if needed, and starts the tray daemon.
+- install.ps1: registers the current user's Office trusted catalog, creates the localhost certificate if needed, and starts the daemon runtime with tray support.
 - uninstall.ps1: removes Office MCP Control user registry entries.
 
 What install.ps1 changes:

@@ -76,7 +76,7 @@ test('Windows packaging includes the tray controller and simplified portable pay
   assert.match(buildScript, /install\.ps1/);
   assert.match(buildScript, /uninstall\.ps1/);
   assert.match(buildScript, /Start-Process[\s\S]*office-mcp-daemon\.exe|\$daemonExe[\s\S]*Start-Process/);
-  assert.match(buildScript, /ArgumentList 'tray'/);
+  assert.match(buildScript, /ArgumentList 'daemon', 'run'/);
   assert.match(buildScript, /WindowStyle Hidden/);
   assert.doesNotMatch(buildScript, /office-mcp-install-user\.ps1/);
   assert.doesNotMatch(buildScript, /install-user\.ps1/);
@@ -256,7 +256,7 @@ test('README documents installation from GitHub Releases', () => {
   assert.match(readme, /6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57/);
   assert.match(readme, /SHA256SUMS/);
   assert.match(readme, /%LOCALAPPDATA%\\office-mcp\\/);
-  assert.match(readme, /tray/i);
+  assert.match(readme, /daemon runtime with tray support/i);
   assert.match(readme, /office-mcp-daemon ui/);
   assert.match(readme, /daemon status/);
   assert.match(readme, /Shared Folder/);
@@ -271,9 +271,9 @@ test('Release notes document the Windows portable pre-release gate', () => {
   const releaseNotes = readFileSync(join(repoRoot, 'RELEASE_NOTES.md'), 'utf8');
 
   assert.match(releaseNotes, /# Release Notes/);
-  assert.match(releaseNotes, /## 0\.1\.2/);
+  assert.match(releaseNotes, /## 0\.1\.3/);
   assert.doesNotMatch(releaseNotes, /office-mcp-setup|\.msi|MSI/i);
-  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.2-x64\.zip/);
+  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.3-x64\.zip/);
   assert.match(releaseNotes, /README-install\.txt/);
   assert.match(releaseNotes, /install\.ps1/);
   assert.match(releaseNotes, /uninstall\.ps1/);

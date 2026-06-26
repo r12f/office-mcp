@@ -147,7 +147,7 @@ During install, Office MCP Control:
   and PowerPoint manifests;
 - creates `.office-mcp-localhost.pfx` in the install folder when needed;
 - writes and uses the package-local `config.toml`;
-- starts the tray daemon through `office-mcp-daemon.exe tray`.
+- starts the daemon runtime with tray support through `office-mcp-daemon.exe daemon run`.
 
 After install:
 

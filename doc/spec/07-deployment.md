@@ -277,7 +277,7 @@ for the same native daemon. `office-mcp-daemon.exe` is the product binary; it
 owns the tray, daemon, UI, status, and MCP server subcommands. The user-run
 `install.ps1` registers the Office trusted catalog, creates or exports the
 localhost certificate, sets any portable runtime environment needed for the
-child process, and directly starts `office-mcp-daemon.exe tray`. MSI packaging
+child process, and directly starts `office-mcp-daemon.exe daemon run`. MSI packaging
 is not a release target.
 
 The production portable zip remains the Windows release packaging target. A
@@ -358,7 +358,7 @@ The Windows user flow remains:
    - Writes a default `config.toml` and points the daemon at it from
      `install.ps1` with `OFFICE_MCP_CONFIG_PATH` or equivalent process-scoped
      configuration.
-   - Starts the tray daemon by launching `office-mcp-daemon.exe tray` from
+   - Starts the daemon runtime by launching `office-mcp-daemon.exe daemon run` from
      `install.ps1`, so the user does not need a separate daemon startup script
      during install.
    - Registers an add-in trusted catalog folder under
