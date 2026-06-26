@@ -271,9 +271,9 @@ test('Release notes document the Windows portable pre-release gate', () => {
   const releaseNotes = readFileSync(join(repoRoot, 'RELEASE_NOTES.md'), 'utf8');
 
   assert.match(releaseNotes, /# Release Notes/);
-  assert.match(releaseNotes, /## 0\.1\.1/);
+  assert.match(releaseNotes, /## 0\.1\.2/);
   assert.doesNotMatch(releaseNotes, /office-mcp-setup|\.msi|MSI/i);
-  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.1-x64\.zip/);
+  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.2-x64\.zip/);
   assert.match(releaseNotes, /README-install\.txt/);
   assert.match(releaseNotes, /install\.ps1/);
   assert.match(releaseNotes, /uninstall\.ps1/);
@@ -281,12 +281,10 @@ test('Release notes document the Windows portable pre-release gate', () => {
   assert.doesNotMatch(releaseNotes, /start-daemon\.ps1/);
   assert.doesNotMatch(releaseNotes, /uninstall-user\.ps1/);
   assert.match(releaseNotes, /SHA256SUMS/);
-  assert.match(releaseNotes, /unsigned/i);
-  assert.match(releaseNotes, /draft/i);
-  assert.match(releaseNotes, /pre-release/i);
+  assert.match(releaseNotes, /one-line installer/i);
+  assert.match(releaseNotes, /portable zip root/i);
   assert.match(releaseNotes, /Windows desktop/i);
   assert.match(releaseNotes, /Office MCP Control/);
-  assert.match(releaseNotes, /tray evidence/i);
-  assert.match(releaseNotes, /portable package smoke evidence/i);
-  assert.match(releaseNotes, /live Office evidence/i);
+  assert.match(releaseNotes, /duplicate launcher wrappers/i);
+  assert.ok(releaseNotes.includes('http://127.0.0.1:8800/mcp'));
 });

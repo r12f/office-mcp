@@ -1,38 +1,33 @@
 # Release Notes
 
-## 0.1.1
+## 0.1.2
 
-Office MCP Control 0.1.1 is the first Windows desktop portable-only pre-release.
-It packages the native Rust daemon, daemon UI assets, Word/Excel/PowerPoint
-add-in bundles, trusted catalog manifests, install/uninstall scripts, product icons, and
-the Windows tray entry point into the auditable portable package
-`office-mcp-windows-portable-0.1.1-x64.zip`.
-
-This release supersedes the earlier 0.1.0 prerelease artifacts and removes the
-opaque Windows installer packaging path. Users should install from the portable zip so the
-program location, add-in catalog, scripts, certificate helper, and uninstall
-steps are visible before anything runs.
-
-This release is published as a draft pre-release until signing status, tray
-evidence, portable package smoke evidence, and required live Office evidence are
-attached to the GitHub Release or explicitly waived for the pre-release.
-Artifacts are unsigned unless the release page states otherwise.
+Office MCP Control 0.1.2 republishes the Windows portable package from the
+current portable-only layout and fixes the one-line installer path.
 
 Expected assets:
 
-- `office-mcp-windows-portable-0.1.1-x64.zip`
+- `office-mcp-windows-portable-0.1.2-x64.zip`
 - `SHA256SUMS`
 
 Validation gates before promoting the release:
 
-- Windows desktop portable install completes without requiring a source checkout.
-- The portable zip contains `README-install.txt`, `install.ps1`, and
-  `uninstall.ps1` so users can inspect the install location and user-level
-  registry/certificate changes before running them. `install.ps1` also starts
-  the tray daemon.
+- The one-line installer downloads the latest published portable zip and runs
+  the package-local `install.ps1` successfully.
+- The portable zip root contains `office-mcp-daemon.exe`, `install.ps1`,
+  `uninstall.ps1`, `config.toml`, and `README-install.txt`.
+- The portable zip root does not contain duplicate launcher wrappers such as
+  `office-mcp.ps1`, `office-mcp-daemon.ps1`, `office-mcp-tray.ps1`, or
+  `office-mcp-env.ps1`.
 - Office MCP Control appears from the tray and opens the daemon UI.
-- Word, Excel, and PowerPoint can load Office MCP Control from the Shared Folder
-  catalog when Office does not auto-show the add-in.
 - MCP clients can connect to `http://127.0.0.1:8800/mcp`.
-- The release page includes tray evidence, portable package smoke evidence, and live
-  Office evidence for the supported hosts.
+
+## 0.1.1
+
+Office MCP Control 0.1.1 was intended to be the first Windows desktop
+portable-only pre-release, but its release artifact was built from the older
+portable layout. Use 0.1.2 or newer for the one-line installer.
+
+## 0.1.0
+
+Initial prerelease artifacts. This release is superseded by portable releases.
