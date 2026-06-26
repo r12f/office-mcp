@@ -129,13 +129,55 @@ under `artifacts/`, not as parallel source packages at the root.
 Windows desktop is the v1 portable package target. macOS, Linux, Office on the web,
 and managed AppSource deployment are still tracked as later distribution paths.
 
-One-command install for the latest release:
+Run this from PowerShell to install the latest Windows portable release:
 
 ```powershell
 irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 | iex
 ```
 
-1. Open the latest GitHub Releases page and download
+The bootstrap script downloads the latest `office-mcp-windows-portable-*-x64.zip`
+release asset, extracts it to `%LOCALAPPDATA%\office-mcp\<release-tag>`, and
+runs the package's `install.ps1` from that folder.
+
+During install, Office MCP Control:
+
+- registers the current-user Office Shared Folder trusted catalog under
+  `HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}`;
+- points that catalog at the package's `addin-catalog` folder for Word, Excel,
+  and PowerPoint manifests;
+- creates `.office-mcp-localhost.pfx` in the install folder when needed;
+- writes and uses the package-local `config.toml`;
+- starts the tray daemon through `office-mcp-daemon.exe tray`.
+
+After install:
+
+1. Restart Word, Excel, or PowerPoint if it was already open.
+2. If Office does not show the add-in automatically, open **Insert > My Add-ins
+   > Shared Folder** and add **Office MCP Control**.
+3. Open the daemon UI from the tray menu with **Show Office MCP Control**, or run:
+
+   ```powershell
+   office-mcp-daemon ui
+   ```
+
+4. Configure MCP clients to use the local Streamable HTTP endpoint:
+   `http://127.0.0.1:8800/mcp`. If the daemon config changes the MCP port, use
+   the endpoint reported by:
+
+   ```powershell
+   office-mcp-daemon daemon status
+   ```
+
+For debugging, use the log path shown in the daemon UI or reported by
+`office-mcp-daemon daemon status`. The default log location is under the current
+user's local Office MCP data directory.
+
+### Manual Install
+
+Use the manual path when you want to inspect or verify the package before
+installing it.
+
+1. Open the latest GitHub Release and download
    `office-mcp-windows-portable-<ver>-x64.zip` plus `SHA256SUMS`.
 2. Optionally verify the package checksum:
 
@@ -144,39 +186,21 @@ irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 |
    Get-Content .\SHA256SUMS
    ```
 
-3. Extract the zip to the folder where Office MCP Control should live, read
-   `README-install.txt`, close Word/Excel/PowerPoint, and run one command from
-   the extracted folder:
+3. Extract the zip to the folder where Office MCP Control should live.
+4. Read `README-install.txt`, close Word, Excel, and PowerPoint, and run from the
+   extracted folder:
 
    ```powershell
    powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
    ```
 
-   The extracted folder is the install directory. `install.ps1` writes the
-   current-user Office Trusted Add-in Catalog registry entry under
-   `HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}`
-   creates `.office-mcp-localhost.pfx` in the same folder when needed, and
-   starts the tray daemon.
-4. Open the daemon UI from the tray menu with **Show Office MCP Control**, or
-   run `office-mcp-daemon ui`. Check runtime status with:
+The extracted folder is the install directory. No hidden copy step is required.
 
-   ```powershell
-   office-mcp-daemon daemon status
-   ```
+### Uninstall
 
-5. Restart Word, Excel, or PowerPoint if it was already open. If the add-in does
-   not appear automatically, open **Insert > My Add-ins > Shared Folder** and
-   add **Office MCP Control**.
-6. Configure MCP clients to use the local Streamable HTTP endpoint:
-   `http://127.0.0.1:8800/mcp`. If the daemon config changes the MCP port, use
-   the endpoint reported by `office-mcp-daemon config endpoints` or
-   `office-mcp-daemon daemon status`.
-7. For debugging, collect the log path reported by `office-mcp-daemon daemon
-   status` or shown in the daemon UI. The default log location is under the
-   current user's local Office MCP data directory.
-8. To uninstall, run `uninstall.ps1` and then delete the extracted folder.
-   If Office still lists the add-in, remove **Office MCP Control** from Office's
-   add-in manager or remove the installed Shared Folder catalog entry.
+Run `uninstall.ps1` from the install folder, then delete the extracted folder.
+If Office still lists the add-in, remove **Office MCP Control** from Office's
+add-in manager or remove the installed Shared Folder catalog entry.
 
 ## Run the MVP locally
 
@@ -453,5 +477,3 @@ final zip.
 ## License
 
 MIT.
-
-

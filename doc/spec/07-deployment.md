@@ -323,10 +323,15 @@ developer setup section. The guide MUST explain how to install from GitHub
 Releases, not only how to build from source. At minimum it must cover:
 
 - Supported platform status, with Windows desktop as the v1 portable package target.
-- Downloading `office-mcp-windows-portable-<ver>-x64.zip` from the latest GitHub Release.
-- Verifying `SHA256SUMS` when desired.
-- Extracting the portable zip, reading `README-install.txt`, and running the
-  single install command `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`.
+- Running the one-line latest-release bootstrap command
+  `irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 | iex`.
+- Explaining that the bootstrap downloads the latest portable zip, extracts it
+  under `%LOCALAPPDATA%\office-mcp\<release-tag>`, and runs the package-local
+  `install.ps1`.
+- Manual fallback: downloading `office-mcp-windows-portable-<ver>-x64.zip` from
+  the latest GitHub Release, verifying `SHA256SUMS` when desired, extracting the
+  portable zip, reading `README-install.txt`, and running
+  `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`.
 - Opening the daemon UI from the tray or `office-mcp-daemon ui` and checking
   `daemon status`.
 - Restarting Office if needed, opening Word/Excel/PowerPoint, and adding
