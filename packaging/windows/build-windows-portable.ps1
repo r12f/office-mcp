@@ -1,5 +1,5 @@
 param(
-  [string]$Version = "0.1.3",
+  [string]$Version = "0.1.4",
   [string]$OutputDir = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) "artifacts"),
   [switch]$SkipNpmInstall
 )
@@ -78,6 +78,11 @@ function Assert-PortableStagePayload([string]$StageRoot) {
   $installScript = Get-Content -Raw -LiteralPath (Join-Path $StageRoot "install.ps1")
   if ($installScript -notmatch "ConvertTo-OfficeCatalogUrl" -or $installScript -notmatch "\\\\localhost" -or $installScript -notmatch "export-localhost-dev-cert\.ps1" -or $installScript -notmatch "-CreateIfMissing" -or $installScript -notmatch "6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57") {
     throw "Portable install script must register a GUID-based UNC Office catalog and create the localhost certificate."
+  }
+  foreach ($requiredCatalogInstallBehavior in @("Assert-OfficeHostsClosed", "Remove-OfficeAddinCache", "Remove-CustomUiValidationCache")) {
+    if ($installScript -notmatch $requiredCatalogInstallBehavior) {
+      throw "Portable install script must $requiredCatalogInstallBehavior before completing Office catalog registration."
+    }
   }
   foreach ($envName in @("OFFICE_MCP_INSTALL_ROOT", "OFFICE_MCP_CONFIG_PATH", "OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PATH", "OFFICE_MCP_ADDIN_CHANNEL__PORT", "OFFICE_MCP_MCP_HTTP__PORT")) {
     if ($installScript -notmatch $envName) {
@@ -272,11 +277,97 @@ function ConvertTo-OfficeCatalogUrl {
   return "\\localhost\$drive`$\$relativePath"
 }
 
+function Assert-OfficeHostsClosed {
+  $running = @()
+  foreach ($processName in @('WINWORD', 'EXCEL', 'POWERPNT')) {
+    if (Get-Process -Name $processName -ErrorAction SilentlyContinue) {
+      $running += $processName
+    }
+  }
+  if ($running.Count -gt 0) {
+    throw "Close Word, Excel, and PowerPoint before installing Office MCP Control so Office can reload the trusted add-in catalog. Running processes: $($running -join ', ')."
+  }
+}
+
+function Remove-DeveloperDebugRegistration {
+  param(
+    [Parameter(Mandatory = $true)][string]$AddinId
+  )
+
+  $developerRoot = 'HKCU:\Software\Microsoft\Office\16.0\WEF\Developer'
+  $developerValue = Get-ItemProperty -LiteralPath $developerRoot -Name $AddinId -ErrorAction SilentlyContinue
+  if ($developerValue) {
+    Remove-ItemProperty -LiteralPath $developerRoot -Name $AddinId -Force
+  }
+
+  $developerKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\Developer\$AddinId"
+  if (Test-Path -LiteralPath $developerKey) {
+    Remove-Item -LiteralPath $developerKey -Recurse -Force
+  }
+}
+
+function Remove-OfficeAddinCache {
+  $wefRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Office\16.0\Wef'
+  if (-not (Test-Path -LiteralPath $wefRoot)) { return }
+
+  $hosts = @(
+    @{ Name = 'Word'; AddinId = '11111111-aaaa-bbbb-cccc-222222222222' },
+    @{ Name = 'Excel'; AddinId = '33333333-aaaa-bbbb-cccc-444444444444' },
+    @{ Name = 'PowerPoint'; AddinId = '44444444-aaaa-bbbb-cccc-555555555555' }
+  )
+
+  foreach ($officeHost in $hosts) {
+    $addinId = $officeHost.AddinId
+    $hostName = $officeHost.Name
+
+    Remove-DeveloperDebugRegistration -AddinId $addinId
+
+    $addinInfoRoot = Join-Path $wefRoot "AddinInfo\1\filesystem\$hostName\1"
+    if (Test-Path -LiteralPath $addinInfoRoot) {
+      Get-ChildItem -LiteralPath $addinInfoRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name.StartsWith($addinId, [System.StringComparison]::OrdinalIgnoreCase) } |
+        Remove-Item -Recurse -Force
+    }
+
+    Get-ChildItem -LiteralPath $wefRoot -Recurse -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -match '\\Manifests\\' -and $_.Name.StartsWith($addinId, [System.StringComparison]::OrdinalIgnoreCase) } |
+      Remove-Item -Force
+
+    $appCommandsRoot = Join-Path $wefRoot 'AppCommands'
+    if (Test-Path -LiteralPath $appCommandsRoot) {
+      Get-ChildItem -LiteralPath $appCommandsRoot -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object {
+          ($_.FullName -match '\\TrustedCatalog\\' -and $_.Name.StartsWith($addinId, [System.StringComparison]::OrdinalIgnoreCase)) -or
+          ($_.Name -like "$hostName.RibbonCache.*")
+        } |
+        Remove-Item -Force
+    }
+  }
+}
+
+function Remove-CustomUiValidationCache {
+  $cacheKey = 'HKCU:\Software\Microsoft\Office\16.0\Common\CustomUIValidationCache'
+  if (-not (Test-Path -LiteralPath $cacheKey)) { return }
+
+  $addinIds = @(
+    '11111111-aaaa-bbbb-cccc-222222222222',
+    '33333333-aaaa-bbbb-cccc-444444444444',
+    '44444444-aaaa-bbbb-cccc-555555555555'
+  )
+  $cache = Get-ItemProperty -LiteralPath $cacheKey
+  foreach ($addinId in $addinIds) {
+    $cache.PSObject.Properties |
+      Where-Object { $_.Name.StartsWith($addinId, [System.StringComparison]::OrdinalIgnoreCase) } |
+      ForEach-Object { Remove-ItemProperty -LiteralPath $cacheKey -Name $_.Name -Force }
+  }
+}
+
 $catalogPath = Join-Path $installRoot 'addin-catalog'
 $catalogUrl = ConvertTo-OfficeCatalogUrl -Path $catalogPath
 $catalogId = '{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}'
 $catalogKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\$catalogId"
 $legacyCatalogKey = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp'
+Assert-OfficeHostsClosed
 if (Test-Path -LiteralPath $legacyCatalogKey) {
   Remove-Item -LiteralPath $legacyCatalogKey -Recurse -Force
 }
@@ -284,6 +375,8 @@ New-Item -Path $catalogKey -Force | Out-Null
 Set-ItemProperty -Path $catalogKey -Name Id -Value $catalogId
 Set-ItemProperty -Path $catalogKey -Name Url -Value $catalogUrl
 Set-ItemProperty -Path $catalogKey -Name Flags -Value 1 -Type DWord
+Remove-OfficeAddinCache
+Remove-CustomUiValidationCache
 
 $pfxPath = Join-Path $installRoot '.office-mcp-localhost.pfx'
 if (-not (Test-Path -LiteralPath $pfxPath)) {
@@ -307,7 +400,7 @@ Write-Output 'Office MCP Control install completed.'
 Write-Output "Install root: $installRoot"
 Write-Output "Catalog folder: $catalogPath"
 Write-Output "Catalog URL: $catalogUrl"
-Write-Output 'Open Word, Excel, or PowerPoint and add Office MCP Control from the Shared Folder catalog if it does not appear automatically.'
+Write-Output 'Office add-in catalog cache cleared. Reopen Word, Excel, or PowerPoint and add Office MCP Control from the Shared Folder catalog if it does not appear automatically.'
 '@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "install.ps1")
 
 @'
@@ -354,6 +447,8 @@ Install:
 3. Run PowerShell from this folder:
    powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 4. Reopen Office and use Home > Add-ins > Advanced > Shared Folder to add Office MCP Control if Office does not show it automatically.
+
+install.ps1 refuses to continue while Word, Excel, or PowerPoint is still running. Office only reloads trusted add-in catalogs on startup, so leaving an Office host open would make the Trust Center look empty even after registry registration succeeds.
 
 Default endpoints:
 - MCP: http://127.0.0.1:8800/mcp

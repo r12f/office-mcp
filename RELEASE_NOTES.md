@@ -1,5 +1,29 @@
 # Release Notes
 
+## 0.1.4
+
+Office MCP Control 0.1.4 fixes Office trusted catalog registration so the
+installer no longer reports success while Word, Excel, or PowerPoint still has
+the old catalog state loaded.
+
+Expected assets:
+
+- `office-mcp-windows-portable-0.1.4-x64.zip`
+- `SHA256SUMS`
+
+Validation gates before promoting the release:
+
+- The package-local `install.ps1` refuses to continue while Word, Excel, or
+  PowerPoint is running. The installer error includes the text
+  `Word, Excel, or PowerPoint is running` because Office only reloads trusted
+  add-in catalogs on startup.
+- The installer writes the GUID-based trusted catalog registry entry, clears
+  stale Office WEF add-in caches, and tells the user to reopen Office.
+- The portable zip root contains `office-mcp-daemon.exe`, `install.ps1`,
+  `uninstall.ps1`, `config.toml`, and `README-install.txt`.
+- The one-line installer downloads this release and starts
+  `office-mcp-daemon.exe daemon run` for `http://127.0.0.1:8800/mcp`.
+
 ## 0.1.3
 
 Office MCP Control 0.1.3 fixes the Windows one-line installer so installation

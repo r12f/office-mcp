@@ -20,26 +20,6 @@ $catalogScriptPath = Join-Path $commonRoot "scripts\register-office-catalog.ps1"
 $catalogPath = Join-Path $InstallRoot "addin-catalog"
 $pfxPath = Join-Path $InstallRoot ".office-mcp-localhost.pfx"
 
-function ConvertTo-OfficeCatalogUrl {
-  param(
-    [Parameter(Mandatory = $true)][string]$Path
-  )
-
-  $resolvedPath = [System.IO.Path]::GetFullPath($Path)
-  if ($resolvedPath.StartsWith("\\", [System.StringComparison]::Ordinal)) {
-    return $resolvedPath
-  }
-
-  $root = [System.IO.Path]::GetPathRoot($resolvedPath)
-  if ([string]::IsNullOrWhiteSpace($root) -or $root.Length -lt 2 -or $root[1] -ne ':') {
-    throw "CatalogPath must be an absolute drive path or UNC path: $Path"
-  }
-
-  $drive = $root.Substring(0, 1).ToUpperInvariant()
-  $relativePath = $resolvedPath.Substring($root.Length).TrimStart('\', '/')
-  return "\\localhost\$drive`$\$relativePath"
-}
-
 if (-not (Test-Path (Join-Path $addinRoot "manifest.xml"))) {
   throw "Cannot find src/office-ctl/word/manifest.xml under $repoRoot."
 }
@@ -100,7 +80,11 @@ try {
   Pop-Location
 }
 
-& $catalogScriptPath -RepoRoot $repoRoot -CatalogPath $catalogPath -BaseUrl "https://localhost:8765" -SkipRegistry -ClearOfficeCache
+$catalogOutput = & $catalogScriptPath -RepoRoot $repoRoot -CatalogPath $catalogPath -BaseUrl "https://localhost:8765" -ClearOfficeCache
+$catalogOutput | Write-Output
+$catalogUrlLine = $catalogOutput | Where-Object { $_ -like 'Catalog URL: *' } | Select-Object -First 1
+if (-not $catalogUrlLine) { throw "Office catalog registration did not report a Catalog URL." }
+$catalogUrl = $catalogUrlLine.Substring('Catalog URL: '.Length)
 Copy-Item -Force -Path (Join-Path $repoRoot "target\release\office-mcp-daemon.exe") -Destination (Join-Path $InstallRoot "office-mcp-daemon.exe")
 $installedUiRoot = Join-Path $InstallRoot "office-mcp\ui"
 $installedCommonRoot = Join-Path $InstallRoot "office-ctl\common"
@@ -118,18 +102,6 @@ Copy-Item -Force -Path (Join-Path $powerPointAddinRoot "manifest.xml") -Destinat
 Copy-Item -Recurse -Force -Path (Join-Path $powerPointAddinRoot "public") -Destination $installedPowerPointRoot
 $trayLauncherPath = Join-Path $InstallRoot "office-mcp-tray.ps1"
 Copy-Item -Force -Path (Join-Path $repoRoot "packaging\windows\office-mcp-tray.ps1") -Destination $trayLauncherPath
-
-$catalogId = "{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}"
-$catalogKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\$catalogId"
-$legacyCatalogKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp"
-$catalogUrl = ConvertTo-OfficeCatalogUrl -Path $catalogPath
-if (Test-Path -LiteralPath $legacyCatalogKey) {
-  Remove-Item -LiteralPath $legacyCatalogKey -Recurse -Force
-}
-New-Item -Path $catalogKey -Force | Out-Null
-Set-ItemProperty -Path $catalogKey -Name Id -Value $catalogId
-Set-ItemProperty -Path $catalogKey -Name Url -Value $catalogUrl
-Set-ItemProperty -Path $catalogKey -Name Flags -Value 1 -Type DWord
 
 if (-not $SkipCertificateExport) {
   & (Join-Path $repoRoot "packaging\windows\export-localhost-dev-cert.ps1") -OutputPath $pfxPath

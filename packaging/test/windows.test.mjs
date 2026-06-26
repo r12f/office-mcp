@@ -95,6 +95,10 @@ test('Windows packaging includes the tray controller and simplified portable pay
   assert.doesNotMatch(buildScript, /office-mcp-setup|\.msi|dotnet wix|WiX|Wix|wixpdb/i);
   assert.match(buildScript, /ConvertTo-OfficeCatalogUrl/);
   assert.match(buildScript, /return "\\\\localhost\\\$drive`\$\\\$relativePath"/);
+  assert.match(buildScript, /Assert-OfficeHostsClosed/);
+  assert.match(buildScript, /Close Word, Excel, and PowerPoint before installing Office MCP Control/);
+  assert.match(buildScript, /Remove-OfficeAddinCache/);
+  assert.match(buildScript, /Remove-CustomUiValidationCache/);
   assert.match(buildScript, /6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57/);
   assert.match(buildScript, /TrustedCatalogs\\\$catalogId/);
   assert.match(buildScript, /TrustedCatalogs\\office-mcp/);
@@ -120,15 +124,14 @@ test('Windows packaging includes the tray controller and simplified portable pay
   assert.match(installScript, /register-office-catalog\.ps1/);
   assert.match(installScript, /-CatalogPath \$catalogPath/);
   assert.match(installScript, /-ClearOfficeCache/);
+  assert.match(installScript, /\$catalogOutput = & \$catalogScriptPath/);
   assert.match(installScript, /\$catalogScriptPath = Join-Path \$commonRoot "scripts\\register-office-catalog\.ps1"/);
   assert.doesNotMatch(installScript, /Destination \(Join-Path \$catalogPath "office-mcp-word\.xml"\)/);
   assert.doesNotMatch(installScript, /Destination \(Join-Path \$catalogPath "office-mcp-excel\.xml"\)/);
   assert.doesNotMatch(installScript, /Destination \(Join-Path \$catalogPath "office-mcp-powerpoint\.xml"\)/);
   assert.match(installScript, /commonRoot/);
-  assert.match(installScript, /function ConvertTo-OfficeCatalogUrl/);
-  assert.match(installScript, /\\\\localhost/);
-  assert.match(installScript, /6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57|TrustedCatalogs\\office-mcp/);
-  assert.match(installScript, /-Name Url -Value \$catalogUrl/);
+  assert.match(readFileSync(join(repoRoot, 'src', 'office-ctl', 'common', 'scripts', 'register-office-catalog.ps1'), 'utf8'), /6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57|TrustedCatalogs\\office-mcp/);
+  assert.doesNotMatch(installScript, /Set-ItemProperty -Path \$catalogKey/);
   assert.match(installScript, /Catalog URL: \$catalogUrl/);
   assert.doesNotMatch(installScript, new RegExp(['npm run', 'daemon'].join(' ')));
   assert.match(installScript, /Tray launcher:/);
@@ -271,9 +274,9 @@ test('Release notes document the Windows portable pre-release gate', () => {
   const releaseNotes = readFileSync(join(repoRoot, 'RELEASE_NOTES.md'), 'utf8');
 
   assert.match(releaseNotes, /# Release Notes/);
-  assert.match(releaseNotes, /## 0\.1\.3/);
+  assert.match(releaseNotes, /## 0\.1\.4/);
   assert.doesNotMatch(releaseNotes, /office-mcp-setup|\.msi|MSI/i);
-  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.3-x64\.zip/);
+  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.4-x64\.zip/);
   assert.match(releaseNotes, /README-install\.txt/);
   assert.match(releaseNotes, /install\.ps1/);
   assert.match(releaseNotes, /uninstall\.ps1/);
@@ -285,6 +288,8 @@ test('Release notes document the Windows portable pre-release gate', () => {
   assert.match(releaseNotes, /portable zip root/i);
   assert.match(releaseNotes, /Windows desktop/i);
   assert.match(releaseNotes, /Office MCP Control/);
+  assert.match(releaseNotes, /Word, Excel, or PowerPoint is running/);
+  assert.match(releaseNotes, /WEF add-in caches/);
   assert.match(releaseNotes, /duplicate launcher wrappers/i);
   assert.ok(releaseNotes.includes('http://127.0.0.1:8800/mcp'));
 });
