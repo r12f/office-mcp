@@ -132,7 +132,7 @@ and managed AppSource deployment are still tracked as later distribution paths.
 One-command install for the latest release:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command '$ErrorActionPreference="Stop"; $release=Invoke-RestMethod "https://api.github.com/repos/r12f/office-mcp/releases" | Where-Object { $_.assets.name -like "office-mcp-windows-portable-*-x64.zip" } | Select-Object -First 1; if (-not $release) { throw "No Windows portable release asset found." }; $asset=$release.assets | Where-Object { $_.name -like "office-mcp-windows-portable-*-x64.zip" } | Select-Object -First 1; $installRoot=Join-Path $env:LOCALAPPDATA ("office-mcp\" + $release.tag_name); $zipPath=Join-Path $env:TEMP $asset.name; Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath; New-Item -ItemType Directory -Force -Path $installRoot | Out-Null; Expand-Archive -LiteralPath $zipPath -DestinationPath $installRoot -Force; & (Join-Path $installRoot "install.ps1")'
+irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 | iex
 ```
 
 1. Open the latest GitHub Releases page and download
