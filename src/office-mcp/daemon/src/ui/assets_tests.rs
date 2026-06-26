@@ -1,4 +1,4 @@
-use super::{UiAssetError, UiAssetStore};
+use super::{UiAssetError, UiAssetStore, default_ui_asset_dir_from_env};
 use std::fs;
 
 #[test]
@@ -52,6 +52,55 @@ fn default_store_finds_repo_daemon_ui_assets() {
 
     assert_eq!(html.content_type, "text/html; charset=utf-8");
     assert!(String::from_utf8_lossy(&html.content).contains("Office MCP"));
+}
+
+#[test]
+fn default_asset_dir_prefers_explicit_ui_asset_dir() {
+    let dir = temp_asset_dir("explicit");
+    write_minimal_assets(&dir);
+
+    let found = default_ui_asset_dir_from_env([(
+        "OFFICE_MCP_UI_ASSET_DIR".to_string(),
+        dir.display().to_string(),
+    )])
+    .expect("explicit asset dir");
+
+    assert_eq!(found, dir);
+    let _ = fs::remove_dir_all(found);
+}
+
+#[test]
+fn default_asset_dir_finds_portable_install_root_assets() {
+    let install_root = temp_asset_dir("install-root");
+    let ui_dir = install_root.join("office-mcp").join("ui");
+    write_minimal_assets(&ui_dir);
+
+    let found = default_ui_asset_dir_from_env([(
+        "OFFICE_MCP_INSTALL_ROOT".to_string(),
+        install_root.display().to_string(),
+    )])
+    .expect("portable install asset dir");
+
+    assert_eq!(found, ui_dir);
+    let _ = fs::remove_dir_all(install_root);
+}
+
+fn temp_asset_dir(label: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "office-mcp-ui-assets-test-{label}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos()
+    ))
+}
+
+fn write_minimal_assets(dir: &std::path::Path) {
+    fs::create_dir_all(dir).expect("asset dir");
+    fs::write(dir.join("index.html"), "<main>Office MCP</main>").expect("html");
+    fs::write(dir.join("app.css"), "body { margin: 0; }").expect("css");
+    fs::write(dir.join("app.js"), "window.ok = true;").expect("js");
 }
 
 #[test]

@@ -42,7 +42,7 @@ impl UiAssetStore {
 impl Default for UiAssetStore {
     fn default() -> Self {
         Self {
-            root: default_ui_asset_dir().unwrap_or_else(|| {
+            root: default_ui_asset_dir_from_env(std::env::vars()).unwrap_or_else(|| {
                 PathBuf::from("src")
                     .join("office-mcp")
                     .join("daemon")
@@ -71,7 +71,42 @@ impl Display for UiAssetError {
 
 impl Error for UiAssetError {}
 
+fn default_ui_asset_dir_from_env<I>(env: I) -> Option<PathBuf>
+where
+    I: IntoIterator<Item = (String, String)>,
+{
+    let mut install_root = None;
+    for (name, value) in env {
+        match name.as_str() {
+            "OFFICE_MCP_UI_ASSET_DIR" => {
+                let path = PathBuf::from(value);
+                if is_ui_asset_dir(&path) {
+                    return Some(path);
+                }
+            }
+            "OFFICE_MCP_INSTALL_ROOT" => install_root = Some(PathBuf::from(value)),
+            _ => {}
+        }
+    }
+    if let Some(root) = install_root {
+        let path = root.join("office-mcp").join("ui");
+        if is_ui_asset_dir(&path) {
+            return Some(path);
+        }
+    }
+    default_ui_asset_dir()
+}
+
 fn default_ui_asset_dir() -> Option<PathBuf> {
+    if let Ok(exe_path) = std::env::current_exe()
+        && let Some(exe_dir) = exe_path.parent()
+    {
+        let candidate = exe_dir.join("office-mcp").join("ui");
+        if is_ui_asset_dir(&candidate) {
+            return Some(candidate);
+        }
+    }
+
     let current = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     for ancestor in current.ancestors() {
         let candidate = ancestor
@@ -81,11 +116,17 @@ fn default_ui_asset_dir() -> Option<PathBuf> {
             .join("src")
             .join("ui")
             .join("assets");
-        if candidate.join("index.html").is_file() {
+        if is_ui_asset_dir(&candidate) {
             return Some(candidate);
         }
     }
     None
+}
+
+fn is_ui_asset_dir(path: &Path) -> bool {
+    path.join("index.html").is_file()
+        && path.join("app.css").is_file()
+        && path.join("app.js").is_file()
 }
 
 fn is_safe_asset_name(name: &str) -> bool {
