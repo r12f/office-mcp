@@ -2,6 +2,7 @@ pub mod controller;
 pub mod host;
 pub mod model;
 pub(crate) mod product_icon;
+pub mod quit_request;
 pub mod ui_launch;
 pub(crate) mod ui_state_client;
 
@@ -13,3 +14,4 @@ pub use model::{
     QuitConfirmation, TrayAction, TrayHealth, TrayMenuItem, TrayPlatform, TraySnapshot,
     TrayStatusInput,
 };
+pub use quit_request::{EnvShutdownController, ShutdownController, TrayQuitRequest};

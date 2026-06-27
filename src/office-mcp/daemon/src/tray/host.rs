@@ -1,4 +1,4 @@
-use crate::api::DaemonController;
+use crate::tray::quit_request::{EnvShutdownController, TrayQuitRequest};
 use crate::tray::ui_launch::{PlatformUiLauncher, TrayUiOpenRequest};
 use crate::tray::ui_state_client::TrayUiStateClient;
 use crate::tray::{TrayController, TrayPlatformError, TraySnapshot};
@@ -101,10 +101,7 @@ pub fn open_ui_from_runtime(options: &TrayHostOptions) -> Result<(), TrayPlatfor
 ///
 /// Returns an error when the controller cannot stop the daemon.
 pub fn stop_daemon() -> Result<(), TrayPlatformError> {
-    tracing::info!(component = "tray_host", "stopping daemon from tray");
-    DaemonController::from_env()
-        .stop()
-        .map_err(|error| TrayPlatformError::new(error.to_string()))
+    TrayQuitRequest::new("native_tray_menu").shutdown_with(&EnvShutdownController)
 }
 
 pub fn start_tray_background() {
