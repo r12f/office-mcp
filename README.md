@@ -136,8 +136,18 @@ irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 |
 ```
 
 The bootstrap script downloads the latest `office-mcp-windows-portable-*-x64.zip`
-release asset, extracts it to `%LOCALAPPDATA%\office-mcp\<release-tag>`, and
-runs the package's `install.ps1` from that folder.
+release asset to a temporary staging folder, extracts it, and runs the package's
+`install.ps1`. The package installer copies the product into a stable install
+root, `%LOCALAPPDATA%\office-mcp` by default, so upgrades do not create a new
+versioned install folder each time.
+
+To choose a different install root for the one-line install, set
+`OFFICE_MCP_INSTALL_ROOT` first:
+
+```powershell
+$env:OFFICE_MCP_INSTALL_ROOT = 'D:\Apps\OfficeMcp'
+irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 | iex
+```
 
 During install, Office MCP Control:
 
@@ -146,8 +156,15 @@ During install, Office MCP Control:
 - points that catalog at the package's `addin-catalog` folder for Word, Excel,
   and PowerPoint manifests;
 - creates `.office-mcp-localhost.pfx` in the install folder when needed;
-- writes and uses the package-local `config.toml`;
+- writes and uses `config.toml` from the fixed install root;
+- stops an existing Office MCP daemon before replacing installed runtime files;
+- cleans stale versioned install roots and stale Office MCP trusted catalog paths
+  left by older bootstrap installers when they are safe to identify;
 - starts the daemon runtime with tray support through `office-mcp-daemon.exe daemon run`.
+
+If Word, Excel, or PowerPoint is running, the installer shows the running hosts
+and asks before closing them. In non-interactive runs, close Office first or pass
+the package-local `-CloseOfficeHosts` option.
 
 After install:
 
@@ -186,19 +203,26 @@ installing it.
    Get-Content .\SHA256SUMS
    ```
 
-3. Extract the zip to the folder where Office MCP Control should live.
-4. Read `README-install.txt`, close Word, Excel, and PowerPoint, and run from the
-   extracted folder:
+3. Extract the zip to a temporary folder so you can inspect it.
+4. Read `README-install.txt` and run from the extracted folder:
 
    ```powershell
    powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
    ```
 
-The extracted folder is the install directory. No hidden copy step is required.
+   To choose an install root:
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -InstallRoot D:\Apps\OfficeMcp
+   ```
+
+The extracted folder is installation media. The installed product lives in the
+fixed install root shown by the installer.
 
 ### Uninstall
 
-Run `uninstall.ps1` from the install folder, then delete the extracted folder.
+Run `uninstall.ps1` from the install folder, then delete the install root if you
+do not need local config, certificates, logs, or cached package files.
 If Office still lists the add-in, remove **Office MCP Control** from Office's
 add-in manager or remove the installed Shared Folder catalog entry.
 

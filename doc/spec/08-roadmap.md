@@ -270,6 +270,47 @@ pre-release with a downloadable Windows portable zip and checksums. A Windows
 desktop user can install from README instructions without cloning the repository
 or running developer build commands.
 
+### M6.2 — Fixed-root Windows installer and safe upgrades
+
+User-reported installer gap: the first one-line installer put every release in
+`%LOCALAPPDATA%\office-mcp\<release-tag>`, which leaked old versions, made the
+installed location hard to reason about, and left Office trusted catalogs at
+stale package paths. The portable zip must remain transparent, but installation
+must behave like normal software.
+
+- [x] Keep `scripts/install.ps1` as a thin latest-release bootstrap. It resolves
+      a published Windows portable zip, extracts it to a temporary staging
+      folder, invokes the package-local `install.ps1`, and does not install
+      product files into a version-tagged directory.
+- [x] Make the package-local `install.ps1` install or upgrade into a stable
+      default root, `%LOCALAPPDATA%\office-mcp`, with custom roots supported by
+      `OFFICE_MCP_INSTALL_ROOT` for one-line installs and `-InstallRoot` for
+      manual package installs.
+- [x] Stop existing Office MCP daemon processes before replacing installed
+      runtime payloads, preserve user-owned config/certificate/log files, and
+      copy the new package payload without mixing old and new UI/add-in assets.
+- [x] Clean safe-to-identify stale versioned install roots created by old
+      bootstraps and stale Office MCP trusted catalog entries that point at
+      previous versioned `addin-catalog` paths.
+- [x] Handle running Word, Excel, and PowerPoint during install by listing the
+      running hosts, prompting before closing them in interactive mode, and
+      failing with an actionable message in non-interactive mode unless
+      `-CloseOfficeHosts` is supplied.
+- [x] Update README and deployment spec so one-line install, manual install,
+      custom install root, upgrade cleanup, Office-host prompting, trusted
+      catalog ownership, logs, and uninstall guidance match the actual package.
+- [ ] Before the next release, locally verify a clean install from no install
+      root and no trusted catalog registry key, an upgrade from an older
+      versioned install root, the daemon UI at `https://localhost:8765/ui/`, and
+      the trusted catalog URL pointing at the fixed install root's
+      `addin-catalog`.
+
+**Exit criterion**: Installing or reinstalling from the one-line command uses a
+stable install root, does not accumulate versioned install directories or stale
+Office catalog paths, restarts the daemon/tray from the fixed root, and leaves
+Word, Excel, and PowerPoint able to discover Office MCP Control from the trusted
+Shared Folder catalog after Office restarts.
+
 ### M6.5 — Product UI
 
 - [x] Daemon UI backend and static web console assets: redacted `/ui/state`,
