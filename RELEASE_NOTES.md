@@ -1,5 +1,30 @@
 # Release Notes
 
+## 0.1.7
+
+Office MCP Control 0.1.7 fixes the native Windows tray menu actions for normal
+portable installs. The tray **Show Office MCP Control** action now opens the
+daemon UI through the runtime UI URL, and **Quit Office MCP Control** now routes
+through a tested daemon shutdown dispatcher with actionable logging.
+
+Expected assets:
+
+- `office-mcp-windows-portable-0.1.7-x64.zip`
+- `SHA256SUMS`
+
+Validation gates before promoting the release:
+
+- The native tray **Show Office MCP Control** action resolves the daemon runtime
+  UI URL, normally `https://localhost:8765/ui/`, and logs action, source, URL,
+  process ID, and launcher errors when opening fails.
+- The native tray **Quit Office MCP Control** action shows native confirmation,
+  dispatches daemon shutdown through the tray shutdown controller, and logs
+  action, source, process ID, and controller errors when shutdown fails.
+- The tray actions work from the fixed Windows install root
+  `%LOCALAPPDATA%\office-mcp` used by the portable installer.
+- Rust tray tests cover Show UI dispatch, Quit dispatch, and actionable failure
+  messages before the release artifact is built.
+
 ## 0.1.6
 
 Office MCP Control 0.1.6 redesigns the Windows portable installer so upgrades
