@@ -1297,6 +1297,16 @@ Current screenshot feedback to preserve for the next implementation goal:
       screenshots; stale screenshots keep the product visual evidence from
       passing. This item remains open until those fields are backed by a real
       interactive Windows tray capture.
+- [ ] Fix and verify the native tray `Show Office MCP Control` action. Clicking
+      the menu item in a normal installed Windows run from
+      `%LOCALAPPDATA%\office-mcp` must open or focus the exact daemon UI URL
+      reported by runtime metadata / `daemon status`, normally
+      `https://localhost:8765/ui/`. The implementation must exercise the real
+      menu action dispatch path, not just the tray probe/menu-label model, and
+      failures must be logged with the action name, URL, runtime metadata
+      source, process ID, and platform launcher error. Automated tests must
+      cover runtime URL resolution and action dispatch; release evidence must
+      include the visible tray menu action opening the UI.
 - [x] Polish the automated tray product surface model so normal Windows users
       are expected to see a deliberate app icon, native tooltip/title, native
       context menu text, disabled status rows, and confirmation dialogs that
