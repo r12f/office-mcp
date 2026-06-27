@@ -234,6 +234,15 @@ test('GitHub release workflow publishes only the Windows portable artifacts', ()
   assert.match(workflow, /github\.ref_type == 'tag'/);
 });
 
+test('GitHub CI verifies the Windows portable zip using package metadata version', () => {
+  const repoRoot = join(PACKAGING_ROOT, '..');
+  const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
+
+  assert.match(workflow, /\$version = \(Get-Content -Raw \.\\packaging\\package\.json \| ConvertFrom-Json\)\.version/);
+  assert.match(workflow, /office-mcp-windows-portable-\$version-x64\.zip/);
+  assert.doesNotMatch(workflow, /office-mcp-windows-portable-0\.1\.1-x64\.zip/);
+});
+
 test('README documents installation from GitHub Releases', () => {
   const repoRoot = join(PACKAGING_ROOT, '..');
   const readme = readFileSync(join(repoRoot, 'README.md'), 'utf8');
