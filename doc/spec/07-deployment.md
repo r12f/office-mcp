@@ -365,14 +365,17 @@ behind links to this deployment spec or other focused docs:
 5. Why `office-mcp`: agents need the document the user is editing; Office hosts
    may own protection, locking, and live state that file parsers cannot see; the
    add-in operates inside the host context.
-6. Key idea: one long-lived local daemon, Word/Excel/PowerPoint add-ins that
-   reverse-connect and register document sessions, and MCP clients calling tools
-   through the daemon router.
-7. Difference versus Python / COM-based MCP servers or skills: file libraries
-   operate on file formats, COM is Windows/session-sensitive and can fight with
-   open Office instances, and `office-mcp` is designed around Office.js live host
-   sessions. Claims in this comparison must stay conservative and aligned with
-   the validated spec and current implementation.
+6. Why not just use `python-docx` / `docx2pdf` / COM?: keep the comparison table
+   from the original README shape. It must explain that file libraries and COM
+   are useful for batch or automation work but do not model the live Office host
+   session. The table must cover IRM/RMS protected documents, live editing,
+   exclusive-access conflicts, add-in discovery, MCP client config churn, and
+   platform path. Claims in this comparison must stay conservative and aligned
+   with the validated spec and current implementation.
+7. Architecture (one diagram): keep one compact README diagram showing MCP
+   clients, the long-lived `office-mcp` daemon, and multiple Office add-in
+   sessions. The bullets under the diagram must explain the MCP daemon,
+   Office.js add-ins, and client-facing tool routing/access-control model.
 8. License, linking to the repository license file.
 
 Detailed install behavior remains specified here: supported platform status,

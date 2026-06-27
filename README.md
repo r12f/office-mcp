@@ -29,21 +29,35 @@ AI agents need access to the document the user is actually editing, not only the
 
 Office documents may be protected, open, locked, or host-managed in ways file parsers cannot handle correctly. A local add-in can run inside the Office host, inherit the user's current Office context, and preserve the live editing state the user sees.
 
-## Key idea
+## Why not just use `python-docx` / `docx2pdf` / COM?
 
-One local long-lived MCP daemon exposes a stable MCP endpoint.
+`python-docx`, `openpyxl`, `python-pptx`, `docx2pdf`, and similar tools work on files or automation surfaces, not the live Office host session. They are useful for batch processing, but they cannot reliably see every part of an already-open, protected, locked, or host-managed editing session.
 
-Office add-ins run inside Word, Excel, and PowerPoint. Each add-in reverse-connects to the daemon and registers the live document session it owns.
+| Problem | File libraries / COM | office-mcp |
+|---|---|---|
+| IRM / RMS protected documents | Cannot reliably access host-enforced state | Design target: run inside the Office host; protected-document behavior remains host-validated |
+| Live editing in the user's open document | File-oriented tools need the file on disk; COM can fight the active desktop session | Operates through the add-in loaded in the live document |
+| Office instance exclusive-access errors | Common when automation opens or locks the same file | Each Office window owns its own add-in session |
+| Add-in install / discovery | Not applicable | Installer registers one trusted catalog for Word, Excel, and PowerPoint |
+| MCP client config churn | Often one subprocess or config path per workflow | One persistent local Streamable HTTP endpoint |
+| Platform path | COM is Windows-only; file libraries miss host behavior | Windows desktop v1; other Office platforms need separate deployment validation |
 
-MCP clients call tools through the daemon, and the daemon routes calls to the correct Office host session.
+## Architecture (one diagram)
 
-## Difference vs Python / COM-based MCP servers or skills
+```text
++-------------+       +-----------------------+       +----------------------------+
+| MCP Client  |<----->|  office-mcp daemon    |<----->| Word instance A (add-in)   |
+| Claude,     | HTTP  |  long-lived process   | WSS   +----------------------------+
+| Cursor,     |       |                       |       | Word instance B (add-in)   |
+| agent       |       |  - tool router        |       +----------------------------+
++-------------+       |  - session registry   |       | Excel instance C (add-in)  |
+                      |  - access control     |       +----------------------------+
+                      +-----------------------+
+```
 
-`python-docx`, `openpyxl`, `python-pptx`, and similar libraries work on file formats, not the live Office host. They are useful for batch file processing, but they cannot see every part of an already-open, protected, or host-managed editing session.
-
-COM automation is Windows-only, can fight with already-open Office instances, and often depends on process or desktop-session assumptions that do not fit agent workflows.
-
-`office-mcp` is designed around Office.js add-ins and live host sessions, giving agents a route to user-open documents through the Office application itself while keeping capability claims aligned with the current implementation and spec.
+- **MCP daemon** is a single long-running process. It speaks MCP Streamable HTTP to clients and JSON-RPC over a local secure WebSocket to add-ins.
+- **Office add-ins** are Office.js task-pane add-ins for Word, Excel, and PowerPoint. Each loaded runtime dials out to the daemon and registers the current host document it can drive.
+- **Clients** see a uniform MCP tool surface. The daemon filters disabled tools, checks session capabilities, and routes each call to the add-in that owns the target document.
 
 ## License
 

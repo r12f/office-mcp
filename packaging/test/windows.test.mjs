@@ -264,8 +264,8 @@ test('README is a compact landing page with install and MCP config first', () =>
     '# office-mcp',
     '## Install and MCP config',
     '## Why office-mcp',
-    '## Key idea',
-    '## Difference vs Python / COM-based MCP servers or skills',
+    '## Why not just use `python-docx` / `docx2pdf` / COM?',
+    '## Architecture (one diagram)',
     '## License',
   ]);
   assert.match(readme, /\[!\[License: MIT\]/);
@@ -282,14 +282,25 @@ test('README is a compact landing page with install and MCP config first', () =>
   assert.match(readme, /the document the user is actually editing/i);
   assert.match(readme, /protected, open, locked, or host-managed/i);
   assert.match(readme, /inside the Office host/i);
-  assert.match(readme, /one local long-lived MCP daemon/i);
-  assert.match(readme, /reverse-connects to the daemon/i);
-  assert.match(readme, /routes calls to the correct Office host session/i);
   assert.match(readme, /python-docx/);
+  assert.match(readme, /docx2pdf/);
   assert.match(readme, /openpyxl/);
   assert.match(readme, /python-pptx/);
-  assert.match(readme, /COM automation is Windows-only/i);
-  assert.match(readme, /Office\.js add-ins and live host sessions/i);
+  assert.match(readme, /IRM \/ RMS protected documents/);
+  assert.match(readme, /Live editing in the user's open document/);
+  assert.match(readme, /Office instance exclusive-access errors/);
+  assert.match(readme, /MCP client config churn/);
+  assert.match(readme, /One persistent local Streamable HTTP endpoint/);
+  assert.match(readme, /Windows desktop v1/);
+  assert.match(readme, /MCP Client/);
+  assert.match(readme, /office-mcp daemon/);
+  assert.match(readme, /Word instance A \(add-in\)/);
+  assert.match(readme, /Excel instance C \(add-in\)/);
+  assert.match(readme, /MCP daemon\*\* is a single long-running process/);
+  assert.match(readme, /Office add-ins\*\* are Office\.js task-pane add-ins/);
+  assert.match(readme, /Clients\*\* see a uniform MCP tool surface/);
+  assert.match(readme, /filters disabled tools/i);
+  assert.match(readme, /routes each call to the add-in that owns the target document/i);
   assert.match(readme, /\[MIT\]\(LICENSE\)/);
   assert.match(readme, /\[deployment spec\]\(doc\/spec\/07-deployment\.md\)/i);
   assert.doesNotMatch(readme, /office-mcp-setup|\.msi|MSI/i);
