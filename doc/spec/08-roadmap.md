@@ -730,6 +730,12 @@ Word, Excel, and PowerPoint session.
       `/ui/state.daemon.tool_catalog`, groups controls by app and category,
       exposes `Read` / `Write` / `All`, and updates the live daemon policy via
       `PUT /ui/tool-access-policy`.
+- [x] Keep Global Tool Access out of the periodic auto-refresh render path so
+      user-owned editing state is stable while daemon telemetry updates.
+      Automatic polling must not rebuild the access-control tree or reset
+      expanded/collapsed app and category groups; the panel reloads only on
+      initial load, explicit access-policy updates, or a real tool-catalog shape
+      change.
 - [x] Add tests covering discovery filtering, daemon-policy dispatch rejection,
       session preflight rejection, refresh hints, persistence, and UI rendering.
       Tests must prove a disabled tool disappears from `tools/list`, a stale
