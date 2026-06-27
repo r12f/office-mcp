@@ -1,5 +1,30 @@
 # Release Notes
 
+## 0.1.5
+
+Office MCP Control 0.1.5 fixes the daemon control panel in the Windows portable
+one-line install path. The portable package already included `office-mcp\ui`,
+but the daemon only discovered the source-tree UI assets, so installed daemons
+returned `404 Not found` for `https://localhost:8765/ui/`.
+
+Expected assets:
+
+- `office-mcp-windows-portable-0.1.5-x64.zip`
+- `SHA256SUMS`
+
+Validation gates before promoting the release:
+
+- The one-line installer downloads this release and expands a portable package
+  whose daemon can discover `office-mcp\ui` from the install root.
+- `https://localhost:8765/ui/` returns `HTTP/1.1 200 OK` with the Office MCP
+  Control HTML after install.
+- The installer writes the GUID-based trusted catalog registry entry and clears
+  stale Office WEF add-in caches.
+- The portable zip root contains `office-mcp-daemon.exe`, `install.ps1`,
+  `uninstall.ps1`, `config.toml`, and `README-install.txt`.
+- The CI portable zip verification uses `packaging/package.json` instead of a
+  hard-coded historical version.
+
 ## 0.1.4
 
 Office MCP Control 0.1.4 fixes Office trusted catalog registration so the
