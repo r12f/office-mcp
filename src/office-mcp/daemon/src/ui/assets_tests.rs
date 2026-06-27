@@ -282,7 +282,12 @@ fn default_daemon_ui_assets_keep_accessible_dense_operations_layout() {
     assert!(!js.contains("$('lastError').textContent"));
     assert!(!js.contains("$('daemonMeta').textContent = snapshot.daemon?.last_error"));
     assert!(!js.contains("'Not configured'"));
-    assert!(js.contains("renderToolAccess(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {})"));
+    assert!(js.contains("renderToolAccessIfNeeded(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {})"));
+    assert!(!js.contains("renderToolAccess(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {})"));
+    assert!(js.contains("function renderToolAccessIfNeeded(catalog, policy, options = {})"));
+    assert!(js.contains("state.toolAccessRenderKey === renderKey"));
+    assert!(js.contains("!options.force"));
+    assert!(js.contains("state.toolAccessRenderKey = renderKey"));
     assert!(js.contains("function renderToolAccess(catalog, policy)"));
     assert!(js.contains("function groupedToolAccessCatalog(catalog)"));
     assert!(js.contains("fetch('/ui/tool-access-policy'"));
