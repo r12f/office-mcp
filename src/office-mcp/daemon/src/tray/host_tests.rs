@@ -1,4 +1,6 @@
 use super::{TrayHost, TrayHostOptions};
+use crate::tray::ui_launch::{RecordingUiLauncher, TrayUiOpenRequest};
+use crate::ui::{UiRuntimeFile, UiRuntimeInfo};
 use crate::common::{Logger, LoggerLogLevel};
 use std::fs;
 use std::fs::{read_to_string, remove_dir_all};
@@ -56,6 +58,59 @@ fn tray_probe_writes_structured_tracing_event() {
     assert!(contents.contains("\"component\":\"tray_host\""));
     assert!(contents.contains("\"state_fetch_ok\":true"));
     let _ = remove_dir_all(dir);
+}
+
+#[test]
+fn show_ui_action_opens_runtime_ui_url_through_launcher() {
+    let dir = std::env::temp_dir().join(format!(
+        "office-mcp-tray-show-ui-runtime-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let runtime_path = dir.join("ui-runtime.json");
+    UiRuntimeFile::with_path(
+        runtime_path.clone(),
+        UiRuntimeInfo::with_origin("https://localhost:9876".to_string()),
+    )
+    .write()
+    .expect("write runtime file");
+    let launcher = RecordingUiLauncher::default();
+    let options = TrayHostOptions {
+        runtime_path: Some(runtime_path),
+        probe_state_path: None,
+        probe: false,
+    };
+
+    let request = TrayUiOpenRequest::from_runtime(&options).expect("resolve runtime UI request");
+    request.open_with(&launcher).expect("open UI request");
+
+    assert_eq!(launcher.opened_urls(), vec!["https://localhost:9876/ui/"]);
+    assert_eq!(request.action(), "show_ui");
+    assert_eq!(request.source(), "runtime_file");
+    assert_eq!(request.process_id(), std::process::id());
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn show_ui_action_error_includes_action_source_url_and_pid() {
+    let launcher = RecordingUiLauncher::failing("launcher unavailable");
+    let options = TrayHostOptions {
+        runtime_path: None,
+        probe_state_path: None,
+        probe: false,
+    };
+
+    let error = TrayUiOpenRequest::from_runtime(&options)
+        .expect("resolve fallback UI request")
+        .open_with(&launcher)
+        .expect_err("launcher failure should be returned");
+    let message = error.to_string();
+
+    assert!(message.contains("show_ui"));
+    assert!(message.contains("fallback"));
+    assert!(message.contains("https://localhost:8765/ui/"));
+    assert!(message.contains(&format!("pid={}", std::process::id())));
+    assert!(message.contains("launcher unavailable"));
 }
 
 #[test]
