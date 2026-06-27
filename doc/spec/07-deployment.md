@@ -349,33 +349,38 @@ The GitHub Release pipeline MUST:
 - Fail rather than publish when the version in the tag, portable zip file name, package
   metadata, and release notes disagree.
 
-The repository README MUST include a user-facing installation guide before the
-developer setup section. The guide MUST explain how to install from GitHub
-Releases, not only how to build from source. At minimum it must cover:
+The repository README is the project landing page, not the full operations
+manual. It MUST keep this top-level flow and move longer operational details
+behind links to this deployment spec or other focused docs:
 
-- Supported platform status, with Windows desktop as the v1 portable package target.
-- Running the one-line latest-release bootstrap command
-  `irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 | iex`.
-- Explaining that the bootstrap downloads the latest portable zip to a temporary
-  staging directory, invokes the package-local `install.ps1`, and installs into
-  the stable `%LOCALAPPDATA%\office-mcp` root by default instead of a
-  version-tagged directory.
-- Explaining how to choose a custom install root with `OFFICE_MCP_INSTALL_ROOT`
-  for one-line installs and `-InstallRoot` for manual package installs.
-- Manual fallback: downloading `office-mcp-windows-portable-<ver>-x64.zip` from
-  the latest GitHub Release, verifying `SHA256SUMS` when desired, extracting the
-  portable zip, reading `README-install.txt`, and running
-  `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`.
-- Opening the daemon UI from the tray or `office-mcp-daemon ui` and checking
-  `daemon status`.
-- Restarting Office if needed, opening Word/Excel/PowerPoint, and adding
-  `Office MCP Control` from the Shared Folder catalog when Office does not
-  auto-show it.
-- Configuring MCP clients to use `http://127.0.0.1:8800/mcp` or the configured
-  endpoint.
-- Where logs live and how to collect them for debugging.
-- How to uninstall with `uninstall.ps1` and delete the fixed install root when
-  appropriate, including the separate Office add-in removal caveat.
+1. Title: `office-mcp`.
+2. Compact badges for license, latest release, CI/release status, and supported
+   platform.
+3. A one-line summary explaining that `office-mcp` connects MCP clients to live
+   Microsoft Office documents through Office add-ins and a local MCP daemon.
+4. A short one-liner installation and MCP config section containing the Windows
+   bootstrap command
+   `irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 | iex`
+   and the default Streamable HTTP endpoint `http://127.0.0.1:8800/mcp`.
+5. Why `office-mcp`: agents need the document the user is editing; Office hosts
+   may own protection, locking, and live state that file parsers cannot see; the
+   add-in operates inside the host context.
+6. Key idea: one long-lived local daemon, Word/Excel/PowerPoint add-ins that
+   reverse-connect and register document sessions, and MCP clients calling tools
+   through the daemon router.
+7. Difference versus Python / COM-based MCP servers or skills: file libraries
+   operate on file formats, COM is Windows/session-sensitive and can fight with
+   open Office instances, and `office-mcp` is designed around Office.js live host
+   sessions. Claims in this comparison must stay conservative and aligned with
+   the validated spec and current implementation.
+8. License, linking to the repository license file.
+
+Detailed install behavior remains specified here: supported platform status,
+the stable `%LOCALAPPDATA%\office-mcp` default install root, custom install root
+options, manual package install, trusted catalog registration, daemon UI/tray
+checks, Office Shared Folder activation, log collection, and uninstall behavior.
+The README may link here for those details, but it must keep the install command
+and MCP endpoint visible near the top.
 
 The Windows user flow remains:
 
