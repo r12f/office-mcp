@@ -1,7 +1,7 @@
 use super::{TrayHost, TrayHostOptions};
+use crate::common::{Logger, LoggerLogLevel};
 use crate::tray::ui_launch::{RecordingUiLauncher, TrayUiOpenRequest};
 use crate::ui::{UiRuntimeFile, UiRuntimeInfo};
-use crate::common::{Logger, LoggerLogLevel};
 use std::fs;
 use std::fs::{read_to_string, remove_dir_all};
 
@@ -93,9 +93,13 @@ fn show_ui_action_opens_runtime_ui_url_through_launcher() {
 
 #[test]
 fn show_ui_action_error_includes_action_source_url_and_pid() {
+    let missing_runtime_path = std::env::temp_dir().join(format!(
+        "office-mcp-missing-ui-runtime-{}.json",
+        std::process::id()
+    ));
     let launcher = RecordingUiLauncher::failing("launcher unavailable");
     let options = TrayHostOptions {
-        runtime_path: None,
+        runtime_path: Some(missing_runtime_path),
         probe_state_path: None,
         probe: false,
     };
@@ -226,9 +230,10 @@ fn background_tray_launcher_owns_native_tray_thread() {
 #[test]
 fn native_tray_actions_emit_tracing_events() {
     let source = format!(
-        "{}\n{}",
+        "{}\n{}\n{}",
         read_tray_source("host.rs"),
-        read_tray_source("native_tray.rs")
+        read_tray_source("native_tray.rs"),
+        read_tray_source("ui_launch.rs")
     );
 
     assert!(source.contains("created native tray icon"));
