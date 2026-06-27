@@ -349,33 +349,38 @@ The GitHub Release pipeline MUST:
 - Fail rather than publish when the version in the tag, portable zip file name, package
   metadata, and release notes disagree.
 
-The repository README MUST include a user-facing installation guide before the
-developer setup section. The guide MUST explain how to install from GitHub
-Releases, not only how to build from source. At minimum it must cover:
+The repository README is the project landing page, not the full operations
+manual. It MUST keep this top-level flow and move longer operational details
+behind links to this deployment spec or other focused docs:
 
-- Supported platform status, with Windows desktop as the v1 portable package target.
-- Running the one-line latest-release bootstrap command
-  `irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 | iex`.
-- Explaining that the bootstrap downloads the latest portable zip to a temporary
-  staging directory, invokes the package-local `install.ps1`, and installs into
-  the stable `%LOCALAPPDATA%\office-mcp` root by default instead of a
-  version-tagged directory.
-- Explaining how to choose a custom install root with `OFFICE_MCP_INSTALL_ROOT`
-  for one-line installs and `-InstallRoot` for manual package installs.
-- Manual fallback: downloading `office-mcp-windows-portable-<ver>-x64.zip` from
-  the latest GitHub Release, verifying `SHA256SUMS` when desired, extracting the
-  portable zip, reading `README-install.txt`, and running
-  `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`.
-- Opening the daemon UI from the tray or `office-mcp-daemon ui` and checking
-  `daemon status`.
-- Restarting Office if needed, opening Word/Excel/PowerPoint, and adding
-  `Office MCP Control` from the Shared Folder catalog when Office does not
-  auto-show it.
-- Configuring MCP clients to use `http://127.0.0.1:8800/mcp` or the configured
-  endpoint.
-- Where logs live and how to collect them for debugging.
-- How to uninstall with `uninstall.ps1` and delete the fixed install root when
-  appropriate, including the separate Office add-in removal caveat.
+1. Title: `office-mcp`.
+2. Compact badges for license, latest release, CI/release status, and supported
+   platform.
+3. A one-line summary explaining that `office-mcp` connects MCP clients to live
+   Microsoft Office documents through Office add-ins and a local MCP daemon.
+4. A short one-liner installation and MCP config section containing the Windows
+   bootstrap command
+   `irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 | iex`
+   and the default Streamable HTTP endpoint `http://127.0.0.1:8800/mcp`.
+5. Why `office-mcp`: agents need the document the user is editing; Office hosts
+   may own protection, locking, and live state that file parsers cannot see; the
+   add-in operates inside the host context.
+6. Key idea: one long-lived local daemon, Word/Excel/PowerPoint add-ins that
+   reverse-connect and register document sessions, and MCP clients calling tools
+   through the daemon router.
+7. Difference versus Python / COM-based MCP servers or skills: file libraries
+   operate on file formats, COM is Windows/session-sensitive and can fight with
+   open Office instances, and `office-mcp` is designed around Office.js live host
+   sessions. Claims in this comparison must stay conservative and aligned with
+   the validated spec and current implementation.
+8. License, linking to the repository license file.
+
+Detailed install behavior remains specified here: supported platform status,
+the stable `%LOCALAPPDATA%\office-mcp` default install root, custom install root
+options, manual package install, trusted catalog registration, daemon UI/tray
+checks, Office Shared Folder activation, log collection, and uninstall behavior.
+The README may link here for those details, but it must keep the install command
+and MCP endpoint visible near the top.
 
 The Windows user flow remains:
 
@@ -463,6 +468,52 @@ or probe commands:
   is not sufficient evidence that the user can see or use the tray.
 - The tray `Show Office MCP Control` action opens or focuses the same UI URL reported by
   `daemon status`.
+
+Release evidence commands belong in this deployment spec, not in the compact
+README landing page. The manual tray evidence command must include the current
+native tray gates and bind screenshots to the daemon under test:
+
+```powershell
+npm run evidence:record-tray-manual -- --daemon-bin C:\Code\office-mcp\target\debug\office-mcp-daemon.exe --visible-icon true --right-click-menu true --menu-opened-from-tray-icon true --native-menu-appearance-reviewed true --menu-anchored-to-tray-icon true --os-native-menu-behavior-reviewed true --keyboard-menu-access-reviewed true --native-quit-confirmation-reviewed true --menu-surface-kind native --show-ui-opened true --tooltip "Office MCP Control - Up - 0 clients - 0 documents" --screenshot-path C:\path\to\tray-icon.png --tray-icon-screenshot C:\path\to\tray-icon.png --tray-native-menu-screenshot C:\path\to\tray-menu.png --tray-tooltip-screenshot C:\path\to\tray-tooltip.png --tray-quit-confirmation-screenshot C:\path\to\tray-quit.png --screenshot-freshness-window-ms 1800000
+```
+
+The recorder writes freshness metadata for every tray screenshot surface, and
+validators reject stale screenshots.
+
+Product visual evidence must tie the UI screenshots to generated logo/catalog
+identity reviews, runtime evidence, and Office tool E2E reports:
+
+```powershell
+node ..\..\..\office-ctl\common\scripts\record-catalog-identity-review.mjs --catalog-path ..\..\..\..\artifacts\portable-stage\addin-catalog --output ..\..\..\..\artifacts\catalog-identity-review.json
+npm run evidence:record-product-visual -- --daemon-bin C:\Code\office-mcp\target\debug\office-mcp-daemon.exe --catalog-identity-review-path ..\..\..\..\artifacts\catalog-identity-review.json --word-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-word.json --excel-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-excel.json --powerpoint-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-powerpoint.json --word-runtime-evidence-path ..\..\..\..\artifacts\runtime-evidence-word.json --excel-runtime-evidence-path ..\..\..\..\artifacts\runtime-evidence-excel.json --powerpoint-runtime-evidence-path ..\..\..\..\artifacts\runtime-evidence-powerpoint.json --powerpoint-ribbon-command "Office MCP Control ribbon command visible" --powerpoint-ribbon-command-screenshot C:\path\to\powerpoint-ribbon.png --powerpoint-catalog-entry "Office MCP Control catalog entry visible" --powerpoint-catalog-entry-screenshot C:\path\to\powerpoint-catalog.png --powerpoint-taskpane-title "Office MCP Control task pane visible" --powerpoint-taskpane-title-screenshot C:\path\to\powerpoint-taskpane.png --daemon-main-window "Office MCP Control daemon main window visible" --daemon-main-window-screenshot C:\path\to\daemon-main-window.png --daemon-main-window-reviewed true --daemon-main-window-compact-reviewed true --daemon-main-window-three-column-reviewed true --logo-quality-reviewed true --logo-future-office-control-reviewed true --final-logo-user-surface-reviewed true --current-logo-screenshot-feedback-reviewed true --rendered-size-logo-reviewed true --addin-identity-reviewed true --addin-title-icon-type-reviewed true --addin-installable-surface-reviewed true --current-addin-screenshot-feedback-reviewed true --word-first-run-identity-reviewed true --excel-first-run-identity-reviewed true --powerpoint-first-run-identity-reviewed true --tray-product-polish-reviewed true --tray-native-first-impression-reviewed true --tray-normal-windows-launch-reviewed true --current-tray-screenshot-feedback-reviewed true --word-compact-top-block true --word-tools-permissions-merged true --word-inline-settings true --word-server-protocol-row "Server 0.1.0 / Protocol 1.0" --word-document-state "Editable" --excel-compact-top-block true --excel-tools-permissions-merged true --excel-inline-settings true --excel-server-protocol-row "Server 0.1.0 / Protocol 1.0" --excel-document-state "Editable" --powerpoint-compact-top-block true --powerpoint-tools-permissions-merged true --powerpoint-inline-settings true --powerpoint-server-protocol-row "Server 0.1.0 / Protocol 1.0" --powerpoint-document-state "Editable" --screenshot-freshness-window-ms 1800000
+```
+
+The self-contained Word runtime evidence gate is `npm run evidence:word`, which
+writes `artifacts/runtime-evidence-word.json`. The README intentionally links
+here instead of carrying that long validation flow.
+
+Live Office tool E2E remains opt-in with `OFFICE_MCP_RUN_E2E = '1'`. Release
+ready reports must use `OFFICE_MCP_E2E_ACTIVATOR`, normally
+`activate-office-mcp-addin.ps1`; `OFFICE_MCP_E2E_USE_DEFAULT_ACTIVATOR=0` and
+`no-activator-configured` are manual-debug paths only. Reports must include the
+add-in activator identity, a non-empty `activation_path`, and must reject weak
+activation proof such as only `activated: true`. One run must not restart
+Office, recreate the document, or reconnect per tool; it must use one
+table-driven loop across the host's complete tool catalog and write
+`office-tool-e2e-<host>.json`. Cleanup proof must include `deleted_paths` with
+concrete cleanup paths.
+
+```powershell
+npm run evidence:validate -- --input ..\..\..\..\artifacts\runtime-evidence-word.json --require-office-tool-e2e --word-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-word.json --excel-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-excel.json --powerpoint-tool-e2e-report-path ..\..\..\..\artifacts\office-tool-e2e-powerpoint.json
+```
+
+Current product scope is Word, Excel, and PowerPoint. The design docs and tool
+specs, not the compact README, own the detailed current host surface: Word and
+Excel are packaged under `office-ctl/word/` and `office-ctl/excel/`, PowerPoint
+under `src/office-ctl/powerpoint/`; the daemon serves Word task pane
+`https://localhost:8765/word/taskpane.html`, Excel task pane
+`https://localhost:8765/excel/taskpane.html`, and PowerPoint task pane
+`https://localhost:8765/powerpoint/taskpane.html`.
 
 ## 7. Versioning & upgrades
 

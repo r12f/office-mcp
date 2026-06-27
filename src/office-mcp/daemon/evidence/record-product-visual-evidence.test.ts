@@ -148,9 +148,9 @@ test('product visual evidence recorder ties daemon main window review to its scr
 });
 
 
-test('README manual tray evidence command matches current native tray gates', () => {
-  const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
-  const commandLine = readme.split('\n').find((line) => line.includes('npm run evidence:record-tray-manual')) ?? '';
+test('deployment spec manual tray evidence command matches current native tray gates', () => {
+  const deployment = readFileSync(resolve(process.cwd(), '../../../..', 'doc/spec/07-deployment.md'), 'utf8');
+  const commandLine = deployment.split('\n').find((line) => line.includes('npm run evidence:record-tray-manual')) ?? '';
 
   for (const required of [
     '--daemon-bin',
@@ -174,8 +174,8 @@ test('README manual tray evidence command matches current native tray gates', ()
   ]) {
     assert.match(commandLine, new RegExp(required));
   }
-  assert.match(readme, /freshness metadata/i);
-  assert.match(readme, /stale screenshots/i);
+  assert.match(deployment, /freshness metadata/i);
+  assert.match(deployment, /stale screenshots/i);
   assert.equal(optionValue(commandLine.split(/\s+/), '--screenshot-path'), optionValue(commandLine.split(/\s+/), '--tray-icon-screenshot'));
 });
 
@@ -185,10 +185,10 @@ test('roadmap documents manual tray screenshot freshness gate', () => {
   assert.match(roadmap, /manual tray evidence[\s\S]*stale screenshots/i);
 });
 
-test('README product visual evidence command matches current product visual gates', () => {
-  const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
-  const commandLine = readme.split('\n').find((line) => line.includes('npm run evidence:record-product-visual')) ?? '';
-  const catalogIdentityLine = readme.split('\n').find((line) => line.includes('record-catalog-identity-review.mjs')) ?? '';
+test('deployment spec product visual evidence command matches current product visual gates', () => {
+  const deployment = readFileSync(resolve(process.cwd(), '../../../..', 'doc/spec/07-deployment.md'), 'utf8');
+  const commandLine = deployment.split('\n').find((line) => line.includes('npm run evidence:record-product-visual')) ?? '';
+  const catalogIdentityLine = deployment.split('\n').find((line) => line.includes('record-catalog-identity-review.mjs')) ?? '';
 
   for (const required of [
     '--catalog-identity-review-path',
@@ -253,40 +253,32 @@ test('README product visual evidence command matches current product visual gate
   assert.match(catalogIdentityLine, /--output .*catalog-identity-review\.json/);
 });
 
-test('README Word runtime evidence command matches self-contained gate', () => {
-  const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
+test('deployment spec Word runtime evidence command matches self-contained gate', () => {
+  const deployment = readFileSync(resolve(process.cwd(), '../../../..', 'doc/spec/07-deployment.md'), 'utf8');
 
-  assert.match(readme, /npm run evidence:word/);
-  assert.match(readme, /runtime-evidence-word\.json/);
-  assert.doesNotMatch(readme, /--require-mutation|--require-full-word-smoke|--require-com-tracked-changes/);
-  assert.doesNotMatch(readme, /runtime-evidence-full\.json/);
-  assert.doesNotMatch(readme, /npm run evidence:runtime -- --endpoint http:\/\/127\.0\.0\.1:8800\/mcp --output .*runtime-evidence-full\.json/);
+  assert.match(deployment, /npm run evidence:word/);
+  assert.match(deployment, /runtime-evidence-word\.json/);
+  assert.doesNotMatch(deployment, /--require-mutation|--require-full-word-smoke|--require-com-tracked-changes/);
+  assert.doesNotMatch(deployment, /runtime-evidence-full\.json/);
+  assert.doesNotMatch(deployment, /npm run evidence:runtime -- --endpoint http:\/\/127\.0\.0\.1:8800\/mcp --output .*runtime-evidence-full\.json/);
 });
 
-test('README describes current Word Excel and PowerPoint product surface', () => {
-  const readme = readFileSync(resolve(process.cwd(), '../../../..', 'README.md'), 'utf8');
+test('deployment spec describes current Word Excel and PowerPoint product surface', () => {
+  const deployment = readFileSync(resolve(process.cwd(), '../../../..', 'doc/spec/07-deployment.md'), 'utf8');
   const mcpSurface = readFileSync(resolve(process.cwd(), '../../../..', 'doc/spec/03-mcp-tool-surface.md'), 'utf8');
 
-  assert.match(readme, /exposes Word, Excel, and PowerPoint \(with Outlook planned\)/);
-  assert.match(readme, /implementation is in place for Word, Excel, and PowerPoint/);
-  assert.match(readme, /Word, Excel, and PowerPoint task pane add-ins/);
-  assert.match(readme, /doc\/spec\/04-excel-capabilities\.md/);
-  assert.match(readme, /current Word add-in runtime advertises and executes the refined 25-tool Word v1 surface/);
-  assert.match(readme, /current Excel add-in runtime advertises and executes the refined 20-tool Excel v1 surface/);
-  assert.match(readme, /sort\/filter, table\/chart creation and updates, and PivotTable creation and updates/);
-  assert.match(readme, /PowerPoint v1 presentation tools/);
-  assert.doesNotMatch(readme, /current Word add-in runtime advertises and executes the 27-tool Word v1 compatibility surface/);
+  assert.match(deployment, /Current product scope is Word, Excel, and PowerPoint/);
+  assert.match(deployment, /`office-ctl\/word\/`/);
+  assert.match(deployment, /`office-ctl\/excel\/`/);
+  assert.match(deployment, /`src\/office-ctl\/powerpoint\/`/);
   assert.match(mcpSurface, /"available_tool_count": 25/);
   assert.doesNotMatch(mcpSurface, /"available_tool_count": 27/);
-  assert.match(readme, /cd \.\.\\excel\s+npm run check\s+cd \.\.\\powerpoint\s+npm run check/);
-  assert.match(readme, /src\/office-ctl\/powerpoint\/` \| PowerPoint add-in package/);
-  assert.match(readme, /Word task pane: `https:\/\/localhost:8765\/word\/taskpane\.html`/);
-  assert.match(readme, /Excel task pane: `https:\/\/localhost:8765\/excel\/taskpane\.html`/);
-  assert.match(readme, /PowerPoint task pane: `https:\/\/localhost:8765\/powerpoint\/taskpane\.html`/);
-  assert.match(readme, /`office-ctl\/word\/`, `office-ctl\/excel\/`, and\s+`office-ctl\/powerpoint\/`/);
-  assert.doesNotMatch(readme, /PowerPoint add-in scaffold/);
-  assert.doesNotMatch(readme, /PowerPoint and Outlook planned/);
-  assert.doesNotMatch(readme, /Add-in task pane: `https:\/\/localhost:8765\/taskpane\.html`/);
+  assert.match(deployment, /Word task pane\s+`https:\/\/localhost:8765\/word\/taskpane\.html`/);
+  assert.match(deployment, /Excel task pane\s+`https:\/\/localhost:8765\/excel\/taskpane\.html`/);
+  assert.match(deployment, /PowerPoint task pane\s+`https:\/\/localhost:8765\/powerpoint\/taskpane\.html`/);
+  assert.doesNotMatch(deployment, /PowerPoint add-in scaffold/);
+  assert.doesNotMatch(deployment, /PowerPoint and Outlook planned/);
+  assert.doesNotMatch(deployment, /Add-in task pane: `https:\/\/localhost:8765\/taskpane\.html`/);
 });
 
 
