@@ -1,5 +1,33 @@
 # Release Notes
 
+## 0.1.6
+
+Office MCP Control 0.1.6 redesigns the Windows portable installer so upgrades
+use a stable install root instead of creating a new versioned directory for each
+release.
+
+Expected assets:
+
+- `office-mcp-windows-portable-0.1.6-x64.zip`
+- `SHA256SUMS`
+
+Validation gates before promoting the release:
+
+- The one-line installer downloads the latest portable zip to a temporary
+  staging directory and invokes the package-local `install.ps1`.
+- The package-local installer installs or upgrades `%LOCALAPPDATA%\office-mcp`
+  by default, with custom roots supported by `OFFICE_MCP_INSTALL_ROOT` and
+  `-InstallRoot`.
+- Upgrade stops existing Office MCP daemon processes before replacing runtime
+  files, preserves config/certificate/log files, removes safe-to-identify stale
+  versioned install roots, and starts `office-mcp-daemon.exe daemon run` from the
+  fixed install root.
+- The trusted Office catalog registry entry points at the fixed install root's
+  `addin-catalog` folder and stale Office MCP catalog paths are removed.
+- If Word, Excel, or PowerPoint is running, interactive installs ask before
+  closing them; non-interactive installs fail unless `-CloseOfficeHosts` is
+  supplied.
+
 ## 0.1.5
 
 Office MCP Control 0.1.5 fixes the daemon control panel in the Windows portable

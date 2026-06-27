@@ -1,5 +1,5 @@
 param(
-  [string]$Version = "0.1.5",
+  [string]$Version = "0.1.6",
   [string]$OutputDir = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) "artifacts"),
   [switch]$SkipNpmInstall
 )
@@ -82,6 +82,11 @@ function Assert-PortableStagePayload([string]$StageRoot) {
   foreach ($requiredCatalogInstallBehavior in @("Assert-OfficeHostsClosed", "Remove-OfficeAddinCache", "Remove-CustomUiValidationCache")) {
     if ($installScript -notmatch $requiredCatalogInstallBehavior) {
       throw "Portable install script must $requiredCatalogInstallBehavior before completing Office catalog registration."
+    }
+  }
+  foreach ($requiredInstallBehavior in @("param\(", "OFFICE_MCP_INSTALL_ROOT", "Copy-PortablePayload", "Stop-OfficeMcpDaemons", "Remove-LegacyVersionedInstallRoots", "Remove-StaleOfficeMcpTrustedCatalogs", "Read-Host", "-InstallRoot")) {
+    if ($installScript -notmatch $requiredInstallBehavior) {
+      throw "Portable install script must include fixed-root upgrade behavior: $requiredInstallBehavior."
     }
   }
   foreach ($envName in @("OFFICE_MCP_INSTALL_ROOT", "OFFICE_MCP_CONFIG_PATH", "OFFICE_MCP_ADDIN_CHANNEL__CERTIFICATE_PATH", "OFFICE_MCP_ADDIN_CHANNEL__PORT", "OFFICE_MCP_MCP_HTTP__PORT")) {
@@ -236,8 +241,84 @@ file = ""
 '@ | Set-Content -Encoding ASCII -Path (Join-Path $stageRoot "config.toml")
 
 @'
+param(
+  [string]$InstallRoot = $(if (-not [string]::IsNullOrWhiteSpace($env:OFFICE_MCP_INSTALL_ROOT)) { $env:OFFICE_MCP_INSTALL_ROOT } else { Join-Path $env:LOCALAPPDATA 'office-mcp' }),
+  [switch]$CloseOfficeHosts,
+  [switch]$NonInteractive
+)
+
 $ErrorActionPreference = 'Stop'
-$installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$packageRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $MyInvocation.MyCommand.Path))
+$installRoot = [System.IO.Path]::GetFullPath($InstallRoot)
+
+function Test-SamePath {
+  param(
+    [Parameter(Mandatory = $true)][string]$Left,
+    [Parameter(Mandatory = $true)][string]$Right
+  )
+
+  return [System.String]::Equals(
+    [System.IO.Path]::GetFullPath($Left).TrimEnd('\'),
+    [System.IO.Path]::GetFullPath($Right).TrimEnd('\'),
+    [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Copy-PortablePayload {
+  param(
+    [Parameter(Mandatory = $true)][string]$PackageRoot,
+    [Parameter(Mandatory = $true)][string]$InstallRoot
+  )
+
+  if (Test-SamePath -Left $PackageRoot -Right $InstallRoot) { return }
+
+  New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
+
+  foreach ($relativePath in @('office-mcp-daemon.exe', 'office-mcp', 'office-ctl', 'addin-catalog', 'scripts', 'install.ps1', 'uninstall.ps1', 'README-install.txt')) {
+    $targetPath = Join-Path $InstallRoot $relativePath
+    if (Test-Path -LiteralPath $targetPath) {
+      Remove-Item -LiteralPath $targetPath -Recurse -Force
+    }
+  }
+
+  foreach ($relativePath in @('office-mcp-daemon.exe', 'office-mcp', 'office-ctl', 'addin-catalog', 'scripts', 'install.ps1', 'uninstall.ps1', 'README-install.txt')) {
+    $sourcePath = Join-Path $PackageRoot $relativePath
+    if (-not (Test-Path -LiteralPath $sourcePath)) {
+      throw "Package payload is missing required path: $relativePath"
+    }
+    Copy-Item -LiteralPath $sourcePath -Destination $InstallRoot -Recurse -Force
+  }
+
+  $targetConfigPath = Join-Path $InstallRoot 'config.toml'
+  if (-not (Test-Path -LiteralPath $targetConfigPath)) {
+    Copy-Item -LiteralPath (Join-Path $PackageRoot 'config.toml') -Destination $targetConfigPath -Force
+  }
+}
+
+function Stop-OfficeMcpDaemons {
+  $processes = @(Get-CimInstance Win32_Process -Filter "Name = 'office-mcp-daemon.exe'" -ErrorAction SilentlyContinue)
+  foreach ($processInfo in $processes) {
+    try {
+      Stop-Process -Id $processInfo.ProcessId -Force -ErrorAction Stop
+      Write-Output "Stopped existing Office MCP Control daemon. PID: $($processInfo.ProcessId)"
+    } catch {
+      throw "Failed to stop existing Office MCP Control daemon PID $($processInfo.ProcessId): $($_.Exception.Message)"
+    }
+  }
+}
+
+function Remove-LegacyVersionedInstallRoots {
+  param(
+    [Parameter(Mandatory = $true)][string]$InstallRoot
+  )
+
+  if (-not (Test-Path -LiteralPath $InstallRoot)) { return }
+  Get-ChildItem -LiteralPath $InstallRoot -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match '^v\d+\.\d+\.\d+' -and (Test-Path -LiteralPath (Join-Path $_.FullName 'office-mcp-daemon.exe')) } |
+    ForEach-Object {
+      Remove-Item -LiteralPath $_.FullName -Recurse -Force
+      Write-Output "Removed legacy versioned install root: $($_.FullName)"
+    }
+}
 
 function Set-OfficeMcpPortableEnvironment {
   param(
@@ -254,8 +335,6 @@ function Set-OfficeMcpPortableEnvironment {
   $env:OFFICE_MCP_MCP_HTTP__BIND = '127.0.0.1'
   $env:OFFICE_MCP_MCP_HTTP__PORT = '8800'
 }
-
-Set-OfficeMcpPortableEnvironment -InstallRoot $installRoot
 
 function ConvertTo-OfficeCatalogUrl {
   param(
@@ -277,16 +356,54 @@ function ConvertTo-OfficeCatalogUrl {
   return "\\localhost\$drive`$\$relativePath"
 }
 
-function Assert-OfficeHostsClosed {
+function Get-RunningOfficeHosts {
   $running = @()
   foreach ($processName in @('WINWORD', 'EXCEL', 'POWERPNT')) {
-    if (Get-Process -Name $processName -ErrorAction SilentlyContinue) {
-      $running += $processName
+    $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+    foreach ($process in $processes) {
+      $running += [pscustomobject]@{ Name = $processName; Id = $process.Id }
     }
   }
+  return $running
+}
+
+function Assert-OfficeHostsClosed {
+  $running = @(Get-RunningOfficeHosts)
   if ($running.Count -gt 0) {
-    throw "Close Word, Excel, and PowerPoint before installing Office MCP Control so Office can reload the trusted add-in catalog. Running processes: $($running -join ', ')."
+    $display = ($running | ForEach-Object { "$($_.Name)($($_.Id))" }) -join ', '
+    if (-not $CloseOfficeHosts) {
+      if ($NonInteractive -or -not [Environment]::UserInteractive) {
+        throw "Word, Excel, or PowerPoint is running: $display. Re-run after closing Office, or pass -CloseOfficeHosts to let the installer close them."
+      }
+      $answer = Read-Host "Office MCP Control must close these Office apps so the trusted catalog reloads: $display. Close them now? [y/N]"
+      if ($answer -notin @('y', 'Y', 'yes', 'YES')) {
+        throw "Install cancelled because Office hosts are still running: $display"
+      }
+    }
+    foreach ($hostProcess in $running) {
+      Stop-Process -Id $hostProcess.Id -Force
+      Write-Output "Closed Office host $($hostProcess.Name). PID: $($hostProcess.Id)"
+    }
   }
+}
+
+function Remove-StaleOfficeMcpTrustedCatalogs {
+  param(
+    [Parameter(Mandatory = $true)][string]$CurrentCatalogKey
+  )
+
+  $trustedRoot = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs'
+  if (-not (Test-Path -LiteralPath $trustedRoot)) { return }
+  Get-ChildItem -LiteralPath $trustedRoot -ErrorAction SilentlyContinue |
+    Where-Object { $_.PSPath -ne $CurrentCatalogKey } |
+    ForEach-Object {
+      $props = Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
+      $url = [string]$props.Url
+      if ($url -match '\\office-mcp\\v\d+\.\d+\.\d+.*\\addin-catalog') {
+        Remove-Item -LiteralPath $_.PSPath -Recurse -Force
+        Write-Output "Removed stale Office MCP trusted catalog: $($_.PSChildName)"
+      }
+    }
 }
 
 function Remove-DeveloperDebugRegistration {
@@ -368,9 +485,14 @@ $catalogId = '{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}'
 $catalogKey = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\$catalogId"
 $legacyCatalogKey = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp'
 Assert-OfficeHostsClosed
+Stop-OfficeMcpDaemons
+Copy-PortablePayload -PackageRoot $packageRoot -InstallRoot $installRoot
+Remove-LegacyVersionedInstallRoots -InstallRoot $installRoot
+Set-OfficeMcpPortableEnvironment -InstallRoot $installRoot
 if (Test-Path -LiteralPath $legacyCatalogKey) {
   Remove-Item -LiteralPath $legacyCatalogKey -Recurse -Force
 }
+Remove-StaleOfficeMcpTrustedCatalogs -CurrentCatalogKey $catalogKey
 New-Item -Path $catalogKey -Force | Out-Null
 Set-ItemProperty -Path $catalogKey -Name Id -Value $catalogId
 Set-ItemProperty -Path $catalogKey -Name Url -Value $catalogUrl
@@ -421,7 +543,9 @@ Write-Output 'Office MCP Control user registry entries removed.'
 @"
 Office MCP Control portable Windows package
 
-This folder is the install directory. No hidden copy step is required.
+This folder is installation media. The installer copies Office MCP Control into
+a stable install root, %LOCALAPPDATA%\office-mcp by default, so upgrades do not
+create a new versioned install folder each time.
 
 Contents:
 - office-mcp-daemon.exe: native daemon, tray host, and MCP server.
@@ -429,26 +553,37 @@ Contents:
 - office-ctl\word, office-ctl\excel, office-ctl\powerpoint: Office add-in bundles.
 - addin-catalog\: Word, Excel, and PowerPoint shared-folder catalog manifests.
 - scripts\export-localhost-dev-cert.ps1: creates/exports the localhost HTTPS certificate.
-- install.ps1: registers the current user's Office trusted catalog, creates the localhost certificate if needed, and starts the daemon runtime with tray support.
+- install.ps1: installs or upgrades the fixed install root, registers the current user's Office trusted catalog, creates the localhost certificate if needed, and starts the daemon runtime with tray support.
 - uninstall.ps1: removes Office MCP Control user registry entries.
 
 What install.ps1 changes:
+- Stops existing Office MCP Control daemon processes before replacing runtime files.
 - Writes HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\{6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}
   - Id = {6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57}
   - Url = the UNC path for this folder's addin-catalog directory
   - Flags = 1, which means Show in Menu
-- Removes the old invalid HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp key if present.
-- Creates .office-mcp-localhost.pfx in this folder if it is missing.
+- Removes stale Office MCP trusted catalog paths and the old invalid HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\office-mcp key if present.
+- Removes safe-to-identify legacy versioned install roots such as %LOCALAPPDATA%\office-mcp\v0.1.5.
+- Creates .office-mcp-localhost.pfx in the install root if it is missing.
 - Uses CurrentUser certificate stores only.
 
 Install:
-1. Extract the zip to the folder where you want Office MCP Control to live.
-2. Close Word, Excel, and PowerPoint.
-3. Run PowerShell from this folder:
+1. Extract the zip to a temporary folder where you can inspect it.
+2. Run PowerShell from this folder:
    powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
-4. Reopen Office and use Home > Add-ins > Advanced > Shared Folder to add Office MCP Control if Office does not show it automatically.
 
-install.ps1 refuses to continue while Word, Excel, or PowerPoint is still running. Office only reloads trusted add-in catalogs on startup, so leaving an Office host open would make the Trust Center look empty even after registry registration succeeds.
+Custom install root:
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -InstallRoot D:\Apps\OfficeMcp
+
+Office host handling:
+If Word, Excel, or PowerPoint is running, install.ps1 shows the running hosts
+and asks before closing them. In non-interactive runs, close Office first or use
+-CloseOfficeHosts.
+
+After install:
+3. The installer prints the install root. From that folder, run:
+   .\office-mcp-daemon.exe daemon status
+4. Reopen Office and use Home > Add-ins > Advanced > Shared Folder to add Office MCP Control if Office does not show it automatically.
 
 Default endpoints:
 - MCP: http://127.0.0.1:8800/mcp

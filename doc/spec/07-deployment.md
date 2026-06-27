@@ -7,7 +7,7 @@ each other.
 
 | Component | What it is | Where it lives | Updated how |
 |---|---|---|---|
-| `office-mcp` | Native Rust long-running daemon from `src/office-mcp/daemon`. | User-selected extracted folder (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | Portable zip / Homebrew tap |
+| `office-mcp` | Native Rust long-running daemon from `src/office-mcp/daemon`. | Stable user-selected install root (Win) / `/usr/local/bin/office-mcp` wrapper target (Mac, Linux) | Portable zip / Homebrew tap |
 | `office-mcp-ui` | Web UI assets owned by `src/office-mcp/daemon/src/ui`, opened from the tray and served or bridged by the daemon. | Installed beside the daemon | Portable zip / Homebrew tap |
 | `office-ctl` | Office add-in bundles from `src/office-ctl`: shared `common` code plus host entries such as `word` and `excel`. | Installed beside the daemon and served from its trusted local HTTPS origin | Installer / atomic local replacement |
 | Manifest | XML / JSON describing the add-in | Sideloaded via the trusted catalog by the installer; AppSource / M365 admin push for managed deployments | See §3 |
@@ -268,17 +268,48 @@ be removed with:
 powershell -ExecutionPolicy Bypass -File .\packaging\windows\uninstall-windows.ps1
 ```
 
-The current Windows release package is a user-selected portable zip for the
-native Rust daemon. It contains `office-mcp-daemon.exe`, daemon-owned UI assets,
+The current Windows release package is a transparent portable zip installer
+source for the native Rust daemon. It contains `office-mcp-daemon.exe`, daemon-owned UI assets,
 the Word/Excel/PowerPoint add-in bundles, catalog manifests, default
 `config.toml`, product assets, and auditable `install.ps1` / `uninstall.ps1`
 scripts. The package MUST NOT expose multiple user-facing PowerShell launchers
 for the same native daemon. `office-mcp-daemon.exe` is the product binary; it
 owns the tray, daemon, UI, status, and MCP server subcommands. The user-run
-`install.ps1` registers the Office trusted catalog, creates or exports the
-localhost certificate, sets any portable runtime environment needed for the
-child process, and directly starts `office-mcp-daemon.exe daemon run`. MSI packaging
-is not a release target.
+`install.ps1` installs or upgrades the package into a stable install root,
+registers the Office trusted catalog, creates or exports the localhost
+certificate, sets any portable runtime environment needed for the child process,
+and directly starts `office-mcp-daemon.exe daemon run`. MSI packaging is not a
+release target.
+
+The root bootstrap script at `scripts/install.ps1` is only a downloader. It MUST
+resolve the latest published Windows portable release asset, extract it to a
+temporary staging directory, and invoke the package-local `install.ps1` with the
+selected install root. It MUST NOT install product files into a version-tagged
+directory or duplicate package-local install semantics. The default Windows
+install root is stable across releases, `%LOCALAPPDATA%\office-mcp` unless the
+user supplies another path through `OFFICE_MCP_INSTALL_ROOT` for the one-line
+bootstrap flow or `-InstallRoot` for the package-local installer.
+
+Upgrade installs MUST stop the running Office MCP daemon/tray before replacing
+runtime files, replace the installed payload from the new package without
+mixing old and new UI/add-in assets, and preserve user config, certificates,
+logs, and audit files unless an uninstall or purge path explicitly removes
+them. Installers MUST remove stale versioned install roots created by earlier
+bootstrap releases when they can be identified as Office MCP roots, and MUST
+avoid creating new version-tagged roots by default.
+
+Office trusted catalog registration is installer-owned. Users must not need to
+add the catalog manually in Trust Center. Reinstall and upgrade MUST use a
+single stable current-user Office MCP trusted catalog entry, update it to the
+fixed install root's `addin-catalog` folder, and remove stale Office MCP catalog
+entries that point at previous versioned install roots. A reinstall that leaves
+multiple Office MCP catalog paths behind is an installer bug.
+
+If Word, Excel, or PowerPoint is running, the installer MUST list the running
+Office hosts and request explicit confirmation before closing them. After
+confirmation it should close those hosts for the user so Office can reload the
+trusted catalog on next start. In non-interactive mode the installer MUST fail
+with an actionable message unless an explicit close/force option is supplied.
 
 The production portable zip remains the Windows release packaging target. A
 checked-in build script is not enough for user distribution: release builds MUST
@@ -325,9 +356,12 @@ Releases, not only how to build from source. At minimum it must cover:
 - Supported platform status, with Windows desktop as the v1 portable package target.
 - Running the one-line latest-release bootstrap command
   `irm https://raw.githubusercontent.com/r12f/office-mcp/main/scripts/install.ps1 | iex`.
-- Explaining that the bootstrap downloads the latest portable zip, extracts it
-  under `%LOCALAPPDATA%\office-mcp\<release-tag>`, and runs the package-local
-  `install.ps1`.
+- Explaining that the bootstrap downloads the latest portable zip to a temporary
+  staging directory, invokes the package-local `install.ps1`, and installs into
+  the stable `%LOCALAPPDATA%\office-mcp` root by default instead of a
+  version-tagged directory.
+- Explaining how to choose a custom install root with `OFFICE_MCP_INSTALL_ROOT`
+  for one-line installs and `-InstallRoot` for manual package installs.
 - Manual fallback: downloading `office-mcp-windows-portable-<ver>-x64.zip` from
   the latest GitHub Release, verifying `SHA256SUMS` when desired, extracting the
   portable zip, reading `README-install.txt`, and running
@@ -340,13 +374,15 @@ Releases, not only how to build from source. At minimum it must cover:
 - Configuring MCP clients to use `http://127.0.0.1:8800/mcp` or the configured
   endpoint.
 - Where logs live and how to collect them for debugging.
-- How to uninstall with `uninstall.ps1` and delete the extracted folder,
-  including the separate Office add-in removal caveat.
+- How to uninstall with `uninstall.ps1` and delete the fixed install root when
+  appropriate, including the separate Office add-in removal caveat.
 
 The Windows user flow remains:
 
-1. User extracts `office-mcp-windows-portable-<ver>-x64.zip`. The package:
-   - Places the native Rust daemon executable in the selected extracted folder.
+1. User runs the one-line bootstrap or extracts
+   `office-mcp-windows-portable-<ver>-x64.zip` and runs `install.ps1`. The
+   package:
+   - Places the native Rust daemon executable in the stable selected install root.
    - Installs the generated product logo, tray icon, add-in command icons, and
      main-window UI assets.
    - Verifies the installed add-in catalog resolves product metadata and icon
@@ -355,16 +391,18 @@ The Windows user flow remains:
    - Installs the static add-in bundle beside the daemon.
    - Exports or creates a current-user trusted localhost certificate when the
      user runs `install.ps1`; it does not require an opaque installer step.
-   - Writes a default `config.toml` and points the daemon at it from
+   - Writes or preserves a default `config.toml` and points the daemon at it from
      `install.ps1` with `OFFICE_MCP_CONFIG_PATH` or equivalent process-scoped
      configuration.
    - Starts the daemon runtime by launching `office-mcp-daemon.exe daemon run` from
      `install.ps1`, so the user does not need a separate daemon startup script
      during install.
-   - Registers an add-in trusted catalog folder under
-     `%LOCALAPPDATA%\office-mcp\addin-catalog\` and drops the Word, Excel, and
-     PowerPoint manifests directly under that catalog root once each host is
-     packaged.
+   - Registers an add-in trusted catalog folder under the fixed install root's
+     `addin-catalog\` directory and drops the Word, Excel, and PowerPoint
+     manifests directly under that catalog root once each host is packaged.
+   - Stops any existing Office MCP daemon, replaces installed package payloads,
+     removes safe-to-identify stale versioned install roots and stale Office MCP
+     trusted catalog paths, then starts the daemon from the fixed install root.
    - Future production builds should start the daemon once so the user does not
      have to log out / log in for the daemon to come up.
    - Future production builds should make the tray icon visible immediately

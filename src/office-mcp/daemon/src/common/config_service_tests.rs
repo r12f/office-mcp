@@ -4,6 +4,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TEMP_CONFIG_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
 fn loads_config_file_values_and_endpoints() {
@@ -413,8 +416,9 @@ fn redacts_secrets_without_hiding_public_endpoint_fields() {
 
 fn temp_config(contents: &str) -> PathBuf {
     let path = env::temp_dir().join(format!(
-        "office-mcp-config-{}-{}.toml",
+        "office-mcp-config-{}-{}-{}.toml",
         std::process::id(),
+        TEMP_CONFIG_COUNTER.fetch_add(1, Ordering::Relaxed),
         unique_suffix()
     ));
     fs::write(&path, contents).expect("write temp config");
