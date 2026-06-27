@@ -261,10 +261,11 @@ fn background_tray_launcher_owns_native_tray_thread() {
 #[test]
 fn native_tray_actions_emit_tracing_events() {
     let source = format!(
-        "{}\n{}\n{}",
+        "{}\n{}\n{}\n{}",
         read_tray_source("host.rs"),
         read_tray_source("native_tray.rs"),
-        read_tray_source("ui_launch.rs")
+        read_tray_source("ui_launch.rs"),
+        read_tray_source("quit_request.rs")
     );
 
     assert!(source.contains("created native tray icon"));
