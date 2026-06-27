@@ -159,6 +159,9 @@ test('GitHub release workflow publishes only the Windows portable artifacts', ()
   assert.match(workflow, /name:\s*Release/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /tags:\s*\[\s*['"]v\*['"]\s*\]/);
+  assert.match(workflow, /default:\s*''/);
+  assert.match(workflow, /\$version = \(Get-Content -Raw \.\\packaging\\package\.json \| ConvertFrom-Json\)\.version/);
+  assert.doesNotMatch(workflow, /default:\s*['"]0\.1\.1['"]/);
   assert.match(workflow, /runs-on:\s*windows-latest/);
   assert.match(workflow, /actions\/checkout@v4/);
   assert.match(workflow, /dtolnay\/rust-toolchain@stable/);
@@ -283,9 +286,10 @@ test('Release notes document the Windows portable pre-release gate', () => {
   const releaseNotes = readFileSync(join(repoRoot, 'RELEASE_NOTES.md'), 'utf8');
 
   assert.match(releaseNotes, /# Release Notes/);
-  assert.match(releaseNotes, /## 0\.1\.4/);
+  assert.match(releaseNotes, /## 0\.1\.5/);
   assert.doesNotMatch(releaseNotes, /office-mcp-setup|\.msi|MSI/i);
-  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.4-x64\.zip/);
+  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.5-x64\.zip/);
+  assert.match(releaseNotes, /https:\/\/localhost:8765\/ui\/` returns `HTTP\/1\.1 200 OK`/);
   assert.match(releaseNotes, /README-install\.txt/);
   assert.match(releaseNotes, /install\.ps1/);
   assert.match(releaseNotes, /uninstall\.ps1/);

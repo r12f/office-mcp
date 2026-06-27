@@ -8,7 +8,7 @@ on:
       version:
         description: 'Version to stage, without the leading v. Defaults to the current package version.'
         required: false
-        default: '0.1.1'
+        default: ''
 
 permissions:
   contents: write
@@ -30,6 +30,9 @@ jobs:
             $version = '${{ github.ref_name }}'.TrimStart('v')
           } else {
             $version = '${{ inputs.version }}'
+          }
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            $version = (Get-Content -Raw .\packaging\package.json | ConvertFrom-Json).version
           }
           if ($version -notmatch '^\d+\.\d+\.\d+(-[A-Za-z0-9.-]+)?$') {
             throw "Invalid release version: $version"
