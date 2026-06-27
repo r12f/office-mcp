@@ -1,4 +1,4 @@
-const state = { snapshot: null, search: '', app: 'all', client: 'all', result: 'all', previousStatus: null, selectedRowKey: null };
+const state = { snapshot: null, search: '', app: 'all', client: 'all', result: 'all', previousStatus: null, selectedRowKey: null, toolAccessRenderKey: null };
 const $ = (id) => document.getElementById(id);
 
 $('search').addEventListener('input', (event) => { state.search = event.target.value.toLowerCase(); render(); });
@@ -91,7 +91,7 @@ function render() {
   $('configPath').textContent = snapshot.daemon?.config_path || '-';
   $('logPath').textContent = snapshot.daemon?.log_path || '-';
   setTextareaValue($('lastError'), snapshot.daemon?.last_error || 'None');
-  renderToolAccess(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {});
+  renderToolAccessIfNeeded(snapshot.daemon?.tool_catalog || [], snapshot.daemon?.tool_access_policy || {});
   renderClientFilter(snapshot);
   renderDocuments(snapshot.documents || {});
   renderClients(snapshot.clients || []);
@@ -116,6 +116,15 @@ function clientFilterOptions(snapshot) {
     if (id && !clients.has(id)) clients.set(id, command.client_name || id);
   }
   return [{ value: 'all', label: 'All clients' }, ...[...clients.entries()].map(([value, label]) => ({ value, label }))];
+}
+
+function renderToolAccessIfNeeded(catalog, policy, options = {}) {
+  const renderKey = toolAccessRenderKey(catalog);
+  if (!options.force && state.toolAccessRenderKey === renderKey) {
+    return;
+  }
+  state.toolAccessRenderKey = renderKey;
+  renderToolAccess(catalog, policy);
 }
 
 function renderToolAccess(catalog, policy) {
@@ -151,6 +160,13 @@ function groupedToolAccessCatalog(catalog) {
     appGroup.categories.get(tool.category).tools.push(tool);
   }
   return [...apps.values()].map((appGroup) => ({ ...appGroup, categories: [...appGroup.categories.values()] }));
+}
+
+function toolAccessRenderKey(catalog) {
+  return groupedToolAccessCatalog(catalog).map((appGroup) => {
+    const categories = appGroup.categories.map((categoryGroup) => `${categoryGroup.category}:${categoryGroup.tools.map((tool) => tool.name).join(',')}`).join('|');
+    return `${appGroup.app}:${categories}`;
+  }).join(';');
 }
 
 function toolAccessToggle(enabled, label, data) {
@@ -195,6 +211,7 @@ async function updateToolAccessPolicy(policy) {
     if (!response.ok) throw new Error('Tool access update returned ' + response.status);
     state.snapshot = await response.json();
     window.__OFFICE_MCP_UI__ = state.snapshot;
+    renderToolAccessIfNeeded(state.snapshot.daemon?.tool_catalog || [], state.snapshot.daemon?.tool_access_policy || {}, { force: true });
     render();
     announce('Updated global tool access');
   } catch (error) {
