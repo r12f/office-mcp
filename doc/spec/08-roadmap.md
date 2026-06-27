@@ -1307,6 +1307,19 @@ Current screenshot feedback to preserve for the next implementation goal:
       source, process ID, and platform launcher error. Automated tests must
       cover runtime URL resolution and action dispatch; release evidence must
       include the visible tray menu action opening the UI.
+- [ ] Fix and verify the native tray `Quit Office MCP Control` action. Clicking
+      the menu item in a normal installed Windows run from
+      `%LOCALAPPDATA%\office-mcp` must show native confirmation, then request
+      shutdown of the daemon process that owns the tray icon, MCP listener,
+      add-in listener, and UI server. After confirmation, the daemon must stop
+      accepting new traffic, close add-in sockets with close code `4004`, close
+      listener ports such as `8765` and `8800`, and remove the tray icon as the
+      process exits. The implementation must exercise the real quit action
+      dispatch path, not just tray probe/menu-label output or confirmation text,
+      and failures must be logged with action name, shutdown source/target,
+      process ID, and controller/platform error. Automated tests must cover quit
+      dispatch and failure messages; release evidence must include the visible
+      tray quit action causing daemon process and port shutdown.
 - [x] Polish the automated tray product surface model so normal Windows users
       are expected to see a deliberate app icon, native tooltip/title, native
       context menu text, disabled status rows, and confirmation dialogs that
