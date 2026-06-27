@@ -2,6 +2,7 @@ pub mod controller;
 pub mod host;
 pub mod model;
 pub(crate) mod product_icon;
+pub mod ui_launch;
 pub(crate) mod ui_state_client;
 
 pub use controller::{TrayController, TrayPlatformAdapter, TrayPlatformError};

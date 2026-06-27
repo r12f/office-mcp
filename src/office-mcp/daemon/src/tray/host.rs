@@ -1,4 +1,5 @@
 use crate::api::DaemonController;
+use crate::tray::ui_launch::{PlatformUiLauncher, TrayUiOpenRequest};
 use crate::tray::ui_state_client::TrayUiStateClient;
 use crate::tray::{TrayController, TrayPlatformError, TraySnapshot};
 use crate::ui::UiRuntimeFile;
@@ -91,23 +92,7 @@ impl TrayHost {
 ///
 /// Returns an error when the platform URL launcher fails.
 pub fn open_ui_from_runtime(options: &TrayHostOptions) -> Result<(), TrayPlatformError> {
-    if let Some(runtime) = runtime_info(options) {
-        tracing::info!(
-            component = "tray_host",
-            ui_url = %runtime.ui_url,
-            source = "runtime_file",
-            "opening daemon UI from tray"
-        );
-        open_url(runtime.ui_url.as_str())?;
-        return Ok(());
-    }
-    tracing::warn!(
-        component = "tray_host",
-        ui_url = "https://localhost:8765/ui/",
-        source = "fallback",
-        "opening daemon UI from tray without runtime file"
-    );
-    open_url("https://localhost:8765/ui/")
+    TrayUiOpenRequest::from_runtime(options)?.open_with(&PlatformUiLauncher)
 }
 
 /// Requests daemon shutdown through the daemon controller.
@@ -196,40 +181,6 @@ fn read_option(args: &[String], name: &str) -> Option<String> {
         .and_then(|index| args.get(index + 1))
         .filter(|value| !value.starts_with("--"))
         .cloned()
-}
-
-fn open_url(url: &str) -> Result<(), TrayPlatformError> {
-    #[cfg(windows)]
-    {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", url])
-            .spawn()
-            .and_then(|mut child| child.wait())
-            .map_err(|error| TrayPlatformError::new(error.to_string()))?;
-        return Ok(());
-    }
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(url)
-            .spawn()
-            .and_then(|mut child| child.wait())
-            .map_err(|error| TrayPlatformError::new(error.to_string()))?;
-        return Ok(());
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(url)
-            .spawn()
-            .and_then(|mut child| child.wait())
-            .map_err(|error| TrayPlatformError::new(error.to_string()))?;
-        return Ok(());
-    }
-    #[allow(unreachable_code)]
-    Err(TrayPlatformError::new(
-        "opening URLs is unsupported on this platform",
-    ))
 }
 
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
