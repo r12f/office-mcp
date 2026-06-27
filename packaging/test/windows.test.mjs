@@ -255,47 +255,48 @@ test('GitHub CI verifies the Windows portable zip using package metadata version
   assert.doesNotMatch(workflow, /office-mcp-windows-portable-0\.1\.1-x64\.zip/);
 });
 
-test('README documents installation from GitHub Releases', () => {
+test('README is a compact landing page with install and MCP config first', () => {
   const repoRoot = join(PACKAGING_ROOT, '..');
   const readme = readFileSync(join(repoRoot, 'README.md'), 'utf8');
-  const installHeading = readme.indexOf('## Install from GitHub Releases');
-  const developerHeading = readme.indexOf('## Run the MVP locally');
+  const topLevelHeadings = [...readme.matchAll(/^#{1,2} .+$/gm)].map((match) => match[0].trim());
 
-  assert.ok(installHeading !== -1, 'README must have a user install section');
-  assert.ok(developerHeading !== -1, 'README must keep the developer setup section');
-  assert.ok(installHeading < developerHeading, 'user install instructions must come before source checkout instructions');
-  assert.match(readme, /Windows desktop/i);
-  assert.match(readme, /GitHub Releases/);
-  assert.match(readme, /office-mcp-windows-portable-<ver>-x64\.zip/);
-  assert.doesNotMatch(readme, /office-mcp-setup|\.msi|MSI/i);
-  assert.match(readme, /README-install\.txt/);
-  assert.match(readme, /powershell -NoProfile -ExecutionPolicy Bypass -File \.\\install\.ps1/);
-  assert.match(readme, /OFFICE_MCP_INSTALL_ROOT/);
-  assert.match(readme, /-InstallRoot/);
-  assert.match(readme, /stable install\s+root/i);
-  assert.match(readme, /temporary staging folder/i);
-  assert.match(readme, /stale versioned install roots/i);
-  assert.match(readme, /asks before closing them/i);
-  assert.match(readme, /install\.ps1/);
-  assert.match(readme, /uninstall\.ps1/);
-  assert.match(readme, /office-mcp-daemon\.exe config claude-desktop --installed --install-root <extracted-folder>/);
-  assert.doesNotMatch(readme, /install-user\.ps1/);
-  assert.doesNotMatch(readme, /start-daemon\.ps1/);
-  assert.doesNotMatch(readme, /uninstall-user\.ps1/);
-  assert.doesNotMatch(readme, /\.\\office-mcp\.ps1/);
-  assert.match(readme, /6D178D62-0D2E-4BD6-9F03-5F7FCA34EC57/);
-  assert.match(readme, /SHA256SUMS/);
-  assert.match(readme, /%LOCALAPPDATA%\\office-mcp\\/);
-  assert.doesNotMatch(readme, /%LOCALAPPDATA%\\office-mcp\\<release-tag>/);
-  assert.doesNotMatch(readme, /The extracted folder is the install directory/);
-  assert.match(readme, /daemon runtime with tray support/i);
-  assert.match(readme, /office-mcp-daemon ui/);
-  assert.match(readme, /daemon status/);
-  assert.match(readme, /Shared Folder/);
-  assert.match(readme, /Office MCP Control/);
+  assert.deepEqual(topLevelHeadings, [
+    '# office-mcp',
+    '## Install and MCP config',
+    '## Why office-mcp',
+    '## Key idea',
+    '## Difference vs Python / COM-based MCP servers or skills',
+    '## License',
+  ]);
+  assert.match(readme, /\[!\[License: MIT\]/);
+  assert.match(readme, /\[!\[Release\]/);
+  assert.match(readme, /\[!\[Release workflow\]/);
+  assert.match(readme, /\[!\[Platform\]/);
+  assert.match(
+    readme,
+    /connects MCP clients to live Microsoft Office documents through Office add-ins and a local MCP daemon/i,
+  );
+  assert.match(readme, /irm https:\/\/raw\.githubusercontent\.com\/r12f\/office-mcp\/main\/scripts\/install\.ps1 \| iex/);
   assert.match(readme, /http:\/\/127\.0\.0\.1:8800\/mcp/);
-  assert.match(readme, /log/i);
-  assert.match(readme, /uninstall/i);
+  assert.match(readme, /Streamable HTTP endpoint/i);
+  assert.match(readme, /the document the user is actually editing/i);
+  assert.match(readme, /protected, open, locked, or host-managed/i);
+  assert.match(readme, /inside the Office host/i);
+  assert.match(readme, /one local long-lived MCP daemon/i);
+  assert.match(readme, /reverse-connects to the daemon/i);
+  assert.match(readme, /routes calls to the correct Office host session/i);
+  assert.match(readme, /python-docx/);
+  assert.match(readme, /openpyxl/);
+  assert.match(readme, /python-pptx/);
+  assert.match(readme, /COM automation is Windows-only/i);
+  assert.match(readme, /Office\.js add-ins and live host sessions/i);
+  assert.match(readme, /\[MIT\]\(LICENSE\)/);
+  assert.match(readme, /\[deployment spec\]\(doc\/spec\/07-deployment\.md\)/i);
+  assert.doesNotMatch(readme, /office-mcp-setup|\.msi|MSI/i);
+  assert.doesNotMatch(readme, /^## Status$/m);
+  assert.doesNotMatch(readme, /^## Verification$/m);
+  assert.doesNotMatch(readme, /^## Repository layout$/m);
+  assert.doesNotMatch(readme, /^## Run the MVP locally$/m);
 });
 
 test('Release notes document the Windows portable pre-release gate', () => {
