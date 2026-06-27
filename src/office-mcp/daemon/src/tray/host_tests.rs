@@ -1,5 +1,6 @@
 use super::{TrayHost, TrayHostOptions};
 use crate::common::{Logger, LoggerLogLevel};
+use crate::tray::quit_request::{RecordingShutdownController, TrayQuitRequest};
 use crate::tray::ui_launch::{RecordingUiLauncher, TrayUiOpenRequest};
 use crate::ui::{UiRuntimeFile, UiRuntimeInfo};
 use std::fs;
@@ -115,6 +116,36 @@ fn show_ui_action_error_includes_action_source_url_and_pid() {
     assert!(message.contains("https://localhost:8765/ui/"));
     assert!(message.contains(&format!("pid={}", std::process::id())));
     assert!(message.contains("launcher unavailable"));
+}
+
+#[test]
+fn quit_action_requests_daemon_shutdown_through_controller() {
+    let controller = RecordingShutdownController::default();
+
+    let request = TrayQuitRequest::new("native_tray_menu");
+    request
+        .shutdown_with(&controller)
+        .expect("quit request should ask controller to stop daemon");
+
+    assert_eq!(controller.stop_count(), 1);
+    assert_eq!(request.action(), "quit");
+    assert_eq!(request.source(), "native_tray_menu");
+    assert_eq!(request.process_id(), std::process::id());
+}
+
+#[test]
+fn quit_action_error_includes_action_source_pid_and_controller_error() {
+    let controller = RecordingShutdownController::failing("scheduled task stop failed");
+
+    let error = TrayQuitRequest::new("native_tray_menu")
+        .shutdown_with(&controller)
+        .expect_err("shutdown controller failure should be returned");
+    let message = error.to_string();
+
+    assert!(message.contains("quit"));
+    assert!(message.contains("native_tray_menu"));
+    assert!(message.contains(&format!("pid={}", std::process::id())));
+    assert!(message.contains("scheduled task stop failed"));
 }
 
 #[test]
