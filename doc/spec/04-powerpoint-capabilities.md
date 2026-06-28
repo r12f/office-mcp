@@ -182,7 +182,10 @@ evidence where the host API cannot be fully proven statically.
   different object owner, permission profile, or user-visible result.
 - `powerpoint.get_presentation_info` is orientation only. It may include counts
   and capability gates, but detailed slide inventory belongs to
-  `powerpoint.list_slides`.
+  `powerpoint.list_slides`. Its `slide_count` field must be populated from the
+  current presentation slide collection when that collection is available, and
+  must match the number of entries returned by `powerpoint.list_slides` for the
+  same session.
 - `powerpoint.export_file` owns full-presentation export for PDF/PPTX. Do not
   keep a separate `powerpoint.export_pdf` in the refined catalog.
 - `office-mcp` must not advertise a PowerPoint deck save tool until stable

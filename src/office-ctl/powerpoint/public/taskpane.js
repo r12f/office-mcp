@@ -453,14 +453,19 @@
   }
 
   async function getPresentationInfoTool(args) {
-    const info = await getPresentationInfo();
-    return {
-      ...info,
-      slide_count: null,
-      requirement_sets: probeRequirementSets(),
-      capabilities: Object.fromEntries(AVAILABLE_TOOLS.map((tool) => [tool, isToolEnabled(tool)])),
-      include_selection: Boolean(args.include_selection)
-    };
+    return PowerPoint.run(async (context) => {
+      const info = await getPresentationInfo();
+      const slides = context.presentation.slides;
+      slides.load('items/id');
+      await context.sync();
+      return {
+        ...info,
+        slide_count: (slides.items || []).length,
+        requirement_sets: probeRequirementSets(),
+        capabilities: Object.fromEntries(AVAILABLE_TOOLS.map((tool) => [tool, isToolEnabled(tool)])),
+        include_selection: Boolean(args.include_selection)
+      };
+    });
   }
 
   async function getActiveView(_args) {
