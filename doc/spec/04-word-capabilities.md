@@ -348,6 +348,18 @@ If `data` is provided, its dimensions must match `rows × cols`.
   "properties": {
     "session_id": { "type": "string" },
     "anchor": { "$ref": "#/$defs/anchor" },
+    "placement": {
+      "enum": [
+        "inline",
+        "before_paragraph",
+        "after_paragraph",
+        "new_paragraph_before",
+        "new_paragraph_after",
+        "replace_paragraph",
+        "selection"
+      ],
+      "default": "inline"
+    },
     "image": {
       "oneOf": [
         { "type": "object", "required": ["base64"], "properties": { "base64": { "type": "string" } } },
@@ -367,14 +379,22 @@ in [05-security.md §6.1](05-security.md): no cookies, auth headers, private
 addresses, unvalidated redirects, oversized bodies, or non-image payloads.
 Base64 input is subject to the same decoded-byte and image-format limits.
 
-For paragraph-resolving anchors (`paragraph_index`, `before_paragraph_index`,
-`after_paragraph_index`, and `heading`), `word.insert_image` MUST insert the
-image into a clean paragraph adjacent to the resolved paragraph instead of
-calling the inline-picture API directly on the `Paragraph` object. The resolved
-anchor paragraph's text and style MUST remain unchanged; for example, inserting
-after a heading must not append the image into the heading paragraph itself.
-If the host cannot support the requested paragraph placement without mutation,
-the tool MUST return a specific `INVALID_ARGUMENT` error with
+`placement` controls how the resolved anchor is used. `inline` preserves the
+legacy behavior and inserts the image at the resolved range, before/after the
+range according to the anchor direction. `selection` inserts into the current
+selection and requires `anchor.kind="selection"`. `before_paragraph`,
+`after_paragraph`, `new_paragraph_before`, `new_paragraph_after`, and
+`replace_paragraph` require a paragraph-resolving anchor (`paragraph_index`,
+`before_paragraph_index`, `after_paragraph_index`, or `heading`).
+
+For paragraph placements, `before_paragraph` and `after_paragraph` insert the
+image directly before or after the resolved paragraph. `new_paragraph_before`
+and `new_paragraph_after` insert the image into a clean adjacent paragraph. The
+resolved anchor paragraph's text and style MUST remain unchanged; for example,
+inserting after a heading must not append the image into the heading paragraph
+itself. `replace_paragraph` replaces the resolved paragraph contents with the
+image. If the host cannot support the requested paragraph placement without
+mutation, the tool MUST return a specific `INVALID_ARGUMENT` error with
 `partial_effect: "none"`.
 
 ### 3.5 `word.resize_image`
