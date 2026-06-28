@@ -396,6 +396,8 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'validateInsertImagePreflight'), /word\.insert_image requires image\.base64/);
   assert.match(functionBody(js, 'validateInsertImagePreflight'), /validateOptionalPositiveNumber\('word\.insert_image', 'width_pt', args\.width_pt\)/);
   assert.match(functionBody(js, 'validateInsertImagePreflight'), /validateOptionalPositiveNumber\('word\.insert_image', 'height_pt', args\.height_pt\)/);
+  assert.match(functionBody(js, 'validateInsertImagePlacement'), /invalidArgumentWithSuggestion/);
+  assert.match(functionBody(js, 'mapError'), /mapped\.suggestion = error\.suggestion/);
   assert.match(functionBody(js, 'validateInsertListArgs'), /word\.insert_list requires a non-empty items array/);
   assert.match(functionBody(js, 'validateInsertListArgs'), /word\.insert_list kind must be bulleted or numbered/);
   assert.match(functionBody(js, 'validateReplaceTextArgs'), /word\.replace_text requires non-empty find text/);
@@ -404,6 +406,22 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'validateUpdateTableArgs'), /Unsupported table action/);
   assert.match(functionBody(js, 'validateContentControlTargetArgs'), /requires content_control_id, tag, or title/);
   assert.match(functionBody(js, 'validateDeleteContentControlMode'), /mode must be keep_content or delete_content/);
+});
+
+test('Word validation-only mode validates required mutating tools without writes', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const validateOnlyBody = functionBody(js, 'validateWordMutationOnly');
+
+  assert.match(invokeBody, /if \(args\?\.validate_only\) data = await validateWordMutationOnly\(tool, args \|\| \{\}\)/);
+  for (const tool of ['word.insert_image', 'word.replace_text', 'word.update_paragraph', 'word.delete_range']) {
+    assert.match(validateOnlyBody, new RegExp(`case '${tool.replace('.', '\\.')}'`));
+  }
+  assert.match(validateOnlyBody, /partial_effect: 'none'/);
+  assert.match(validateOnlyBody, /valid: true/);
+  assert.doesNotMatch(validateOnlyBody, /insertText\(/);
+  assert.doesNotMatch(validateOnlyBody, /delete\(/);
+  assert.doesNotMatch(validateOnlyBody, /insertInlinePictureFromBase64\(/);
 });
 
 test('word.resolve_anchor returns safe anchor diagnostics without mutating', () => {

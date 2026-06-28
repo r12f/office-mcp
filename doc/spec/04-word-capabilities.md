@@ -369,7 +369,8 @@ If `data` is provided, its dimensions must match `rows × cols`.
     },
     "alt_text": { "type": "string" },
     "width_pt":  { "type": "number" },
-    "height_pt": { "type": "number" }
+    "height_pt": { "type": "number" },
+    "validate_only": { "type": "boolean", "default": false }
   }
 }
 ```
@@ -404,6 +405,15 @@ itself. `replace_paragraph` replaces the resolved paragraph contents with the
 image. If the host cannot support the requested paragraph placement without
 mutation, the tool MUST return a specific `INVALID_ARGUMENT` error with
 `partial_effect: "none"`.
+
+With `validate_only: true`, the tool MUST run the same daemon preprocessing,
+argument preflight, anchor resolution, and placement compatibility checks, then
+return without inserting an image. A valid response includes `valid: true`,
+`operation: "word.insert_image"`, and a `resolved_target` summary with the
+resolved anchor kind, target object type when known, and placement. If the
+anchor/placement combination is unsupported, the error SHOULD include a
+`suggestion.placement` value such as `new_paragraph_after` when that correction
+is deterministic.
 
 ### 3.5 `word.resize_image`
 
@@ -496,6 +506,7 @@ text, relationship identity, and adjacent text.
       }
     },
     "dry_run": { "type": "boolean", "default": false },
+    "validate_only": { "type": "boolean", "default": false },
     "partial_ok": { "type": "boolean", "default": false }
   }
 }
@@ -509,6 +520,11 @@ Returns `{ replaced_count: N, matches: [...] }`.
 recommended pattern for agents**: dry-run first, present to user, then run again
 without `dry_run`.
 
+`validate_only: true` is accepted as a synonym for `dry_run: true` and returns
+the same bounded `matches`, `skipped_count`, and `replaced_count: 0` shape plus
+`valid: true`. If both flags are provided, either truthy value selects the
+no-mutation path.
+
 ### 4.2 `word.update_paragraph`
 
 Replace one paragraph's text wholesale.
@@ -520,13 +536,19 @@ Replace one paragraph's text wholesale.
   "properties": {
     "session_id": { "type": "string" },
     "index": { "type": "integer" },
-    "text": { "type": "string" }
+    "text": { "type": "string" },
+    "validate_only": { "type": "boolean", "default": false }
   }
 }
 ```
 
 Replacing paragraph text preserves paragraph-level style but does not promise
 to preserve mixed character-run formatting inside the old text.
+
+With `validate_only: true`, the add-in resolves the paragraph by index, loads
+safe metadata such as the current paragraph text length and style when
+available, and returns `valid: true`, `operation: "word.update_paragraph"`, and
+`resolved_target.paragraph_index` without calling `insertText`.
 
 ### 4.3 `word.delete_range`
 
@@ -537,10 +559,16 @@ to preserve mixed character-run formatting inside the old text.
   "properties": {
     "session_id": { "type": "string" },
     "anchor": { "$ref": "#/$defs/anchor" },
-    "extent": { "enum": ["paragraph", "sentence", "selection"] }
+    "extent": { "enum": ["paragraph", "sentence", "selection"] },
+    "validate_only": { "type": "boolean", "default": false }
   }
 }
 ```
+
+With `validate_only: true`, the add-in resolves the target range or current
+selection and returns `valid: true`, `operation: "word.delete_range"`, and a
+`resolved_target` summary that includes the requested extent and target object
+type when known. It MUST NOT call `delete`.
 
 ### 4.4 `word.apply_formatting`
 
@@ -995,14 +1023,34 @@ MUST use `INVALID_ARGUMENT` and MUST report `partial_effect: "none"`. Error
 messages SHOULD name the tool, field, and expected corrective action when that
 information is available.
 
-### 9.2 Undo grouping
+### 10.3 Validation-only mode
+
+`word.insert_image`, `word.replace_text`, `word.update_paragraph`, and
+`word.delete_range` MUST support `validate_only: true`. Validation-only mode is
+not a transaction preview; it is a no-write preflight. The add-in MAY call
+read-only Office.js APIs and `context.sync()` to resolve anchors, count matches,
+or load target metadata, but it MUST NOT queue a write before returning.
+
+Successful validation-only responses MUST include:
+
+- `valid: true`
+- `operation`: the tool name
+- `partial_effect: "none"`
+- `resolved_target` or equivalent tool-specific planning metadata when a target
+  can be resolved
+
+Invalid validation-only requests use the normal MCP error envelope with
+`INVALID_ARGUMENT` and `partial_effect: "none"`. If the add-in can identify a
+safe correction, it SHOULD include a small structured `suggestion` object.
+
+### 10.4 Undo grouping
 
 The add-in does not control Word's undo stack or custom undo labels through a
 portable Office.js API. Implementations SHOULD group writes into as few sync
 boundaries as possible, but the number and labels of undo entries are
 host-defined. Tool results do not promise one-keystroke rollback.
 
-### 9.3 IRM enforcement
+### 10.5 IRM enforcement
 
 The following table describes the conceptual right required by each category:
 
@@ -1022,14 +1070,14 @@ so the add-in otherwise attempts the operation and maps a host access-denied
 failure to `IRM_DENIED`. `denied_rights` and `granted_rights` are included
 only when known; clients MUST tolerate their absence.
 
-### 9.4 Track-changes interaction
+### 10.6 Track-changes interaction
 
 If the document has Track Changes ON, Word decides how edits are recorded.
 When `WordApi 1.6` is available, the add-in may re-read tracked changes after
 the edit and return current indices and fingerprints it can correlate
 reliably. Tool success does not depend on producing revision references.
 
-### 9.5 What the tool does NOT do
+### 10.7 What the tool does NOT do
 
 - It does NOT print.
 - It does NOT mail-merge.

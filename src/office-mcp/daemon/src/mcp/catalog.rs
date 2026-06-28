@@ -686,7 +686,8 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "width_pt",
             "height_pt",
             "caption",
-            "match_case"
+            "match_case",
+            "validate_only"
         ]
     ),
     tool_spec!(
@@ -727,19 +728,32 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "replace",
             "match_case",
             "whole_word",
+            "wildcards",
+            "scope",
+            "limit",
+            "dry_run",
+            "partial_ok",
             "all",
-            "occurrence"
+            "occurrence",
+            "validate_only"
         ]
     ),
     tool_spec!(
         "word.update_paragraph",
         ["session_id", "index", "text"],
-        ["session_id", "index", "text", "style", "heading_level"]
+        [
+            "session_id",
+            "index",
+            "text",
+            "style",
+            "heading_level",
+            "validate_only"
+        ]
     ),
     tool_spec!(
         "word.delete_range",
         ["session_id", "anchor"],
-        ["session_id", "anchor", "match_case"]
+        ["session_id", "anchor", "match_case", "validate_only"]
     ),
     tool_spec!(
         "word.apply_formatting",
@@ -1341,6 +1355,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
         }
         "match_case"
         | "whole_word"
+        | "wildcards"
+        | "dry_run"
+        | "partial_ok"
         | "include_metadata"
         | "include_text_preview"
         | "include_formatting"
@@ -1370,8 +1387,10 @@ fn property_schema(tool: &str, name: &str) -> Value {
         | "clear_fill"
         | "line_visible"
         | "lock_aspect_ratio"
-        | "delete_contents" => json!({ "type": "boolean" }),
+        | "delete_contents"
+        | "validate_only" => json!({ "type": "boolean" }),
         "anchor" => anchor_schema_for_tool(tool),
+        "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
         "image" => image_schema(),
         "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
         "formatting" => formatting_schema(),
@@ -1487,6 +1506,22 @@ fn word_insert_image_placement_schema() -> Value {
             "selection"
         ],
         "default": "inline"
+    })
+}
+
+fn word_replace_text_scope_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "paragraph_range": {
+                "type": "array",
+                "items": { "type": "integer", "minimum": 0 },
+                "minItems": 2,
+                "maxItems": 2
+            },
+            "selection_only": { "type": "boolean" }
+        },
+        "additionalProperties": false
     })
 }
 

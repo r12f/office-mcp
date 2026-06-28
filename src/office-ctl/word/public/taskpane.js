@@ -434,6 +434,8 @@
       if (!isToolEnabled(tool)) throw toolDisabledError(tool);
       if (taskStore.isCancelled(requestId)) throw cancelledError(tool);
       preflightWordMutatingTool(tool, args || {});
+      if (args?.validate_only) data = await validateWordMutationOnly(tool, args || {});
+      else
       switch (tool) {
         case 'word.get_text':
           data = await getText(args);
@@ -631,6 +633,140 @@
 
   function invalidArgument(message) {
     return Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  function invalidArgumentWithSuggestion(message, suggestion) {
+    return Object.assign(invalidArgument(message), { suggestion });
+  }
+
+  async function validateWordMutationOnly(tool, args) {
+    switch (tool) {
+      case 'word.insert_image':
+        return validateInsertImageOnly(args);
+      case 'word.replace_text':
+        return validateReplaceTextOnly(args);
+      case 'word.update_paragraph':
+        return validateUpdateParagraphOnly(args);
+      case 'word.delete_range':
+        return validateDeleteRangeOnly(args);
+      default:
+        throw invalidArgument(`${tool} does not support validate_only.`);
+    }
+    return { valid: true, partial_effect: 'none' };
+  }
+
+  async function validateInsertImageOnly(args) {
+    return Word.run(async (context) => {
+      validateInsertImagePlacement(args.anchor, args.placement);
+      const resolved = await resolveValidationAnchor(context, args.anchor);
+      return validationSuccess('word.insert_image', {
+        resolved_target: {
+          ...resolved,
+          placement: args.placement || 'inline',
+          image_mime_type: args.image?.mime_type ?? null,
+          image_byte_length: args.image?.byte_length ?? null
+        }
+      });
+    });
+  }
+
+  async function validateReplaceTextOnly(args) {
+    return Word.run(async (context) => {
+      const scope = args.scope || {};
+      const searchRoot = scope.selection_only ? context.document.getSelection() : context.document.body;
+      const ranges = searchRoot.search(args.find, {
+        matchCase: args.match_case ?? false,
+        matchWholeWord: args.whole_word ?? false,
+        matchWildcards: args.wildcards ?? false
+      });
+      ranges.load('items/text');
+      const paragraphs = context.document.body.paragraphs;
+      paragraphs.load('items/text');
+      await context.sync();
+
+      const limit = args.limit ?? 500;
+      const limitedRanges = ranges.items.slice(0, limit);
+      const paragraphMatches = mapMatchesToParagraphs(paragraphs.items, args.find, args.match_case ?? false, limit, limitedRanges);
+      const filtered = filterReplaceRanges(limitedRanges, paragraphMatches, scope.paragraph_range);
+      filtered.skipped_count += Math.max(0, ranges.items.length - limitedRanges.length);
+      if (!args.partial_ok && scope.paragraph_range && filtered.skipped_count > 0) {
+        throw invalidArgument('replace_text scope excluded one or more matches. Pass partial_ok to replace only scoped matches.');
+      }
+      const matches = filtered.matches.map((match) => ({
+        paragraph_index: match.paragraph_index,
+        occurrence_in_paragraph: match.occurrence_in_paragraph,
+        text: match.range.text,
+        snippet: match.snippet
+      }));
+      return validationSuccess('word.replace_text', {
+        replaced_count: 0,
+        matches,
+        skipped_count: filtered.skipped_count,
+        dry_run: true
+      });
+    });
+  }
+
+  async function validateUpdateParagraphOnly(args) {
+    return Word.run(async (context) => {
+      const paragraph = await getParagraphByIndex(context, args.index);
+      paragraph.load('text,style');
+      await context.sync();
+      return validationSuccess('word.update_paragraph', {
+        resolved_target: {
+          type: 'Paragraph',
+          paragraph_index: args.index,
+          current_text_length: (paragraph.text || '').length,
+          style: paragraph.style || null
+        }
+      });
+    });
+  }
+
+  async function validateDeleteRangeOnly(args) {
+    return Word.run(async (context) => {
+      const target = args.extent === 'selection' ? context.document.getSelection() : await resolveAnchor(context, args.anchor);
+      target.load('text');
+      await context.sync();
+      return validationSuccess('word.delete_range', {
+        resolved_target: {
+          ...validationTargetForAnchor(args.anchor || { kind: 'selection' }),
+          extent: args.extent ?? 'paragraph',
+          current_text_length: (target.text || '').length
+        }
+      });
+    });
+  }
+
+  async function resolveValidationAnchor(context, anchor) {
+    if (anchor.kind === 'start_of_document' || anchor.kind === 'end_of_document') {
+      return validationTargetForAnchor(anchor);
+    }
+    const resolved = await resolveAnchor(context, anchor);
+    resolved.load('text');
+    await context.sync();
+    return {
+      ...validationTargetForAnchor(anchor),
+      current_text_length: (resolved.text || '').length
+    };
+  }
+
+  function validationTargetForAnchor(anchor) {
+    const target = {
+      type: resolvedAnchorObjectType(anchor),
+      anchor_kind: anchor.kind
+    };
+    if (Number.isInteger(anchor.index)) target.paragraph_index = anchor.index;
+    return target;
+  }
+
+  function validationSuccess(operation, data = {}) {
+    return {
+      valid: true,
+      operation,
+      partial_effect: 'none',
+      ...data
+    };
   }
 
   async function getText(args) {
@@ -953,7 +1089,17 @@
         text: match.range.text,
         snippet: match.snippet
       }));
-      if (args.dry_run) return { replaced_count: 0, matches, dry_run: true, skipped_count: filtered.skipped_count };
+      if (args.dry_run || args.validate_only) {
+        return {
+          valid: args.validate_only ? true : undefined,
+          operation: args.validate_only ? 'word.replace_text' : undefined,
+          partial_effect: args.validate_only ? 'none' : undefined,
+          replaced_count: 0,
+          matches,
+          dry_run: true,
+          skipped_count: filtered.skipped_count
+        };
+      }
       for (const match of filtered.matches) {
         match.range.insertText(args.replace, Word.InsertLocation.replace);
       }
@@ -1819,10 +1965,10 @@
       throw invalidArgument(`Unsupported word.insert_image placement: ${placement}.`);
     }
     if (placement === 'selection' && anchor.kind !== 'selection') {
-      throw invalidArgument('word.insert_image placement selection requires anchor.kind selection.');
+      throw invalidArgumentWithSuggestion('word.insert_image placement selection requires anchor.kind selection.', { placement: 'inline' });
     }
     if (isParagraphPlacement(placement) && !isParagraphAnchor(anchor)) {
-      throw invalidArgument(`word.insert_image placement ${placement} requires a paragraph-resolving anchor.`);
+      throw invalidArgumentWithSuggestion(`word.insert_image placement ${placement} requires a paragraph-resolving anchor.`, { placement: 'inline' });
     }
   }
 
@@ -1973,6 +2119,7 @@
     };
     const debug = officeErrorDebug(error, tool, args);
     if (debug) mapped.debug = debug;
+    if (error.suggestion && typeof error.suggestion === 'object') mapped.suggestion = error.suggestion;
     return mapped;
   }
 
