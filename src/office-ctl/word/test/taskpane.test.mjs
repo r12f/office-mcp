@@ -366,6 +366,46 @@ test('word.insert_image handles paragraph anchors through clean image paragraphs
   assert.match(functionBody(js, 'isParagraphAnchor'), /heading/);
 });
 
+test('Word mutating tools run preflight validation before Office mutation dispatch', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const preflightBody = functionBody(js, 'preflightWordMutatingTool');
+
+  assert.match(js, /const WORD_MUTATING_TOOLS = new Set\(\[/);
+  assert.match(invokeBody, /preflightWordMutatingTool\(tool, args \|\| \{\}\);[\s\S]*switch \(tool\)/);
+  assert.match(preflightBody, /case 'word\.insert_image':/);
+  assert.match(preflightBody, /validateInsertImagePreflight\(args\)/);
+  assert.match(preflightBody, /case 'word\.insert_table':/);
+  assert.match(preflightBody, /requirePositiveInteger\(tool, 'rows', args\.rows\)/);
+  assert.match(preflightBody, /case 'word\.insert_list':/);
+  assert.match(preflightBody, /validateInsertListArgs\(args\)/);
+  assert.match(preflightBody, /case 'word\.replace_text':/);
+  assert.match(preflightBody, /validateReplaceTextArgs\(args\)/);
+  assert.match(preflightBody, /case 'word\.delete_range':/);
+  assert.match(preflightBody, /validateExtentToolArgs\(tool, args\)/);
+  assert.match(preflightBody, /case 'word\.update_table':/);
+  assert.match(preflightBody, /validateUpdateTableArgs\(args\)/);
+  assert.match(preflightBody, /case 'word\.update_tracked_change':/);
+  assert.match(preflightBody, /validateTrackedChangeAction\(args\.action\)/);
+});
+
+test('Word mutating preflight helpers return specific no-effect validation errors', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+
+  assert.match(functionBody(js, 'invalidArgument'), /officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none'/);
+  assert.match(functionBody(js, 'validateInsertImagePreflight'), /word\.insert_image requires image\.base64/);
+  assert.match(functionBody(js, 'validateInsertImagePreflight'), /validateOptionalPositiveNumber\('word\.insert_image', 'width_pt', args\.width_pt\)/);
+  assert.match(functionBody(js, 'validateInsertImagePreflight'), /validateOptionalPositiveNumber\('word\.insert_image', 'height_pt', args\.height_pt\)/);
+  assert.match(functionBody(js, 'validateInsertListArgs'), /word\.insert_list requires a non-empty items array/);
+  assert.match(functionBody(js, 'validateInsertListArgs'), /word\.insert_list kind must be bulleted or numbered/);
+  assert.match(functionBody(js, 'validateReplaceTextArgs'), /word\.replace_text requires non-empty find text/);
+  assert.match(functionBody(js, 'validateReplaceTextArgs'), /scope\.paragraph_range must be \[start, end\]/);
+  assert.match(functionBody(js, 'validateExtentToolArgs'), /extent must be paragraph, sentence, or selection/);
+  assert.match(functionBody(js, 'validateUpdateTableArgs'), /Unsupported table action/);
+  assert.match(functionBody(js, 'validateContentControlTargetArgs'), /requires content_control_id, tag, or title/);
+  assert.match(functionBody(js, 'validateDeleteContentControlMode'), /mode must be keep_content or delete_content/);
+});
+
 test('Word task pane exposes product UI regions and accessible endpoint settings', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const css = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');
