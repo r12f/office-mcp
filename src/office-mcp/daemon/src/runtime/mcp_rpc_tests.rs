@@ -476,6 +476,61 @@ fn mcp_json_rpc_powerpoint_text_resource_routes_to_read_text_tool() {
 }
 
 #[test]
+fn mcp_json_rpc_powerpoint_presentation_resource_returns_slide_count() {
+    let registry = registry_with_powerpoint_session();
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("powerpoint-connection");
+    connection_hub.bind_instance("powerpoint-connection", "powerpoint-instance");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("powerpoint-connection");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["method"], "tool.invoke");
+        assert_eq!(invoke["params"]["session_id"], "powerpoint-session");
+        assert_eq!(invoke["params"]["tool"], "powerpoint.get_presentation_info");
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"filename":"Deck.pptx","title":"Deck.pptx","slide_count":9}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"read-ppt-presentation","method":"resources/read","params":{"uri":"office://powerpoint/powerpoint-session/presentation"}}"#,
+    );
+    response_thread.join().expect("response thread");
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    assert_eq!(
+        reply["result"]["contents"][0]["uri"],
+        "office://powerpoint/powerpoint-session/presentation"
+    );
+    let text = reply["result"]["contents"][0]["text"]
+        .as_str()
+        .expect("resource text");
+    let body: serde_json::Value = serde_json::from_str(text).expect("presentation resource json");
+    assert_eq!(body["slide_count"], 9);
+}
+
+#[test]
 fn mcp_json_rpc_excel_range_resource_routes_to_read_range_tool() {
     let registry = registry_with_excel_session();
     let mut ui_state = UiStateStore::new();

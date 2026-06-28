@@ -362,14 +362,16 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   assert.doesNotMatch(js, /declared by the daemon contract but is not implemented/);
 });
 
-test('PowerPoint presentation info is a non-blocking metadata probe', () => {
+test('PowerPoint presentation info reports the loaded slide count', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const source = functionBody(js, 'getPresentationInfoTool');
 
-  assert.doesNotMatch(source, /PowerPoint\.run/, 'presentation info must not block the task pane on PowerPoint.run');
-  assert.doesNotMatch(source, /context\.sync\(/, 'presentation info must not depend on host sync');
+  assert.match(source, /PowerPoint\.run/, 'presentation info must read the PowerPoint slide collection');
+  assert.match(source, /context\.presentation\.slides/);
+  assert.match(source, /slides\.load\('items\/id'\)/);
+  assert.match(source, /context\.sync\(/);
   assert.match(source, /getPresentationInfo\(\)/);
-  assert.match(source, /slide_count:\s*null/);
+  assert.match(source, /slide_count:\s*\(slides\.items\s*\|\|\s*\[\]\)\.length/);
   assert.match(source, /include_selection:\s*Boolean\(args\.include_selection\)/);
 });
 
