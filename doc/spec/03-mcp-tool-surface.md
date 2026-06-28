@@ -49,6 +49,15 @@ dynamic app tools can still inspect active workbooks and decks. Outlook will
 ship its own resource table with a future capability doc; app resource types do
 not share a generic "document" abstraction.
 
+The resource fallback is additive. When a host session reports tools in
+`available_tools`, those public tools must still be exposed as callable MCP
+tools through `tools/list` whenever the daemon Global Tool Access policy allows
+them. In particular, PowerPoint action tools such as `powerpoint.add_slide`,
+`powerpoint.add_text_box`, `powerpoint.update_shape`,
+`powerpoint.replace_text`, and `powerpoint.format_text` are not resource-only
+capabilities; clients invoke them with `tools/call` and the daemon then checks
+the target session's `available_tools` before forwarding to the add-in.
+
 | URI pattern | Returns | Notes |
 |---|---|---|
 | `office://sessions` | List of session descriptors across all apps | Roughly `office.list_sessions` as a resource |
