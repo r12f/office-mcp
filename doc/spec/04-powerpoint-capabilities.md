@@ -259,10 +259,23 @@ and host-denied operations. These map through the standard error model in
 - Export operations must enforce the shared `MAX_RESPONSE_BYTES` limit and may
   return chunk metadata or a host-capability error instead of oversized inline
   payloads.
-- The server does not expose a PowerPoint resource URI surface in v1. Clients
-  use `powerpoint.get_presentation_info`, `powerpoint.list_slides`,
-  `powerpoint.list_shapes`, `powerpoint.read_text`, and
-  `powerpoint.read_table` for deck reads.
+- PowerPoint tools remain the authoritative execution surface. The daemon also
+  exposes a limited read-only MCP resource fallback for clients that can read
+  resources but cannot call dynamic app tools. The fallback forwards through
+  the same add-in path as PowerPoint tools and must respect daemon Global Tool
+  Access policy and session `available_tools` capability checks.
+- The PowerPoint read-only resource templates are:
+
+| URI template | Forwarded tool | Purpose |
+|---|---|---|
+| `office://powerpoint/{session_id}/presentation` | `powerpoint.get_presentation_info` | Presentation metadata, counts, selection summary, and capability gates. |
+| `office://powerpoint/{session_id}/slides` | `powerpoint.list_slides` | Slide inventory with IDs, indices, layouts, tags, and shape counts. |
+| `office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}` | `powerpoint.read_text` | Paginated text for one slide. |
+| `office://powerpoint/{session_id}/slide/{index}/shapes` | `powerpoint.list_shapes` | Shape inventory for one slide. |
+
+The fallback is intentionally read-only. Presentation export, slide mutation,
+metadata writes, shape creation or updates, text replacement or formatting, and
+table reads or mutations remain tool-only operations.
 
 ## 7. Evidence
 
