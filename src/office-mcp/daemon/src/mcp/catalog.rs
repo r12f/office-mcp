@@ -488,6 +488,7 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "session_id",
             "anchor",
             "image",
+            "placement",
             "alt_text",
             "width_pt",
             "height_pt",
@@ -1178,6 +1179,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
         | "delete_contents" => json!({ "type": "boolean" }),
         "anchor" => anchor_schema_for_tool(tool),
         "image" => image_schema(),
+        "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
         "formatting" => formatting_schema(),
         "title_box" | "content_box" => shape_box_schema(),
         "values" | "data" | "formulas" | "number_formats" | "items" | "fields" | "borders"
@@ -1205,32 +1207,19 @@ fn validate_anchor_argument(
     }
 }
 
-fn supported_anchor_kinds(tool: &str) -> &'static [&'static str] {
-    match tool {
-        "word.insert_image" => &[
-            "selection",
-            "start_of_document",
-            "end_of_document",
-            "paragraph_index",
-            "before_paragraph_index",
-            "before_text",
-            "after_text",
-            "heading",
-            "bookmark",
-        ],
-        _ => &[
-            "selection",
-            "start_of_document",
-            "end_of_document",
-            "paragraph_index",
-            "before_paragraph_index",
-            "after_paragraph_index",
-            "before_text",
-            "after_text",
-            "heading",
-            "bookmark",
-        ],
-    }
+fn supported_anchor_kinds(_tool: &str) -> &'static [&'static str] {
+    &[
+        "selection",
+        "start_of_document",
+        "end_of_document",
+        "paragraph_index",
+        "before_paragraph_index",
+        "after_paragraph_index",
+        "before_text",
+        "after_text",
+        "heading",
+        "bookmark",
+    ]
 }
 
 fn anchor_schema_for_tool(tool: &str) -> Value {
@@ -1289,6 +1278,21 @@ fn image_schema() -> Value {
             { "type": "object", "required": ["base64"], "properties": { "base64": { "type": "string" }, "mime_type": { "type": "string" }, "byte_length": { "type": "integer", "minimum": 0 } }, "additionalProperties": false },
             { "type": "object", "required": ["url"], "properties": { "url": { "type": "string", "format": "uri" }, "mime_type": { "type": "string" }, "byte_length": { "type": "integer", "minimum": 0 } }, "additionalProperties": false }
         ]
+    })
+}
+
+fn word_insert_image_placement_schema() -> Value {
+    json!({
+        "enum": [
+            "inline",
+            "before_paragraph",
+            "after_paragraph",
+            "new_paragraph_before",
+            "new_paragraph_after",
+            "replace_paragraph",
+            "selection"
+        ],
+        "default": "inline"
     })
 }
 

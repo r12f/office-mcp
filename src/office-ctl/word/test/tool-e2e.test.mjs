@@ -89,7 +89,7 @@ const WORD_E2E_CASES = Object.fromEntries([
         { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'image anchor marker' } }
       ]
     },
-    args: { anchor: { kind: 'after_text', text: 'image anchor marker' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'E2E image', width_pt: 24, height_pt: 24 },
+    args: { anchor: { kind: 'after_paragraph_index', index: 0 }, placement: 'new_paragraph_after', image: { base64: PNG_1X1_BASE64 }, alt_text: 'E2E image', width_pt: 24, height_pt: 24 },
     verify: {
       kind: 'direct-result',
       expect: {

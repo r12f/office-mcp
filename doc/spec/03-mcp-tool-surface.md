@@ -150,12 +150,10 @@ Per-tool schemas intentionally narrow this vocabulary. For example,
 `word.insert_paragraph`, `word.insert_table`, `word.insert_page_break`,
 `word.insert_list`, `word.delete_range`, `word.apply_formatting`,
 `word.apply_style`, `word.insert_content_control`, and `word.add_comment`
-support the full anchor vocabulary. `word.insert_image` supports only concrete
-range-like targets where inline media insertion is portable in v1:
-`selection`, `start_of_document`, `end_of_document`, `paragraph_index`,
-`before_paragraph_index`, `before_text`, `after_text`, `heading`, and
-`bookmark`. It does not advertise `after_paragraph_index` until the tool owns an
-explicit placement model for creating a separate image paragraph.
+support the full anchor vocabulary. `word.insert_image` also supports the full
+anchor vocabulary, but its advertised schema includes a `placement` argument so
+callers can distinguish inline insertion from paragraph-relative insertion such
+as `new_paragraph_after`.
 
 The daemon validates the advertised anchor kind before forwarding a mutating
 call to the add-in. Unsupported anchor kinds fail with `INVALID_ARGUMENTS` and

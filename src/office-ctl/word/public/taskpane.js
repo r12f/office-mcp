@@ -53,6 +53,15 @@
     taskStatusLabel
   } = window.OfficeCtlMainUi;
   const CONNECT_TIMEOUT_MS = 8000;
+  const INSERT_IMAGE_PLACEMENTS = new Set([
+    'inline',
+    'before_paragraph',
+    'after_paragraph',
+    'new_paragraph_before',
+    'new_paragraph_after',
+    'replace_paragraph',
+    'selection'
+  ]);
   const AVAILABLE_TOOLS = [
     'word.get_text',
     'word.get_outline',
@@ -686,14 +695,17 @@
     return Word.run(async (context) => {
       const base64 = args.image?.base64;
       if (!base64) throw Object.assign(new Error('word.insert_image requires base64 image data after daemon preprocessing.'), { officeMcpCode: 'INVALID_ARGUMENT' });
+      validateInsertImagePlacement(args.anchor, args.placement);
       let picture;
-      if (args.anchor.kind === 'start_of_document') {
+      if (args.placement === 'selection') {
+        picture = context.document.getSelection().insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+      } else if (args.anchor.kind === 'start_of_document') {
         picture = context.document.body.insertInlinePictureFromBase64(base64, Word.InsertLocation.start);
       } else if (args.anchor.kind === 'end_of_document') {
         picture = context.document.body.insertInlinePictureFromBase64(base64, Word.InsertLocation.end);
       } else {
         const target = await resolveAnchor(context, args.anchor);
-        picture = insertInlinePictureAtAnchor(target, args.anchor, base64);
+        picture = insertInlinePictureWithPlacement(target, args.anchor, base64, args.placement);
       }
       if (args.alt_text) picture.altTextDescription = args.alt_text;
       if (typeof args.width_pt === 'number') picture.width = args.width_pt;
@@ -1441,12 +1453,46 @@
     return anchor.kind === 'before_paragraph_index' || anchor.kind === 'before_text' || anchor.kind === 'start_of_document';
   }
 
-  function insertInlinePictureAtAnchor(target, anchor, base64) {
-    if (isParagraphAnchor(anchor)) {
-      const paragraph = target.insertParagraph('', isBeforeAnchor(anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
-      return paragraph.getRange().insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+  function insertInlinePictureWithPlacement(target, anchor, base64, placement) {
+    switch (placement || 'inline') {
+      case 'before_paragraph':
+        return target.getRange().insertInlinePictureFromBase64(base64, Word.InsertLocation.before);
+      case 'after_paragraph':
+        return target.getRange().insertInlinePictureFromBase64(base64, Word.InsertLocation.after);
+      case 'new_paragraph_before': {
+        const paragraph = target.insertParagraph('', Word.InsertLocation.before);
+        return paragraph.getRange().insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+      }
+      case 'new_paragraph_after': {
+        const paragraph = target.insertParagraph('', Word.InsertLocation.after);
+        return paragraph.getRange().insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+      }
+      case 'replace_paragraph':
+        return target.getRange().insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+      default:
+        if (isParagraphAnchor(anchor)) {
+          const paragraph = target.insertParagraph('', isBeforeAnchor(anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
+          return paragraph.getRange().insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+        }
+        return target.insertInlinePictureFromBase64(base64, isBeforeAnchor(anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
     }
-    return target.insertInlinePictureFromBase64(base64, isBeforeAnchor(anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
+  }
+
+  function validateInsertImagePlacement(anchor, placement) {
+    if (!placement) return;
+    if (!INSERT_IMAGE_PLACEMENTS.has(placement)) {
+      throw Object.assign(new Error(`Unsupported word.insert_image placement: ${placement}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (placement === 'selection' && anchor.kind !== 'selection') {
+      throw Object.assign(new Error('word.insert_image placement selection requires anchor.kind selection.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (isParagraphPlacement(placement) && !isParagraphAnchor(anchor)) {
+      throw Object.assign(new Error(`word.insert_image placement ${placement} requires a paragraph-resolving anchor.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
+  function isParagraphPlacement(placement) {
+    return placement === 'before_paragraph' || placement === 'after_paragraph' || placement === 'new_paragraph_before' || placement === 'new_paragraph_after' || placement === 'replace_paragraph';
   }
 
   function isParagraphAnchor(anchor) {

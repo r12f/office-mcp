@@ -435,23 +435,54 @@ fn mcp_json_rpc_rejects_unknown_tool_arguments_before_dispatch() {
 }
 
 #[test]
-fn mcp_json_rpc_rejects_unsupported_word_anchor_kind_before_dispatch() {
+fn mcp_json_rpc_allows_insert_image_after_paragraph_anchor_with_explicit_placement() {
     let registry = registry_with_word_session_with_tools(vec!["word.insert_image"]);
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("connection-1");
+    connection_hub.bind_instance("connection-1", "instance-1");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("connection-1");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["params"]["tool"], "word.insert_image");
+        let args = invoke["params"]["args"].as_str().map_or_else(
+            || invoke["params"]["args"].clone(),
+            |raw| serde_json::from_str(raw).expect("parsed args"),
+        );
+        assert_eq!(args["anchor"]["kind"], "after_paragraph_index");
+        assert_eq!(args["placement"], "new_paragraph_after");
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"inserted":true}}}}}}"#
+        )));
+    });
 
-    let reply = mcp_handle_body(
-        &registry,
-        br#"{"jsonrpc":"2.0","id":"bad-anchor","method":"tools/call","params":{"name":"word.insert_image","arguments":{"session_id":"session-1","anchor":{"kind":"after_paragraph_index","index":2},"image":{"base64":"iVBORw0KGgoA"}}}}"#,
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"call-image","method":"tools/call","params":{"name":"word.insert_image","arguments":{"session_id":"session-1","anchor":{"kind":"after_paragraph_index","index":2},"placement":"new_paragraph_after","image":{"base64":"iVBORw0KGgoA"}}}}"#,
     );
-
+    response_thread.join().expect("response thread");
     let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
-    let error = &reply["result"]["structuredContent"]["error"];
-    assert_eq!(error["office_mcp_code"], "INVALID_ARGUMENTS");
-    assert_eq!(error["tool"], "word.insert_image");
-    assert_eq!(error["partial_effect"], "none");
-    assert_eq!(
-        error["message"],
-        "word.insert_image does not support anchor kind after_paragraph_index."
-    );
+    assert_eq!(reply["result"]["structuredContent"]["inserted"], true);
 }
 
 #[test]
@@ -623,6 +654,7 @@ fn mcp_json_rpc_insert_image_base64_is_validated_before_forwarding() {
         );
         assert_eq!(args["image"]["mime_type"], "image/png");
         assert_eq!(args["image"]["byte_length"], 9);
+        assert_eq!(args["placement"], "new_paragraph_after");
         let request_id = invoke["id"].as_str().expect("request id");
         assert!(response_hub.complete_from_text(&format!(
             r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"inserted":true}}}}}}"#
@@ -641,7 +673,7 @@ fn mcp_json_rpc_insert_image_base64_is_validated_before_forwarding() {
     };
     let reply = McpJsonRpcRuntime::handle_body(
         &mut context,
-        br#"{"jsonrpc":"2.0","id":"call-image","method":"tools/call","params":{"name":"word.insert_image","arguments":{"session_id":"session-1","anchor":{"kind":"end_of_document"},"image":{"base64":"iVBORw0KGgoA"}}}}"#,
+        br#"{"jsonrpc":"2.0","id":"call-image","method":"tools/call","params":{"name":"word.insert_image","arguments":{"session_id":"session-1","anchor":{"kind":"paragraph_index","index":0},"placement":"new_paragraph_after","image":{"base64":"iVBORw0KGgoA"}}}}"#,
     );
     response_thread.join().expect("response thread");
     let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");

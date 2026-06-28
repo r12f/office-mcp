@@ -117,6 +117,14 @@ fn representative_word_schemas_are_specific() {
         6
     );
     assert_eq!(
+        image["properties"]["placement"]["enum"]
+            .as_array()
+            .expect("placement enum")
+            .len(),
+        7
+    );
+    assert_eq!(image["properties"]["placement"]["default"], "inline");
+    assert_eq!(
         image["properties"]["image"]["oneOf"]
             .as_array()
             .expect("image oneOf")
@@ -141,10 +149,7 @@ fn word_anchor_schemas_advertise_per_tool_supported_kinds() {
     assert!(image_kinds.contains(&"after_text"));
     assert!(image_kinds.contains(&"heading"));
     assert!(image_kinds.contains(&"bookmark"));
-    assert!(
-        !image_kinds.contains(&"after_paragraph_index"),
-        "word.insert_image must not advertise paragraph-after anchors until explicit placement support exists"
-    );
+    assert!(image_kinds.contains(&"after_paragraph_index"));
 }
 
 #[test]
