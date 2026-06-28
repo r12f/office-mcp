@@ -46,6 +46,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word.insert_content_control"));
     assert!(names.contains(&"word.update_content_control"));
     assert!(names.contains(&"word.delete_content_control"));
+    assert!(names.contains(&"word.resize_image"));
     assert!(names.contains(&"word.update_table"));
     assert!(names.contains(&"word.update_tracked_change"));
     assert!(!names.contains(&"word.insert_heading"));
@@ -69,10 +70,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 25);
+    assert_eq!(WORD_V1_TOOLS.len(), 26);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 72);
+    assert_eq!(tools.len(), 73);
 }
 
 #[test]
