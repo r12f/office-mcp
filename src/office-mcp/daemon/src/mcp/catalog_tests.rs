@@ -102,6 +102,92 @@ fn every_tool_exposes_a_strict_input_schema() {
 }
 
 #[test]
+fn office_tools_expose_rich_contract_metadata_in_tools_list() {
+    for name in [
+        "word.insert_image",
+        "word.update_table",
+        "excel.update_table",
+        "powerpoint.update_table",
+    ] {
+        let tool = tool_for(name);
+        let meta = &tool["_meta"];
+
+        assert_eq!(
+            meta["com.office-mcp/app"],
+            app_for(name),
+            "{name} app metadata"
+        );
+        assert!(
+            meta["com.office-mcp/category"].is_string(),
+            "{name} category metadata"
+        );
+        assert!(
+            ["read", "mutating", "destructive"].contains(
+                &meta["com.office-mcp/side_effects"]
+                    .as_str()
+                    .expect("side effect")
+            ),
+            "{name} side effect metadata"
+        );
+        assert!(
+            meta["com.office-mcp/common_errors"]
+                .as_array()
+                .expect("common errors")
+                .iter()
+                .any(|error| error["code"] == "INVALID_ARGUMENTS"),
+            "{name} common errors metadata"
+        );
+        assert!(
+            !meta["com.office-mcp/examples"]
+                .as_array()
+                .expect("examples")
+                .is_empty(),
+            "{name} complex tool examples metadata"
+        );
+
+        let annotations = &tool["annotations"];
+        assert_eq!(
+            annotations["openWorldHint"], false,
+            "{name} should not be modeled as open-world"
+        );
+        assert!(
+            annotations["readOnlyHint"].is_boolean(),
+            "{name} read-only annotation"
+        );
+        assert!(
+            annotations["destructiveHint"].is_boolean(),
+            "{name} destructive annotation"
+        );
+    }
+}
+
+#[test]
+fn tools_list_contract_metadata_matches_describe_tool() {
+    for name in [
+        "word.insert_image",
+        "excel.update_table",
+        "powerpoint.update_table",
+    ] {
+        let listed = tool_for(name);
+        let described = super::describe_tool_contract(name).expect("described tool");
+
+        assert_eq!(listed["inputSchema"], described["input_schema"]);
+        assert_eq!(
+            listed["_meta"]["com.office-mcp/examples"],
+            described["examples"]
+        );
+        assert_eq!(
+            listed["_meta"]["com.office-mcp/common_errors"],
+            described["common_errors"]
+        );
+        assert_eq!(
+            listed["_meta"]["com.office-mcp/side_effects"],
+            described["side_effect"]
+        );
+    }
+}
+
+#[test]
 fn representative_word_schemas_are_specific() {
     let describe = schema_for("office.describe_tool");
     assert_required(&describe, &["tool"]);
@@ -248,11 +334,19 @@ fn word_resource_templates_include_document_and_paragraph_routes() {
 }
 
 fn schema_for(name: &str) -> Value {
+    tool_for(name)["inputSchema"].clone()
+}
+
+fn tool_for(name: &str) -> Value {
     tool_catalog_json()
         .into_iter()
         .find(|tool| tool["name"] == name)
-        .unwrap_or_else(|| panic!("missing tool {name}"))["inputSchema"]
-        .clone()
+        .unwrap_or_else(|| panic!("missing tool {name}"))
+}
+
+fn app_for(name: &str) -> &str {
+    name.split_once('.')
+        .map_or_else(|| panic!("missing app prefix for {name}"), |(app, _)| app)
 }
 
 fn assert_required(schema: &Value, required: &[&str]) {

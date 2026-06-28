@@ -766,6 +766,19 @@ Word, Excel, and PowerPoint session.
       rejection, session preflight rejection wording and refresh hints,
       config-file startup and UI write-back persistence, and browser-level UI
       rendering/toggle interaction.
+- [x] Expose rich tool contracts directly in MCP `tools/list` for agent
+      clients. Each listed tool must carry its tool-specific `inputSchema`, MCP
+      annotations, Office MCP side-effect metadata, common error hints, and
+      curated examples for complex nested/action tools so Hermes and other MCP
+      clients do not see Word, Excel, and PowerPoint tools as untyped
+      forwarders. `office.describe_tool` remains a one-tool helper, but its
+      contract must stay byte-for-byte aligned with the metadata advertised by
+      `tools/list`. Current evidence: `office_tools_expose_rich_contract_metadata_in_tools_list`
+      and `tools_list_contract_metadata_matches_describe_tool` require `_meta`
+      examples/common-errors/side-effect/app/category metadata and MCP annotations
+      in `tools/list`; local validation passed with targeted catalog tests,
+      `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
+      and `cargo test --workspace`.
 
 **Exit criterion**: A user can manage tool access once in the daemon UI across
 all sessions, MCP clients see only daemon-allowed tools from `tools/list`, and

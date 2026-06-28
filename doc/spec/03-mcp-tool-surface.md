@@ -239,10 +239,26 @@ exceeding it returns `MAX_RESPONSE_SIZE` with `max_response_bytes`.
 
 ## 9. Tool metadata
 
-Every tool returned by `tools/list` MUST include an `inputSchema` object that
-is specific to that tool. The schema is part of the public client contract, not
-debug documentation. Clients must be able to plan valid calls from `tools/list`
-without reading add-in source code or per-host JavaScript.
+Every tool returned by `tools/list` MUST include rich, machine-readable
+contract metadata for that specific tool. The contract is part of the public
+client surface, not debug documentation. Clients must be able to plan valid
+calls from `tools/list` alone without reading add-in source code, per-host
+JavaScript, or first making a secondary `office.describe_tool` call.
+
+Required `tools/list` metadata for every public tool:
+
+- `inputSchema`: a tool-specific JSON Schema object.
+- `annotations`: MCP tool annotations derived from the tool side-effect model.
+- `_meta["com.office-mcp/side_effects"]`: one of `read`, `mutating`, or
+  `destructive`.
+- `_meta["com.office-mcp/common_errors"]`: stable, sanitized error hints for
+  client planning and recovery.
+- `_meta["com.office-mcp/examples"]`: at least one valid example for complex
+  tools whose arguments contain nested objects, action-dependent fields, image
+  inputs, anchors, table operations, chart options, PivotTable descriptors, or
+  slide/shape selectors. Simple tools may expose an empty example array.
+- `_meta["com.office-mcp/app"]` and `_meta["com.office-mcp/category"]` for
+  Office-host tools, matching the daemon UI permission catalog.
 
 Schema requirements:
 
@@ -276,13 +292,14 @@ Clients should treat these fields as optional diagnostic aids and continue to
 branch on stable `office_mcp_code` values first.
 
 The daemon also exposes `office.describe_tool` as a read-only discovery helper
-for clients that need one tool contract at runtime. Its `tool` argument names a
-public Office MCP tool, and its result MUST return the same input schema graph
-advertised for that tool in `tools/list`, plus curated examples, side-effect
-classification, and common error hints. Unknown requested tool names return a
-structured `UNKNOWN_TOOL` tool result rather than being forwarded to an Office
-session. The helper is for contract discovery only; it does not require a
-document session and must not mutate host state.
+for clients that want to retrieve one tool contract at runtime. Its `tool`
+argument names a public Office MCP tool, and its result MUST return the same
+input schema graph, examples, side-effect classification, app/category
+metadata, and common error hints advertised for that tool in `tools/list`.
+Unknown requested tool names return a structured `UNKNOWN_TOOL` tool result
+rather than being forwarded to an Office session. The helper is for contract
+discovery only; it does not require a document session and must not mutate host
+state.
 
 Each tool's project metadata is carried under MCP `_meta` so the standard tool
 shape remains valid:
