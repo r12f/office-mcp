@@ -47,7 +47,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 25 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 26 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -61,7 +61,7 @@ The per-tool JSON Schemas follow in §2-§8.
 | **Range & selection** | `word.get_selection`, `word.find_text`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
-| **Media** | `word.insert_image` |
+| **Media** | `word.insert_image`, `word.resize_image` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_tracked_change` |
 
@@ -73,7 +73,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 25 tools. It deliberately consolidates specialized tools
+The target surface has 26 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -88,6 +88,7 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.insert_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a paragraph at an anchor; also owns heading insertion through style or heading-level arguments after migration. |
 | `word.insert_table` | implemented | Tables | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
 | `word.insert_image` | implemented | Media | edit | `WordApi 1.3` | Insert a validated image from base64 or a daemon-fetched HTTPS URL. |
+| `word.resize_image` | implemented | Media | edit | `WordApi 1.3` | Resize an existing inline image in place by paragraph index and image index. |
 | `word.insert_page_break` | implemented | Document & structure | edit | `WordApi 1.3` | Insert a page break at an anchor. |
 | `word.insert_list` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a numbered or bulleted list. |
 | `word.replace_text` | implemented | Range & selection | edit | `WordApi 1.3` | Find and replace text, with dry-run support. |
@@ -130,6 +131,9 @@ Tool ownership rules:
   `word.apply_formatting` owns direct character/run formatting only.
 - `word.read_table` owns table content reads. `word.update_table` owns table
   structure, cell value, table/cell formatting, and deletion mutations.
+- `word.insert_image` owns new image insertion. `word.resize_image` owns in-place
+  resizing of an existing inline image and must not require re-uploading image
+  bytes or alter surrounding paragraphs.
 - Content-control tools own content-control lifecycle and metadata. Generic text
   edits inside a known range remain owned by range/paragraph tools unless the
   caller is explicitly targeting a content control.
@@ -363,7 +367,42 @@ in [05-security.md §6.1](05-security.md): no cookies, auth headers, private
 addresses, unvalidated redirects, oversized bodies, or non-image payloads.
 Base64 input is subject to the same decoded-byte and image-format limits.
 
-### 3.5 `word.insert_page_break`
+### 3.5 `word.resize_image`
+
+Resize an existing inline image in place without deleting and reinserting its
+binary data.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "image"],
+  "properties": {
+    "session_id": { "type": "string" },
+    "image": {
+      "type": "object",
+      "required": ["kind", "index"],
+      "properties": {
+        "kind": { "const": "paragraph_index" },
+        "index": { "type": "integer", "minimum": 0 },
+        "image_index": { "type": "integer", "minimum": 0, "default": 0 }
+      },
+      "additionalProperties": false
+    },
+    "width_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "height_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "preserve_aspect_ratio": { "type": "boolean", "default": true }
+  },
+  "additionalProperties": false
+}
+```
+
+Callers must provide at least one of `width_pt` or `height_pt`. When
+`preserve_aspect_ratio` is true and exactly one dimension is provided, the
+add-in derives the other dimension from the current image dimensions. The tool
+returns old and new dimensions in points and preserves paragraph placement, alt
+text, relationship identity, and adjacent text.
+
+### 3.6 `word.insert_page_break`
 
 ```json
 {
@@ -376,7 +415,7 @@ Base64 input is subject to the same decoded-byte and image-format limits.
 }
 ```
 
-### 3.6 `word.insert_list`
+### 3.7 `word.insert_list`
 
 ```json
 {

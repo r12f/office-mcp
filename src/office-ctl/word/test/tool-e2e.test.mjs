@@ -100,6 +100,26 @@ const WORD_E2E_CASES = Object.fromEntries([
       }
     }
   }],
+  ['word.resize_image', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Resize image E2E', width_pt: 24, height_pt: 24 } }
+      ]
+    },
+    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 }, width_pt: 48, preserve_aspect_ratio: true },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        pathEquals: [
+          { path: 'resized', value: true },
+          { path: 'image.new_width_pt', value: 48 },
+          { path: 'image.new_height_pt', value: 48 },
+          { path: 'image.old_width_pt', value: 24 },
+          { path: 'image.old_height_pt', value: 24 }
+        ]
+      }
+    }
+  }],
   ['word.insert_table', {
     setup: {
       actions: [

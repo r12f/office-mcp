@@ -22,6 +22,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.read_table",
     "word.replace_text",
     "word.resolve_comment",
+    "word.resize_image",
     "word.save",
     "word.update_content_control",
     "word.update_paragraph",

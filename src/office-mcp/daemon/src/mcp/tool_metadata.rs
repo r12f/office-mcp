@@ -108,6 +108,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
+        "word.resize_image",
+        "word",
+        "Media",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
         "word.insert_table",
         "word",
         "Tables",

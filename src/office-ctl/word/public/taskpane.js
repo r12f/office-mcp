@@ -61,6 +61,7 @@
     'word.get_selection',
     'word.insert_paragraph',
     'word.insert_image',
+    'word.resize_image',
     'word.insert_table',
     'word.insert_page_break',
     'word.insert_list',
@@ -85,7 +86,7 @@
     { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
-    { label: 'Media', tools: ['word.insert_image'] },
+    { label: 'Media', tools: ['word.insert_image', 'word.resize_image'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
     { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_tracked_change'] }
   ];
@@ -97,6 +98,7 @@
     ['word.get_selection', { category: 'Range & selection', sideEffect: 'read', description: 'Read the current selection.' }],
     ['word.insert_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
     ['word.insert_image', { category: 'Media', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
+    ['word.resize_image', { category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image.' }],
     ['word.insert_table', { category: 'Tables', sideEffect: 'mutating', description: 'Insert a table with provided values.' }],
     ['word.insert_page_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page break.' }],
     ['word.insert_list', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a list.' }],
@@ -424,6 +426,9 @@
         case 'word.insert_image':
           data = await insertImage(args);
           break;
+        case 'word.resize_image':
+          data = await resizeImage(args);
+          break;
         case 'word.insert_page_break':
           data = await insertPageBreak(args);
           break;
@@ -695,6 +700,43 @@
       if (typeof args.height_pt === 'number') picture.height = args.height_pt;
       await context.sync();
       return { inserted: true, byte_length: args.image.byte_length ?? null, mime_type: args.image.mime_type ?? null };
+    });
+  }
+
+  async function resizeImage(args) {
+    validateResizeImageArgs(args);
+    return Word.run(async (context) => {
+      const selector = args.image;
+      const paragraph = await getParagraphByIndex(context, selector.index);
+      const pictures = paragraph.inlinePictures;
+      pictures.load('items/width,items/height');
+      await context.sync();
+
+      const imageIndex = selector.image_index ?? 0;
+      const picture = pictures.items[imageIndex];
+      if (!picture) {
+        throw Object.assign(new Error(`Inline image index ${imageIndex} is out of range for paragraph ${selector.index}.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
+      }
+
+      const oldWidth = picture.width;
+      const oldHeight = picture.height;
+      const size = resizedImageSize(args, oldWidth, oldHeight);
+      picture.width = size.width;
+      picture.height = size.height;
+      await context.sync();
+
+      return {
+        resized: true,
+        image: {
+          paragraph_index: selector.index,
+          image_index: imageIndex,
+          old_width_pt: oldWidth,
+          old_height_pt: oldHeight,
+          new_width_pt: size.width,
+          new_height_pt: size.height,
+          preserve_aspect_ratio: args.preserve_aspect_ratio !== false
+        }
+      };
     });
   }
 
@@ -1353,6 +1395,46 @@
     if (normalized === 'tags') return 'Tags';
     if (normalized === 'hidden') return 'Hidden';
     throw Object.assign(new Error(`Unsupported content control appearance ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  function validateResizeImageArgs(args) {
+    if (!args.image || args.image.kind !== 'paragraph_index') {
+      throw Object.assign(new Error('word.resize_image requires image.kind="paragraph_index".'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (!Number.isInteger(args.image.index) || args.image.index < 0) {
+      throw Object.assign(new Error('word.resize_image image.index must be a non-negative integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (args.image.image_index !== undefined && (!Number.isInteger(args.image.image_index) || args.image.image_index < 0)) {
+      throw Object.assign(new Error('word.resize_image image.image_index must be a non-negative integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (args.width_pt === undefined && args.height_pt === undefined) {
+      throw Object.assign(new Error('word.resize_image requires width_pt or height_pt.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (args.width_pt !== undefined && !isPositiveNumber(args.width_pt)) {
+      throw Object.assign(new Error('word.resize_image width_pt must be a positive number.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (args.height_pt !== undefined && !isPositiveNumber(args.height_pt)) {
+      throw Object.assign(new Error('word.resize_image height_pt must be a positive number.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (args.preserve_aspect_ratio === false && (args.width_pt === undefined || args.height_pt === undefined)) {
+      throw Object.assign(new Error('word.resize_image requires both width_pt and height_pt when preserve_aspect_ratio is false.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
+  function resizedImageSize(args, oldWidth, oldHeight) {
+    const preserve = args.preserve_aspect_ratio !== false;
+    let width = args.width_pt;
+    let height = args.height_pt;
+    if (preserve && width !== undefined && height === undefined) {
+      height = oldHeight * (width / oldWidth);
+    } else if (preserve && height !== undefined && width === undefined) {
+      width = oldWidth * (height / oldHeight);
+    }
+    return { width, height };
+  }
+
+  function isPositiveNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0;
   }
 
   function isBeforeAnchor(anchor) {

@@ -16,7 +16,7 @@ fn renders_active_session_descriptor_json() {
     assert_eq!(rendered["document"]["is_dirty"], true);
     assert_eq!(rendered["capability_tiers"][0], "core");
     assert_eq!(rendered["available_tools"][0], "word.get_text");
-    assert_eq!(rendered["available_tool_count"], 25);
+    assert_eq!(rendered["available_tool_count"], 26);
     assert_eq!(rendered["queue_depth"], 2);
     assert_eq!(rendered["registered_at"], "unix:5");
     assert_eq!(rendered["status"], "active");

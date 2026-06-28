@@ -408,12 +408,13 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.insert_content_control'/);
   assert.match(js, /'word\.update_content_control'/);
   assert.match(js, /'word\.delete_content_control'/);
+  assert.match(js, /'word\.resize_image'/);
   assert.match(js, /'word\.update_tracked_change'/);
   assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.insert_page_break', 'word\.save'\] \}/);
   assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
-  assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image'\] \}/);
+  assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image'\] \}/);
   assert.match(js, /\{ label: 'Content controls', tools: \['word\.list_content_controls', 'word\.insert_content_control', 'word\.update_content_control', 'word\.delete_content_control'\] \}/);
   assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.update_tracked_change'\] \}/);
   assert.doesNotMatch(js, /'word\.insert_heading'/);
@@ -429,12 +430,14 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.insert_content_control', \{ category: 'Content controls', sideEffect: 'mutating', description: 'Create a content control around an anchored range\.' \}\]/);
   assert.match(js, /\['word\.update_content_control', \{ category: 'Content controls', sideEffect: 'mutating', description: 'Update content-control metadata, locks, or text\.' \}\]/);
   assert.match(js, /\['word\.delete_content_control', \{ category: 'Content controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling\.' \}\]/);
+  assert.match(js, /\['word\.resize_image', \{ category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image\.' \}\]/);
   assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint\.' \}\]/);
   assert.match(js, /case 'word\.update_table':\s*data = await updateTable\(args\);/);
   assert.match(js, /case 'word\.list_content_controls':\s*data = await listContentControls\(args\);/);
   assert.match(js, /case 'word\.insert_content_control':\s*data = await insertContentControl\(args\);/);
   assert.match(js, /case 'word\.update_content_control':\s*data = await updateContentControl\(args\);/);
   assert.match(js, /case 'word\.delete_content_control':\s*data = await deleteContentControl\(args\);/);
+  assert.match(js, /case 'word\.resize_image':\s*data = await resizeImage\(args\);/);
   assert.match(js, /case 'word\.update_tracked_change':\s*data = await updateTrackedChange\(args\);/);
   assert.match(js, /async function insertTable\(args\)/);
   assert.match(js, /table_index: tableIndex/);
@@ -443,6 +446,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /async function insertContentControl\(args\)/);
   assert.match(js, /async function updateContentControl\(args\)/);
   assert.match(js, /async function deleteContentControl\(args\)/);
+  assert.match(js, /async function resizeImage\(args\)/);
   assert.match(js, /control\.load\('id'\);\s*await context\.sync\(\);\s*const id = control\.id;/);
   assert.match(js, /async function updateTrackedChange\(args\)/);
   assert.match(js, /return mutateTrackedChange\(args, action\);/);
