@@ -1,5 +1,6 @@
 use super::{
-    ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS, tool_catalog_json,
+    ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS,
+    powerpoint_resource_catalog_for_session, powerpoint_resource_templates, tool_catalog_json,
     word_resource_catalog_for_session, word_resource_templates,
 };
 use serde_json::Value;
@@ -366,6 +367,36 @@ fn word_resource_templates_include_document_and_paragraph_routes() {
 
     assert!(names.contains(&"word.document.template"));
     assert!(names.contains(&"word.paragraph.template"));
+}
+
+#[test]
+fn powerpoint_resource_catalog_uses_session_scoped_uris() {
+    let resources = powerpoint_resource_catalog_for_session("powerpoint-session");
+    let uris = resources
+        .iter()
+        .filter_map(|resource| resource["uri"].as_str())
+        .collect::<Vec<_>>();
+
+    assert!(uris.contains(&"office://powerpoint/powerpoint-session/presentation"));
+    assert!(uris.contains(&"office://powerpoint/powerpoint-session/slides"));
+    assert!(
+        uris.contains(&"office://powerpoint/powerpoint-session/slide/0/text?offset=0&limit=200")
+    );
+    assert!(uris.contains(&"office://powerpoint/powerpoint-session/slide/0/shapes"));
+}
+
+#[test]
+fn powerpoint_resource_templates_include_read_only_routes() {
+    let templates = powerpoint_resource_templates();
+    let names = templates
+        .iter()
+        .filter_map(|template| template["name"].as_str())
+        .collect::<Vec<_>>();
+
+    assert!(names.contains(&"powerpoint.presentation.template"));
+    assert!(names.contains(&"powerpoint.slides.template"));
+    assert!(names.contains(&"powerpoint.slide.text.template"));
+    assert!(names.contains(&"powerpoint.slide.shapes.template"));
 }
 
 fn schema_for(name: &str) -> Value {

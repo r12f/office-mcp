@@ -74,6 +74,71 @@ fn parses_structure_and_paragraph_resources() {
 }
 
 #[test]
+fn parses_powerpoint_read_only_resources() {
+    let registry = registry_with_app("powerpoint");
+
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://powerpoint/session-1/presentation")
+            .expect("presentation request"),
+        ResourceReadRequest::Forwarded {
+            uri: "office://powerpoint/session-1/presentation".to_string(),
+            tool: "powerpoint.get_presentation_info",
+            arguments: json!({ "session_id": "session-1" }),
+            check_capability: true,
+        }
+    );
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://powerpoint/session-1/slides")
+            .expect("slides request"),
+        ResourceReadRequest::Forwarded {
+            uri: "office://powerpoint/session-1/slides".to_string(),
+            tool: "powerpoint.list_slides",
+            arguments: json!({ "session_id": "session-1" }),
+            check_capability: true,
+        }
+    );
+    assert_eq!(
+        resource_request_from_uri(
+            &registry,
+            "office://powerpoint/session-1/slide/2/text?offset=10&limit=20",
+        )
+        .expect("slide text request"),
+        ResourceReadRequest::Forwarded {
+            uri: "office://powerpoint/session-1/slide/2/text?offset=10&limit=20".to_string(),
+            tool: "powerpoint.read_text",
+            arguments: json!({
+                "session_id": "session-1",
+                "slide_index": 2,
+                "offset": 10,
+                "limit": 20,
+            }),
+            check_capability: true,
+        }
+    );
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://powerpoint/session-1/slide/2/shapes")
+            .expect("slide shapes request"),
+        ResourceReadRequest::Forwarded {
+            uri: "office://powerpoint/session-1/slide/2/shapes".to_string(),
+            tool: "powerpoint.list_shapes",
+            arguments: json!({ "session_id": "session-1", "slide_index": 2 }),
+            check_capability: true,
+        }
+    );
+}
+
+#[test]
+fn rejects_bad_powerpoint_slide_index() {
+    let registry = registry_with_app("powerpoint");
+
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://powerpoint/session-1/slide/nope/text")
+            .expect_err("bad slide index"),
+        "slide index must be a non-negative integer."
+    );
+}
+
+#[test]
 fn rejects_unknown_sessions_and_bad_numbers() {
     let registry = registry();
 
@@ -95,11 +160,15 @@ fn rejects_unknown_sessions_and_bad_numbers() {
 }
 
 fn registry() -> SessionRegistry {
+    registry_with_app("word")
+}
+
+fn registry_with_app(app: &str) -> SessionRegistry {
     let mut registry = SessionRegistry::new();
     registry.register_runtime(RuntimeInfo {
         instance_id: "instance-1".to_string(),
         host: HostInfo {
-            app: "word".to_string(),
+            app: app.to_string(),
             version: Some("16.0".to_string()),
             platform: Some("windows".to_string()),
             build: Some("Desktop".to_string()),

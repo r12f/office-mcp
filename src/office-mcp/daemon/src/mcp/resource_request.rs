@@ -25,9 +25,20 @@ pub fn resource_request_from_uri(
     if uri == "office://sessions" {
         return Ok(ResourceReadRequest::Sessions);
     }
-    let Some(rest) = uri.strip_prefix("office://word/") else {
-        return Err(format!("Unsupported resource URI {uri}."));
-    };
+    if let Some(rest) = uri.strip_prefix("office://word/") {
+        return word_resource_request_from_uri(registry, uri, rest);
+    }
+    if let Some(rest) = uri.strip_prefix("office://powerpoint/") {
+        return powerpoint_resource_request_from_uri(registry, uri, rest);
+    }
+    Err(format!("Unsupported resource URI {uri}."))
+}
+
+fn word_resource_request_from_uri(
+    registry: &SessionRegistry,
+    uri: &str,
+    rest: &str,
+) -> Result<ResourceReadRequest, String> {
     let (path, query) = rest
         .split_once('?')
         .map_or((rest, ""), |(path, query)| (path, query));
@@ -85,6 +96,65 @@ pub fn resource_request_from_uri(
         }),
         _ => Err(format!("Unsupported Word resource URI {uri}.")),
     }
+}
+
+fn powerpoint_resource_request_from_uri(
+    registry: &SessionRegistry,
+    uri: &str,
+    rest: &str,
+) -> Result<ResourceReadRequest, String> {
+    let (path, query) = rest
+        .split_once('?')
+        .map_or((rest, ""), |(path, query)| (path, query));
+    let segments = path.split('/').collect::<Vec<_>>();
+    if segments.len() < 2 {
+        return Err(format!("Malformed PowerPoint resource URI {uri}."));
+    }
+    let session_id = segments[0];
+    if registry.get_session_info(session_id).is_none() {
+        return Err(format!("Session {session_id} is not registered."));
+    }
+    match segments.as_slice() {
+        [_, "presentation"] => Ok(ResourceReadRequest::Forwarded {
+            uri: uri.to_string(),
+            tool: "powerpoint.get_presentation_info",
+            arguments: json!({ "session_id": session_id }),
+            check_capability: true,
+        }),
+        [_, "slides"] => Ok(ResourceReadRequest::Forwarded {
+            uri: uri.to_string(),
+            tool: "powerpoint.list_slides",
+            arguments: json!({ "session_id": session_id }),
+            check_capability: true,
+        }),
+        [_, "slide", index, "text"] => Ok(ResourceReadRequest::Forwarded {
+            uri: uri.to_string(),
+            tool: "powerpoint.read_text",
+            arguments: json!({
+                "session_id": session_id,
+                "slide_index": parse_index(index, "slide index")?,
+                "offset": query_param_usize(query, "offset", 0)?,
+                "limit": query_param_usize(query, "limit", 200)?,
+            }),
+            check_capability: true,
+        }),
+        [_, "slide", index, "shapes"] => Ok(ResourceReadRequest::Forwarded {
+            uri: uri.to_string(),
+            tool: "powerpoint.list_shapes",
+            arguments: json!({
+                "session_id": session_id,
+                "slide_index": parse_index(index, "slide index")?,
+            }),
+            check_capability: true,
+        }),
+        _ => Err(format!("Unsupported PowerPoint resource URI {uri}.")),
+    }
+}
+
+fn parse_index(value: &str, name: &str) -> Result<usize, String> {
+    value
+        .parse::<usize>()
+        .map_err(|_| format!("{name} must be a non-negative integer."))
 }
 
 fn query_param_usize(query: &str, name: &str, default: usize) -> Result<usize, String> {
