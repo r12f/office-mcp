@@ -6,7 +6,7 @@ use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::mcp::{
     ExcelToolCatalog, PowerPointToolCatalog, ResourceReadRequest, ToolAccessPolicy, WORD_V1_TOOLS,
-    resource_request_from_uri, tool_failure, tool_failure_without_effect,
+    describe_tool_contract, resource_request_from_uri, tool_failure, tool_failure_without_effect,
     tool_not_available_by_policy, tool_success, validate_tool_arguments,
 };
 use crate::runtime::json_rpc;
@@ -151,6 +151,7 @@ impl McpJsonRpcRuntime {
                     .collect::<Vec<_>>()
             })),
             "office.get_session_info" => Self::get_session_info(context.registry, arguments),
+            "office.describe_tool" => Self::describe_tool(arguments),
             tool if WORD_V1_TOOLS.contains(&tool) => {
                 Self::call_forwarded_tool(context, value, tool, arguments)
             }
@@ -212,6 +213,26 @@ impl McpJsonRpcRuntime {
         }))
     }
 
+    fn describe_tool(arguments: &Value) -> Value {
+        let Some(tool) = arguments.get("tool").and_then(Value::as_str) else {
+            return tool_failure(
+                "INVALID_ARGUMENTS",
+                "office.describe_tool requires tool.",
+                Some("office.describe_tool"),
+                false,
+            );
+        };
+        match describe_tool_contract(tool) {
+            Some(contract) => tool_success(&contract),
+            None => tool_failure(
+                "UNKNOWN_TOOL",
+                &format!("Unknown tool {tool}."),
+                Some("office.describe_tool"),
+                false,
+            ),
+        }
+    }
+
     fn is_forwarded_tool(name: &str) -> bool {
         WORD_V1_TOOLS.contains(&name)
             || ExcelToolCatalog::contains(name)
@@ -219,8 +240,10 @@ impl McpJsonRpcRuntime {
     }
 
     fn is_known_tool(name: &str) -> bool {
-        matches!(name, "office.list_sessions" | "office.get_session_info")
-            || Self::is_forwarded_tool(name)
+        matches!(
+            name,
+            "office.list_sessions" | "office.get_session_info" | "office.describe_tool"
+        ) || Self::is_forwarded_tool(name)
     }
 }
 
