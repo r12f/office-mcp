@@ -64,7 +64,7 @@ not share a generic "document" abstraction.
 | `office://excel/<session_id>/range/<address>?sheet=<name>` | Range values, text, formulas, dimensions, and formats JSON | Forwards to `excel.read_range` with `address` and optional `sheet`. |
 | `office://powerpoint/<session_id>/presentation` | Presentation metadata JSON | Forwards to `powerpoint.get_presentation_info` and requires that capability in the session. |
 | `office://powerpoint/<session_id>/slides` | Slide inventory JSON | Forwards to `powerpoint.list_slides` and requires that capability in the session. |
-| `office://powerpoint/<session_id>/slide/<index>/text?offset=0&limit=200` | Paginated slide text JSON | Forwards to `powerpoint.read_text` with `slide_index`, `offset`, and `limit`. |
+| `office://powerpoint/<session_id>/slide/<index>/text` | Slide text JSON | Forwards to `powerpoint.read_text` with `slide_index`. |
 | `office://powerpoint/<session_id>/slide/<index>/shapes` | Shape inventory JSON | Forwards to `powerpoint.list_shapes` for one slide. |
 
 ## 4. Management tools
