@@ -766,6 +766,14 @@ Word, Excel, and PowerPoint session.
       rejection, session preflight rejection wording and refresh hints,
       config-file startup and UI write-back persistence, and browser-level UI
       rendering/toggle interaction.
+- [ ] Expose rich tool contracts directly in MCP `tools/list` for agent
+      clients. Each listed tool must carry its tool-specific `inputSchema`, MCP
+      annotations, Office MCP side-effect metadata, common error hints, and
+      curated examples for complex nested/action tools so Hermes and other MCP
+      clients do not see Word, Excel, and PowerPoint tools as untyped
+      forwarders. `office.describe_tool` remains a one-tool helper, but its
+      contract must stay byte-for-byte aligned with the metadata advertised by
+      `tools/list`. This is tracked by GitHub issue #22.
 
 **Exit criterion**: A user can manage tool access once in the daemon UI across
 all sessions, MCP clients see only daemon-allowed tools from `tools/list`, and
