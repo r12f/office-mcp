@@ -158,6 +158,11 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.
+- [ ] Define the shared typed Word `Anchor` schema in the daemon catalog and
+      narrow each anchored tool's advertised `oneOf` to the anchor kinds it
+      supports. The daemon must reject unsupported anchor kinds before
+      forwarding mutating calls to Office.js, with `INVALID_ARGUMENTS` and
+      `partial_effect: none`.
 
 ### M5 — Document IO
 
