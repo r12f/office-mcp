@@ -9,7 +9,7 @@ What the `office-mcp` server exposes to MCP clients (the AI side).
   `<app>` is the Office application the tool targets
   (`word`, `excel`, `outlook`, ...).
 - A small set of cross-app management tools live under `office.*`:
-  `office.list_sessions`, `office.get_session_info`, `office.describe_tool`.
+  `office.list_sessions`, `office.get_session_info`, `office.describe_tools`.
 - Resource URIs use a custom scheme:
   `office://<app>/<session_id>/<app-specific-path>`.
   The `<app>` segment is the URI authority — purely a namespace, not a
@@ -104,33 +104,63 @@ Args: `{ "session_id": "..." }`. Returns the descriptor plus the full
 `available_tools` array, useful when the client only kept the ID or needs to
 plan around host capabilities.
 
-### 4.3 `office.describe_tool`
+### 4.3 `office.describe_tools`
 
-Args: `{ "tool": "word.insert_image" }`. Returns the runtime contract for one
-public Office MCP tool. The `input_schema` field is the same JSON Schema object
-advertised by MCP `tools/list`; clients can use it without reading daemon or
-add-in source code. The response also includes side-effect classification,
-curated examples for complex tools, and common error hints.
+Args: `{ "tools": ["word.insert_image", "excel.read_range"] }`. Returns
+runtime contracts for multiple public Office MCP tools in one call. Each
+`input_schema` field is the same JSON Schema object advertised by MCP
+`tools/list`; clients can use it without reading daemon or add-in source code.
+Each contract also includes a client-friendly top-level `parameters` array,
+side-effect classification, curated examples for complex tools, and common
+error hints.
 
 Example response shape:
 
 ```json
 {
-  "name": "word.insert_image",
-  "input_schema": { "type": "object" },
-  "examples": [
+  "tools": [
     {
-      "description": "Insert a PNG as a new paragraph after paragraph 2.",
-      "arguments": { "session_id": "session-1" }
+      "name": "word.insert_image",
+      "input_schema": { "type": "object" },
+      "parameters": [
+        {
+          "name": "session_id",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "examples": [
+        {
+          "description": "Insert a PNG as a new paragraph after paragraph 2.",
+          "arguments": { "session_id": "session-1" }
+        }
+      ],
+      "side_effect": "mutating",
+      "app": "word",
+      "category": "Media",
+      "common_errors": [
+        {
+          "code": "INVALID_ARGUMENTS",
+          "cause": "The arguments do not match the advertised input schema."
+        }
+      ]
     }
-  ],
-  "side_effect": "mutating",
-  "app": "word",
-  "category": "Media",
-  "common_errors": [
+  ]
+}
+```
+
+Unknown requested tool names return structured per-entry `UNKNOWN_TOOL`
+results instead of failing the whole batch:
+
+```json
+{
+  "tools": [
     {
-      "code": "INVALID_ARGUMENTS",
-      "cause": "The arguments do not match the advertised input schema."
+      "name": "word.future_tool",
+      "error": {
+        "office_mcp_code": "UNKNOWN_TOOL",
+        "message": "Unknown tool word.future_tool."
+      }
     }
   ]
 }
@@ -270,7 +300,7 @@ Every tool returned by `tools/list` MUST include rich, machine-readable
 contract metadata for that specific tool. The contract is part of the public
 client surface, not debug documentation. Clients must be able to plan valid
 calls from `tools/list` alone without reading add-in source code, per-host
-JavaScript, or first making a secondary `office.describe_tool` call.
+JavaScript, or first making a secondary `office.describe_tools` call.
 
 Required `tools/list` metadata for every public tool:
 
@@ -318,15 +348,17 @@ arguments, file contents, auth material, or arbitrary host exception dumps.
 Clients should treat these fields as optional diagnostic aids and continue to
 branch on stable `office_mcp_code` values first.
 
-The daemon also exposes `office.describe_tool` as a read-only discovery helper
-for clients that want to retrieve one tool contract at runtime. Its `tool`
-argument names a public Office MCP tool, and its result MUST return the same
-input schema graph, examples, side-effect classification, app/category
-metadata, and common error hints advertised for that tool in `tools/list`.
-Unknown requested tool names return a structured `UNKNOWN_TOOL` tool result
-rather than being forwarded to an Office session. The helper is for contract
-discovery only; it does not require a document session and must not mutate host
-state.
+The daemon also exposes `office.describe_tools` as a read-only batch discovery
+helper for clients that want to retrieve multiple detailed tool contracts at
+runtime. Its `tools` argument names public Office MCP tools, and each result
+entry MUST return the same input schema graph, examples, side-effect
+classification, app/category metadata, and common error hints advertised for
+that tool in `tools/list`, plus a top-level `parameters` array derived from the
+schema. Unknown requested tool names return structured per-entry `UNKNOWN_TOOL`
+results rather than being forwarded to an Office session. The helper is for
+contract discovery only; it does not require a document session and must not
+mutate host state. The previous single-tool `office.describe_tool` helper is
+not a public tool.
 
 Each tool's project metadata is carried under MCP `_meta` so the standard tool
 shape remains valid:

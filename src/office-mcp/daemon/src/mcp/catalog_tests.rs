@@ -1,7 +1,8 @@
 use super::{
-    ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS,
-    powerpoint_resource_catalog_for_session, powerpoint_resource_templates, tool_catalog_json,
-    word_resource_catalog_for_session, word_resource_templates,
+    ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS, excel_resource_catalog_for_session,
+    excel_resource_templates, powerpoint_resource_catalog_for_session,
+    powerpoint_resource_templates, tool_catalog_json, word_resource_catalog_for_session,
+    word_resource_templates,
 };
 use serde_json::Value;
 
@@ -43,7 +44,8 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
 
     assert!(names.contains(&"office.list_sessions"));
     assert!(names.contains(&"office.get_session_info"));
-    assert!(names.contains(&"office.describe_tool"));
+    assert!(names.contains(&"office.describe_tools"));
+    assert!(!names.contains(&"office.describe_tool"));
     assert!(names.contains(&"word.get_text"));
     assert!(names.contains(&"word.resolve_anchor"));
     assert!(names.contains(&"word.list_content_controls"));
@@ -163,7 +165,7 @@ fn office_tools_expose_rich_contract_metadata_in_tools_list() {
 }
 
 #[test]
-fn tools_list_contract_metadata_matches_describe_tool() {
+fn tools_list_contract_metadata_matches_describe_tool_contract() {
     for name in [
         "word.insert_image",
         "excel.update_table",
@@ -173,6 +175,15 @@ fn tools_list_contract_metadata_matches_describe_tool() {
         let described = super::describe_tool_contract(name).expect("described tool");
 
         assert_eq!(listed["inputSchema"], described["input_schema"]);
+        assert!(
+            described["parameters"]
+                .as_array()
+                .expect("parameters")
+                .iter()
+                .any(|parameter| parameter["name"] == "session_id"
+                    && parameter["required"] == true
+                    && parameter["schema"]["type"] == "string")
+        );
         assert_eq!(
             listed["_meta"]["com.office-mcp/examples"],
             described["examples"]
@@ -190,9 +201,9 @@ fn tools_list_contract_metadata_matches_describe_tool() {
 
 #[test]
 fn representative_word_schemas_are_specific() {
-    let describe = schema_for("office.describe_tool");
-    assert_required(&describe, &["tool"]);
-    assert_eq!(describe["properties"]["tool"]["type"], "string");
+    let describe = schema_for("office.describe_tools");
+    assert_required(&describe, &["tools"]);
+    assert_eq!(describe["properties"]["tools"]["type"], "array");
 
     let paragraph = schema_for("word.get_paragraph");
     assert_required(&paragraph, &["session_id", "index"]);
@@ -399,6 +410,108 @@ fn powerpoint_resource_templates_include_read_only_routes() {
     assert!(names.contains(&"powerpoint.slide.shapes.template"));
 }
 
+#[test]
+fn resource_catalogs_cover_every_parsed_resource_route() {
+    let word_resource_catalog = word_resource_catalog_for_session("session-1");
+    let word_resource_template_catalog = word_resource_templates();
+    let word_resources = resource_uris(&word_resource_catalog);
+    let word_templates = resource_template_uris(&word_resource_template_catalog);
+    assert_resource_route_covered(
+        &word_resources,
+        &word_templates,
+        "office://word/session-1/document?offset=0&limit=200",
+        "office://word/{session_id}/document{?offset,limit}",
+    );
+    assert_resource_route_covered(
+        &word_resources,
+        &word_templates,
+        "office://word/session-1/structure",
+        "office://word/{session_id}/structure",
+    );
+    assert_resource_route_covered(
+        &word_resources,
+        &word_templates,
+        "office://word/session-1/paragraph/0",
+        "office://word/{session_id}/paragraph/{index}",
+    );
+    assert_resource_route_covered(
+        &word_resources,
+        &word_templates,
+        "office://word/session-1/comments",
+        "office://word/{session_id}/comments",
+    );
+    assert_resource_route_covered(
+        &word_resources,
+        &word_templates,
+        "office://word/session-1/track_changes",
+        "office://word/{session_id}/track_changes",
+    );
+    assert_resource_route_covered(
+        &word_resources,
+        &word_templates,
+        "office://word/session-1/selection",
+        "office://word/{session_id}/selection",
+    );
+
+    let excel_resource_catalog = excel_resource_catalog_for_session("session-1");
+    let excel_resource_template_catalog = excel_resource_templates();
+    let excel_resources = resource_uris(&excel_resource_catalog);
+    let excel_templates = resource_template_uris(&excel_resource_template_catalog);
+    assert_resource_route_covered(
+        &excel_resources,
+        &excel_templates,
+        "office://excel/session-1/workbook",
+        "office://excel/{session_id}/workbook",
+    );
+    assert_resource_route_covered(
+        &excel_resources,
+        &excel_templates,
+        "office://excel/session-1/sheets",
+        "office://excel/{session_id}/sheets",
+    );
+    assert_resource_route_covered(
+        &excel_resources,
+        &excel_templates,
+        "office://excel/session-1/used-range",
+        "office://excel/{session_id}/used-range{?sheet}",
+    );
+    assert_resource_route_covered(
+        &excel_resources,
+        &excel_templates,
+        "office://excel/session-1/range/A1",
+        "office://excel/{session_id}/range/{address}{?sheet}",
+    );
+
+    let powerpoint_resource_catalog = powerpoint_resource_catalog_for_session("session-1");
+    let powerpoint_resource_template_catalog = powerpoint_resource_templates();
+    let powerpoint_resources = resource_uris(&powerpoint_resource_catalog);
+    let powerpoint_templates = resource_template_uris(&powerpoint_resource_template_catalog);
+    assert_resource_route_covered(
+        &powerpoint_resources,
+        &powerpoint_templates,
+        "office://powerpoint/session-1/presentation",
+        "office://powerpoint/{session_id}/presentation",
+    );
+    assert_resource_route_covered(
+        &powerpoint_resources,
+        &powerpoint_templates,
+        "office://powerpoint/session-1/slides",
+        "office://powerpoint/{session_id}/slides",
+    );
+    assert_resource_route_covered(
+        &powerpoint_resources,
+        &powerpoint_templates,
+        "office://powerpoint/session-1/slide/0/text?offset=0&limit=200",
+        "office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}",
+    );
+    assert_resource_route_covered(
+        &powerpoint_resources,
+        &powerpoint_templates,
+        "office://powerpoint/session-1/slide/0/shapes",
+        "office://powerpoint/{session_id}/slide/{index}/shapes",
+    );
+}
+
 fn schema_for(name: &str) -> Value {
     tool_for(name)["inputSchema"].clone()
 }
@@ -446,4 +559,31 @@ fn anchor_kinds(schema: &Value) -> Vec<&str> {
             }
         })
         .collect()
+}
+
+fn resource_uris(resources: &[Value]) -> Vec<String> {
+    resources
+        .iter()
+        .filter_map(|resource| resource["uri"].as_str().map(ToString::to_string))
+        .collect()
+}
+
+fn resource_template_uris(templates: &[Value]) -> Vec<String> {
+    templates
+        .iter()
+        .filter_map(|template| template["uriTemplate"].as_str().map(ToString::to_string))
+        .collect()
+}
+
+fn assert_resource_route_covered(
+    resources: &[String],
+    templates: &[String],
+    concrete_uri: &str,
+    template_uri: &str,
+) {
+    assert!(
+        resources.iter().any(|uri| uri == concrete_uri)
+            || templates.iter().any(|uri| uri == template_uri),
+        "missing resource discovery coverage for {concrete_uri} / {template_uri}"
+    );
 }

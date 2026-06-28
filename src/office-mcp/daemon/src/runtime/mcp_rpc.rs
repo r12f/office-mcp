@@ -7,7 +7,7 @@ use crate::common::AuditLog;
 use crate::mcp::{
     ExcelToolCatalog, PowerPointToolCatalog, ResourceReadRequest, ToolAccessPolicy, WORD_V1_TOOLS,
     describe_tool_contract, resource_request_from_uri, tool_failure, tool_failure_without_effect,
-    tool_not_available_by_policy, tool_success, validate_tool_arguments,
+    tool_not_available_by_policy, tool_success, unknown_tool_contract, validate_tool_arguments,
 };
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_catalog_response::McpCatalogResponder;
@@ -166,7 +166,7 @@ impl McpJsonRpcRuntime {
                     .collect::<Vec<_>>()
             })),
             "office.get_session_info" => Self::get_session_info(context.registry, arguments),
-            "office.describe_tool" => Self::describe_tool(arguments),
+            "office.describe_tools" => Self::describe_tools(arguments),
             tool if WORD_V1_TOOLS.contains(&tool) => {
                 Self::call_forwarded_tool(context, value, tool, arguments)
             }
@@ -228,24 +228,29 @@ impl McpJsonRpcRuntime {
         }))
     }
 
-    fn describe_tool(arguments: &Value) -> Value {
-        let Some(tool) = arguments.get("tool").and_then(Value::as_str) else {
+    fn describe_tools(arguments: &Value) -> Value {
+        let Some(tools) = arguments.get("tools").and_then(Value::as_array) else {
             return tool_failure(
                 "INVALID_ARGUMENTS",
-                "office.describe_tool requires tool.",
-                Some("office.describe_tool"),
+                "office.describe_tools requires tools.",
+                Some("office.describe_tools"),
                 false,
             );
         };
-        match describe_tool_contract(tool) {
-            Some(contract) => tool_success(&contract),
-            None => tool_failure(
-                "UNKNOWN_TOOL",
-                &format!("Unknown tool {tool}."),
-                Some("office.describe_tool"),
-                false,
-            ),
+        let mut contracts = Vec::new();
+        for tool in tools {
+            let Some(tool) = tool.as_str() else {
+                return tool_failure(
+                    "INVALID_ARGUMENTS",
+                    "office.describe_tools requires tools to contain only strings.",
+                    Some("office.describe_tools"),
+                    false,
+                );
+            };
+            contracts
+                .push(describe_tool_contract(tool).unwrap_or_else(|| unknown_tool_contract(tool)));
         }
+        tool_success(&json!({ "tools": contracts }))
     }
 
     fn is_forwarded_tool(name: &str) -> bool {
@@ -257,7 +262,7 @@ impl McpJsonRpcRuntime {
     fn is_known_tool(name: &str) -> bool {
         matches!(
             name,
-            "office.list_sessions" | "office.get_session_info" | "office.describe_tool"
+            "office.list_sessions" | "office.get_session_info" | "office.describe_tools"
         ) || Self::is_forwarded_tool(name)
     }
 }
