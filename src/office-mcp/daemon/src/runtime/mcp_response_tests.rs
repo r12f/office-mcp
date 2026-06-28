@@ -108,9 +108,8 @@ fn forwarded_response_invokes_mcp_runtime() {
 fn forwarded_tools_list_filters_powerpoint_actions_by_access_policy() {
     let mut ui_state = UiStateStore::new();
     let registry = SessionRegistry::new();
-    let shared_state = shared_state_with_policy(
-        ToolAccessPolicy::default().with_access_mode(AccessMode::Read),
-    );
+    let shared_state =
+        shared_state_with_policy(ToolAccessPolicy::default().with_access_mode(AccessMode::Read));
     let response = McpHttpResponseService::runtime_response(
         McpHttpDecision::ForwardToTransport {
             session_id: Some("mcp-session-1".to_string()),
