@@ -1207,33 +1207,19 @@ fn validate_anchor_argument(
     }
 }
 
-fn supported_anchor_kinds(tool: &str) -> &'static [&'static str] {
-    match tool {
-        "word.insert_image" => &[
-            "selection",
-            "start_of_document",
-            "end_of_document",
-            "paragraph_index",
-            "before_paragraph_index",
-            "after_paragraph_index",
-            "before_text",
-            "after_text",
-            "heading",
-            "bookmark",
-        ],
-        _ => &[
-            "selection",
-            "start_of_document",
-            "end_of_document",
-            "paragraph_index",
-            "before_paragraph_index",
-            "after_paragraph_index",
-            "before_text",
-            "after_text",
-            "heading",
-            "bookmark",
-        ],
-    }
+fn supported_anchor_kinds(_tool: &str) -> &'static [&'static str] {
+    &[
+        "selection",
+        "start_of_document",
+        "end_of_document",
+        "paragraph_index",
+        "before_paragraph_index",
+        "after_paragraph_index",
+        "before_text",
+        "after_text",
+        "heading",
+        "bookmark",
+    ]
 }
 
 fn anchor_schema_for_tool(tool: &str) -> Value {
