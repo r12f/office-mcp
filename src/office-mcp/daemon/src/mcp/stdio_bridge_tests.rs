@@ -65,6 +65,9 @@ fn bridge_uses_standard_mcp_stdio_framing_and_exposes_daemon_tools() {
         while captured_bodies.len() < 4 && Instant::now() < deadline {
             match listener.accept() {
                 Ok((mut stream, _addr)) => {
+                    stream
+                        .set_nonblocking(false)
+                        .expect("accepted stream blocking");
                     let request = read_request(&mut stream);
                     let body = request_body(&request).to_string();
                     let is_initialize = body.contains(r#""method":"initialize""#);
