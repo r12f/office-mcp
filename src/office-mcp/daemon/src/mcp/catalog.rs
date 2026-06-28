@@ -21,6 +21,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.list_content_controls",
     "word.read_table",
     "word.replace_text",
+    "word.resolve_anchor",
     "word.resolve_comment",
     "word.resize_image",
     "word.save",
@@ -453,6 +454,11 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "occurrence",
             "limit"
         ]
+    ),
+    tool_spec!(
+        "word.resolve_anchor",
+        ["session_id", "anchor"],
+        ["session_id", "anchor", "include_text_preview"]
     ),
     tool_spec!("word.get_selection", ["session_id"], ["session_id"]),
     tool_spec!("word.save", ["session_id"], ["session_id"]),
@@ -1149,6 +1155,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "match_case"
         | "whole_word"
         | "include_metadata"
+        | "include_text_preview"
         | "include_formatting"
         | "include_formulas"
         | "include_selection"

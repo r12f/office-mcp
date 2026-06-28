@@ -81,7 +81,10 @@ fn renders_daemon_endpoints_and_grouped_documents() {
     assert_eq!(rendered["clients"][0]["connected_at"], 1_000);
     assert_eq!(rendered["documents"]["word"][0]["registered_at"], "unix:3");
     assert_eq!(rendered["documents"]["word"][0]["status"], "active");
-    assert_eq!(rendered["documents"]["word"][0]["available_tool_count"], 26);
+    assert_eq!(
+        rendered["documents"]["word"][0]["available_tool_count"],
+        WORD_V1_TOOLS.len()
+    );
     assert_eq!(rendered["current_tasks"][0]["status"], "running");
     assert_eq!(rendered["current_tasks"][0]["deadline_at"], 7_000);
 }
