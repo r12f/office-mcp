@@ -19,6 +19,7 @@ fn tools_list_contains_office_word_and_excel_tools() {
         .collect::<Vec<_>>();
 
     assert!(names.contains(&"office.list_sessions"));
+    assert!(names.contains(&"office.describe_tool"));
     assert!(names.contains(&"word.get_text"));
     assert!(names.contains(&"excel.read_range"));
     assert!(names.contains(&"powerpoint.add_slide"));
@@ -39,6 +40,7 @@ fn tools_list_filters_daemon_disabled_tools() {
     assert!(!names.contains(&"word.get_text"));
     assert!(names.contains(&"word.get_outline"));
     assert!(names.contains(&"office.get_session_info"));
+    assert!(names.contains(&"office.describe_tool"));
 }
 
 #[test]
@@ -53,6 +55,7 @@ fn tools_list_filters_by_daemon_access_mode() {
         .collect::<Vec<_>>();
 
     assert!(names.contains(&"office.list_sessions"));
+    assert!(names.contains(&"office.describe_tool"));
     assert!(names.contains(&"word.get_text"));
     assert!(names.contains(&"excel.read_range"));
     assert!(names.contains(&"powerpoint.list_slides"));

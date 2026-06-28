@@ -1,4 +1,4 @@
-use crate::mcp::ToolAccessPolicy;
+use crate::mcp::{ToolAccessPolicy, ToolSideEffect, tool_metadata};
 use serde_json::{Value, json};
 
 pub const WORD_V1_TOOLS: &[&str] = &[
@@ -230,6 +230,11 @@ pub fn tool_catalog_json_for_policy(policy: &ToolAccessPolicy) -> Vec<Value> {
             "Get Office Session Info",
             "Return metadata and supported tools for one Office document session.",
         ),
+        tool_json(
+            "office.describe_tool",
+            "Describe Office Tool",
+            "Return the runtime contract, examples, and common errors for one Office MCP tool.",
+        ),
     ];
     tools.extend(
         WORD_V1_TOOLS
@@ -400,6 +405,166 @@ pub fn input_schema_for_tool(tool: &str) -> Value {
     object_schema(tool, spec.required, spec.properties)
 }
 
+#[must_use]
+pub fn describe_tool_contract(tool: &str) -> Option<Value> {
+    let side_effect = tool_side_effect(tool)?;
+    let mut contract = json!({
+        "name": tool,
+        "input_schema": input_schema_for_tool(tool),
+        "examples": examples_for_tool(tool),
+        "side_effect": side_effect,
+        "common_errors": common_errors_for_tool(tool)
+    });
+    if let Some(metadata) = tool_metadata(tool) {
+        contract["app"] = json!(metadata.app);
+        contract["category"] = json!(metadata.category);
+    }
+    Some(contract)
+}
+
+fn tool_side_effect(tool: &str) -> Option<&'static str> {
+    match tool {
+        "office.list_sessions" | "office.get_session_info" | "office.describe_tool" => Some("read"),
+        _ => tool_metadata(tool).map(|metadata| side_effect_name(metadata.side_effect)),
+    }
+}
+
+const fn side_effect_name(side_effect: ToolSideEffect) -> &'static str {
+    match side_effect {
+        ToolSideEffect::Read => "read",
+        ToolSideEffect::Mutating => "mutating",
+        ToolSideEffect::Destructive => "destructive",
+    }
+}
+
+fn examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "office.describe_tool" => vec![json!({
+            "description": "Inspect the contract for Word image insertion.",
+            "arguments": { "tool": "word.insert_image" }
+        })],
+        "word.insert_image" => vec![json!({
+            "description": "Insert a PNG as a new paragraph after paragraph 2.",
+            "arguments": {
+                "session_id": "session-1",
+                "anchor": { "kind": "after_paragraph_index", "index": 2 },
+                "placement": "new_paragraph_after",
+                "image": { "base64": "iVBORw0KGgo...", "mime_type": "image/png" },
+                "alt_text": "Quarterly revenue chart",
+                "width_pt": 420
+            }
+        })],
+        "word.delete_range" => vec![json!({
+            "description": "Delete the first occurrence of a phrase without relying on character offsets.",
+            "arguments": {
+                "session_id": "session-1",
+                "anchor": { "kind": "before_text", "text": "Remove this paragraph", "occurrence": 1 }
+            }
+        })],
+        "word.insert_content_control" => vec![json!({
+            "description": "Wrap inserted review text in a tagged content control.",
+            "arguments": {
+                "session_id": "session-1",
+                "anchor": { "kind": "end_of_document" },
+                "text": "Approved by legal.",
+                "tag": "approval-note",
+                "title": "Approval note"
+            }
+        })],
+        "word.update_content_control" => vec![json!({
+            "description": "Replace text and metadata for an existing content control.",
+            "arguments": {
+                "session_id": "session-1",
+                "content_control_id": 42,
+                "text": "Final approval received.",
+                "tag": "approval-note-final"
+            }
+        })],
+        "word.delete_content_control" => vec![json!({
+            "description": "Remove a content control while keeping its contents in the document.",
+            "arguments": {
+                "session_id": "session-1",
+                "content_control_id": 42,
+                "delete_contents": false
+            }
+        })],
+        "word.update_table" => vec![json!({
+            "description": "Replace one table cell by row and column index.",
+            "arguments": {
+                "session_id": "session-1",
+                "table_index": 0,
+                "action": "set_cell_text",
+                "row": 1,
+                "col": 2,
+                "text": "Approved"
+            }
+        })],
+        "excel.update_table" => vec![json!({
+            "description": "Append rows to an Excel table.",
+            "arguments": {
+                "session_id": "session-1",
+                "table": "Table1",
+                "action": "add_rows",
+                "values": [["North", 1200], ["South", 980]]
+            }
+        })],
+        "powerpoint.update_table" => vec![json!({
+            "description": "Update a PowerPoint table cell.",
+            "arguments": {
+                "session_id": "session-1",
+                "slide_index": 0,
+                "shape_id": "table-1",
+                "action": "set_cell_text",
+                "row_index": 0,
+                "column_index": 1,
+                "text": "Q4"
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
+fn common_errors_for_tool(tool: &str) -> Vec<Value> {
+    let mut errors = vec![json!({
+        "code": "INVALID_ARGUMENTS",
+        "cause": "The arguments do not match the advertised input schema."
+    })];
+    if tool_metadata(tool).is_some() {
+        errors.push(json!({
+            "code": "TOOL_NOT_ENABLED_FOR_DOCUMENT",
+            "cause": "The selected Office session did not advertise this tool."
+        }));
+        errors.push(json!({
+            "code": "TOOL_NOT_AVAILABLE",
+            "cause": "The daemon access policy currently hides or disables this tool."
+        }));
+    }
+    match tool {
+        "word.insert_image" => errors.push(json!({
+            "code": "INVALID_ARGUMENTS",
+            "cause": "Image input must be base64 data or an HTTPS URL, and paragraph anchors may require an explicit placement."
+        })),
+        "word.delete_range" => errors.push(json!({
+            "code": "INVALID_ARGUMENTS",
+            "cause": "The anchor must resolve to a deletable range, not the whole document body."
+        })),
+        "word.insert_content_control" | "word.update_content_control" | "word.delete_content_control" => {
+            errors.push(json!({
+                "code": "INVALID_ARGUMENTS",
+                "cause": "Content control IDs are runtime identifiers; refresh the list before updating stale IDs."
+            }));
+        }
+        "word.update_table" | "excel.update_table" | "powerpoint.update_table" => {
+            errors.push(json!({
+                "code": "INVALID_ARGUMENTS",
+                "cause": "Table action arguments must match the action being requested."
+            }));
+        }
+        _ => {}
+    }
+    errors
+}
+
 #[derive(Clone, Copy)]
 struct ToolInputSpec {
     required: &'static [&'static str],
@@ -428,6 +593,7 @@ macro_rules! tool_spec {
 const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     tool_spec!("office.list_sessions", [], []),
     tool_spec!("office.get_session_info", ["session_id"], ["session_id"]),
+    tool_spec!("office.describe_tool", ["tool"], ["tool"]),
     tool_spec!(
         "word.get_text",
         ["session_id"],

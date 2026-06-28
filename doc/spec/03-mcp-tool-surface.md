@@ -9,7 +9,7 @@ What the `office-mcp` server exposes to MCP clients (the AI side).
   `<app>` is the Office application the tool targets
   (`word`, `excel`, `outlook`, ...).
 - A small set of cross-app management tools live under `office.*`:
-  `office.list_sessions`, `office.get_session_info`.
+  `office.list_sessions`, `office.get_session_info`, `office.describe_tool`.
 - Resource URIs use a custom scheme:
   `office://<app>/<session_id>/<app-specific-path>`.
   The `<app>` segment is the URI authority — purely a namespace, not a
@@ -98,7 +98,39 @@ Args: `{ "session_id": "..." }`. Returns the descriptor plus the full
 `available_tools` array, useful when the client only kept the ID or needs to
 plan around host capabilities.
 
-### 4.3 `office.activate_session`
+### 4.3 `office.describe_tool`
+
+Args: `{ "tool": "word.insert_image" }`. Returns the runtime contract for one
+public Office MCP tool. The `input_schema` field is the same JSON Schema object
+advertised by MCP `tools/list`; clients can use it without reading daemon or
+add-in source code. The response also includes side-effect classification,
+curated examples for complex tools, and common error hints.
+
+Example response shape:
+
+```json
+{
+  "name": "word.insert_image",
+  "input_schema": { "type": "object" },
+  "examples": [
+    {
+      "description": "Insert a PNG as a new paragraph after paragraph 2.",
+      "arguments": { "session_id": "session-1" }
+    }
+  ],
+  "side_effect": "mutating",
+  "app": "word",
+  "category": "Media",
+  "common_errors": [
+    {
+      "code": "INVALID_ARGUMENTS",
+      "cause": "The arguments do not match the advertised input schema."
+    }
+  ]
+}
+```
+
+### 4.4 `office.activate_session`
 
 Deferred from v1. Office.js does not provide a portable API that reliably
 brings an arbitrary document window to the foreground. Clients may use
@@ -242,6 +274,15 @@ short hint. It must not include document text, image bytes/base64, complete raw
 arguments, file contents, auth material, or arbitrary host exception dumps.
 Clients should treat these fields as optional diagnostic aids and continue to
 branch on stable `office_mcp_code` values first.
+
+The daemon also exposes `office.describe_tool` as a read-only discovery helper
+for clients that need one tool contract at runtime. Its `tool` argument names a
+public Office MCP tool, and its result MUST return the same input schema graph
+advertised for that tool in `tools/list`, plus curated examples, side-effect
+classification, and common error hints. Unknown requested tool names return a
+structured `UNKNOWN_TOOL` tool result rather than being forwarded to an Office
+session. The helper is for contract discovery only; it does not require a
+document session and must not mutate host state.
 
 Each tool's project metadata is carried under MCP `_meta` so the standard tool
 shape remains valid:

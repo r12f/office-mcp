@@ -42,6 +42,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
 
     assert!(names.contains(&"office.list_sessions"));
     assert!(names.contains(&"office.get_session_info"));
+    assert!(names.contains(&"office.describe_tool"));
     assert!(names.contains(&"word.get_text"));
     assert!(names.contains(&"word.resolve_anchor"));
     assert!(names.contains(&"word.list_content_controls"));
@@ -75,7 +76,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert_eq!(WORD_V1_TOOLS.len(), 27);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 74);
+    assert_eq!(tools.len(), 75);
 }
 
 #[test]
@@ -102,6 +103,10 @@ fn every_tool_exposes_a_strict_input_schema() {
 
 #[test]
 fn representative_word_schemas_are_specific() {
+    let describe = schema_for("office.describe_tool");
+    assert_required(&describe, &["tool"]);
+    assert_eq!(describe["properties"]["tool"]["type"], "string");
+
     let paragraph = schema_for("word.get_paragraph");
     assert_required(&paragraph, &["session_id", "index"]);
     assert_eq!(paragraph["properties"]["index"]["type"], "integer");
