@@ -128,19 +128,14 @@ fn parses_powerpoint_read_only_resources() {
         }
     );
     assert_eq!(
-        resource_request_from_uri(
-            &registry,
-            "office://powerpoint/session-1/slide/2/text?offset=10&limit=20",
-        )
-        .expect("slide text request"),
+        resource_request_from_uri(&registry, "office://powerpoint/session-1/slide/2/text")
+            .expect("slide text request"),
         ResourceReadRequest::Forwarded {
-            uri: "office://powerpoint/session-1/slide/2/text?offset=10&limit=20".to_string(),
+            uri: "office://powerpoint/session-1/slide/2/text".to_string(),
             tool: "powerpoint.read_text",
             arguments: json!({
                 "session_id": "session-1",
                 "slide_index": 2,
-                "offset": 10,
-                "limit": 20,
             }),
             check_capability: true,
         }

@@ -203,8 +203,6 @@ fn powerpoint_resource_request_from_uri(
             arguments: json!({
                 "session_id": session_id,
                 "slide_index": parse_index(index, "slide index")?,
-                "offset": query_param_usize(query, "offset", 0)?,
-                "limit": query_param_usize(query, "limit", 200)?,
             }),
             check_capability: true,
         }),

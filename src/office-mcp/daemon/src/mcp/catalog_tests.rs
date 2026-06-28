@@ -391,9 +391,7 @@ fn powerpoint_resource_catalog_uses_session_scoped_uris() {
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/presentation"));
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/slides"));
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/slides/text?start=0"));
-    assert!(
-        uris.contains(&"office://powerpoint/powerpoint-session/slide/0/text?offset=0&limit=200")
-    );
+    assert!(uris.contains(&"office://powerpoint/powerpoint-session/slide/0/text"));
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/slide/0/shapes"));
 }
 
@@ -513,8 +511,8 @@ fn assert_powerpoint_resource_routes_covered() {
     assert_resource_route_covered(
         &resources,
         &templates,
-        "office://powerpoint/session-1/slide/0/text?offset=0&limit=200",
-        "office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}",
+        "office://powerpoint/session-1/slide/0/text",
+        "office://powerpoint/{session_id}/slide/{index}/text",
     );
     assert_resource_route_covered(
         &resources,

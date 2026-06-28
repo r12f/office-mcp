@@ -160,7 +160,7 @@ Rejected v1 expansions:
 | `powerpoint.add_shape` | implemented | Shapes | edit | `PowerPointApi 1.4` | Add a geometric shape or line to a slide with explicit type and geometry. |
 | `powerpoint.insert_image` | implemented | Shapes | edit | Current implementation uses Common API image insertion; shape-owned implementation requires PowerPoint image API verification | Insert an image on a slide or current selection from validated base64 or daemon-fetched HTTPS URL. |
 | `powerpoint.update_shape` | implemented | Shapes | edit/destructive | `PowerPointApi 1.4`; grouping and advanced fields require higher sets | Read/update shape position, size, rotation, name, alt text, fill, line, z-order, grouping, and delete through one shape owner. |
-| `powerpoint.read_text` | implemented | Text | read | `PowerPointApi 1.4` | Read text from selected text, a shape, one slide, or all slides with pagination. |
+| `powerpoint.read_text` | implemented | Text | read | `PowerPointApi 1.4` | Read text from selected text, a shape, one slide, or all slides. |
 | `powerpoint.replace_text` | implemented | Text | edit | `PowerPointApi 1.4` | Replace matching text in slide shape text ranges, with optional scope and dry-run support. |
 | `powerpoint.format_text` | implemented | Text | edit | `PowerPointApi 1.4`; advanced font features require `PowerPointApi 1.8+` | Apply font and paragraph formatting to selected text or a target shape text range. |
 | `powerpoint.add_table` | implemented | Tables | edit | `PowerPointApi 1.8` | Add a table to a slide with initial dimensions and optional values, or return explicit host-capability rejection where table objects are unavailable. |
@@ -218,7 +218,7 @@ evidence where the host API cannot be fully proven statically.
   avoids exposing unsupported PowerPoint.js properties as accidental public API.
 - Read operations must return metadata, ids, indices, dimensions, and object
   owners where useful, but must not return large deck text unless the tool is
-  explicitly `powerpoint.read_text` with pagination.
+  explicitly `powerpoint.read_text`.
 - Destructive actions must be explicit in the tool arguments and must set
   destructive metadata in the daemon catalog.
 - Host-gated operations must fail with `HOST_CAPABILITY_UNAVAILABLE` when the
@@ -274,7 +274,7 @@ and host-denied operations. These map through the standard error model in
 | `office://powerpoint/{session_id}/presentation` | `powerpoint.get_presentation_info` | Presentation metadata, counts, selection summary, and capability gates. |
 | `office://powerpoint/{session_id}/slides` | `powerpoint.list_slides` | Slide inventory with IDs, indices, layouts, tags, and shape counts. |
 | `office://powerpoint/{session_id}/slides/text{?start,end}` | `powerpoint.read_text` | Text for a slide range. `start` is the 0-based inclusive slide index and defaults to `0`; `end` is the 0-based exclusive slide index and defaults to the deck slide count. |
-| `office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}` | `powerpoint.read_text` | Paginated text for one slide. |
+| `office://powerpoint/{session_id}/slide/{index}/text` | `powerpoint.read_text` | Text for one slide. |
 | `office://powerpoint/{session_id}/slide/{index}/shapes` | `powerpoint.list_shapes` | Shape inventory for one slide. |
 
 The fallback is intentionally read-only. Presentation export, slide mutation,
