@@ -2,6 +2,7 @@ use super::{
     ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS, tool_catalog_json,
     word_resource_catalog_for_session, word_resource_templates,
 };
+use serde_json::Value;
 
 const POWERPOINT_V1_TOOL_NAMES: &[&str] = &[
     "powerpoint.get_presentation_info",
@@ -77,6 +78,70 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
 }
 
 #[test]
+fn every_tool_exposes_a_strict_input_schema() {
+    for tool in tool_catalog_json() {
+        let name = tool["name"].as_str().expect("tool name");
+        let schema = &tool["inputSchema"];
+
+        assert_eq!(schema["type"], "object", "{name} schema must be an object");
+        assert_eq!(
+            schema["additionalProperties"], false,
+            "{name} schema must reject unknown arguments"
+        );
+        assert!(
+            schema["properties"].is_object(),
+            "{name} schema must define properties"
+        );
+        assert!(
+            schema["required"].is_array(),
+            "{name} schema must define required fields"
+        );
+    }
+}
+
+#[test]
+fn representative_word_schemas_are_specific() {
+    let paragraph = schema_for("word.get_paragraph");
+    assert_required(&paragraph, &["session_id", "index"]);
+    assert_eq!(paragraph["properties"]["index"]["type"], "integer");
+    assert_eq!(paragraph["properties"]["index"]["minimum"], 0);
+    assert!(paragraph["properties"].get("paragraph_index").is_none());
+
+    let image = schema_for("word.insert_image");
+    assert_required(&image, &["session_id", "anchor", "image"]);
+    assert_eq!(
+        image["properties"]["anchor"]["oneOf"]
+            .as_array()
+            .expect("anchor oneOf")
+            .len(),
+        6
+    );
+    assert_eq!(
+        image["properties"]["image"]["oneOf"]
+            .as_array()
+            .expect("image oneOf")
+            .len(),
+        2
+    );
+}
+
+#[test]
+fn representative_excel_and_powerpoint_schemas_are_specific() {
+    let range = schema_for("excel.read_range");
+    assert_required(&range, &["session_id", "address"]);
+    assert_eq!(range["properties"]["sheet"]["type"], "string");
+    assert!(range["properties"].get("range").is_none());
+
+    let slide = schema_for("powerpoint.add_slide");
+    assert_required(&slide, &["session_id"]);
+    assert_eq!(slide["properties"]["layout"]["type"], "string");
+    assert_eq!(
+        slide["properties"]["title_box"]["additionalProperties"],
+        false
+    );
+}
+
+#[test]
 fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.get_workbook_info"));
     assert!(ExcelToolCatalog::contains("excel.list_sheets"));
@@ -133,4 +198,24 @@ fn word_resource_templates_include_document_and_paragraph_routes() {
 
     assert!(names.contains(&"word.document.template"));
     assert!(names.contains(&"word.paragraph.template"));
+}
+
+fn schema_for(name: &str) -> Value {
+    tool_catalog_json()
+        .into_iter()
+        .find(|tool| tool["name"] == name)
+        .unwrap_or_else(|| panic!("missing tool {name}"))["inputSchema"]
+        .clone()
+}
+
+fn assert_required(schema: &Value, required: &[&str]) {
+    let actual = schema["required"]
+        .as_array()
+        .expect("required array")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>();
+    for field in required {
+        assert!(actual.contains(field), "missing required field {field}");
+    }
 }

@@ -354,10 +354,886 @@ fn tool_json(name: &str, title: &str, description: &str) -> Value {
         "name": name,
         "title": title,
         "description": description,
-        "inputSchema": {
-            "type": "object",
-            "additionalProperties": true
+        "inputSchema": input_schema_for_tool(name)
+    })
+}
+
+/// Validates that a tool call argument object only uses advertised top-level
+/// fields and includes every advertised required field.
+///
+/// # Errors
+///
+/// Returns an error when `arguments` is not an object, includes an unknown
+/// top-level field, or omits a required top-level field.
+pub fn validate_tool_arguments(tool: &str, arguments: &Value) -> Result<(), String> {
+    let schema = input_schema_for_tool(tool);
+    let Some(arguments) = arguments.as_object() else {
+        return Err(format!("{tool} arguments must be a JSON object."));
+    };
+    let Some(properties) = schema["properties"].as_object() else {
+        return Err(format!("{tool} has an invalid input schema."));
+    };
+    for key in arguments.keys() {
+        if !properties.contains_key(key) {
+            return Err(format!("{tool} does not accept argument {key}."));
         }
+    }
+    let Some(required_fields) = schema["required"].as_array() else {
+        return Err(format!("{tool} has an invalid input schema."));
+    };
+    for required in required_fields {
+        let Some(field) = required.as_str() else {
+            return Err(format!("{tool} has an invalid input schema."));
+        };
+        if !arguments.contains_key(field) {
+            return Err(format!("{tool} requires argument {field}."));
+        }
+    }
+    Ok(())
+}
+
+#[must_use]
+pub fn input_schema_for_tool(tool: &str) -> Value {
+    let spec = tool_input_spec(tool);
+    object_schema(spec.required, spec.properties)
+}
+
+#[derive(Clone, Copy)]
+struct ToolInputSpec {
+    required: &'static [&'static str],
+    properties: &'static [&'static str],
+}
+
+impl ToolInputSpec {
+    const EMPTY: Self = Self {
+        required: &[],
+        properties: &[],
+    };
+}
+
+macro_rules! tool_spec {
+    ($tool:literal, [$($required:literal),* $(,)?], [$($property:literal),* $(,)?]) => {
+        (
+            $tool,
+            ToolInputSpec {
+                required: &[$($required),*],
+                properties: &[$($property),*],
+            },
+        )
+    };
+}
+
+const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
+    tool_spec!("office.list_sessions", [], []),
+    tool_spec!("office.get_session_info", ["session_id"], ["session_id"]),
+    tool_spec!(
+        "word.get_text",
+        ["session_id"],
+        ["session_id", "offset", "limit", "include_metadata"]
+    ),
+    tool_spec!(
+        "word.get_outline",
+        ["session_id"],
+        ["session_id", "max_depth"]
+    ),
+    tool_spec!(
+        "word.get_paragraph",
+        ["session_id", "index"],
+        ["session_id", "index"]
+    ),
+    tool_spec!(
+        "word.find_text",
+        ["session_id", "query"],
+        [
+            "session_id",
+            "query",
+            "match_case",
+            "whole_word",
+            "occurrence",
+            "limit"
+        ]
+    ),
+    tool_spec!("word.get_selection", ["session_id"], ["session_id"]),
+    tool_spec!("word.save", ["session_id"], ["session_id"]),
+    tool_spec!(
+        "word.insert_paragraph",
+        ["session_id", "anchor", "text"],
+        [
+            "session_id",
+            "anchor",
+            "text",
+            "style",
+            "heading_level",
+            "match_case"
+        ]
+    ),
+    tool_spec!(
+        "word.insert_table",
+        ["session_id", "anchor", "rows", "cols"],
+        [
+            "session_id",
+            "anchor",
+            "rows",
+            "cols",
+            "data",
+            "style",
+            "match_case"
+        ]
+    ),
+    tool_spec!(
+        "word.insert_image",
+        ["session_id", "anchor", "image"],
+        [
+            "session_id",
+            "anchor",
+            "image",
+            "alt_text",
+            "width_pt",
+            "height_pt",
+            "caption",
+            "match_case"
+        ]
+    ),
+    tool_spec!(
+        "word.resize_image",
+        ["session_id", "image"],
+        [
+            "session_id",
+            "image",
+            "width_pt",
+            "height_pt",
+            "scale_percent",
+            "lock_aspect_ratio"
+        ]
+    ),
+    tool_spec!(
+        "word.insert_page_break",
+        ["session_id", "anchor"],
+        ["session_id", "anchor", "match_case"]
+    ),
+    tool_spec!(
+        "word.insert_list",
+        ["session_id", "anchor", "items"],
+        [
+            "session_id",
+            "anchor",
+            "items",
+            "ordered",
+            "style",
+            "match_case"
+        ]
+    ),
+    tool_spec!(
+        "word.replace_text",
+        ["session_id", "find", "replace"],
+        [
+            "session_id",
+            "find",
+            "replace",
+            "match_case",
+            "whole_word",
+            "all",
+            "occurrence"
+        ]
+    ),
+    tool_spec!(
+        "word.update_paragraph",
+        ["session_id", "index", "text"],
+        ["session_id", "index", "text", "style", "heading_level"]
+    ),
+    tool_spec!(
+        "word.delete_range",
+        ["session_id", "anchor"],
+        ["session_id", "anchor", "match_case"]
+    ),
+    tool_spec!(
+        "word.apply_formatting",
+        ["session_id", "anchor", "formatting"],
+        ["session_id", "anchor", "formatting", "match_case"]
+    ),
+    tool_spec!(
+        "word.apply_style",
+        ["session_id", "anchor"],
+        [
+            "session_id",
+            "anchor",
+            "style",
+            "heading_level",
+            "match_case"
+        ]
+    ),
+    tool_spec!(
+        "word.read_table",
+        ["session_id", "table_index"],
+        ["session_id", "table_index", "include_formatting"]
+    ),
+    tool_spec!(
+        "word.update_table",
+        ["session_id", "table_index", "action"],
+        [
+            "session_id",
+            "table_index",
+            "action",
+            "row",
+            "col",
+            "text",
+            "data",
+            "rows",
+            "cols"
+        ]
+    ),
+    tool_spec!(
+        "word.list_content_controls",
+        ["session_id"],
+        ["session_id", "tag", "title"]
+    ),
+    tool_spec!(
+        "word.insert_content_control",
+        ["session_id"],
+        [
+            "session_id",
+            "anchor",
+            "text",
+            "tag",
+            "title",
+            "type",
+            "match_case"
+        ]
+    ),
+    tool_spec!(
+        "word.update_content_control",
+        ["session_id", "content_control_id"],
+        ["session_id", "content_control_id", "text", "tag", "title"]
+    ),
+    tool_spec!(
+        "word.delete_content_control",
+        ["session_id", "content_control_id"],
+        ["session_id", "content_control_id", "delete_contents"]
+    ),
+    tool_spec!(
+        "word.add_comment",
+        ["session_id", "anchor", "text"],
+        ["session_id", "anchor", "text", "match_case"]
+    ),
+    tool_spec!(
+        "word.resolve_comment",
+        ["session_id", "comment_id"],
+        ["session_id", "comment_id"]
+    ),
+    tool_spec!(
+        "word.update_tracked_change",
+        [
+            "session_id",
+            "action",
+            "change_index",
+            "expected_fingerprint"
+        ],
+        [
+            "session_id",
+            "action",
+            "change_index",
+            "expected_fingerprint"
+        ]
+    ),
+    tool_spec!("excel.get_workbook_info", ["session_id"], ["session_id"]),
+    tool_spec!("excel.list_sheets", ["session_id"], ["session_id"]),
+    tool_spec!(
+        "excel.add_sheet",
+        ["session_id", "name"],
+        ["session_id", "name", "activate"]
+    ),
+    tool_spec!(
+        "excel.update_sheet",
+        ["session_id", "sheet"],
+        [
+            "session_id",
+            "sheet",
+            "name",
+            "position",
+            "visibility",
+            "tab_color",
+            "activate"
+        ]
+    ),
+    tool_spec!(
+        "excel.delete_sheet",
+        ["session_id", "sheet"],
+        ["session_id", "sheet"]
+    ),
+    tool_spec!(
+        "excel.get_used_range",
+        ["session_id"],
+        ["session_id", "sheet", "values_only"]
+    ),
+    tool_spec!(
+        "excel.read_range",
+        ["session_id", "address"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "include_formulas",
+            "include_formatting"
+        ]
+    ),
+    tool_spec!(
+        "excel.write_range",
+        ["session_id", "address", "values"],
+        ["session_id", "sheet", "address", "values"]
+    ),
+    tool_spec!(
+        "excel.clear_range",
+        ["session_id", "address"],
+        ["session_id", "sheet", "address", "apply_to", "delete_shift"]
+    ),
+    tool_spec!(
+        "excel.find_replace_cells",
+        ["session_id", "find"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "find",
+            "replace",
+            "complete_match",
+            "match_case",
+            "search_direction"
+        ]
+    ),
+    tool_spec!(
+        "excel.set_formula",
+        ["session_id", "address"],
+        ["session_id", "sheet", "address", "formula", "formulas"]
+    ),
+    tool_spec!(
+        "excel.format_range",
+        ["session_id", "address"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "bold",
+            "italic",
+            "underline",
+            "font_color",
+            "fill_color",
+            "number_format",
+            "number_formats",
+            "horizontal_alignment",
+            "vertical_alignment",
+            "wrap_text",
+            "autofit",
+            "borders"
+        ]
+    ),
+    tool_spec!(
+        "excel.sort_range",
+        ["session_id", "fields"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "table",
+            "target_type",
+            "fields",
+            "match_case",
+            "has_headers",
+            "orientation",
+            "method"
+        ]
+    ),
+    tool_spec!(
+        "excel.apply_filter",
+        ["session_id", "action"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "table",
+            "column",
+            "action",
+            "criteria"
+        ]
+    ),
+    tool_spec!(
+        "excel.create_table",
+        ["session_id", "address"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "has_headers",
+            "name",
+            "style"
+        ]
+    ),
+    tool_spec!(
+        "excel.update_table",
+        ["session_id", "table", "action"],
+        [
+            "session_id",
+            "table",
+            "action",
+            "name",
+            "style",
+            "show_headers",
+            "show_totals",
+            "highlight_first_column",
+            "highlight_last_column",
+            "show_banded_columns",
+            "show_banded_rows",
+            "show_filter_button",
+            "rows",
+            "columns",
+            "values",
+            "address"
+        ]
+    ),
+    tool_spec!(
+        "excel.create_chart",
+        ["session_id", "address"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "type",
+            "title",
+            "series_by"
+        ]
+    ),
+    tool_spec!(
+        "excel.update_chart",
+        ["session_id", "chart", "action"],
+        [
+            "session_id",
+            "sheet",
+            "chart",
+            "action",
+            "title",
+            "visible",
+            "position",
+            "overlay",
+            "axis",
+            "axis_group",
+            "title_visible",
+            "address",
+            "series_by",
+            "start_cell",
+            "end_cell",
+            "width",
+            "height",
+            "fitting_mode"
+        ]
+    ),
+    tool_spec!(
+        "excel.create_pivot_table",
+        ["session_id", "destination"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "table",
+            "name",
+            "destination"
+        ]
+    ),
+    tool_spec!(
+        "excel.update_pivot_table",
+        ["session_id", "pivot_table", "action"],
+        [
+            "session_id",
+            "pivot_table",
+            "action",
+            "axis",
+            "hierarchy",
+            "field",
+            "summarize_by",
+            "number_format",
+            "layout_type",
+            "show_column_grand_totals",
+            "show_row_grand_totals",
+            "selected_items",
+            "values"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.get_presentation_info",
+        ["session_id"],
+        ["session_id", "include_selection"]
+    ),
+    tool_spec!("powerpoint.get_active_view", ["session_id"], ["session_id"]),
+    tool_spec!(
+        "powerpoint.export_file",
+        ["session_id"],
+        ["session_id", "format", "slice_size"]
+    ),
+    tool_spec!(
+        "powerpoint.update_tags",
+        ["session_id"],
+        ["session_id", "action", "key", "value"]
+    ),
+    tool_spec!(
+        "powerpoint.list_slides",
+        ["session_id"],
+        ["session_id", "include_tags"]
+    ),
+    tool_spec!(
+        "powerpoint.add_slide",
+        ["session_id"],
+        [
+            "session_id",
+            "layout",
+            "title",
+            "content",
+            "title_box",
+            "content_box"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.update_slide",
+        ["session_id"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "action",
+            "tags",
+            "hidden",
+            "background_color"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.delete_slide",
+        ["session_id"],
+        ["session_id", "slide_id", "slide_index", "format"]
+    ),
+    tool_spec!(
+        "powerpoint.move_slide",
+        ["session_id", "target_index"],
+        ["session_id", "slide_id", "slide_index", "target_index"]
+    ),
+    tool_spec!(
+        "powerpoint.export_slide",
+        ["session_id"],
+        ["session_id", "slide_id", "slide_index", "format"]
+    ),
+    tool_spec!("powerpoint.list_layouts", ["session_id"], ["session_id"]),
+    tool_spec!(
+        "powerpoint.apply_layout",
+        ["session_id"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "layout_id",
+            "layout_name",
+            "layout_type"
+        ]
+    ),
+    tool_spec!("powerpoint.get_selection", ["session_id"], ["session_id"]),
+    tool_spec!(
+        "powerpoint.set_selection",
+        ["session_id"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "shape_id",
+            "text_range"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.list_shapes",
+        ["session_id"],
+        ["session_id", "slide_id", "slide_index"]
+    ),
+    tool_spec!(
+        "powerpoint.add_text_box",
+        ["session_id", "text"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "text",
+            "left",
+            "top",
+            "width",
+            "height",
+            "name"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.add_shape",
+        ["session_id", "type"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "type",
+            "left",
+            "top",
+            "width",
+            "height",
+            "name"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.insert_image",
+        ["session_id"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "image",
+            "base64",
+            "left",
+            "top",
+            "width",
+            "height",
+            "alt_text"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.update_shape",
+        ["session_id", "action"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "shape_id",
+            "shape_ids",
+            "action",
+            "name",
+            "left",
+            "top",
+            "width",
+            "height",
+            "rotation",
+            "alt_text_title",
+            "alt_text_description",
+            "is_decorative",
+            "visible",
+            "fill_color",
+            "fill_transparency",
+            "clear_fill",
+            "line_color",
+            "line_weight",
+            "line_transparency",
+            "line_visible",
+            "z_order"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.read_text",
+        ["session_id"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "shape_id",
+            "offset",
+            "limit"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.replace_text",
+        ["session_id", "find", "replace"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "shape_id",
+            "find",
+            "replace",
+            "match_case",
+            "all"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.format_text",
+        ["session_id"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "shape_id",
+            "bold",
+            "italic",
+            "underline",
+            "font_color",
+            "font_size",
+            "font_name"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.add_table",
+        ["session_id"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "rows",
+            "columns",
+            "values",
+            "left",
+            "top",
+            "width",
+            "height"
+        ]
+    ),
+    tool_spec!(
+        "powerpoint.read_table",
+        ["session_id"],
+        ["session_id", "slide_id", "slide_index", "shape_id"]
+    ),
+    tool_spec!(
+        "powerpoint.update_table",
+        ["session_id", "action"],
+        [
+            "session_id",
+            "slide_id",
+            "slide_index",
+            "shape_id",
+            "action",
+            "values",
+            "row_index",
+            "column_index",
+            "row_indices",
+            "column_indices",
+            "row_count",
+            "column_count",
+            "count",
+            "value",
+            "all",
+            "text",
+            "format",
+            "style"
+        ]
+    ),
+];
+
+fn tool_input_spec(tool: &str) -> ToolInputSpec {
+    TOOL_INPUT_SPECS
+        .iter()
+        .find(|(name, _)| *name == tool)
+        .map_or(ToolInputSpec::EMPTY, |(_, spec)| *spec)
+}
+
+fn object_schema(required: &[&str], properties: &[&str]) -> Value {
+    let mut map = serde_json::Map::new();
+    for property in properties {
+        map.insert((*property).to_string(), property_schema(property));
+    }
+    json!({
+        "type": "object",
+        "required": required,
+        "properties": map,
+        "additionalProperties": false
+    })
+}
+
+fn property_schema(name: &str) -> Value {
+    match name {
+        "session_id" => json!({ "type": "string", "description": "Office document session ID." }),
+        "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
+        | "table_index" | "change_index" | "content_control_id" | "position" | "slice_size"
+        | "slide_index" | "target_index" | "row_index" | "column_index" | "row_count"
+        | "column_count" | "count" | "max_depth" => json!({ "type": "integer", "minimum": 0 }),
+        "heading_level" | "level" | "columns" => json!({ "type": "integer", "minimum": 1 }),
+        "width_pt" | "height_pt" | "scale_percent" | "width" | "height" | "left" | "top"
+        | "rotation" | "fill_transparency" | "line_weight" | "line_transparency" | "font_size" => {
+            json!({ "type": "number" })
+        }
+        "match_case"
+        | "whole_word"
+        | "include_metadata"
+        | "include_formatting"
+        | "include_formulas"
+        | "include_selection"
+        | "include_tags"
+        | "ordered"
+        | "all"
+        | "activate"
+        | "has_headers"
+        | "values_only"
+        | "complete_match"
+        | "autofit"
+        | "wrap_text"
+        | "show_headers"
+        | "show_totals"
+        | "highlight_first_column"
+        | "highlight_last_column"
+        | "show_banded_columns"
+        | "show_banded_rows"
+        | "show_filter_button"
+        | "visible"
+        | "overlay"
+        | "title_visible"
+        | "hidden"
+        | "is_decorative"
+        | "clear_fill"
+        | "line_visible"
+        | "lock_aspect_ratio"
+        | "delete_contents" => json!({ "type": "boolean" }),
+        "anchor" => anchor_schema(),
+        "image" => image_schema(),
+        "formatting" => formatting_schema(),
+        "title_box" | "content_box" => shape_box_schema(),
+        "values" | "data" | "formulas" | "number_formats" | "items" | "fields" | "borders"
+        | "criteria" | "selected_items" | "shape_ids" | "row_indices" | "column_indices" => {
+            json!({ "type": "array" })
+        }
+        _ => json!({ "type": "string" }),
+    }
+}
+
+fn anchor_schema() -> Value {
+    json!({
+        "oneOf": [
+            { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "selection" } }, "additionalProperties": false },
+            { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["start_of_document", "end_of_document"] } }, "additionalProperties": false },
+            { "type": "object", "required": ["kind", "index"], "properties": { "kind": { "enum": ["paragraph_index", "before_paragraph_index", "after_paragraph_index"] }, "index": { "type": "integer", "minimum": 0 } }, "additionalProperties": false },
+            { "type": "object", "required": ["kind", "text"], "properties": { "kind": { "enum": ["after_text", "before_text"] }, "text": { "type": "string", "minLength": 1 }, "occurrence": { "type": "integer", "minimum": 1 } }, "additionalProperties": false },
+            { "type": "object", "required": ["kind", "text"], "properties": { "kind": { "const": "heading" }, "text": { "type": "string", "minLength": 1 }, "level": { "type": "integer", "minimum": 1, "maximum": 9 } }, "additionalProperties": false },
+            { "type": "object", "required": ["kind", "name"], "properties": { "kind": { "const": "bookmark" }, "name": { "type": "string", "minLength": 1 } }, "additionalProperties": false }
+        ]
+    })
+}
+
+fn image_schema() -> Value {
+    json!({
+        "oneOf": [
+            { "type": "object", "required": ["base64"], "properties": { "base64": { "type": "string" }, "mime_type": { "type": "string" }, "byte_length": { "type": "integer", "minimum": 0 } }, "additionalProperties": false },
+            { "type": "object", "required": ["url"], "properties": { "url": { "type": "string", "format": "uri" }, "mime_type": { "type": "string" }, "byte_length": { "type": "integer", "minimum": 0 } }, "additionalProperties": false }
+        ]
+    })
+}
+
+fn formatting_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "bold": { "type": "boolean" },
+            "italic": { "type": "boolean" },
+            "underline": { "type": "boolean" },
+            "font_color": { "type": "string" },
+            "highlight_color": { "type": "string" },
+            "font_size": { "type": "number" }
+        },
+        "additionalProperties": false
+    })
+}
+
+fn shape_box_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "left": { "type": "number" },
+            "top": { "type": "number" },
+            "width": { "type": "number" },
+            "height": { "type": "number" }
+        },
+        "additionalProperties": false
     })
 }
 
