@@ -72,10 +72,13 @@ fn maps_ok_false_result_debug_to_command_failure() {
                 "office_mcp_code": "INVALID_ARGUMENT",
                 "message": "Word.js InvalidArgument while running word.insert_image.",
                 "tool": "word.insert_image",
+                "partial_effect": "none",
                 "debug": {
                     "office_error_code": "InvalidArgument",
                     "error_location": "Range.insertInlinePictureFromBase64",
-                    "anchor_kind": "after_paragraph_index"
+                    "anchor_kind": "after_paragraph_index",
+                    "base64": "do-not-return",
+                    "raw_arguments": { "image": { "base64": "do-not-return" } }
                 }
             }
         }
@@ -85,8 +88,11 @@ fn maps_ok_false_result_debug_to_command_failure() {
         panic!("expected failure response");
     };
     let debug = failure.debug.expect("debug context");
+    assert_eq!(failure.partial_effect, Some(PartialEffect::None));
     assert_eq!(debug["office_error_code"], "InvalidArgument");
     assert_eq!(debug["anchor_kind"], "after_paragraph_index");
+    assert!(debug.get("base64").is_none());
+    assert!(debug.get("raw_arguments").is_none());
 }
 
 #[test]
