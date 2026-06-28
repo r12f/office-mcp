@@ -390,6 +390,7 @@ fn powerpoint_resource_catalog_uses_session_scoped_uris() {
 
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/presentation"));
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/slides"));
+    assert!(uris.contains(&"office://powerpoint/powerpoint-session/slides/text?start=0"));
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/slide/0/text"));
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/slide/0/shapes"));
 }
@@ -404,6 +405,7 @@ fn powerpoint_resource_templates_include_read_only_routes() {
 
     assert!(names.contains(&"powerpoint.presentation.template"));
     assert!(names.contains(&"powerpoint.slides.template"));
+    assert!(names.contains(&"powerpoint.slides.text.template"));
     assert!(names.contains(&"powerpoint.slide.text.template"));
     assert!(names.contains(&"powerpoint.slide.shapes.template"));
 }
@@ -480,31 +482,41 @@ fn resource_catalogs_cover_every_parsed_resource_route() {
         "office://excel/{session_id}/range/{address}{?sheet}",
     );
 
-    let powerpoint_resource_catalog = powerpoint_resource_catalog_for_session("session-1");
-    let powerpoint_resource_template_catalog = powerpoint_resource_templates();
-    let powerpoint_resources = resource_uris(&powerpoint_resource_catalog);
-    let powerpoint_templates = resource_template_uris(&powerpoint_resource_template_catalog);
+    assert_powerpoint_resource_routes_covered();
+}
+
+fn assert_powerpoint_resource_routes_covered() {
+    let resource_catalog = powerpoint_resource_catalog_for_session("session-1");
+    let resource_template_catalog = powerpoint_resource_templates();
+    let resources = resource_uris(&resource_catalog);
+    let templates = resource_template_uris(&resource_template_catalog);
     assert_resource_route_covered(
-        &powerpoint_resources,
-        &powerpoint_templates,
+        &resources,
+        &templates,
         "office://powerpoint/session-1/presentation",
         "office://powerpoint/{session_id}/presentation",
     );
     assert_resource_route_covered(
-        &powerpoint_resources,
-        &powerpoint_templates,
+        &resources,
+        &templates,
         "office://powerpoint/session-1/slides",
         "office://powerpoint/{session_id}/slides",
     );
     assert_resource_route_covered(
-        &powerpoint_resources,
-        &powerpoint_templates,
+        &resources,
+        &templates,
+        "office://powerpoint/session-1/slides/text?start=0",
+        "office://powerpoint/{session_id}/slides/text{?start,end}",
+    );
+    assert_resource_route_covered(
+        &resources,
+        &templates,
         "office://powerpoint/session-1/slide/0/text",
         "office://powerpoint/{session_id}/slide/{index}/text",
     );
     assert_resource_route_covered(
-        &powerpoint_resources,
-        &powerpoint_templates,
+        &resources,
+        &templates,
         "office://powerpoint/session-1/slide/0/shapes",
         "office://powerpoint/{session_id}/slide/{index}/shapes",
     );

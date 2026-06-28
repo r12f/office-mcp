@@ -273,6 +273,7 @@ and host-denied operations. These map through the standard error model in
 |---|---|---|
 | `office://powerpoint/{session_id}/presentation` | `powerpoint.get_presentation_info` | Presentation metadata, counts, selection summary, and capability gates. |
 | `office://powerpoint/{session_id}/slides` | `powerpoint.list_slides` | Slide inventory with IDs, indices, layouts, tags, and shape counts. |
+| `office://powerpoint/{session_id}/slides/text{?start,end}` | `powerpoint.read_text` | Text for a slide range. `start` is the 0-based inclusive slide index and defaults to `0`; `end` is the 0-based exclusive slide index and defaults to the deck slide count. |
 | `office://powerpoint/{session_id}/slide/{index}/text` | `powerpoint.read_text` | Text for one slide. |
 | `office://powerpoint/{session_id}/slide/{index}/shapes` | `powerpoint.list_shapes` | Shape inventory for one slide. |
 
