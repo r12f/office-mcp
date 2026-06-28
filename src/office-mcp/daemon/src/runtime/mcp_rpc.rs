@@ -7,6 +7,7 @@ use crate::common::AuditLog;
 use crate::mcp::{
     ExcelToolCatalog, PowerPointToolCatalog, ResourceReadRequest, ToolAccessPolicy, WORD_V1_TOOLS,
     resource_request_from_uri, tool_failure, tool_not_available_by_policy, tool_success,
+    validate_tool_arguments,
 };
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_catalog_response::McpCatalogResponder;
@@ -130,6 +131,16 @@ impl McpJsonRpcRuntime {
             })
             .to_string();
         }
+        if Self::is_known_tool(name)
+            && let Err(message) = validate_tool_arguments(name, arguments)
+        {
+            return json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": tool_failure("INVALID_ARGUMENTS", &message, Some(name), false)
+            })
+            .to_string();
+        }
         let result = match name {
             "office.list_sessions" => tool_success(&json!({
                 "sessions": context
@@ -205,6 +216,11 @@ impl McpJsonRpcRuntime {
         WORD_V1_TOOLS.contains(&name)
             || ExcelToolCatalog::contains(name)
             || PowerPointToolCatalog::contains(name)
+    }
+
+    fn is_known_tool(name: &str) -> bool {
+        matches!(name, "office.list_sessions" | "office.get_session_info")
+            || Self::is_forwarded_tool(name)
     }
 }
 
