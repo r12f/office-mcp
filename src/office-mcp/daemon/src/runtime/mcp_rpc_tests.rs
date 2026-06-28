@@ -260,10 +260,7 @@ fn mcp_json_rpc_lists_resources_and_prompts() {
     assert!(uri_templates.contains(&"office://word/{session_id}/document{?offset,limit}"));
     assert!(uri_templates.contains(&"office://word/{session_id}/track_changes"));
     assert!(uri_templates.contains(&"office://powerpoint/{session_id}/presentation"));
-    assert!(
-        uri_templates
-            .contains(&"office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}")
-    );
+    assert!(uri_templates.contains(&"office://powerpoint/{session_id}/slide/{index}/text"));
 
     let prompts = mcp_handle_body(
         &registry,
@@ -439,8 +436,8 @@ fn mcp_json_rpc_powerpoint_text_resource_routes_to_read_text_tool() {
         assert_eq!(invoke["params"]["session_id"], "powerpoint-session");
         assert_eq!(invoke["params"]["tool"], "powerpoint.read_text");
         assert_eq!(invoke["params"]["args"]["slide_index"], 1);
-        assert_eq!(invoke["params"]["args"]["offset"], 5);
-        assert_eq!(invoke["params"]["args"]["limit"], 10);
+        assert_eq!(invoke["params"]["args"].get("offset"), None);
+        assert_eq!(invoke["params"]["args"].get("limit"), None);
         let request_id = invoke["id"].as_str().expect("request id");
         assert!(response_hub.complete_from_text(&format!(
             r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"text":"slide text"}}}}}}"#
@@ -459,13 +456,13 @@ fn mcp_json_rpc_powerpoint_text_resource_routes_to_read_text_tool() {
     };
     let reply = McpJsonRpcRuntime::handle_body(
         &mut context,
-        br#"{"jsonrpc":"2.0","id":"read-ppt-text","method":"resources/read","params":{"uri":"office://powerpoint/powerpoint-session/slide/1/text?offset=5&limit=10"}}"#,
+        br#"{"jsonrpc":"2.0","id":"read-ppt-text","method":"resources/read","params":{"uri":"office://powerpoint/powerpoint-session/slide/1/text"}}"#,
     );
     response_thread.join().expect("response thread");
     let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
     assert_eq!(
         reply["result"]["contents"][0]["uri"],
-        "office://powerpoint/powerpoint-session/slide/1/text?offset=5&limit=10"
+        "office://powerpoint/powerpoint-session/slide/1/text"
     );
     assert!(
         reply["result"]["contents"][0]["text"]
