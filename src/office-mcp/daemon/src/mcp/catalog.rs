@@ -389,13 +389,14 @@ pub fn validate_tool_arguments(tool: &str, arguments: &Value) -> Result<(), Stri
             return Err(format!("{tool} requires argument {field}."));
         }
     }
+    validate_anchor_argument(tool, arguments)?;
     Ok(())
 }
 
 #[must_use]
 pub fn input_schema_for_tool(tool: &str) -> Value {
     let spec = tool_input_spec(tool);
-    object_schema(spec.required, spec.properties)
+    object_schema(tool, spec.required, spec.properties)
 }
 
 #[derive(Clone, Copy)]
@@ -1119,10 +1120,10 @@ fn tool_input_spec(tool: &str) -> ToolInputSpec {
         .map_or(ToolInputSpec::EMPTY, |(_, spec)| *spec)
 }
 
-fn object_schema(required: &[&str], properties: &[&str]) -> Value {
+fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
     let mut map = serde_json::Map::new();
     for property in properties {
-        map.insert((*property).to_string(), property_schema(property));
+        map.insert((*property).to_string(), property_schema(tool, property));
     }
     json!({
         "type": "object",
@@ -1132,7 +1133,7 @@ fn object_schema(required: &[&str], properties: &[&str]) -> Value {
     })
 }
 
-fn property_schema(name: &str) -> Value {
+fn property_schema(tool: &str, name: &str) -> Value {
     match name {
         "session_id" => json!({ "type": "string", "description": "Office document session ID." }),
         "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
@@ -1175,7 +1176,7 @@ fn property_schema(name: &str) -> Value {
         | "line_visible"
         | "lock_aspect_ratio"
         | "delete_contents" => json!({ "type": "boolean" }),
-        "anchor" => anchor_schema(),
+        "anchor" => anchor_schema_for_tool(tool),
         "image" => image_schema(),
         "formatting" => formatting_schema(),
         "title_box" | "content_box" => shape_box_schema(),
@@ -1187,16 +1188,98 @@ fn property_schema(name: &str) -> Value {
     }
 }
 
-fn anchor_schema() -> Value {
+fn validate_anchor_argument(
+    tool: &str,
+    arguments: &serde_json::Map<String, Value>,
+) -> Result<(), String> {
+    let Some(anchor) = arguments.get("anchor") else {
+        return Ok(());
+    };
+    let Some(kind) = anchor.get("kind").and_then(Value::as_str) else {
+        return Err(format!("{tool} anchor requires string kind."));
+    };
+    if supported_anchor_kinds(tool).contains(&kind) {
+        Ok(())
+    } else {
+        Err(format!("{tool} does not support anchor kind {kind}."))
+    }
+}
+
+fn supported_anchor_kinds(tool: &str) -> &'static [&'static str] {
+    match tool {
+        "word.insert_image" => &[
+            "selection",
+            "start_of_document",
+            "end_of_document",
+            "paragraph_index",
+            "before_paragraph_index",
+            "before_text",
+            "after_text",
+            "heading",
+            "bookmark",
+        ],
+        _ => &[
+            "selection",
+            "start_of_document",
+            "end_of_document",
+            "paragraph_index",
+            "before_paragraph_index",
+            "after_paragraph_index",
+            "before_text",
+            "after_text",
+            "heading",
+            "bookmark",
+        ],
+    }
+}
+
+fn anchor_schema_for_tool(tool: &str) -> Value {
+    anchor_schema(supported_anchor_kinds(tool))
+}
+
+fn supports_anchor_kind(kinds: &[&str], kind: &str) -> bool {
+    kinds.contains(&kind)
+}
+
+fn anchor_schema(kinds: &[&str]) -> Value {
+    let mut variants = Vec::new();
+    if supports_anchor_kind(kinds, "selection") {
+        variants.push(json!({ "type": "object", "required": ["kind"], "properties": { "kind": { "const": "selection" } }, "additionalProperties": false }));
+    }
+    let document_kinds = ["start_of_document", "end_of_document"]
+        .into_iter()
+        .filter(|kind| supports_anchor_kind(kinds, kind))
+        .collect::<Vec<_>>();
+    if !document_kinds.is_empty() {
+        variants.push(json!({ "type": "object", "required": ["kind"], "properties": { "kind": { "enum": document_kinds } }, "additionalProperties": false }));
+    }
+    let paragraph_kinds = [
+        "paragraph_index",
+        "before_paragraph_index",
+        "after_paragraph_index",
+    ]
+    .into_iter()
+    .filter(|kind| supports_anchor_kind(kinds, kind))
+    .collect::<Vec<_>>();
+    if !paragraph_kinds.is_empty() {
+        variants.push(json!({ "type": "object", "required": ["kind", "index"], "properties": { "kind": { "enum": paragraph_kinds }, "index": { "type": "integer", "minimum": 0 } }, "additionalProperties": false }));
+    }
+    let text_kinds = ["after_text", "before_text"]
+        .into_iter()
+        .filter(|kind| supports_anchor_kind(kinds, kind))
+        .collect::<Vec<_>>();
+    if !text_kinds.is_empty() {
+        variants.push(json!({ "type": "object", "required": ["kind", "text"], "properties": { "kind": { "enum": text_kinds }, "text": { "type": "string", "minLength": 1 }, "occurrence": { "type": "integer", "minimum": 1 } }, "additionalProperties": false }));
+    }
+    if supports_anchor_kind(kinds, "heading") {
+        variants.push(json!({ "type": "object", "required": ["kind", "text"], "properties": { "kind": { "const": "heading" }, "text": { "type": "string", "minLength": 1 }, "level": { "type": "integer", "minimum": 1, "maximum": 9 } }, "additionalProperties": false }));
+    }
+    if supports_anchor_kind(kinds, "bookmark") {
+        variants.push(json!({ "type": "object", "required": ["kind", "name"], "properties": { "kind": { "const": "bookmark" }, "name": { "type": "string", "minLength": 1 } }, "additionalProperties": false }));
+    }
+
     json!({
-        "oneOf": [
-            { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "selection" } }, "additionalProperties": false },
-            { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["start_of_document", "end_of_document"] } }, "additionalProperties": false },
-            { "type": "object", "required": ["kind", "index"], "properties": { "kind": { "enum": ["paragraph_index", "before_paragraph_index", "after_paragraph_index"] }, "index": { "type": "integer", "minimum": 0 } }, "additionalProperties": false },
-            { "type": "object", "required": ["kind", "text"], "properties": { "kind": { "enum": ["after_text", "before_text"] }, "text": { "type": "string", "minLength": 1 }, "occurrence": { "type": "integer", "minimum": 1 } }, "additionalProperties": false },
-            { "type": "object", "required": ["kind", "text"], "properties": { "kind": { "const": "heading" }, "text": { "type": "string", "minLength": 1 }, "level": { "type": "integer", "minimum": 1, "maximum": 9 } }, "additionalProperties": false },
-            { "type": "object", "required": ["kind", "name"], "properties": { "kind": { "const": "bookmark" }, "name": { "type": "string", "minLength": 1 } }, "additionalProperties": false }
-        ]
+        "oneOf": variants
     })
 }
 
