@@ -484,37 +484,41 @@ fn resource_catalogs_cover_every_parsed_resource_route() {
         "office://excel/{session_id}/range/{address}{?sheet}",
     );
 
-    let powerpoint_resource_catalog = powerpoint_resource_catalog_for_session("session-1");
-    let powerpoint_resource_template_catalog = powerpoint_resource_templates();
-    let powerpoint_resources = resource_uris(&powerpoint_resource_catalog);
-    let powerpoint_templates = resource_template_uris(&powerpoint_resource_template_catalog);
+    assert_powerpoint_resource_routes_covered();
+}
+
+fn assert_powerpoint_resource_routes_covered() {
+    let resource_catalog = powerpoint_resource_catalog_for_session("session-1");
+    let resource_template_catalog = powerpoint_resource_templates();
+    let resources = resource_uris(&resource_catalog);
+    let templates = resource_template_uris(&resource_template_catalog);
     assert_resource_route_covered(
-        &powerpoint_resources,
-        &powerpoint_templates,
+        &resources,
+        &templates,
         "office://powerpoint/session-1/presentation",
         "office://powerpoint/{session_id}/presentation",
     );
     assert_resource_route_covered(
-        &powerpoint_resources,
-        &powerpoint_templates,
+        &resources,
+        &templates,
         "office://powerpoint/session-1/slides",
         "office://powerpoint/{session_id}/slides",
     );
     assert_resource_route_covered(
-        &powerpoint_resources,
-        &powerpoint_templates,
+        &resources,
+        &templates,
         "office://powerpoint/session-1/slides/text?start=0",
         "office://powerpoint/{session_id}/slides/text{?start,end}",
     );
     assert_resource_route_covered(
-        &powerpoint_resources,
-        &powerpoint_templates,
+        &resources,
+        &templates,
         "office://powerpoint/session-1/slide/0/text?offset=0&limit=200",
         "office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}",
     );
     assert_resource_route_covered(
-        &powerpoint_resources,
-        &powerpoint_templates,
+        &resources,
+        &templates,
         "office://powerpoint/session-1/slide/0/shapes",
         "office://powerpoint/{session_id}/slide/{index}/shapes",
     );
