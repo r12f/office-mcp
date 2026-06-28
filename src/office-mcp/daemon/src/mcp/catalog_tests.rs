@@ -126,6 +126,28 @@ fn representative_word_schemas_are_specific() {
 }
 
 #[test]
+fn word_anchor_schemas_advertise_per_tool_supported_kinds() {
+    let paragraph = schema_for("word.insert_paragraph");
+    let paragraph_kinds = anchor_kinds(&paragraph);
+    assert!(paragraph_kinds.contains(&"after_paragraph_index"));
+    assert!(paragraph_kinds.contains(&"heading"));
+    assert!(paragraph_kinds.contains(&"bookmark"));
+
+    let image = schema_for("word.insert_image");
+    let image_kinds = anchor_kinds(&image);
+    assert!(image_kinds.contains(&"paragraph_index"));
+    assert!(image_kinds.contains(&"before_paragraph_index"));
+    assert!(image_kinds.contains(&"before_text"));
+    assert!(image_kinds.contains(&"after_text"));
+    assert!(image_kinds.contains(&"heading"));
+    assert!(image_kinds.contains(&"bookmark"));
+    assert!(
+        !image_kinds.contains(&"after_paragraph_index"),
+        "word.insert_image must not advertise paragraph-after anchors until explicit placement support exists"
+    );
+}
+
+#[test]
 fn representative_excel_and_powerpoint_schemas_are_specific() {
     let range = schema_for("excel.read_range");
     assert_required(&range, &["session_id", "address"]);
@@ -218,4 +240,25 @@ fn assert_required(schema: &Value, required: &[&str]) {
     for field in required {
         assert!(actual.contains(field), "missing required field {field}");
     }
+}
+
+fn anchor_kinds(schema: &Value) -> Vec<&str> {
+    schema["properties"]["anchor"]["oneOf"]
+        .as_array()
+        .expect("anchor oneOf")
+        .iter()
+        .flat_map(|variant| {
+            let kind = &variant["properties"]["kind"];
+            if let Some(value) = kind["const"].as_str() {
+                vec![value]
+            } else {
+                kind["enum"]
+                    .as_array()
+                    .expect("kind enum")
+                    .iter()
+                    .map(|value| value.as_str().expect("kind string"))
+                    .collect()
+            }
+        })
+        .collect()
 }
