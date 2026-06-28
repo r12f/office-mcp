@@ -42,9 +42,9 @@ fn word_resource_request_from_uri(
     uri: &str,
     rest: &str,
 ) -> Result<ResourceReadRequest, String> {
-    let path = rest
+    let (path, query) = rest
         .split_once('?')
-        .map_or(rest, |(path, _query)| path);
+        .map_or((rest, ""), |(path, query)| (path, query));
     let segments = path.split('/').collect::<Vec<_>>();
     if segments.len() < 2 {
         return Err(format!("Malformed Word resource URI {uri}."));
@@ -106,9 +106,9 @@ fn excel_resource_request_from_uri(
     uri: &str,
     rest: &str,
 ) -> Result<ResourceReadRequest, String> {
-    let (path, query) = rest
+    let path = rest
         .split_once('?')
-        .map_or((rest, ""), |(path, query)| (path, query));
+        .map_or(rest, |(path, _query)| path);
     let segments = path.split('/').collect::<Vec<_>>();
     if segments.len() < 2 {
         return Err(format!("Malformed Excel resource URI {uri}."));
