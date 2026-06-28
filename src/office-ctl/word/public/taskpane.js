@@ -88,6 +88,7 @@
     'word.get_outline',
     'word.get_paragraph',
     'word.find_text',
+    'word.resolve_anchor',
     'word.get_selection',
     'word.insert_paragraph',
     'word.insert_image',
@@ -113,7 +114,7 @@
   ];
   const TOOL_GROUPS = [
     { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.insert_page_break', 'word.save'] },
-    { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
+    { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
     { label: 'Media', tools: ['word.insert_image', 'word.resize_image'] },
@@ -125,6 +126,7 @@
     ['word.get_outline', { category: 'Document & structure', sideEffect: 'read', description: 'Read heading outline and structure.' }],
     ['word.get_paragraph', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'Read a single paragraph by index.' }],
     ['word.find_text', { category: 'Range & selection', sideEffect: 'read', description: 'Find text matches in the document body.' }],
+    ['word.resolve_anchor', { category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata.' }],
     ['word.get_selection', { category: 'Range & selection', sideEffect: 'read', description: 'Read the current selection.' }],
     ['word.insert_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
     ['word.insert_image', { category: 'Media', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
@@ -445,6 +447,9 @@
         case 'word.find_text':
           data = await findText(args);
           break;
+        case 'word.resolve_anchor':
+          data = await resolveAnchorTool(args);
+          break;
         case 'word.get_selection':
           data = await getSelection(args);
           break;
@@ -707,6 +712,14 @@
         snippet: match.snippet
       }));
       return { matches, count: matches.length, truncated: ranges.items.length > limit, untrusted_source: true };
+    });
+  }
+
+  async function resolveAnchorTool(args) {
+    requireAnchor('word.resolve_anchor', args.anchor);
+    return Word.run(async (context) => {
+      const resolved = await resolveAnchor(context, args.anchor);
+      return describeResolvedAnchor(context, args.anchor, resolved, args.include_text_preview !== false);
     });
   }
 
@@ -1423,6 +1436,92 @@
       default:
         throw Object.assign(new Error(`Unsupported anchor ${anchor.kind}`), { officeMcpCode: 'INVALID_ARGUMENT' });
     }
+  }
+
+  async function describeResolvedAnchor(context, anchor, resolved, includeTextPreview) {
+    const descriptor = {
+      resolved: true,
+      anchor_kind: anchor.kind,
+      object_type: resolvedAnchorObjectType(anchor),
+      supported_operations: supportedOperationsForAnchor(anchor),
+      unsupported_operations: unsupportedOperationsForAnchor(anchor),
+      tool_suitability: toolSuitabilityForAnchor(anchor),
+      untrusted_source: true
+    };
+    if (Number.isInteger(anchor.index)) descriptor.paragraph_index = anchor.index;
+    if (includeTextPreview) {
+      const preview = await resolvedAnchorTextPreview(context, anchor, resolved);
+      if (preview !== null) descriptor.text_preview = preview;
+    }
+    return descriptor;
+  }
+
+  async function resolvedAnchorTextPreview(context, anchor, resolved) {
+    switch (anchor.kind) {
+      case 'start_of_document':
+      case 'end_of_document':
+        return null;
+      case 'paragraph_index':
+      case 'before_paragraph_index':
+      case 'after_paragraph_index':
+      case 'heading':
+        resolved.load('text');
+        await context.sync();
+        return safeTextPreview(resolved.text);
+      case 'selection':
+      case 'before_text':
+      case 'after_text':
+      case 'bookmark':
+        resolved.load('text');
+        await context.sync();
+        return safeTextPreview(resolved.text);
+      default:
+        return null;
+    }
+  }
+
+  function safeTextPreview(value) {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+    return text.length > 80 ? `${text.slice(0, 77)}...` : text;
+  }
+
+  function resolvedAnchorObjectType(anchor) {
+    if (anchor.kind === 'start_of_document' || anchor.kind === 'end_of_document') return 'Body';
+    if (isParagraphAnchor(anchor)) return 'Paragraph';
+    return 'Range';
+  }
+
+  function supportedOperationsForAnchor(anchor) {
+    switch (resolvedAnchorObjectType(anchor)) {
+      case 'Body':
+        return ['insertParagraph', 'insertTable', 'insertInlinePictureFromBase64', 'insertBreak'];
+      case 'Paragraph':
+        return ['insertParagraph', 'insertText', 'insertTable', 'insertBreak'];
+      default:
+        return ['insertText', 'delete', 'font', 'insertContentControl'];
+    }
+  }
+
+  function unsupportedOperationsForAnchor(anchor) {
+    switch (resolvedAnchorObjectType(anchor)) {
+      case 'Paragraph':
+        return ['insertInlinePictureFromBase64'];
+      case 'Range':
+        return ['insertTable'];
+      default:
+        return [];
+    }
+  }
+
+  function toolSuitabilityForAnchor(anchor) {
+    const objectType = resolvedAnchorObjectType(anchor);
+    return {
+      image_insertion: objectType !== 'Paragraph' || 'requires_explicit_paragraph_placement',
+      text_replacement: objectType === 'Range',
+      deletion: objectType !== 'Body',
+      formatting: objectType !== 'Body'
+    };
   }
 
   async function getParagraphByIndex(context, index) {

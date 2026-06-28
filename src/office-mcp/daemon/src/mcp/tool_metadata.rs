@@ -90,6 +90,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Read,
     ),
     tool(
+        "word.resolve_anchor",
+        "word",
+        "Range & selection",
+        ToolSideEffect::Read,
+    ),
+    tool(
         "word.get_selection",
         "word",
         "Range & selection",

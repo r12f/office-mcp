@@ -63,6 +63,26 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { contains: ['target E2E'], pathEquals: [{ path: 'count', value: 1 }] }
     }
   }],
+  ['word.resolve_anchor', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Resolve anchor E2E paragraph' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'Resolve anchor E2E paragraph' } },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        contains: ['Resolve anchor E2E paragraph'],
+        pathEquals: [
+          { path: 'resolved', value: true },
+          { path: 'object_type', value: 'Range' },
+          { path: 'anchor_kind', value: 'after_text' },
+          { path: 'untrusted_source', value: true }
+        ]
+      }
+    }
+  }],
   ['word.get_selection', {
     setup: {
       actions: [

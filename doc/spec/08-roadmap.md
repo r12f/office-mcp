@@ -98,7 +98,7 @@ not keep a separate tool when it only repeats another tool's object owner and
 user intent.
 
 Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
-`word.find_text`, `word.get_selection`, `word.insert_paragraph`,
+`word.find_text`, `word.resolve_anchor`, `word.get_selection`, `word.insert_paragraph`,
 `word.insert_table`, `word.insert_image`, `word.resize_image`, `word.insert_page_break`,
 `word.insert_list`, `word.replace_text`, `word.update_paragraph`,
 `word.delete_range`, `word.apply_formatting`, `word.apply_style`,
@@ -149,12 +149,18 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       the target-surface retirement slice.
 - [x] Update daemon MCP catalog entries, JSON schemas, permission categories,
       task pane tool grouping, runtime evidence scripts, and README text from
-      the current 27-tool compatibility surface to the refined 25-tool surface.
+      the retired compatibility surface to the refined target surface.
       Current evidence: daemon `WORD_V1_TOOLS` and Word task pane
-      `AVAILABLE_TOOLS` both expose exactly the refined 25-tool catalog;
+      `AVAILABLE_TOOLS` both expose the refined target catalog;
       compatibility/deprecation tests reject superseded tool names; and runtime
       smoke scripts call the refined owner tools instead of retired compatibility
       tools.
+- [x] Add `word.resolve_anchor` as a read-only diagnostic helper for the shared
+      Word anchor vocabulary. Current implementation exposes it through the
+      daemon catalog, MCP `tools/list`, Word task pane available-tools metadata,
+      permission grouping, dispatch path, and E2E case table; it returns safe
+      object metadata, operation hints, and bounded preview text without
+      mutating the document or returning full document text.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.

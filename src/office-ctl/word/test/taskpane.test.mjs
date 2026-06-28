@@ -406,6 +406,32 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'validateDeleteContentControlMode'), /mode must be keep_content or delete_content/);
 });
 
+test('word.resolve_anchor returns safe anchor diagnostics without mutating', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const resolveBody = functionBody(js, 'resolveAnchorTool');
+  const describeBody = functionBody(js, 'describeResolvedAnchor');
+
+  assert.match(js, /'word\.resolve_anchor'/);
+  assert.match(js, /\['word\.resolve_anchor', \{ category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.resolve_anchor':\s*data = await resolveAnchorTool\(args\);/);
+  assert.match(resolveBody, /requireAnchor\('word\.resolve_anchor', args\.anchor\)/);
+  assert.match(resolveBody, /const resolved = await resolveAnchor\(context, args\.anchor\)/);
+  assert.match(resolveBody, /describeResolvedAnchor\(context, args\.anchor, resolved, args\.include_text_preview !== false\)/);
+  assert.match(describeBody, /resolved: true/);
+  assert.match(describeBody, /object_type: resolvedAnchorObjectType\(anchor\)/);
+  assert.match(describeBody, /supported_operations: supportedOperationsForAnchor\(anchor\)/);
+  assert.match(describeBody, /unsupported_operations: unsupportedOperationsForAnchor\(anchor\)/);
+  assert.match(describeBody, /tool_suitability: toolSuitabilityForAnchor\(anchor\)/);
+  assert.match(describeBody, /untrusted_source: true/);
+  assert.match(functionBody(js, 'toolSuitabilityForAnchor'), /image_insertion/);
+  assert.match(functionBody(js, 'toolSuitabilityForAnchor'), /text_replacement/);
+  assert.match(functionBody(js, 'toolSuitabilityForAnchor'), /deletion/);
+  assert.match(functionBody(js, 'toolSuitabilityForAnchor'), /formatting/);
+  assert.match(functionBody(js, 'safeTextPreview'), /text\.length > 80/);
+  assert.doesNotMatch(functionBody(js, 'describeResolvedAnchor'), /document\.body\.text|body\.load\('text'/);
+});
+
 test('Word task pane preserves safe Office.js error debug context', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const mapBody = functionBody(js, 'mapError');
@@ -500,8 +526,9 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.delete_content_control'/);
   assert.match(js, /'word\.resize_image'/);
   assert.match(js, /'word\.update_tracked_change'/);
+  assert.match(js, /'word\.resolve_anchor'/);
   assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.insert_page_break', 'word\.save'\] \}/);
-  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image'\] \}/);
@@ -521,6 +548,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.update_content_control', \{ category: 'Content controls', sideEffect: 'mutating', description: 'Update content-control metadata, locks, or text\.' \}\]/);
   assert.match(js, /\['word\.delete_content_control', \{ category: 'Content controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling\.' \}\]/);
   assert.match(js, /\['word\.resize_image', \{ category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image\.' \}\]/);
+  assert.match(js, /\['word\.resolve_anchor', \{ category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata\.' \}\]/);
   assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint\.' \}\]/);
   assert.match(js, /case 'word\.update_table':\s*data = await updateTable\(args\);/);
   assert.match(js, /case 'word\.list_content_controls':\s*data = await listContentControls\(args\);/);
@@ -528,6 +556,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /case 'word\.update_content_control':\s*data = await updateContentControl\(args\);/);
   assert.match(js, /case 'word\.delete_content_control':\s*data = await deleteContentControl\(args\);/);
   assert.match(js, /case 'word\.resize_image':\s*data = await resizeImage\(args\);/);
+  assert.match(js, /case 'word\.resolve_anchor':\s*data = await resolveAnchorTool\(args\);/);
   assert.match(js, /case 'word\.update_tracked_change':\s*data = await updateTrackedChange\(args\);/);
   assert.match(js, /async function insertTable\(args\)/);
   assert.match(js, /table_index: tableIndex/);

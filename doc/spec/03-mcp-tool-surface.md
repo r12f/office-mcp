@@ -170,6 +170,13 @@ moment the tool call is processed. Clients must not cache indices across edits.
 - Returns `ANCHOR_NOT_FOUND` if no match.
 - If `occurrence > 1` and fewer matches exist, returns `ANCHOR_NOT_FOUND`.
 
+Clients can call `word.resolve_anchor` to inspect the same anchor resolution
+path without mutating the document. The response returns safe metadata such as
+`object_type`, paragraph index when known, supported and unsupported operation
+hints, tool suitability for image insertion, text replacement, deletion, and
+formatting, and a bounded text preview unless `include_text_preview: false` is
+set. It must not return the full document body.
+
 ## 7. Concurrent calls and ordering
 
 - Calls to the same `session_id` are serialized by the daemon. One call is

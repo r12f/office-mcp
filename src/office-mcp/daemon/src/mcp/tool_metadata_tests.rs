@@ -9,6 +9,11 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(read.category, "Document & structure");
     assert_eq!(read.side_effect, ToolSideEffect::Read);
 
+    let anchor = tool_metadata("word.resolve_anchor").expect("anchor metadata");
+    assert_eq!(anchor.app, "word");
+    assert_eq!(anchor.category, "Range & selection");
+    assert_eq!(anchor.side_effect, ToolSideEffect::Read);
+
     let mutating = tool_metadata("excel.write_range").expect("excel metadata");
     assert_eq!(mutating.app, "excel");
     assert_eq!(mutating.category, "Range");

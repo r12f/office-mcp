@@ -43,6 +43,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"office.list_sessions"));
     assert!(names.contains(&"office.get_session_info"));
     assert!(names.contains(&"word.get_text"));
+    assert!(names.contains(&"word.resolve_anchor"));
     assert!(names.contains(&"word.list_content_controls"));
     assert!(names.contains(&"word.insert_content_control"));
     assert!(names.contains(&"word.update_content_control"));
@@ -71,10 +72,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 26);
+    assert_eq!(WORD_V1_TOOLS.len(), 27);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 73);
+    assert_eq!(tools.len(), 74);
 }
 
 #[test]
@@ -130,6 +131,20 @@ fn representative_word_schemas_are_specific() {
             .expect("image oneOf")
             .len(),
         2
+    );
+
+    let resolve_anchor = schema_for("word.resolve_anchor");
+    assert_required(&resolve_anchor, &["session_id", "anchor"]);
+    assert_eq!(
+        resolve_anchor["properties"]["include_text_preview"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        resolve_anchor["properties"]["anchor"]["oneOf"]
+            .as_array()
+            .expect("anchor oneOf")
+            .len(),
+        6
     );
 }
 
