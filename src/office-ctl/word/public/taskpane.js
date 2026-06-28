@@ -62,6 +62,27 @@
     'replace_paragraph',
     'selection'
   ]);
+  const WORD_MUTATING_TOOLS = new Set([
+    'word.insert_paragraph',
+    'word.insert_table',
+    'word.insert_image',
+    'word.resize_image',
+    'word.insert_page_break',
+    'word.insert_list',
+    'word.replace_text',
+    'word.update_paragraph',
+    'word.delete_range',
+    'word.apply_formatting',
+    'word.update_table',
+    'word.insert_content_control',
+    'word.update_content_control',
+    'word.delete_content_control',
+    'word.apply_style',
+    'word.add_comment',
+    'word.resolve_comment',
+    'word.update_tracked_change',
+    'word.save'
+  ]);
   const AVAILABLE_TOOLS = [
     'word.get_text',
     'word.get_outline',
@@ -410,6 +431,7 @@
     try {
       if (!isToolEnabled(tool)) throw toolDisabledError(tool);
       if (taskStore.isCancelled(requestId)) throw cancelledError(tool);
+      preflightWordMutatingTool(tool, args || {});
       switch (tool) {
         case 'word.get_text':
           data = await getText(args);
@@ -521,6 +543,89 @@
       officeMcpCode: 'TOOL_DISABLED_BY_USER',
       partialEffect: 'none'
     });
+  }
+
+  function preflightWordMutatingTool(tool, args) {
+    if (!WORD_MUTATING_TOOLS.has(tool)) return;
+    switch (tool) {
+      case 'word.insert_paragraph':
+        requireAnchor(tool, args.anchor);
+        validateHeadingLevelArg(tool, args.heading_level, true);
+        validateFormattingArg(tool, args.formatting);
+        break;
+      case 'word.insert_table':
+        requireAnchor(tool, args.anchor);
+        requirePositiveInteger(tool, 'rows', args.rows);
+        requirePositiveInteger(tool, 'cols', args.cols);
+        validateTableData(args.rows, args.cols, args.data);
+        break;
+      case 'word.insert_image':
+        requireAnchor(tool, args.anchor);
+        validateInsertImagePreflight(args);
+        break;
+      case 'word.resize_image':
+        validateResizeImageArgs(args);
+        break;
+      case 'word.insert_page_break':
+        requireAnchor(tool, args.anchor);
+        break;
+      case 'word.insert_list':
+        requireAnchor(tool, args.anchor);
+        validateInsertListArgs(args);
+        break;
+      case 'word.replace_text':
+        validateReplaceTextArgs(args);
+        break;
+      case 'word.update_paragraph':
+        requireNonNegativeInteger(tool, 'index', args.index);
+        break;
+      case 'word.delete_range':
+        validateExtentToolArgs(tool, args);
+        break;
+      case 'word.apply_formatting':
+        validateExtentToolArgs(tool, args);
+        validateFormattingArg(tool, args.formatting, true);
+        break;
+      case 'word.update_table':
+        validateUpdateTableArgs(args);
+        break;
+      case 'word.insert_content_control':
+        if (args.anchor !== undefined) requireAnchor(tool, args.anchor);
+        validateContentControlArgs(tool, args);
+        break;
+      case 'word.update_content_control':
+        validateContentControlTargetArgs(tool, args);
+        validateContentControlArgs(tool, args);
+        break;
+      case 'word.delete_content_control':
+        validateContentControlTargetArgs(tool, args);
+        validateDeleteContentControlMode(args.mode);
+        break;
+      case 'word.apply_style':
+        requireAnchor(tool, args.anchor);
+        if (!args.style && args.heading_level === undefined) {
+          throw invalidArgument('word.apply_style requires style or heading_level.');
+        }
+        validateHeadingLevelArg(tool, args.heading_level, true);
+        break;
+      case 'word.add_comment':
+        requireAnchor(tool, args.anchor);
+        break;
+      case 'word.resolve_comment':
+        if (!args.comment_id) throw invalidArgument('word.resolve_comment requires comment_id.');
+        break;
+      case 'word.update_tracked_change':
+        requireNonNegativeInteger(tool, 'change_index', args.change_index);
+        validateTrackedChangeAction(args.action);
+        if (!args.expected_fingerprint) throw invalidArgument('word.update_tracked_change requires expected_fingerprint.');
+        break;
+      default:
+        break;
+    }
+  }
+
+  function invalidArgument(message) {
+    return Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
   }
 
   async function getText(args) {
@@ -988,7 +1093,7 @@
       const rowCount = table.rowCount ?? table.values.length;
       const columnCount = table.columnCount ?? (table.values[0]?.length ?? 0);
       const values = args.values ?? blankRow(columnCount);
-      if (values.length !== columnCount) throw Object.assign(new Error('Row values length must match table column count.'), { officeMcpCode: 'INVALID_ARGUMENT' });
+      if (values.length !== columnCount) throw invalidArgument('Row values length must match table column count.');
       const rowIndex = args.index ?? rowCount;
       if (rowIndex >= rowCount) {
         table.getCell(rowCount - 1, 0).insertRows(Word.InsertLocation.after, 1, [values]);
@@ -1008,7 +1113,7 @@
       const rowCount = table.rowCount ?? table.values.length;
       const columnCount = table.columnCount ?? (table.values[0]?.length ?? 0);
       const values = args.values ?? blankColumn(rowCount);
-      if (values.length !== rowCount) throw Object.assign(new Error('Column values length must match table row count.'), { officeMcpCode: 'INVALID_ARGUMENT' });
+      if (values.length !== rowCount) throw invalidArgument('Column values length must match table row count.');
       const colIndex = args.index ?? columnCount;
       const matrix = values.map((value) => [value]);
       if (colIndex >= columnCount) {
@@ -1409,6 +1514,137 @@
     throw Object.assign(new Error(`Unsupported content control appearance ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
   }
 
+  function requireAnchor(tool, anchor) {
+    if (!anchor || typeof anchor !== 'object' || typeof anchor.kind !== 'string') {
+      throw invalidArgument(`${tool} requires anchor.kind.`);
+    }
+  }
+
+  function requireNonNegativeInteger(tool, name, value) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw invalidArgument(`${tool} ${name} must be a non-negative integer.`);
+    }
+  }
+
+  function requirePositiveInteger(tool, name, value) {
+    if (!Number.isInteger(value) || value < 1) {
+      throw invalidArgument(`${tool} ${name} must be a positive integer.`);
+    }
+  }
+
+  function validateOptionalPositiveNumber(tool, name, value) {
+    if (value !== undefined && !isPositiveNumber(value)) {
+      throw invalidArgument(`${tool} ${name} must be a positive number.`);
+    }
+  }
+
+  function validateHeadingLevelArg(tool, level, allowZero = false) {
+    if (level === undefined) return;
+    const minimum = allowZero ? 0 : 1;
+    if (!Number.isInteger(level) || level < minimum || level > 9) {
+      throw invalidArgument(`${tool} heading_level must be an integer from ${minimum} to 9.`);
+    }
+  }
+
+  function validateFormattingArg(tool, formatting, required = false) {
+    if (formatting === undefined) {
+      if (required) throw invalidArgument(`${tool} requires formatting.`);
+      return;
+    }
+    if (!formatting || typeof formatting !== 'object' || Array.isArray(formatting)) {
+      throw invalidArgument(`${tool} formatting must be an object.`);
+    }
+    validateOptionalPositiveNumber(tool, 'formatting.font_size_pt', formatting.font_size_pt);
+  }
+
+  function validateInsertImagePreflight(args) {
+    const base64 = args.image?.base64;
+    if (!base64) throw invalidArgument('word.insert_image requires image.base64 after daemon preprocessing.');
+    validateInsertImagePlacement(args.anchor, args.placement);
+    validateOptionalPositiveNumber('word.insert_image', 'width_pt', args.width_pt);
+    validateOptionalPositiveNumber('word.insert_image', 'height_pt', args.height_pt);
+  }
+
+  function validateInsertListArgs(args) {
+    if (!Array.isArray(args.items) || args.items.length === 0) {
+      throw invalidArgument('word.insert_list requires a non-empty items array.');
+    }
+    if (args.level !== undefined && (!Number.isInteger(args.level) || args.level < 0 || args.level > 8)) {
+      throw invalidArgument('word.insert_list level must be an integer from 0 to 8.');
+    }
+    const kind = args.kind ?? 'bulleted';
+    if (kind !== 'bulleted' && kind !== 'numbered') {
+      throw invalidArgument('word.insert_list kind must be bulleted or numbered.');
+    }
+  }
+
+  function validateReplaceTextArgs(args) {
+    if (!args.find) throw invalidArgument('word.replace_text requires non-empty find text.');
+    if (args.limit !== undefined && (!Number.isInteger(args.limit) || args.limit < 1)) {
+      throw invalidArgument('word.replace_text limit must be a positive integer.');
+    }
+    const range = args.scope?.paragraph_range;
+    if (range !== undefined && (!Array.isArray(range) || range.length !== 2 || !range.every((value) => Number.isInteger(value) && value >= 0) || range[0] > range[1])) {
+      throw invalidArgument('word.replace_text scope.paragraph_range must be [start, end] with non-negative integer bounds.');
+    }
+  }
+
+  function validateExtentToolArgs(tool, args) {
+    const extent = args.extent ?? 'paragraph';
+    if (extent !== 'selection') requireAnchor(tool, args.anchor);
+    if (extent !== 'paragraph' && extent !== 'sentence' && extent !== 'selection') {
+      throw invalidArgument(`${tool} extent must be paragraph, sentence, or selection.`);
+    }
+  }
+
+  function validateUpdateTableArgs(args) {
+    requireNonNegativeInteger('word.update_table', 'table_index', args.table_index);
+    const action = String(args.action || '').trim().toLowerCase();
+    if (!['update_cell', 'cell', 'add_row', 'add_column', 'format_cell', 'delete'].includes(action)) {
+      throw invalidArgument(`Unsupported table action ${args.action}.`);
+    }
+    if (action === 'update_cell' || action === 'cell' || action === 'format_cell') {
+      requireNonNegativeInteger('word.update_table', 'row', args.row);
+      requireNonNegativeInteger('word.update_table', 'col', args.col);
+    }
+    if ((action === 'add_row' || action === 'add_column') && args.index !== undefined) {
+      requireNonNegativeInteger('word.update_table', 'index', args.index);
+    }
+    if ((action === 'add_row' || action === 'add_column') && args.values !== undefined && !Array.isArray(args.values)) {
+      throw invalidArgument('word.update_table values must be an array.');
+    }
+    validateOptionalPositiveNumber('word.update_table', 'padding_pt', args.padding_pt);
+    validateFormattingArg('word.update_table', args.formatting);
+  }
+
+  function validateContentControlTargetArgs(tool, args) {
+    if (args.content_control_id === undefined && !args.tag && !args.title) {
+      throw invalidArgument(`${tool} requires content_control_id, tag, or title.`);
+    }
+    if (args.content_control_id !== undefined) requireNonNegativeInteger(tool, 'content_control_id', args.content_control_id);
+  }
+
+  function validateContentControlArgs(tool, args) {
+    if (args.type !== undefined) contentControlTypeFrom(args.type);
+    if (args.appearance !== undefined) contentControlAppearanceFrom(args.appearance);
+    if (args.color !== undefined && !/^#[0-9a-f]{6}$/i.test(String(args.color))) {
+      throw invalidArgument(`${tool} color must be a #RRGGBB value.`);
+    }
+  }
+
+  function validateDeleteContentControlMode(mode) {
+    if (mode !== undefined && mode !== 'keep_content' && mode !== 'delete_content') {
+      throw invalidArgument('word.delete_content_control mode must be keep_content or delete_content.');
+    }
+  }
+
+  function validateTrackedChangeAction(action) {
+    const normalized = String(action || '').trim().toLowerCase();
+    if (normalized !== 'accept' && normalized !== 'reject') {
+      throw invalidArgument(`Unsupported tracked-change action ${action}.`);
+    }
+  }
+
   function validateResizeImageArgs(args) {
     if (!args.image || args.image.kind !== 'paragraph_index') {
       throw Object.assign(new Error('word.resize_image requires image.kind="paragraph_index".'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
@@ -1481,13 +1717,13 @@
   function validateInsertImagePlacement(anchor, placement) {
     if (!placement) return;
     if (!INSERT_IMAGE_PLACEMENTS.has(placement)) {
-      throw Object.assign(new Error(`Unsupported word.insert_image placement: ${placement}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      throw invalidArgument(`Unsupported word.insert_image placement: ${placement}.`);
     }
     if (placement === 'selection' && anchor.kind !== 'selection') {
-      throw Object.assign(new Error('word.insert_image placement selection requires anchor.kind selection.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      throw invalidArgument('word.insert_image placement selection requires anchor.kind selection.');
     }
     if (isParagraphPlacement(placement) && !isParagraphAnchor(anchor)) {
-      throw Object.assign(new Error(`word.insert_image placement ${placement} requires a paragraph-resolving anchor.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      throw invalidArgument(`word.insert_image placement ${placement} requires a paragraph-resolving anchor.`);
     }
   }
 
@@ -1553,7 +1789,7 @@
   function validateTableData(rows, cols, data) {
     if (!data) return;
     if (data.length !== rows || data.some((row) => row.length !== cols)) {
-      throw Object.assign(new Error('Table data dimensions must match rows and cols.'), { officeMcpCode: 'INVALID_ARGUMENT' });
+      throw invalidArgument('Table data dimensions must match rows and cols.');
     }
   }
 

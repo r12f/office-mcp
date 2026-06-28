@@ -133,11 +133,16 @@ failure is represented as:
 `retry_after_ms`. Mutation failures also include `partial_effect` as `none`,
 `possible`, or `unknown`.
 
+Schema validation, daemon argument normalization, and add-in semantic preflight
+for mutating tools all happen before Office.js writes are queued. Failures from
+those phases MUST return `INVALID_ARGUMENT` with `partial_effect: "none"` so
+clients can safely correct the request and retry.
+
 ## 4. Partial-success semantics
 
-The default is to preflight every known target before mutation. Office.js does
-not provide a general transaction, so a host failure during `context.sync()`
-can still leave `partial_effect: "unknown"`.
+The default is to preflight every deterministic target and argument constraint
+before mutation. Office.js does not provide a general transaction, so a host
+failure during `context.sync()` can still leave `partial_effect: "unknown"`.
 
 Tools that explicitly support `partial_ok: true` may return `ok: true` with a
 `skipped` array when at least one target succeeds. If none succeeds, return the

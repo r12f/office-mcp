@@ -379,6 +379,13 @@ in [05-security.md §6.1](05-security.md): no cookies, auth headers, private
 addresses, unvalidated redirects, oversized bodies, or non-image payloads.
 Base64 input is subject to the same decoded-byte and image-format limits.
 
+Before invoking any Office.js mutating API, `word.insert_image` MUST preflight
+the post-daemon argument shape. That preflight includes the presence of
+`image.base64`, positive `width_pt` and `height_pt` values when provided, and
+the compatibility between `placement` and `anchor.kind`. Invalid image
+arguments MUST fail with `INVALID_ARGUMENT` and `partial_effect: "none"` before
+the add-in queues a Word mutation.
+
 `placement` controls how the resolved anchor is used. `inline` preserves the
 legacy behavior and inserts the image at the resolved range, before/after the
 range according to the anchor direction. `selection` inserts into the current
@@ -968,6 +975,24 @@ general transaction or rollback guarantee. A mutating tool MUST:
 
 Tools MUST NOT claim atomicity unless the specific Office.js API used documents
 that guarantee.
+
+### 10.2 Mutating tool preflight
+
+Mutating Word tools MUST validate all deterministic argument errors before
+queuing Office.js writes. This validation is split across two layers:
+
+- The daemon validates JSON schema shape, rejects unsupported fields, enforces
+  advertised anchor-kind support, and normalizes daemon-owned inputs such as
+  fetched image URLs.
+- The Word add-in validates semantic rules that depend on the final tool
+  arguments, including required anchors, numeric bounds, mutually exclusive
+  options, placement compatibility, and target-object capabilities that can be
+  checked before mutation.
+
+When either layer rejects a mutating call before any write is queued, the error
+MUST use `INVALID_ARGUMENT` and MUST report `partial_effect: "none"`. Error
+messages SHOULD name the tool, field, and expected corrective action when that
+information is available.
 
 ### 9.2 Undo grouping
 
