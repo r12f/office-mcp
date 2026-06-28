@@ -102,9 +102,7 @@ fn resources_list_includes_powerpoint_resources_for_powerpoint_sessions() {
     assert!(uris.contains(&"office://sessions"));
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/presentation"));
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/slides"));
-    assert!(
-        uris.contains(&"office://powerpoint/powerpoint-session/slide/0/text?offset=0&limit=200")
-    );
+    assert!(uris.contains(&"office://powerpoint/powerpoint-session/slide/0/text"));
     assert!(uris.contains(&"office://powerpoint/powerpoint-session/slide/0/shapes"));
 }
 
@@ -146,9 +144,7 @@ fn resource_templates_list_uses_word_and_powerpoint_templates() {
     assert!(templates.contains(&"office://excel/{session_id}/used-range{?sheet}"));
     assert!(templates.contains(&"office://excel/{session_id}/range/{address}{?sheet}"));
     assert!(templates.contains(&"office://powerpoint/{session_id}/presentation"));
-    assert!(
-        templates.contains(&"office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}")
-    );
+    assert!(templates.contains(&"office://powerpoint/{session_id}/slide/{index}/text"));
 }
 
 #[test]
@@ -289,8 +285,8 @@ fn concrete_resource_routes() -> &'static [ConcreteResourceRoute] {
             discovered_uri: "office://powerpoint/powerpoint-session/slides",
         },
         ConcreteResourceRoute {
-            read_uri: "office://powerpoint/powerpoint-session/slide/0/text?offset=0&limit=200",
-            discovered_uri: "office://powerpoint/powerpoint-session/slide/0/text?offset=0&limit=200",
+            read_uri: "office://powerpoint/powerpoint-session/slide/0/text",
+            discovered_uri: "office://powerpoint/powerpoint-session/slide/0/text",
         },
         ConcreteResourceRoute {
             read_uri: "office://powerpoint/powerpoint-session/slide/0/shapes",
@@ -318,8 +314,8 @@ fn dynamic_resource_routes() -> &'static [DynamicResourceRoute] {
             template_uri: "office://excel/{session_id}/range/{address}{?sheet}",
         },
         DynamicResourceRoute {
-            read_uri: "office://powerpoint/powerpoint-session/slide/2/text?offset=10&limit=20",
-            template_uri: "office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}",
+            read_uri: "office://powerpoint/powerpoint-session/slide/2/text",
+            template_uri: "office://powerpoint/{session_id}/slide/{index}/text",
         },
         DynamicResourceRoute {
             read_uri: "office://powerpoint/powerpoint-session/slide/2/shapes",
