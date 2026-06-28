@@ -28,6 +28,9 @@ pub fn resource_request_from_uri(
     if let Some(rest) = uri.strip_prefix("office://word/") {
         return word_resource_request_from_uri(registry, uri, rest);
     }
+    if let Some(rest) = uri.strip_prefix("office://excel/") {
+        return excel_resource_request_from_uri(registry, uri, rest);
+    }
     if let Some(rest) = uri.strip_prefix("office://powerpoint/") {
         return powerpoint_resource_request_from_uri(registry, uri, rest);
     }
@@ -98,6 +101,58 @@ fn word_resource_request_from_uri(
     }
 }
 
+fn excel_resource_request_from_uri(
+    registry: &SessionRegistry,
+    uri: &str,
+    rest: &str,
+) -> Result<ResourceReadRequest, String> {
+    let (path, query) = rest
+        .split_once('?')
+        .map_or((rest, ""), |(path, query)| (path, query));
+    let segments = path.split('/').collect::<Vec<_>>();
+    if segments.len() < 2 {
+        return Err(format!("Malformed Excel resource URI {uri}."));
+    }
+    let session_id = segments[0];
+    if registry.get_session_info(session_id).is_none() {
+        return Err(format!("Session {session_id} is not registered."));
+    }
+    match segments.as_slice() {
+        [_, "workbook"] => Ok(ResourceReadRequest::Forwarded {
+            uri: uri.to_string(),
+            tool: "excel.get_workbook_info",
+            arguments: json!({ "session_id": session_id }),
+            check_capability: true,
+        }),
+        [_, "sheets"] => Ok(ResourceReadRequest::Forwarded {
+            uri: uri.to_string(),
+            tool: "excel.list_sheets",
+            arguments: json!({ "session_id": session_id }),
+            check_capability: true,
+        }),
+        [_, "used-range"] => Ok(ResourceReadRequest::Forwarded {
+            uri: uri.to_string(),
+            tool: "excel.get_used_range",
+            arguments: excel_arguments_with_optional_sheet(session_id, query),
+            check_capability: true,
+        }),
+        [_, "range", address] => {
+            if address.is_empty() {
+                return Err("Excel range resource requires a non-empty address.".to_string());
+            }
+            let mut arguments = excel_arguments_with_optional_sheet(session_id, query);
+            arguments["address"] = json!(*address);
+            Ok(ResourceReadRequest::Forwarded {
+                uri: uri.to_string(),
+                tool: "excel.read_range",
+                arguments,
+                check_capability: true,
+            })
+        }
+        _ => Err(format!("Unsupported Excel resource URI {uri}.")),
+    }
+}
+
 fn powerpoint_resource_request_from_uri(
     registry: &SessionRegistry,
     uri: &str,
@@ -151,6 +206,14 @@ fn powerpoint_resource_request_from_uri(
     }
 }
 
+fn excel_arguments_with_optional_sheet(session_id: &str, query: &str) -> Value {
+    let mut arguments = json!({ "session_id": session_id });
+    if let Some(sheet) = query_param_string(query, "sheet") {
+        arguments["sheet"] = json!(sheet);
+    }
+    arguments
+}
+
 fn parse_index(value: &str, name: &str) -> Result<usize, String> {
     value
         .parse::<usize>()
@@ -167,6 +230,16 @@ fn query_param_usize(query: &str, name: &str, default: usize) -> Result<usize, S
         }
     }
     Ok(default)
+}
+
+fn query_param_string(query: &str, name: &str) -> Option<String> {
+    query
+        .split('&')
+        .filter(|part| !part.is_empty())
+        .find_map(|part| {
+            let (key, value) = part.split_once('=').unwrap_or((part, ""));
+            (key == name).then(|| value.to_string())
+        })
 }
 
 #[cfg(test)]

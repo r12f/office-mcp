@@ -87,6 +87,21 @@ impl McpJsonRpcRuntime {
                 arguments,
                 check_capability,
             }) => {
+                if Self::is_forwarded_tool(tool) && !context.tool_access_policy.allows_tool(tool) {
+                    let result = tool_not_available_by_policy(tool);
+                    return json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "result": {
+                            "contents": [{
+                                "uri": uri,
+                                "mimeType": "application/json",
+                                "text": result.get("structuredContent").cloned().unwrap_or(result).to_string()
+                            }]
+                        }
+                    })
+                    .to_string();
+                }
                 let result = Self::call_forwarded_tool_with_capability(
                     context,
                     value,
