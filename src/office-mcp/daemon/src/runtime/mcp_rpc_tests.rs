@@ -49,7 +49,7 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
             "excel.update_sheet",
             "excel.update_table",
             "excel.write_range",
-            "office.describe_tool",
+            "office.describe_tools",
             "office.get_session_info",
             "office.list_sessions",
             "powerpoint.add_shape",
@@ -141,7 +141,7 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
 }
 
 #[test]
-fn mcp_json_rpc_describes_tool_contract_from_catalog() {
+fn mcp_json_rpc_describes_tool_contracts_from_catalog() {
     let registry = registry_with_word_session();
 
     let tools = mcp_handle_body(
@@ -159,13 +159,29 @@ fn mcp_json_rpc_describes_tool_contract_from_catalog() {
 
     let reply = mcp_handle_body(
         &registry,
-        br#"{"jsonrpc":"2.0","id":"describe","method":"tools/call","params":{"name":"office.describe_tool","arguments":{"tool":"word.insert_image"}}}"#,
+        br#"{"jsonrpc":"2.0","id":"describe","method":"tools/call","params":{"name":"office.describe_tools","arguments":{"tools":["word.insert_image","excel.read_range"]}}}"#,
     );
     let reply: serde_json::Value = serde_json::from_str(&reply).expect("describe json");
-    let contract = &reply["result"]["structuredContent"];
+    let contracts = reply["result"]["structuredContent"]["tools"]
+        .as_array()
+        .expect("contracts");
+    assert_eq!(contracts.len(), 2);
+    let contract = contracts
+        .iter()
+        .find(|contract| contract["name"] == "word.insert_image")
+        .expect("word.insert_image contract");
 
     assert_eq!(contract["name"], "word.insert_image");
     assert_eq!(contract["input_schema"], listed_schema);
+    assert!(
+        contract["parameters"]
+            .as_array()
+            .expect("parameters")
+            .iter()
+            .any(|parameter| parameter["name"] == "session_id"
+                && parameter["required"] == true
+                && parameter["schema"]["type"] == "string")
+    );
     assert_eq!(contract["side_effect"], "mutating");
     assert_eq!(contract["app"], "word");
     assert_eq!(contract["category"], "Media");
@@ -183,12 +199,26 @@ fn mcp_json_rpc_describes_tool_contract_from_catalog() {
 }
 
 #[test]
-fn mcp_json_rpc_describe_tool_reports_unknown_tool() {
+fn mcp_json_rpc_describe_tools_reports_unknown_tool_entry() {
     let registry = registry_with_word_session();
 
     let reply = mcp_handle_body(
         &registry,
-        br#"{"jsonrpc":"2.0","id":"describe-missing","method":"tools/call","params":{"name":"office.describe_tool","arguments":{"tool":"word.future_tool"}}}"#,
+        br#"{"jsonrpc":"2.0","id":"describe-missing","method":"tools/call","params":{"name":"office.describe_tools","arguments":{"tools":["word.future_tool"]}}}"#,
+    );
+
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    let error = &reply["result"]["structuredContent"]["tools"][0]["error"];
+    assert_eq!(error["office_mcp_code"], "UNKNOWN_TOOL");
+}
+
+#[test]
+fn mcp_json_rpc_rejects_removed_single_tool_describer() {
+    let registry = registry_with_word_session();
+
+    let reply = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"describe-removed","method":"tools/call","params":{"name":"office.describe_tool","arguments":{"tool":"word.insert_image"}}}"#,
     );
 
     let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");

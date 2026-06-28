@@ -231,9 +231,9 @@ pub fn tool_catalog_json_for_policy(policy: &ToolAccessPolicy) -> Vec<Value> {
             "Return metadata and supported tools for one Office document session.",
         ),
         tool_json(
-            "office.describe_tool",
-            "Describe Office Tool",
-            "Return the runtime contract, examples, and common errors for one Office MCP tool.",
+            "office.describe_tools",
+            "Describe Office Tools",
+            "Return runtime contracts, examples, and common errors for multiple Office MCP tools.",
         ),
     ];
     tools.extend(
@@ -533,9 +533,11 @@ pub fn input_schema_for_tool(tool: &str) -> Value {
 #[must_use]
 pub fn describe_tool_contract(tool: &str) -> Option<Value> {
     let side_effect = tool_side_effect(tool)?;
+    let input_schema = input_schema_for_tool(tool);
     let mut contract = json!({
         "name": tool,
-        "input_schema": input_schema_for_tool(tool),
+        "input_schema": input_schema,
+        "parameters": parameters_for_schema(&input_schema),
         "examples": examples_for_tool(tool),
         "side_effect": side_effect,
         "common_errors": common_errors_for_tool(tool)
@@ -547,9 +549,42 @@ pub fn describe_tool_contract(tool: &str) -> Option<Value> {
     Some(contract)
 }
 
+#[must_use]
+pub fn unknown_tool_contract(tool: &str) -> Value {
+    json!({
+        "name": tool,
+        "error": {
+            "office_mcp_code": "UNKNOWN_TOOL",
+            "message": format!("Unknown tool {tool}.")
+        }
+    })
+}
+
+fn parameters_for_schema(schema: &Value) -> Vec<Value> {
+    let required = schema["required"]
+        .as_array()
+        .map(|fields| fields.iter().filter_map(Value::as_str).collect::<Vec<_>>())
+        .unwrap_or_default();
+    let Some(properties) = schema["properties"].as_object() else {
+        return Vec::new();
+    };
+    properties
+        .iter()
+        .map(|(name, schema)| {
+            json!({
+                "name": name,
+                "required": required.contains(&name.as_str()),
+                "schema": schema
+            })
+        })
+        .collect()
+}
+
 fn tool_side_effect(tool: &str) -> Option<&'static str> {
     match tool {
-        "office.list_sessions" | "office.get_session_info" | "office.describe_tool" => Some("read"),
+        "office.list_sessions" | "office.get_session_info" | "office.describe_tools" => {
+            Some("read")
+        }
         _ => tool_metadata(tool).map(|metadata| side_effect_name(metadata.side_effect)),
     }
 }
@@ -564,9 +599,9 @@ const fn side_effect_name(side_effect: ToolSideEffect) -> &'static str {
 
 fn examples_for_tool(tool: &str) -> Vec<Value> {
     match tool {
-        "office.describe_tool" => vec![json!({
-            "description": "Inspect the contract for Word image insertion.",
-            "arguments": { "tool": "word.insert_image" }
+        "office.describe_tools" => vec![json!({
+            "description": "Inspect contracts for Word image insertion and Excel range reads.",
+            "arguments": { "tools": ["word.insert_image", "excel.read_range"] }
         })],
         "word.insert_image" => vec![json!({
             "description": "Insert a PNG as a new paragraph after paragraph 2.",
@@ -718,7 +753,7 @@ macro_rules! tool_spec {
 const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     tool_spec!("office.list_sessions", [], []),
     tool_spec!("office.get_session_info", ["session_id"], ["session_id"]),
-    tool_spec!("office.describe_tool", ["tool"], ["tool"]),
+    tool_spec!("office.describe_tools", ["tools"], ["tools"]),
     tool_spec!(
         "word.get_text",
         ["session_id"],
@@ -1499,8 +1534,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
         "formatting" => formatting_schema(),
         "title_box" | "content_box" => shape_box_schema(),
-        "values" | "data" | "formulas" | "number_formats" | "items" | "fields" | "borders"
-        | "criteria" | "selected_items" | "shape_ids" | "row_indices" | "column_indices" => {
+        "tools" | "values" | "data" | "formulas" | "number_formats" | "items" | "fields"
+        | "borders" | "criteria" | "selected_items" | "shape_ids" | "row_indices"
+        | "column_indices" => {
             json!({ "type": "array" })
         }
         _ => json!({ "type": "string" }),

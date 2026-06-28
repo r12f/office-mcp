@@ -774,10 +774,11 @@ Word, Excel, and PowerPoint session.
       annotations, Office MCP side-effect metadata, common error hints, and
       curated examples for complex nested/action tools so Hermes and other MCP
       clients do not see Word, Excel, and PowerPoint tools as untyped
-      forwarders. `office.describe_tool` remains a one-tool helper, but its
-      contract must stay byte-for-byte aligned with the metadata advertised by
-      `tools/list`. Current evidence: `office_tools_expose_rich_contract_metadata_in_tools_list`
-      and `tools_list_contract_metadata_matches_describe_tool` require `_meta`
+      forwarders. `office.describe_tools` is the batch-only richer planning
+      helper for clients that need multiple detailed contracts, and its
+      contracts must stay aligned with the metadata advertised by `tools/list`.
+      Current evidence: `office_tools_expose_rich_contract_metadata_in_tools_list`
+      and `tools_list_contract_metadata_matches_describe_tool_contract` require `_meta`
       examples/common-errors/side-effect/app/category metadata and MCP annotations
       in `tools/list`; local validation passed with targeted catalog tests,
       `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
