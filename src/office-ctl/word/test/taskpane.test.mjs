@@ -406,6 +406,30 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'validateDeleteContentControlMode'), /mode must be keep_content or delete_content/);
 });
 
+test('Word task pane preserves safe Office.js error debug context', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const mapBody = functionBody(js, 'mapError');
+  const debugBody = functionBody(js, 'officeErrorDebug');
+  const contextBody = functionBody(js, 'safeArgumentContext');
+
+  assert.match(mapBody, /mapError\(error, tool, args\)/);
+  assert.match(mapBody, /const debug = officeErrorDebug\(error, tool, args\)/);
+  assert.match(mapBody, /if \(debug\) mapped\.debug = debug/);
+  assert.match(functionBody(js, 'classifyOfficeError'), /InvalidArgument\|InvalidObjectPath\|InvalidSelection\|ItemNotFound/);
+  assert.match(functionBody(js, 'errorMessage'), /Word\.js \$\{officeCode\} while running/);
+  assert.match(debugBody, /office_error_code: officeCode/);
+  assert.match(debugBody, /error_location: safeDebugString\(error\.debugInfo\?\.errorLocation/);
+  assert.match(debugBody, /statement: safeDebugString\(error\.debugInfo\?\.statement\)/);
+  assert.match(debugBody, /\.\.\.safeArgumentContext\(args\)/);
+  assert.match(contextBody, /anchor_kind/);
+  assert.match(contextBody, /placement/);
+  assert.match(contextBody, /image_mime_type/);
+  assert.match(contextBody, /image_byte_length/);
+  assert.doesNotMatch(contextBody, /base64/);
+  assert.doesNotMatch(contextBody, /text_preview|find|replace|text/);
+  assert.match(functionBody(js, 'looksSensitive'), /base64\|data:image/);
+});
+
 test('Word task pane exposes product UI regions and accessible endpoint settings', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const css = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');

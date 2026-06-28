@@ -40,6 +40,7 @@ fn records_command_failure_with_redacted_message() {
         tool: Some("word.insert_paragraph".to_string()),
         retriable: false,
         partial_effect: Some(PartialEffect::None),
+        debug: None,
     };
 
     McpToolAuditRecorder::record_failure(

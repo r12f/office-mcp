@@ -17,6 +17,7 @@ fn maps_tool_response_to_ui_command_result() {
         tool: Some("word.get_text".to_string()),
         retriable: false,
         partial_effect: Some(PartialEffect::Unknown),
+        debug: None,
     };
     assert_eq!(
         result_from_tool_response(&ToolResponse::Failure(failure.clone())),

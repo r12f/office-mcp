@@ -25,6 +25,7 @@ fn command_result_maps_timeout_cancel_and_thrown_statuses() {
             tool: Some("word.get_text".to_string()),
             retriable: true,
             partial_effect: Some(PartialEffect::None),
+            debug: None,
         })
         .into_status()
         .status,
@@ -37,6 +38,7 @@ fn command_result_maps_timeout_cancel_and_thrown_statuses() {
             tool: None,
             retriable: false,
             partial_effect: None,
+            debug: None,
         })
         .into_status()
         .status,

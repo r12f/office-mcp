@@ -19,6 +19,7 @@ fn failure_response_estimate_includes_error_code_message_and_overhead() {
         tool: Some("word.get_text".to_string()),
         retriable: false,
         partial_effect: Some(PartialEffect::None),
+        debug: None,
     });
 
     assert_eq!(

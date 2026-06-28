@@ -60,6 +60,7 @@ fn command_failure_result_maps_partial_effect() {
         tool: Some("word.insert_paragraph".to_string()),
         retriable: true,
         partial_effect: Some(PartialEffect::Possible),
+        debug: None,
     });
 
     assert_eq!(result["isError"], true);
@@ -82,6 +83,7 @@ fn disabled_document_tool_failure_includes_session_refresh_hint() {
         tool: Some("word.get_text".to_string()),
         retriable: false,
         partial_effect: None,
+        debug: None,
     });
 
     assert_eq!(
@@ -98,6 +100,29 @@ fn disabled_document_tool_failure_includes_session_refresh_hint() {
             .expect("message")
             .starts_with("Tool word.get_text is disabled")
     );
+}
+
+#[test]
+fn command_failure_result_preserves_safe_debug_context() {
+    let result = tool_failure_from_command(&CommandFailure {
+        office_mcp_code: "INVALID_ARGUMENT".to_string(),
+        message: "Word.js InvalidArgument while running word.insert_image.".to_string(),
+        tool: Some("word.insert_image".to_string()),
+        retriable: false,
+        partial_effect: Some(PartialEffect::Unknown),
+        debug: Some(json!({
+            "office_error_code": "InvalidArgument",
+            "error_location": "Range.insertInlinePictureFromBase64",
+            "anchor_kind": "after_paragraph_index",
+            "placement": "inline",
+            "hint": "Check image payload, placement, anchor kind, and dimensions."
+        })),
+    });
+
+    let error = &result["structuredContent"]["error"];
+    assert_eq!(error["debug"]["office_error_code"], "InvalidArgument");
+    assert_eq!(error["debug"]["anchor_kind"], "after_paragraph_index");
+    assert_eq!(error["debug"]["placement"], "inline");
 }
 
 #[test]
