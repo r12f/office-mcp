@@ -179,6 +179,33 @@ exceeding it returns `MAX_RESPONSE_SIZE` with `max_response_bytes`.
 
 ## 9. Tool metadata
 
+Every tool returned by `tools/list` MUST include an `inputSchema` object that
+is specific to that tool. The schema is part of the public client contract, not
+debug documentation. Clients must be able to plan valid calls from `tools/list`
+without reading add-in source code or per-host JavaScript.
+
+Schema requirements:
+
+- Top-level schemas are JSON objects with explicit `required` fields and
+  `additionalProperties: false`, unless the tool section documents a deliberate
+  extension bag.
+- Each document-affecting tool requires `session_id` at the top level. Cross-app
+  management tools only require `session_id` when they target one session.
+- Primitive fields declare their JSON type; integer offsets, indices, row and
+  column positions declare a lower bound; bounded strings use `enum` or `const`.
+- Nested objects such as anchors, image inputs, table ranges, formatting blocks,
+  slide/shape selectors, chart options, and PivotTable descriptors are modeled
+  with nested schemas and reject unknown keys wherever the operation has a
+  closed contract.
+- Reused structures may be represented through `$defs` and `$ref` inside a
+  tool schema, but each advertised tool still carries a complete schema graph
+  that an MCP client can validate locally.
+
+Invalid argument names such as `paragraph_index` for a tool that requires
+`index` are rejected by the advertised schema before dispatch. The daemon may
+also validate server-side, but client-visible `tools/list` schemas are the
+source of truth for contract discovery.
+
 Each tool's project metadata is carried under MCP `_meta` so the standard tool
 shape remains valid:
 
