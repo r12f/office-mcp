@@ -100,6 +100,36 @@ fn parses_powerpoint_read_only_resources() {
     assert_eq!(
         resource_request_from_uri(
             &registry,
+            "office://powerpoint/session-1/slides/text?start=2&end=5",
+        )
+        .expect("slides text request"),
+        ResourceReadRequest::Forwarded {
+            uri: "office://powerpoint/session-1/slides/text?start=2&end=5".to_string(),
+            tool: "powerpoint.read_text",
+            arguments: json!({
+                "session_id": "session-1",
+                "start": 2,
+                "end": 5,
+            }),
+            check_capability: true,
+        }
+    );
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://powerpoint/session-1/slides/text")
+            .expect("slides text default range request"),
+        ResourceReadRequest::Forwarded {
+            uri: "office://powerpoint/session-1/slides/text".to_string(),
+            tool: "powerpoint.read_text",
+            arguments: json!({
+                "session_id": "session-1",
+                "start": 0,
+            }),
+            check_capability: true,
+        }
+    );
+    assert_eq!(
+        resource_request_from_uri(
+            &registry,
             "office://powerpoint/session-1/slide/2/text?offset=10&limit=20",
         )
         .expect("slide text request"),
