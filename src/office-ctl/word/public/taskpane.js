@@ -693,7 +693,7 @@
         picture = context.document.body.insertInlinePictureFromBase64(base64, Word.InsertLocation.end);
       } else {
         const target = await resolveAnchor(context, args.anchor);
-        picture = target.insertInlinePictureFromBase64(base64, isBeforeAnchor(args.anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
+        picture = insertInlinePictureAtAnchor(target, args.anchor, base64);
       }
       if (args.alt_text) picture.altTextDescription = args.alt_text;
       if (typeof args.width_pt === 'number') picture.width = args.width_pt;
@@ -1439,6 +1439,18 @@
 
   function isBeforeAnchor(anchor) {
     return anchor.kind === 'before_paragraph_index' || anchor.kind === 'before_text' || anchor.kind === 'start_of_document';
+  }
+
+  function insertInlinePictureAtAnchor(target, anchor, base64) {
+    if (isParagraphAnchor(anchor)) {
+      const paragraph = target.insertParagraph('', isBeforeAnchor(anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
+      return paragraph.getRange().insertInlinePictureFromBase64(base64, Word.InsertLocation.replace);
+    }
+    return target.insertInlinePictureFromBase64(base64, isBeforeAnchor(anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
+  }
+
+  function isParagraphAnchor(anchor) {
+    return anchor.kind === 'paragraph_index' || anchor.kind === 'before_paragraph_index' || anchor.kind === 'after_paragraph_index' || anchor.kind === 'heading';
   }
 
   function applyRunFormatting(font, formatting) {
