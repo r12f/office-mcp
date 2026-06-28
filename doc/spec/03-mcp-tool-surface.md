@@ -15,12 +15,10 @@ What the `office-mcp` server exposes to MCP clients (the AI side).
   The `<app>` segment is the URI authority — purely a namespace, not a
   network host (the daemon is a strictly local singleton; see
   [07-deployment.md](07-deployment.md) §0). Resources under each app are
-  defined by that app's spec — Word resources are listed in §3 below. Excel v1
-  intentionally uses tools rather than MCP resources; see
-  [04-excel-capabilities.md](04-excel-capabilities.md). PowerPoint v1 also uses
-  tools rather than MCP resources; see
-  [04-powerpoint-capabilities.md](04-powerpoint-capabilities.md). Outlook
-  resources will be added with the future Outlook capability doc.
+  defined by that app's spec — Word and PowerPoint resources are listed in §3
+  below. Excel v1 intentionally uses tools rather than MCP resources; see
+  [04-excel-capabilities.md](04-excel-capabilities.md). Outlook resources will
+  be added with the future Outlook capability doc.
 
 ## 2. Sessions as the unit of addressing
 
@@ -37,19 +35,19 @@ Discovery flow for an MCP client:
 The session ID is stable for the life of the document session and is the
 **same** ID used in the add-in protocol ([02-registration-protocol.md](02-registration-protocol.md)).
 
-## 3. Resources (Word v1)
+## 3. Resources (Word and PowerPoint v1)
 
 MCP resources allow clients to read document state declaratively. All resources
 are read-only; mutations happen via tools.
 
-The table below is the **Word v1** resource surface. Excel v1 does not expose
-MCP resources; clients read workbook state through `excel.read_range` in
-[04-excel-capabilities.md](04-excel-capabilities.md). PowerPoint v1 similarly
-uses `powerpoint.get_presentation_info`, `powerpoint.list_slides`,
-`powerpoint.list_shapes`, `powerpoint.read_text`, and
-`powerpoint.read_table` instead of MCP resources. Outlook will ship its own
-resource table with a future capability doc; app resource types do not share a
-generic "document" abstraction.
+The table below is the **Word v1** and **PowerPoint v1 read-only** resource
+surface. Excel v1 does not expose MCP resources; clients read workbook state
+through `excel.read_range` in [04-excel-capabilities.md](04-excel-capabilities.md).
+PowerPoint tools remain the authoritative execution surface, but the daemon
+also exposes read-only PowerPoint resources so MCP clients that can read
+resources but cannot call dynamic app tools can still inspect active decks.
+Outlook will ship its own resource table with a future capability doc; app
+resource types do not share a generic "document" abstraction.
 
 | URI pattern | Returns | Notes |
 |---|---|---|
@@ -60,6 +58,10 @@ generic "document" abstraction.
 | `office://word/<session_id>/comments` | All comments JSON | |
 | `office://word/<session_id>/track_changes` | Tracked changes JSON | |
 | `office://word/<session_id>/selection` | Currently selected range text + metadata | |
+| `office://powerpoint/<session_id>/presentation` | Presentation metadata JSON | Forwards to `powerpoint.get_presentation_info` and requires that capability in the session. |
+| `office://powerpoint/<session_id>/slides` | Slide inventory JSON | Forwards to `powerpoint.list_slides` and requires that capability in the session. |
+| `office://powerpoint/<session_id>/slide/<index>/text?offset=0&limit=200` | Paginated slide text JSON | Forwards to `powerpoint.read_text` with `slide_index`, `offset`, and `limit`. |
+| `office://powerpoint/<session_id>/slide/<index>/shapes` | Shape inventory JSON | Forwards to `powerpoint.list_shapes` for one slide. |
 
 ## 4. Management tools
 
