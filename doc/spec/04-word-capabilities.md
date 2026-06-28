@@ -367,6 +367,16 @@ in [05-security.md §6.1](05-security.md): no cookies, auth headers, private
 addresses, unvalidated redirects, oversized bodies, or non-image payloads.
 Base64 input is subject to the same decoded-byte and image-format limits.
 
+For paragraph-resolving anchors (`paragraph_index`, `before_paragraph_index`,
+`after_paragraph_index`, and `heading`), `word.insert_image` MUST insert the
+image into a clean paragraph adjacent to the resolved paragraph instead of
+calling the inline-picture API directly on the `Paragraph` object. The resolved
+anchor paragraph's text and style MUST remain unchanged; for example, inserting
+after a heading must not append the image into the heading paragraph itself.
+If the host cannot support the requested paragraph placement without mutation,
+the tool MUST return a specific `INVALID_ARGUMENT` error with
+`partial_effect: "none"`.
+
 ### 3.5 `word.resize_image`
 
 Resize an existing inline image in place without deleting and reinserting its

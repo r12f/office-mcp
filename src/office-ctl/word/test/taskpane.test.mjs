@@ -340,6 +340,21 @@ test('Office catalog registration writes a shared folder URL to the trusted cata
   }
 });
 
+test('word.insert_image handles paragraph anchors through clean image paragraphs', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const insertImageBody = functionBody(js, 'insertImage');
+
+  assert.match(insertImageBody, /insertInlinePictureAtAnchor\(target, args\.anchor, base64\)/);
+  assert.match(js, /function insertInlinePictureAtAnchor\(target, anchor, base64\)/);
+  assert.match(functionBody(js, 'insertInlinePictureAtAnchor'), /if \(isParagraphAnchor\(anchor\)\) \{/);
+  assert.match(functionBody(js, 'insertInlinePictureAtAnchor'), /target\.insertParagraph\('', isBeforeAnchor\(anchor\) \? Word\.InsertLocation\.before : Word\.InsertLocation\.after\)/);
+  assert.match(functionBody(js, 'insertInlinePictureAtAnchor'), /paragraph\.getRange\(\)\.insertInlinePictureFromBase64\(base64, Word\.InsertLocation\.replace\)/);
+  assert.match(functionBody(js, 'isParagraphAnchor'), /paragraph_index/);
+  assert.match(functionBody(js, 'isParagraphAnchor'), /before_paragraph_index/);
+  assert.match(functionBody(js, 'isParagraphAnchor'), /after_paragraph_index/);
+  assert.match(functionBody(js, 'isParagraphAnchor'), /heading/);
+});
+
 test('Word task pane exposes product UI regions and accessible endpoint settings', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const css = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');
