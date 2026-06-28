@@ -85,6 +85,7 @@ review the result like a normal collaborator's edits.
 - [x] `word.read_table`, `word.update_cell`, `word.add_row`, `word.add_column`,
       `word.format_cell`
 - [x] `word.insert_image` (base64 + URL)
+- [ ] `word.resize_image` (in-place inline image resizing by paragraph index)
 - [x] `word.insert_list` (numbered, bulleted)
 
 ### M4.1 — Word Core Tool Surface Refinement
@@ -98,7 +99,7 @@ user intent.
 
 Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.find_text`, `word.get_selection`, `word.insert_paragraph`,
-`word.insert_table`, `word.insert_image`, `word.insert_page_break`,
+`word.insert_table`, `word.insert_image`, `word.resize_image`, `word.insert_page_break`,
 `word.insert_list`, `word.replace_text`, `word.update_paragraph`,
 `word.delete_range`, `word.apply_formatting`, `word.apply_style`,
 `word.read_table`, `word.update_table`, `word.list_content_controls`,
