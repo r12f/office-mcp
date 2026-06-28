@@ -1,5 +1,36 @@
 # Release Notes
 
+## 0.1.9
+
+Office MCP Control 0.1.9 improves MCP client planning and resource discovery
+confidence. The daemon now exposes batch-only tool contract discovery through
+`office.describe_tools`, including client-friendly top-level parameter
+summaries, and adds regression coverage that keeps `resources/read` routing
+aligned with `resources/list` and `resources/templates/list` for Word, Excel,
+and PowerPoint.
+
+Expected assets:
+
+- `office-mcp-windows-portable-0.1.9-x64.zip`
+- `SHA256SUMS`
+
+Validation gates before promoting the release:
+
+- MCP clients can request multiple detailed tool contracts with one
+  `office.describe_tools` call; the previous `office.describe_tool` helper is
+  no longer exposed as a public tool.
+- Returned tool contracts include `input_schema`, top-level `parameters`,
+  examples, side-effect classification, app/category metadata, and common error
+  hints.
+- Unknown requested tool names return structured per-entry `UNKNOWN_TOOL`
+  results without failing the whole batch.
+- Resource discovery coverage proves every accepted Word, Excel, and PowerPoint
+  read-only resource route is represented in either `resources/list` or
+  `resources/templates/list`.
+- Release CI builds the Windows portable artifact after Rust daemon, Word,
+  Excel, PowerPoint, evidence, packaging, rendered-logo, and catalog-identity
+  gates pass.
+
 ## 0.1.8
 
 Office MCP Control 0.1.8 improves agent-facing Word tool planning. MCP
