@@ -531,9 +531,22 @@ Planned tools should keep contracts coarse and workflow-oriented:
 - The add-in validates required scalar fields and obvious JSON shape errors.
 - Excel remains the authority for range validity, formula syntax, table/chart
   constraints, protected workbook denial, and other workbook-specific errors.
-- The server does not expose an Excel resource URI surface in v1. Clients use
-  `excel.get_workbook_info`, `excel.list_sheets`, `excel.get_used_range`, and
-  `excel.read_range` for workbook reads.
+- Excel tools remain the authoritative execution surface. The daemon also
+  exposes a limited read-only MCP resource fallback for clients that can read
+  resources but cannot call dynamic app tools. The fallback forwards through
+  the same add-in path as Excel tools and must respect daemon Global Tool
+  Access policy and session `available_tools` capability checks.
+- The Excel read-only resource templates are:
+
+| URI template | Forwarded tool | Purpose |
+|---|---|---|
+| `office://excel/{session_id}/workbook` | `excel.get_workbook_info` | Workbook metadata and active sheet orientation. |
+| `office://excel/{session_id}/sheets` | `excel.list_sheets` | Worksheet inventory. |
+| `office://excel/{session_id}/used-range{?sheet}` | `excel.get_used_range` | Used range address and dimensions for the active or named sheet. |
+| `office://excel/{session_id}/range/{address}{?sheet}` | `excel.read_range` | Values, display text, formulas, dimensions, and number formats for an explicit range. |
+
+The fallback is intentionally read-only. Workbook mutation, formulas, table
+updates, charts, PivotTables, and formatting remain tool-only operations.
 
 ## 6. Evidence
 

@@ -338,6 +338,58 @@ pub fn word_resource_templates() -> Vec<Value> {
 }
 
 #[must_use]
+pub fn excel_resource_catalog_for_session(session_id: &str) -> Vec<Value> {
+    vec![
+        resource_json(
+            &format!("office://excel/{session_id}/workbook"),
+            "excel.workbook",
+            "Excel Workbook Info",
+        ),
+        resource_json(
+            &format!("office://excel/{session_id}/sheets"),
+            "excel.sheets",
+            "Excel Worksheets",
+        ),
+        resource_json(
+            &format!("office://excel/{session_id}/used-range"),
+            "excel.used_range",
+            "Excel Used Range",
+        ),
+        resource_json(
+            &format!("office://excel/{session_id}/range/A1"),
+            "excel.range",
+            "Excel Range",
+        ),
+    ]
+}
+
+#[must_use]
+pub fn excel_resource_templates() -> Vec<Value> {
+    vec![
+        resource_template_json(
+            "office://excel/{session_id}/workbook",
+            "excel.workbook.template",
+            "Excel Workbook Info",
+        ),
+        resource_template_json(
+            "office://excel/{session_id}/sheets",
+            "excel.sheets.template",
+            "Excel Worksheets",
+        ),
+        resource_template_json(
+            "office://excel/{session_id}/used-range{?sheet}",
+            "excel.used_range.template",
+            "Excel Used Range",
+        ),
+        resource_template_json(
+            "office://excel/{session_id}/range/{address}{?sheet}",
+            "excel.range.template",
+            "Excel Range",
+        ),
+    ]
+}
+
+#[must_use]
 pub fn powerpoint_resource_catalog_for_session(session_id: &str) -> Vec<Value> {
     vec![
         resource_json(

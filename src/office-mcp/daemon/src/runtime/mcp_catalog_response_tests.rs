@@ -107,6 +107,27 @@ fn resources_list_includes_powerpoint_resources_for_powerpoint_sessions() {
 }
 
 #[test]
+fn resources_list_includes_excel_resources_for_excel_sessions() {
+    let registry = registry_with_excel_session();
+    let response = parse(&McpCatalogResponder::resources_list(
+        &registry,
+        &json!("r1"),
+    ));
+    let uris = response["result"]["resources"]
+        .as_array()
+        .expect("resources")
+        .iter()
+        .filter_map(|resource| resource["uri"].as_str())
+        .collect::<Vec<_>>();
+
+    assert!(uris.contains(&"office://sessions"));
+    assert!(uris.contains(&"office://excel/excel-session/workbook"));
+    assert!(uris.contains(&"office://excel/excel-session/sheets"));
+    assert!(uris.contains(&"office://excel/excel-session/used-range"));
+    assert!(uris.contains(&"office://excel/excel-session/range/A1"));
+}
+
+#[test]
 fn resource_templates_list_uses_word_and_powerpoint_templates() {
     let response = parse(&McpCatalogResponder::resource_templates_list(&json!("t1")));
     let templates = response["result"]["resourceTemplates"]
@@ -118,6 +139,10 @@ fn resource_templates_list_uses_word_and_powerpoint_templates() {
 
     assert!(templates.contains(&"office://word/{session_id}/document{?offset,limit}"));
     assert!(templates.contains(&"office://word/{session_id}/track_changes"));
+    assert!(templates.contains(&"office://excel/{session_id}/workbook"));
+    assert!(templates.contains(&"office://excel/{session_id}/sheets"));
+    assert!(templates.contains(&"office://excel/{session_id}/used-range{?sheet}"));
+    assert!(templates.contains(&"office://excel/{session_id}/range/{address}{?sheet}"));
     assert!(templates.contains(&"office://powerpoint/{session_id}/presentation"));
     assert!(
         templates.contains(&"office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}")
@@ -184,6 +209,40 @@ fn registry_with_word_session() -> SessionRegistry {
                 ..DocumentInfo::default()
             },
             available_tools: vec!["word.get_text".to_string()],
+            is_active: Some(true),
+        },
+        now,
+    );
+    registry
+}
+
+fn registry_with_excel_session() -> SessionRegistry {
+    let now = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(10);
+    let mut registry = SessionRegistry::new();
+    registry.register_runtime(RuntimeInfo {
+        instance_id: "excel-instance".to_string(),
+        host: HostInfo {
+            app: "excel".to_string(),
+            version: Some("16.0".to_string()),
+            platform: Some("windows".to_string()),
+            build: Some("Desktop".to_string()),
+        },
+        add_in: AddInInfo {
+            version: "0.1.0".to_string(),
+            protocol_version: "1.0".to_string(),
+            supported_features: vec!["workbook.session".to_string()],
+        },
+        registered_at: now,
+    });
+    registry.add_session(
+        NewSessionInfo {
+            session_id: "excel-session".to_string(),
+            instance_id: "excel-instance".to_string(),
+            document: DocumentInfo {
+                filename: Some("Budget.xlsx".to_string()),
+                ..DocumentInfo::default()
+            },
+            available_tools: vec!["excel.read_range".to_string()],
             is_active: Some(true),
         },
         now,

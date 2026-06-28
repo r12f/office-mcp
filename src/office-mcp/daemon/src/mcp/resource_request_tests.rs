@@ -128,6 +128,68 @@ fn parses_powerpoint_read_only_resources() {
 }
 
 #[test]
+fn parses_excel_read_only_resources() {
+    let registry = registry_with_app("excel");
+
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://excel/session-1/workbook")
+            .expect("workbook request"),
+        ResourceReadRequest::Forwarded {
+            uri: "office://excel/session-1/workbook".to_string(),
+            tool: "excel.get_workbook_info",
+            arguments: json!({ "session_id": "session-1" }),
+            check_capability: true,
+        }
+    );
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://excel/session-1/sheets")
+            .expect("sheets request"),
+        ResourceReadRequest::Forwarded {
+            uri: "office://excel/session-1/sheets".to_string(),
+            tool: "excel.list_sheets",
+            arguments: json!({ "session_id": "session-1" }),
+            check_capability: true,
+        }
+    );
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://excel/session-1/used-range?sheet=Data")
+            .expect("used range request"),
+        ResourceReadRequest::Forwarded {
+            uri: "office://excel/session-1/used-range?sheet=Data".to_string(),
+            tool: "excel.get_used_range",
+            arguments: json!({ "session_id": "session-1", "sheet": "Data" }),
+            check_capability: true,
+        }
+    );
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://excel/session-1/range/A1:B2?sheet=Data")
+            .expect("range request"),
+        ResourceReadRequest::Forwarded {
+            uri: "office://excel/session-1/range/A1:B2?sheet=Data".to_string(),
+            tool: "excel.read_range",
+            arguments: json!({ "session_id": "session-1", "address": "A1:B2", "sheet": "Data" }),
+            check_capability: true,
+        }
+    );
+}
+
+#[test]
+fn rejects_bad_excel_resource_uris() {
+    let registry = registry_with_app("excel");
+
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://excel/missing/workbook")
+            .expect_err("missing session"),
+        "Session missing is not registered."
+    );
+    assert_eq!(
+        resource_request_from_uri(&registry, "office://excel/session-1/range/")
+            .expect_err("missing range address"),
+        "Excel range resource requires a non-empty address."
+    );
+}
+
+#[test]
 fn rejects_bad_powerpoint_slide_index() {
     let registry = registry_with_app("powerpoint");
 
