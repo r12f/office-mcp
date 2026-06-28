@@ -344,11 +344,22 @@ test('word.insert_image handles paragraph anchors through clean image paragraphs
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const insertImageBody = functionBody(js, 'insertImage');
 
-  assert.match(insertImageBody, /insertInlinePictureAtAnchor\(target, args\.anchor, base64\)/);
-  assert.match(js, /function insertInlinePictureAtAnchor\(target, anchor, base64\)/);
-  assert.match(functionBody(js, 'insertInlinePictureAtAnchor'), /if \(isParagraphAnchor\(anchor\)\) \{/);
-  assert.match(functionBody(js, 'insertInlinePictureAtAnchor'), /target\.insertParagraph\('', isBeforeAnchor\(anchor\) \? Word\.InsertLocation\.before : Word\.InsertLocation\.after\)/);
-  assert.match(functionBody(js, 'insertInlinePictureAtAnchor'), /paragraph\.getRange\(\)\.insertInlinePictureFromBase64\(base64, Word\.InsertLocation\.replace\)/);
+  assert.match(insertImageBody, /insertInlinePictureWithPlacement\(target, args\.anchor, base64, args\.placement\)/);
+  assert.match(js, /function insertInlinePictureWithPlacement\(target, anchor, base64, placement\)/);
+  assert.match(js, /function validateInsertImagePlacement\(anchor, placement\)/);
+  assert.match(js, /const INSERT_IMAGE_PLACEMENTS = new Set\(\[/);
+  assert.match(functionBody(js, 'validateInsertImagePlacement'), /if \(!placement\) return/);
+  assert.match(functionBody(js, 'validateInsertImagePlacement'), /placement === 'selection' && anchor\.kind !== 'selection'/);
+  assert.match(functionBody(js, 'insertInlinePictureWithPlacement'), /case 'new_paragraph_before':/);
+  assert.match(functionBody(js, 'insertInlinePictureWithPlacement'), /case 'new_paragraph_after':/);
+  assert.match(functionBody(js, 'insertInlinePictureWithPlacement'), /case 'replace_paragraph':/);
+  assert.match(functionBody(js, 'insertInlinePictureWithPlacement'), /case 'before_paragraph':/);
+  assert.match(functionBody(js, 'insertInlinePictureWithPlacement'), /case 'after_paragraph':/);
+  assert.match(functionBody(js, 'insertInlinePictureWithPlacement'), /target\.insertParagraph\('', Word\.InsertLocation\.before\)/);
+  assert.match(functionBody(js, 'insertInlinePictureWithPlacement'), /target\.insertParagraph\('', Word\.InsertLocation\.after\)/);
+  assert.match(functionBody(js, 'insertInlinePictureWithPlacement'), /target\.getRange\(\)\.insertInlinePictureFromBase64\(base64, Word\.InsertLocation\.replace\)/);
+  assert.match(functionBody(js, 'validateInsertImagePlacement'), /Unsupported word\.insert_image placement/);
+  assert.match(functionBody(js, 'validateInsertImagePlacement'), /requires a paragraph-resolving anchor/);
   assert.match(functionBody(js, 'isParagraphAnchor'), /paragraph_index/);
   assert.match(functionBody(js, 'isParagraphAnchor'), /before_paragraph_index/);
   assert.match(functionBody(js, 'isParagraphAnchor'), /after_paragraph_index/);
