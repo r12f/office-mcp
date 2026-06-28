@@ -112,7 +112,11 @@ fn office_tools_expose_rich_contract_metadata_in_tools_list() {
         let tool = tool_for(name);
         let meta = &tool["_meta"];
 
-        assert_eq!(meta["com.office-mcp/app"], app_for(name), "{name} app metadata");
+        assert_eq!(
+            meta["com.office-mcp/app"],
+            app_for(name),
+            "{name} app metadata"
+        );
         assert!(
             meta["com.office-mcp/category"].is_string(),
             "{name} category metadata"
@@ -168,7 +172,10 @@ fn tools_list_contract_metadata_matches_describe_tool() {
         let described = super::describe_tool_contract(name).expect("described tool");
 
         assert_eq!(listed["inputSchema"], described["input_schema"]);
-        assert_eq!(listed["_meta"]["com.office-mcp/examples"], described["examples"]);
+        assert_eq!(
+            listed["_meta"]["com.office-mcp/examples"],
+            described["examples"]
+        );
         assert_eq!(
             listed["_meta"]["com.office-mcp/common_errors"],
             described["common_errors"]
@@ -339,8 +346,7 @@ fn tool_for(name: &str) -> Value {
 
 fn app_for(name: &str) -> &str {
     name.split_once('.')
-        .map(|(app, _)| app)
-        .unwrap_or_else(|| panic!("missing app prefix for {name}"))
+        .map_or_else(|| panic!("missing app prefix for {name}"), |(app, _)| app)
 }
 
 fn assert_required(schema: &Value, required: &[&str]) {

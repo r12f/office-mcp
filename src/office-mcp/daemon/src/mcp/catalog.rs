@@ -356,11 +356,32 @@ fn resource_template_json(uri_template: &str, name: &str, title: &str) -> Value 
 }
 
 fn tool_json(name: &str, title: &str, description: &str) -> Value {
-    json!({
+    let side_effect = tool_side_effect(name).unwrap_or("read");
+    let mut tool = json!({
         "name": name,
         "title": title,
         "description": description,
-        "inputSchema": input_schema_for_tool(name)
+        "inputSchema": input_schema_for_tool(name),
+        "annotations": tool_annotations(side_effect),
+        "_meta": {
+            "com.office-mcp/side_effects": side_effect,
+            "com.office-mcp/common_errors": common_errors_for_tool(name),
+            "com.office-mcp/examples": examples_for_tool(name)
+        }
+    });
+    if let Some(metadata) = tool_metadata(name) {
+        tool["_meta"]["com.office-mcp/app"] = json!(metadata.app);
+        tool["_meta"]["com.office-mcp/category"] = json!(metadata.category);
+    }
+    tool
+}
+
+fn tool_annotations(side_effect: &str) -> Value {
+    json!({
+        "readOnlyHint": side_effect == "read",
+        "destructiveHint": side_effect == "destructive",
+        "idempotentHint": false,
+        "openWorldHint": false
     })
 }
 
