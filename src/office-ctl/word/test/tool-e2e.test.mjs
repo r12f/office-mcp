@@ -103,11 +103,10 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.resize_image', {
     setup: {
       actions: [
-        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'resize image anchor marker' } },
-        { tool: 'word.insert_image', saveAs: 'imageResult', arguments: { anchor: { kind: 'after_text', text: 'resize image anchor marker' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Resize image E2E', width_pt: 24, height_pt: 24 } }
+        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Resize image E2E', width_pt: 24, height_pt: 24 } }
       ]
     },
-    args: { image: { kind: 'paragraph_index', index: '${imageResult.paragraph_index}', image_index: 0 }, width_pt: 48, preserve_aspect_ratio: true },
+    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 }, width_pt: 48, preserve_aspect_ratio: true },
     verify: {
       kind: 'direct-result',
       expect: {

@@ -94,6 +94,7 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
             "word.list_content_controls",
             "word.read_table",
             "word.replace_text",
+            "word.resize_image",
             "word.resolve_comment",
             "word.save",
             "word.update_content_control",

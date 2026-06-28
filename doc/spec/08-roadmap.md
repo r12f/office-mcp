@@ -85,7 +85,7 @@ review the result like a normal collaborator's edits.
 - [x] `word.read_table`, `word.update_cell`, `word.add_row`, `word.add_column`,
       `word.format_cell`
 - [x] `word.insert_image` (base64 + URL)
-- [ ] `word.resize_image` (in-place inline image resizing by paragraph index)
+- [x] `word.resize_image` (in-place inline image resizing by paragraph index)
 - [x] `word.insert_list` (numbered, bulleted)
 
 ### M4.1 — Word Core Tool Surface Refinement

@@ -88,7 +88,7 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.insert_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a paragraph at an anchor; also owns heading insertion through style or heading-level arguments after migration. |
 | `word.insert_table` | implemented | Tables | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
 | `word.insert_image` | implemented | Media | edit | `WordApi 1.3` | Insert a validated image from base64 or a daemon-fetched HTTPS URL. |
-| `word.resize_image` | planned | Media | edit | `WordApi 1.3` | Resize an existing inline image in place by paragraph index and image index. |
+| `word.resize_image` | implemented | Media | edit | `WordApi 1.3` | Resize an existing inline image in place by paragraph index and image index. |
 | `word.insert_page_break` | implemented | Document & structure | edit | `WordApi 1.3` | Insert a page break at an anchor. |
 | `word.insert_list` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a numbered or bulleted list. |
 | `word.replace_text` | implemented | Range & selection | edit | `WordApi 1.3` | Find and replace text, with dry-run support. |
