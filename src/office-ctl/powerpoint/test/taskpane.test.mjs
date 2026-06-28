@@ -302,6 +302,9 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   assert.match(js, /async function readText\(args\)/);
   const readTextBody = functionBody(js, 'readText');
   assert.match(readTextBody, /loadSlidesWithShapes\(context, args\)/);
+  assert.match(readTextBody, /const start = optionalInteger\(args\.start, 0\)/);
+  assert.match(readTextBody, /const end = optionalInteger\(args\.end, slides\.length\)/);
+  assert.match(readTextBody, /return \{ slide_count: slides\.length, range: \{ start, end, returned: selectedSlides\.length \}, slides: selectedSlides\.map/);
   assert.match(readTextBody, /shape\.load\('id,textFrame\/hasText,textFrame\/textRange\/text'\)/);
   assert.match(js, /async function replaceText\(args\)/);
   const replaceTextBody = functionBody(js, 'replaceText');
