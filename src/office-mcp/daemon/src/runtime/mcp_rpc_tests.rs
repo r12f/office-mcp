@@ -562,7 +562,10 @@ fn mcp_json_rpc_forwards_word_validate_only_requests() {
             if !outbound.is_empty() {
                 break outbound;
             }
-            assert!(Instant::now() < deadline, "validate_only request was not forwarded");
+            assert!(
+                Instant::now() < deadline,
+                "validate_only request was not forwarded"
+            );
             thread::sleep(Duration::from_millis(5));
         };
         let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");

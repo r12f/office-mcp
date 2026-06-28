@@ -250,11 +250,28 @@ fn word_validation_only_schemas_accept_validate_only_flag() {
     ] {
         let schema = schema_for(tool);
         assert_eq!(
-            schema["properties"]["validate_only"]["type"],
-            "boolean",
+            schema["properties"]["validate_only"]["type"], "boolean",
             "{tool} must advertise validate_only"
         );
     }
+}
+
+#[test]
+fn word_replace_text_schema_accepts_no_mutation_preview_options() {
+    let schema = schema_for("word.replace_text");
+    assert_eq!(schema["properties"]["dry_run"]["type"], "boolean");
+    assert_eq!(schema["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(schema["properties"]["partial_ok"]["type"], "boolean");
+    assert_eq!(schema["properties"]["wildcards"]["type"], "boolean");
+    assert_eq!(schema["properties"]["limit"]["type"], "integer");
+    assert_eq!(
+        schema["properties"]["scope"]["properties"]["selection_only"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        schema["properties"]["scope"]["properties"]["paragraph_range"]["minItems"],
+        2
+    );
 }
 
 #[test]

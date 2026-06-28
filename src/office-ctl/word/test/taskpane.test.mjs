@@ -396,6 +396,8 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'validateInsertImagePreflight'), /word\.insert_image requires image\.base64/);
   assert.match(functionBody(js, 'validateInsertImagePreflight'), /validateOptionalPositiveNumber\('word\.insert_image', 'width_pt', args\.width_pt\)/);
   assert.match(functionBody(js, 'validateInsertImagePreflight'), /validateOptionalPositiveNumber\('word\.insert_image', 'height_pt', args\.height_pt\)/);
+  assert.match(functionBody(js, 'validateInsertImagePlacement'), /invalidArgumentWithSuggestion/);
+  assert.match(functionBody(js, 'mapError'), /mapped\.suggestion = error\.suggestion/);
   assert.match(functionBody(js, 'validateInsertListArgs'), /word\.insert_list requires a non-empty items array/);
   assert.match(functionBody(js, 'validateInsertListArgs'), /word\.insert_list kind must be bulleted or numbered/);
   assert.match(functionBody(js, 'validateReplaceTextArgs'), /word\.replace_text requires non-empty find text/);
