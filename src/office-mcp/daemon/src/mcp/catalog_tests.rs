@@ -216,6 +216,7 @@ fn representative_word_schemas_are_specific() {
         7
     );
     assert_eq!(image["properties"]["placement"]["default"], "inline");
+    assert_eq!(image["properties"]["validate_only"]["type"], "boolean");
     assert_eq!(
         image["properties"]["image"]["oneOf"]
             .as_array()
@@ -237,6 +238,23 @@ fn representative_word_schemas_are_specific() {
             .len(),
         6
     );
+}
+
+#[test]
+fn word_validation_only_schemas_accept_validate_only_flag() {
+    for tool in [
+        "word.insert_image",
+        "word.replace_text",
+        "word.update_paragraph",
+        "word.delete_range",
+    ] {
+        let schema = schema_for(tool);
+        assert_eq!(
+            schema["properties"]["validate_only"]["type"],
+            "boolean",
+            "{tool} must advertise validate_only"
+        );
+    }
 }
 
 #[test]

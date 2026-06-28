@@ -8,6 +8,7 @@ use crate::common::AuditLog;
 use crate::mcp::ToolAccessPolicy;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 #[test]
 #[allow(clippy::too_many_lines)]
 fn mcp_json_rpc_lists_tools_and_connected_sessions() {
@@ -542,6 +543,62 @@ fn mcp_json_rpc_allows_insert_image_after_paragraph_anchor_with_explicit_placeme
     response_thread.join().expect("response thread");
     let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
     assert_eq!(reply["result"]["structuredContent"]["inserted"], true);
+}
+
+#[test]
+fn mcp_json_rpc_forwards_word_validate_only_requests() {
+    let registry = registry_with_word_session_with_tools(vec!["word.update_paragraph"]);
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("connection-1");
+    connection_hub.bind_instance("connection-1", "instance-1");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("connection-1");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            assert!(Instant::now() < deadline, "validate_only request was not forwarded");
+            thread::sleep(Duration::from_millis(5));
+        };
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["params"]["tool"], "word.update_paragraph");
+        let args = invoke["params"]["args"].as_str().map_or_else(
+            || invoke["params"]["args"].clone(),
+            |raw| serde_json::from_str(raw).expect("parsed args"),
+        );
+        assert_eq!(args["validate_only"], true);
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"valid":true,"operation":"word.update_paragraph","partial_effect":"none","resolved_target":{{"paragraph_index":2}}}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"validate-paragraph","method":"tools/call","params":{"name":"word.update_paragraph","arguments":{"session_id":"session-1","index":2,"text":"Draft","validate_only":true}}}"#,
+    );
+    response_thread.join().expect("response thread");
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    assert_eq!(reply["result"]["structuredContent"]["valid"], true);
+    assert_eq!(
+        reply["result"]["structuredContent"]["partial_effect"],
+        "none"
+    );
 }
 
 #[test]
