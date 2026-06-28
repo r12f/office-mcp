@@ -23,6 +23,23 @@ pub fn tool_failure(code: &str, message: &str, tool: Option<&str>, retriable: bo
 }
 
 #[must_use]
+pub fn tool_failure_without_effect(
+    code: &str,
+    message: &str,
+    tool: Option<&str>,
+    retriable: bool,
+) -> Value {
+    let error = json!({
+        "office_mcp_code": code,
+        "message": message,
+        "tool": tool,
+        "retriable": retriable,
+        "partial_effect": partial_effect_json(PartialEffect::None)
+    });
+    tool_error_result(&error)
+}
+
+#[must_use]
 pub fn tool_failure_from_command(failure: &CommandFailure) -> Value {
     let partial_effect = failure.partial_effect.map(partial_effect_json);
     let mut error = json!({

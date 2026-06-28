@@ -435,6 +435,26 @@ fn mcp_json_rpc_rejects_unknown_tool_arguments_before_dispatch() {
 }
 
 #[test]
+fn mcp_json_rpc_rejects_unsupported_word_anchor_kind_before_dispatch() {
+    let registry = registry_with_word_session_with_tools(vec!["word.insert_image"]);
+
+    let reply = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"bad-anchor","method":"tools/call","params":{"name":"word.insert_image","arguments":{"session_id":"session-1","anchor":{"kind":"after_paragraph_index","index":2},"image":{"base64":"iVBORw0KGgoA"}}}}"#,
+    );
+
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    let error = &reply["result"]["structuredContent"]["error"];
+    assert_eq!(error["office_mcp_code"], "INVALID_ARGUMENTS");
+    assert_eq!(error["tool"], "word.insert_image");
+    assert_eq!(error["partial_effect"], "none");
+    assert_eq!(
+        error["message"],
+        "word.insert_image does not support anchor kind after_paragraph_index."
+    );
+}
+
+#[test]
 fn mcp_json_rpc_daemon_policy_filters_discovery_and_rejects_before_session_preflight() {
     let registry = registry_with_word_session_with_tools(vec!["word.get_text"]);
     let policy = ToolAccessPolicy::default().with_disabled_tool("word.get_text");

@@ -124,7 +124,14 @@ adds or renames a tool.
 ## 6. Anchor model
 
 Many tools take an `anchor` argument that describes *where* in the document to act.
-Anchor variants:
+The public contract is a shared typed `Anchor` schema. Tools that accept an
+`anchor` argument MUST expose that argument as a JSON Schema `oneOf` over the
+anchor variants they support, and MUST omit unsupported variants from that
+tool's advertised schema. This keeps client planning machine-readable: a client
+can inspect `tools/list` to learn whether a tool supports a paragraph, text,
+selection, heading, bookmark, start-of-document, or end-of-document target.
+
+The complete Word anchor vocabulary is:
 
 ```jsonc
 { "kind": "selection" }
@@ -138,6 +145,22 @@ Anchor variants:
 { "kind": "heading", "text": "Methodology", "level": 2 }
 { "kind": "bookmark", "name": "ResultsSection" }
 ```
+
+Per-tool schemas intentionally narrow this vocabulary. For example,
+`word.insert_paragraph`, `word.insert_table`, `word.insert_page_break`,
+`word.insert_list`, `word.delete_range`, `word.apply_formatting`,
+`word.apply_style`, `word.insert_content_control`, and `word.add_comment`
+support the full anchor vocabulary. `word.insert_image` supports only concrete
+range-like targets where inline media insertion is portable in v1:
+`selection`, `start_of_document`, `end_of_document`, `paragraph_index`,
+`before_paragraph_index`, `before_text`, `after_text`, `heading`, and
+`bookmark`. It does not advertise `after_paragraph_index` until the tool owns an
+explicit placement model for creating a separate image paragraph.
+
+The daemon validates the advertised anchor kind before forwarding a mutating
+call to the add-in. Unsupported anchor kinds fail with `INVALID_ARGUMENTS` and
+`partial_effect: none`; they must not reach Office.js and must not mutate the
+document.
 
 Paragraph indices are 0-based and refer to the *current* document state at the
 moment the tool call is processed. Clients must not cache indices across edits.

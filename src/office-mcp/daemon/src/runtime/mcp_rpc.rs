@@ -6,8 +6,8 @@ use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::mcp::{
     ExcelToolCatalog, PowerPointToolCatalog, ResourceReadRequest, ToolAccessPolicy, WORD_V1_TOOLS,
-    resource_request_from_uri, tool_failure, tool_not_available_by_policy, tool_success,
-    validate_tool_arguments,
+    resource_request_from_uri, tool_failure, tool_failure_without_effect,
+    tool_not_available_by_policy, tool_success, validate_tool_arguments,
 };
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_catalog_response::McpCatalogResponder;
@@ -137,7 +137,7 @@ impl McpJsonRpcRuntime {
             return json!({
                 "jsonrpc": "2.0",
                 "id": id,
-                "result": tool_failure("INVALID_ARGUMENTS", &message, Some(name), false)
+                "result": tool_failure_without_effect("INVALID_ARGUMENTS", &message, Some(name), false)
             })
             .to_string();
         }

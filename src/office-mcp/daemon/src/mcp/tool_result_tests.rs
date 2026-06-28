@@ -1,4 +1,7 @@
-use super::{tool_failure, tool_failure_from_command, tool_not_available_by_policy, tool_success};
+use super::{
+    tool_failure, tool_failure_from_command, tool_failure_without_effect,
+    tool_not_available_by_policy, tool_success,
+};
 use crate::addin_mgr::PartialEffect;
 use crate::api::CommandFailure;
 use serde_json::json;
@@ -31,6 +34,21 @@ fn failure_result_contains_structured_error() {
     assert_eq!(
         result["content"][0]["text"],
         result["structuredContent"]["error"].to_string()
+    );
+}
+
+#[test]
+fn failure_without_effect_marks_partial_effect_none() {
+    let result = tool_failure_without_effect(
+        "INVALID_ARGUMENTS",
+        "Bad arguments.",
+        Some("word.insert_image"),
+        false,
+    );
+
+    assert_eq!(
+        result["structuredContent"]["error"]["partial_effect"],
+        "none"
     );
 }
 
