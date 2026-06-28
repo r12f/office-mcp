@@ -247,8 +247,11 @@ Rust daemon implementation MUST follow these style rules:
 
 The canonical client transport is Streamable HTTP. MCP clients that only speak
 stdio use the bundled `office-mcp stdio` shim, which is a thin protocol bridge
-to the already-running daemon. The shim does not own Office sessions or spawn
-add-ins; it only adapts process-spawned clients to the long-lived daemon.
+to the already-running daemon. The shim speaks standard MCP stdio framing on
+its process boundary, forwards every JSON-RPC request to the daemon's
+Streamable HTTP `/mcp` endpoint, and relays every daemon response back without
+filtering the advertised capabilities. It does not own Office sessions or
+spawn add-ins; it only adapts process-spawned clients to the long-lived daemon.
 
 ### 2.2 The Office add-in
 
@@ -321,6 +324,16 @@ The implementation follows the negotiated MCP protocol version, including
 `Origin` validation, `Accept` handling, `MCP-Protocol-Version`, optional
 `MCP-Session-Id`, and POST/GET/DELETE semantics. Invalid browser origins are
 rejected with HTTP 403 to prevent DNS rebinding.
+
+The stdio bridge is a transport adapter, not a reduced client surface. A client
+connected through `office-mcp stdio` MUST see the same daemon-enabled
+`tools/list` result as a Streamable HTTP client, including `office.*`,
+`word.*`, `excel.*`, and `powerpoint.*` entries allowed by Global Tool Access
+policy. `tools/call` over stdio MUST forward through the same daemon routing
+path as HTTP, so Global Tool Access changes, session capability checks,
+`refresh_tools: true`, and `refresh_session_info: true` errors remain
+identical across transports. Resource and prompt support must remain available,
+but stdio clients must not be limited to resource-only interaction.
 
 ### 3.2 Daemon ↔ add-in: WSS + JSON-RPC 2.0
 

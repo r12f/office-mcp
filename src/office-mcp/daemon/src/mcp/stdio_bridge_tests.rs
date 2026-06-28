@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc;
 use std::thread;
+use std::time::{Duration, Instant};
 
 #[test]
 fn bridge_forwards_initialize_and_reuses_session_id() {
@@ -51,6 +52,78 @@ fn bridge_forwards_initialize_and_reuses_session_id() {
 }
 
 #[test]
+fn bridge_uses_standard_mcp_stdio_framing_and_exposes_daemon_tools() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("listener");
+    listener
+        .set_nonblocking(true)
+        .expect("listener nonblocking");
+    let port = listener.local_addr().expect("addr").port();
+    let (sender, receiver) = mpsc::channel();
+    let server = thread::spawn(move || {
+        let mut captured_bodies = Vec::new();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while captured_bodies.len() < 4 && Instant::now() < deadline {
+            match listener.accept() {
+                Ok((mut stream, _addr)) => {
+                    stream
+                        .set_nonblocking(false)
+                        .expect("accepted stream blocking");
+                    let request = read_request(&mut stream);
+                    let body = request_body(&request).to_string();
+                    let is_initialize = body.contains(r#""method":"initialize""#);
+                    captured_bodies.push(body);
+                    if is_initialize {
+                        respond(
+                            &mut stream,
+                            "MCP-Session-Id: mcp-session-1\r\n",
+                            r#"{"jsonrpc":"2.0","id":1,"result":{}}"#,
+                        );
+                    } else {
+                        respond(
+                            &mut stream,
+                            "",
+                            r#"{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"excel.read_range"},{"name":"powerpoint.list_slides"}]}}"#,
+                        );
+                    }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(error) => panic!("accept failed: {error}"),
+            }
+        }
+        sender.send(captured_bodies).expect("send captured bodies");
+    });
+
+    let mut bridge = StdioBridge::new(McpEndpoint {
+        host: "127.0.0.1".to_string(),
+        port,
+        path: "/mcp".to_string(),
+    });
+    let initialize = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#;
+    let tools_list = r#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#;
+    let input = format!(
+        "Content-Length: {}\r\n\r\n{}Content-Length: {}\r\n\r\n{}",
+        initialize.len(),
+        initialize,
+        tools_list.len(),
+        tools_list
+    );
+    let mut output = Vec::new();
+    bridge
+        .run_with(input.as_bytes(), &mut output)
+        .expect("bridge runs");
+    server.join().expect("server joins");
+
+    let captured_bodies = receiver.recv().expect("captured bodies");
+    assert_eq!(captured_bodies, vec![initialize, tools_list]);
+    let output = String::from_utf8(output).expect("output utf8");
+    assert!(output.contains("Content-Length:"));
+    assert!(output.contains("excel.read_range"));
+    assert!(output.contains("powerpoint.list_slides"));
+}
+
+#[test]
 fn endpoint_formats_config_url() {
     let endpoint = McpEndpoint {
         host: "127.0.0.1".to_string(),
@@ -83,6 +156,12 @@ fn read_request(stream: &mut TcpStream) -> String {
             return String::from_utf8_lossy(&bytes).to_string();
         }
     }
+}
+
+fn request_body(request: &str) -> &str {
+    request
+        .split_once("\r\n\r\n")
+        .map_or("", |(_head, body)| body)
 }
 
 fn respond(stream: &mut TcpStream, extra_headers: &str, body: &str) {

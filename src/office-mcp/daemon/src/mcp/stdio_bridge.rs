@@ -47,18 +47,10 @@ impl StdioBridge {
         input: impl Read,
         mut output: impl Write,
     ) -> Result<(), StdioBridgeError> {
-        for line in BufReader::new(input).lines() {
-            let line = line.map_err(StdioBridgeError::Io)?;
-            let message = line.trim();
-            if message.is_empty() {
-                continue;
-            }
-            let response = self.forward_json_rpc(message)?;
-            output
-                .write_all(response.body.as_bytes())
-                .and_then(|()| output.write_all(b"\n"))
-                .and_then(|()| output.flush())
-                .map_err(StdioBridgeError::Io)?;
+        let mut input = BufReader::new(input);
+        while let Some(message) = read_stdio_message(&mut input)? {
+            let response = self.forward_json_rpc(&message.body)?;
+            write_stdio_response(&mut output, &response.body, message.framing)?;
         }
         Ok(())
     }
@@ -210,6 +202,110 @@ impl Error for StdioBridgeError {}
 
 fn is_initialize(message: &str) -> bool {
     message.contains("\"method\"") && message.contains("\"initialize\"")
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StdioFraming {
+    ContentLength,
+    JsonLine,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StdioMessage {
+    body: String,
+    framing: StdioFraming,
+}
+
+fn read_stdio_message(reader: &mut impl BufRead) -> Result<Option<StdioMessage>, StdioBridgeError> {
+    loop {
+        let buffer = reader.fill_buf().map_err(StdioBridgeError::Io)?;
+        if buffer.is_empty() {
+            return Ok(None);
+        }
+        if buffer.starts_with(b"\r\n") {
+            reader.consume(2);
+            continue;
+        }
+        if buffer.starts_with(b"\n") {
+            reader.consume(1);
+            continue;
+        }
+        if starts_with_ignore_ascii_case(buffer, b"content-length:") {
+            return read_content_length_message(reader).map(Some);
+        }
+        return read_json_line_message(reader).map(Some);
+    }
+}
+
+fn read_content_length_message(
+    reader: &mut impl BufRead,
+) -> Result<StdioMessage, StdioBridgeError> {
+    let mut content_length = None;
+    let mut line = String::new();
+    loop {
+        line.clear();
+        let bytes_read = reader.read_line(&mut line).map_err(StdioBridgeError::Io)?;
+        if bytes_read == 0 {
+            return Err(StdioBridgeError::Protocol(
+                "incomplete MCP stdio frame headers".to_string(),
+            ));
+        }
+        let header = line.trim_end_matches(['\r', '\n']);
+        if header.is_empty() {
+            break;
+        }
+        if let Some((name, value)) = header.split_once(':')
+            && name.eq_ignore_ascii_case("content-length")
+        {
+            content_length = Some(value.trim().parse::<usize>().map_err(|_| {
+                StdioBridgeError::Protocol("invalid MCP stdio Content-Length".to_string())
+            })?);
+        }
+    }
+    let Some(content_length) = content_length else {
+        return Err(StdioBridgeError::Protocol(
+            "missing MCP stdio Content-Length".to_string(),
+        ));
+    };
+    let mut body = vec![0_u8; content_length];
+    reader.read_exact(&mut body).map_err(StdioBridgeError::Io)?;
+    let body = String::from_utf8(body).map_err(|_| {
+        StdioBridgeError::Protocol("MCP stdio frame body is not UTF-8 JSON".to_string())
+    })?;
+    Ok(StdioMessage {
+        body,
+        framing: StdioFraming::ContentLength,
+    })
+}
+
+fn read_json_line_message(reader: &mut impl BufRead) -> Result<StdioMessage, StdioBridgeError> {
+    let mut line = String::new();
+    reader.read_line(&mut line).map_err(StdioBridgeError::Io)?;
+    Ok(StdioMessage {
+        body: line.trim().to_string(),
+        framing: StdioFraming::JsonLine,
+    })
+}
+
+fn write_stdio_response(
+    output: &mut impl Write,
+    body: &str,
+    framing: StdioFraming,
+) -> Result<(), StdioBridgeError> {
+    match framing {
+        StdioFraming::ContentLength => {
+            write!(output, "Content-Length: {}\r\n\r\n{}", body.len(), body)
+        }
+        StdioFraming::JsonLine => writeln!(output, "{body}"),
+    }
+    .and_then(|()| output.flush())
+    .map_err(StdioBridgeError::Io)
+}
+
+fn starts_with_ignore_ascii_case(value: &[u8], prefix: &[u8]) -> bool {
+    value
+        .get(..prefix.len())
+        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix))
 }
 
 fn parse_status(status_line: &str) -> Result<u16, StdioBridgeError> {
