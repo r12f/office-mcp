@@ -798,8 +798,27 @@
           items.push({ slide_id: slide.id, slide_index: slide.index, shape_id: shape.id, text: shape.textFrame.textRange?.text || '' });
         }
       }
+      if (isSlideRangeTextRequest(args)) {
+        const start = optionalInteger(args.start, 0);
+        const end = optionalInteger(args.end, slides.length);
+        if (start > end || end > slides.length) throw invalidArgument('powerpoint.read_text requires 0 <= start <= end <= slide count.');
+        const selectedSlides = slides.slice(start, end);
+        return { slide_count: slides.length, range: { start, end, returned: selectedSlides.length }, slides: selectedSlides.map((slide) => {
+          const slideItems = items.filter((item) => item.slide_index === slide.index);
+          return { slide_id: slide.id, slide_index: slide.index, text_count: slideItems.length, items: slideItems };
+        }) };
+      }
       return { items, count: items.length };
     });
+  }
+
+  function isSlideRangeTextRequest(args) {
+    return (args.start !== undefined || args.end !== undefined)
+      && !stringArg(args, 'slide_id')
+      && !stringArg(args, 'slideId')
+      && numberOrNull(args.slide_index ?? args.slideIndex) === null
+      && !stringArg(args, 'shape_id')
+      && !stringArg(args, 'shapeId');
   }
 
   async function formatText(args) {
