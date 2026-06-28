@@ -3,7 +3,7 @@ use crate::addin_mgr::SessionRegistry;
 use crate::addin_mgr::{AddinChannelServer, AddinConnectionHub, CommandRouter, ImageFetcher};
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
-use crate::mcp::{McpHttpDecision, ToolAccessPolicy};
+use crate::mcp::{AccessMode, McpHttpDecision, ToolAccessPolicy};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -96,9 +96,47 @@ fn forwarded_response_invokes_mcp_runtime() {
     assert!(text.starts_with("HTTP/1.1 200 OK"));
     assert!(text.contains("office.list_sessions"));
     assert!(text.contains("word.get_text"));
+    assert!(text.contains("powerpoint.add_slide"));
+    assert!(text.contains("powerpoint.add_text_box"));
+    assert!(text.contains("powerpoint.update_shape"));
+    assert!(text.contains("powerpoint.replace_text"));
+    assert!(text.contains("powerpoint.format_text"));
+    assert!(text.contains("powerpoint.read_text"));
+}
+
+#[test]
+fn forwarded_tools_list_filters_powerpoint_actions_by_access_policy() {
+    let mut ui_state = UiStateStore::new();
+    let registry = SessionRegistry::new();
+    let shared_state = shared_state_with_policy(
+        ToolAccessPolicy::default().with_access_mode(AccessMode::Read),
+    );
+    let response = McpHttpResponseService::runtime_response(
+        McpHttpDecision::ForwardToTransport {
+            session_id: Some("mcp-session-1".to_string()),
+        },
+        &registry,
+        &mut ui_state,
+        &shared_state,
+        br#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#,
+    );
+    let text = response_text(&response);
+
+    assert!(text.starts_with("HTTP/1.1 200 OK"));
+    assert!(text.contains("powerpoint.read_text"));
+    assert!(text.contains("powerpoint.list_slides"));
+    assert!(!text.contains("powerpoint.add_slide"));
+    assert!(!text.contains("powerpoint.add_text_box"));
+    assert!(!text.contains("powerpoint.update_shape"));
+    assert!(!text.contains("powerpoint.replace_text"));
+    assert!(!text.contains("powerpoint.format_text"));
 }
 
 fn shared_state() -> Arc<RuntimeSharedState> {
+    shared_state_with_policy(ToolAccessPolicy::default())
+}
+
+fn shared_state_with_policy(policy: ToolAccessPolicy) -> Arc<RuntimeSharedState> {
     Arc::new(RuntimeSharedState {
         registry: Arc::new(Mutex::new(SessionRegistry::new())),
         session_grace: std::time::Duration::from_mins(1),
@@ -107,7 +145,7 @@ fn shared_state() -> Arc<RuntimeSharedState> {
         command_router: Arc::new(Mutex::new(CommandRouter::new())),
         audit_log: AuditLog::new(),
         image_fetcher: ImageFetcher::new(),
-        tool_access_policy: Arc::new(Mutex::new(ToolAccessPolicy::default())),
+        tool_access_policy: Arc::new(Mutex::new(policy)),
         config_path: None,
     })
 }
