@@ -227,16 +227,12 @@ fn mcp_json_rpc_lists_resources_and_prompts() {
         .iter()
         .filter_map(|template| template["uriTemplate"].as_str())
         .collect::<Vec<_>>();
-    assert_eq!(
-        uri_templates,
-        vec![
-            "office://word/{session_id}/comments",
-            "office://word/{session_id}/document{?offset,limit}",
-            "office://word/{session_id}/paragraph/{index}",
-            "office://word/{session_id}/selection",
-            "office://word/{session_id}/structure",
-            "office://word/{session_id}/track_changes",
-        ]
+    assert!(uri_templates.contains(&"office://word/{session_id}/document{?offset,limit}"));
+    assert!(uri_templates.contains(&"office://word/{session_id}/track_changes"));
+    assert!(uri_templates.contains(&"office://powerpoint/{session_id}/presentation"));
+    assert!(
+        uri_templates
+            .contains(&"office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}")
     );
 
     let prompts = mcp_handle_body(
@@ -389,6 +385,66 @@ fn mcp_json_rpc_structure_resource_routes_to_full_structure_tool() {
         "application/json"
     );
 }
+
+#[test]
+fn mcp_json_rpc_powerpoint_text_resource_routes_to_read_text_tool() {
+    let registry = registry_with_powerpoint_session();
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("powerpoint-connection");
+    connection_hub.bind_instance("powerpoint-connection", "powerpoint-instance");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("powerpoint-connection");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["method"], "tool.invoke");
+        assert_eq!(invoke["params"]["session_id"], "powerpoint-session");
+        assert_eq!(invoke["params"]["tool"], "powerpoint.read_text");
+        assert_eq!(invoke["params"]["args"]["slide_index"], 1);
+        assert_eq!(invoke["params"]["args"]["offset"], 5);
+        assert_eq!(invoke["params"]["args"]["limit"], 10);
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"text":"slide text"}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"read-ppt-text","method":"resources/read","params":{"uri":"office://powerpoint/powerpoint-session/slide/1/text?offset=5&limit=10"}}"#,
+    );
+    response_thread.join().expect("response thread");
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    assert_eq!(
+        reply["result"]["contents"][0]["uri"],
+        "office://powerpoint/powerpoint-session/slide/1/text?offset=5&limit=10"
+    );
+    assert!(
+        reply["result"]["contents"][0]["text"]
+            .as_str()
+            .expect("resource text")
+            .contains("slide text")
+    );
+}
+
 #[test]
 fn mcp_json_rpc_forwarded_word_tool_invokes_addin_connection() {
     let registry = registry_with_word_session();

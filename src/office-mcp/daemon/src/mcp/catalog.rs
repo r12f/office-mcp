@@ -337,6 +337,58 @@ pub fn word_resource_templates() -> Vec<Value> {
     ]
 }
 
+#[must_use]
+pub fn powerpoint_resource_catalog_for_session(session_id: &str) -> Vec<Value> {
+    vec![
+        resource_json(
+            &format!("office://powerpoint/{session_id}/presentation"),
+            "powerpoint.presentation",
+            "PowerPoint Presentation Info",
+        ),
+        resource_json(
+            &format!("office://powerpoint/{session_id}/slides"),
+            "powerpoint.slides",
+            "PowerPoint Slides",
+        ),
+        resource_json(
+            &format!("office://powerpoint/{session_id}/slide/0/text?offset=0&limit=200"),
+            "powerpoint.slide.text",
+            "PowerPoint Slide Text",
+        ),
+        resource_json(
+            &format!("office://powerpoint/{session_id}/slide/0/shapes"),
+            "powerpoint.slide.shapes",
+            "PowerPoint Slide Shapes",
+        ),
+    ]
+}
+
+#[must_use]
+pub fn powerpoint_resource_templates() -> Vec<Value> {
+    vec![
+        resource_template_json(
+            "office://powerpoint/{session_id}/presentation",
+            "powerpoint.presentation.template",
+            "PowerPoint Presentation Info",
+        ),
+        resource_template_json(
+            "office://powerpoint/{session_id}/slides",
+            "powerpoint.slides.template",
+            "PowerPoint Slides",
+        ),
+        resource_template_json(
+            "office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}",
+            "powerpoint.slide.text.template",
+            "PowerPoint Slide Text",
+        ),
+        resource_template_json(
+            "office://powerpoint/{session_id}/slide/{index}/shapes",
+            "powerpoint.slide.shapes.template",
+            "PowerPoint Slide Shapes",
+        ),
+    ]
+}
+
 fn resource_json(uri: &str, name: &str, title: &str) -> Value {
     json!({
         "uri": uri,

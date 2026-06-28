@@ -84,7 +84,30 @@ fn resources_list_includes_sessions_and_word_resources() {
 }
 
 #[test]
-fn resource_templates_list_uses_word_templates() {
+fn resources_list_includes_powerpoint_resources_for_powerpoint_sessions() {
+    let registry = registry_with_powerpoint_session();
+    let response = parse(&McpCatalogResponder::resources_list(
+        &registry,
+        &json!("r1"),
+    ));
+    let uris = response["result"]["resources"]
+        .as_array()
+        .expect("resources")
+        .iter()
+        .filter_map(|resource| resource["uri"].as_str())
+        .collect::<Vec<_>>();
+
+    assert!(uris.contains(&"office://sessions"));
+    assert!(uris.contains(&"office://powerpoint/powerpoint-session/presentation"));
+    assert!(uris.contains(&"office://powerpoint/powerpoint-session/slides"));
+    assert!(
+        uris.contains(&"office://powerpoint/powerpoint-session/slide/0/text?offset=0&limit=200")
+    );
+    assert!(uris.contains(&"office://powerpoint/powerpoint-session/slide/0/shapes"));
+}
+
+#[test]
+fn resource_templates_list_uses_word_and_powerpoint_templates() {
     let response = parse(&McpCatalogResponder::resource_templates_list(&json!("t1")));
     let templates = response["result"]["resourceTemplates"]
         .as_array()
@@ -95,6 +118,10 @@ fn resource_templates_list_uses_word_templates() {
 
     assert!(templates.contains(&"office://word/{session_id}/document{?offset,limit}"));
     assert!(templates.contains(&"office://word/{session_id}/track_changes"));
+    assert!(templates.contains(&"office://powerpoint/{session_id}/presentation"));
+    assert!(
+        templates.contains(&"office://powerpoint/{session_id}/slide/{index}/text{?offset,limit}")
+    );
 }
 
 #[test]
@@ -157,6 +184,40 @@ fn registry_with_word_session() -> SessionRegistry {
                 ..DocumentInfo::default()
             },
             available_tools: vec!["word.get_text".to_string()],
+            is_active: Some(true),
+        },
+        now,
+    );
+    registry
+}
+
+fn registry_with_powerpoint_session() -> SessionRegistry {
+    let now = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(10);
+    let mut registry = SessionRegistry::new();
+    registry.register_runtime(RuntimeInfo {
+        instance_id: "powerpoint-instance".to_string(),
+        host: HostInfo {
+            app: "powerpoint".to_string(),
+            version: Some("16.0".to_string()),
+            platform: Some("windows".to_string()),
+            build: Some("Desktop".to_string()),
+        },
+        add_in: AddInInfo {
+            version: "0.1.0".to_string(),
+            protocol_version: "1.0".to_string(),
+            supported_features: vec!["presentation.session".to_string()],
+        },
+        registered_at: now,
+    });
+    registry.add_session(
+        NewSessionInfo {
+            session_id: "powerpoint-session".to_string(),
+            instance_id: "powerpoint-instance".to_string(),
+            document: DocumentInfo {
+                filename: Some("Deck.pptx".to_string()),
+                ..DocumentInfo::default()
+            },
+            available_tools: vec!["powerpoint.read_text".to_string()],
             is_active: Some(true),
         },
         now,

@@ -1,7 +1,8 @@
 use crate::addin_mgr::SessionRegistry;
 use crate::mcp::{
-    ToolAccessPolicy, prompt_catalog_json, prompt_description, prompt_messages,
-    tool_catalog_json_for_policy, word_resource_catalog_for_session, word_resource_templates,
+    ToolAccessPolicy, powerpoint_resource_catalog_for_session, powerpoint_resource_templates,
+    prompt_catalog_json, prompt_description, prompt_messages, tool_catalog_json_for_policy,
+    word_resource_catalog_for_session, word_resource_templates,
 };
 use crate::runtime::json_rpc;
 use serde_json::{Value, json};
@@ -30,6 +31,8 @@ impl McpCatalogResponder {
         for session in registry.list_sessions() {
             if session.app == "word" {
                 resources.extend(word_resource_catalog_for_session(&session.session_id));
+            } else if session.app == "powerpoint" {
+                resources.extend(powerpoint_resource_catalog_for_session(&session.session_id));
             }
         }
         json!({ "jsonrpc": "2.0", "id": id, "result": { "resources": resources } }).to_string()
@@ -37,10 +40,12 @@ impl McpCatalogResponder {
 
     #[must_use]
     pub(crate) fn resource_templates_list(id: &Value) -> String {
+        let mut resource_templates = word_resource_templates();
+        resource_templates.extend(powerpoint_resource_templates());
         json!({
             "jsonrpc": "2.0",
             "id": id,
-            "result": { "resourceTemplates": word_resource_templates() }
+            "result": { "resourceTemplates": resource_templates }
         })
         .to_string()
     }
