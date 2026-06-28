@@ -1,6 +1,7 @@
 use crate::addin_mgr::{PartialEffect, SessionDescriptor};
 use crate::api::ui_redaction::redact_text;
 use crate::mcp::{ToolAccessPolicy, UiToolAccessPolicySnapshot};
+use serde_json::Value;
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
@@ -146,6 +147,7 @@ pub struct CommandFailure {
     pub tool: Option<String>,
     pub retriable: bool,
     pub partial_effect: Option<PartialEffect>,
+    pub debug: Option<Value>,
 }
 
 impl CommandFailure {

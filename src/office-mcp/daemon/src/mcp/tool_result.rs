@@ -49,6 +49,9 @@ pub fn tool_failure_from_command(failure: &CommandFailure) -> Value {
         "retriable": failure.retriable,
         "partial_effect": partial_effect
     });
+    if let Some(debug) = &failure.debug {
+        error["debug"] = debug.clone();
+    }
     if failure.office_mcp_code == "TOOL_NOT_ENABLED_FOR_DOCUMENT" {
         error["refresh_session_info"] = json!(true);
     }

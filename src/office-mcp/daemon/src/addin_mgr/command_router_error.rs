@@ -22,6 +22,7 @@ impl CommandRouterError {
                 tool: Some(tool.to_string()),
                 retriable: error.failure.retriable,
                 partial_effect: error.failure.partial_effect,
+                debug: None,
             },
             Self::UnknownRequest(request_id) => CommandFailure {
                 office_mcp_code: "INTERNAL_BUG".to_string(),
@@ -29,6 +30,7 @@ impl CommandRouterError {
                 tool: Some(tool.to_string()),
                 retriable: false,
                 partial_effect: None,
+                debug: None,
             },
             Self::ResponseTooLarge {
                 max_response_bytes, ..
@@ -38,6 +40,7 @@ impl CommandRouterError {
                 tool: Some(tool.to_string()),
                 retriable: false,
                 partial_effect: Some(PartialEffect::None),
+                debug: None,
             },
         }
     }

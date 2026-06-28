@@ -80,6 +80,7 @@ pub(crate) fn seeded_state(options: UiStateOptions) -> RuntimeSeedState {
                 tool: Some("word.insert_paragraph".to_string()),
                 retriable: false,
                 partial_effect: Some(PartialEffect::None),
+                debug: None,
             }),
             2 => CommandResult::Failure(CommandFailure {
                 office_mcp_code: "TIMEOUT".to_string(),
@@ -87,6 +88,7 @@ pub(crate) fn seeded_state(options: UiStateOptions) -> RuntimeSeedState {
                 tool: Some("word.get_text".to_string()),
                 retriable: true,
                 partial_effect: Some(PartialEffect::Unknown),
+                debug: None,
             }),
             _ => CommandResult::Failure(CommandFailure {
                 office_mcp_code: "CANCELLED".to_string(),
@@ -94,6 +96,7 @@ pub(crate) fn seeded_state(options: UiStateOptions) -> RuntimeSeedState {
                 tool: Some("word.insert_paragraph".to_string()),
                 retriable: true,
                 partial_effect: Some(PartialEffect::Unknown),
+                debug: None,
             }),
         };
         ui_state.finish_command(

@@ -62,3 +62,63 @@ fn maps_ok_false_result_to_command_failure() {
     assert!(!failure.retriable);
     assert_eq!(failure.partial_effect, Some(PartialEffect::Unknown));
 }
+
+#[test]
+fn maps_ok_false_result_debug_to_command_failure() {
+    let response = AddinToolResponseMapper::map(&json!({
+        "result": {
+            "ok": false,
+            "error": {
+                "office_mcp_code": "INVALID_ARGUMENT",
+                "message": "Word.js InvalidArgument while running word.insert_image.",
+                "tool": "word.insert_image",
+                "partial_effect": "none",
+                "debug": {
+                    "office_error_code": "InvalidArgument",
+                    "error_location": "Range.insertInlinePictureFromBase64",
+                    "anchor_kind": "after_paragraph_index",
+                    "base64": "do-not-return",
+                    "raw_arguments": { "image": { "base64": "do-not-return" } }
+                }
+            }
+        }
+    }));
+
+    let ToolResponse::Failure(failure) = response else {
+        panic!("expected failure response");
+    };
+    let debug = failure.debug.expect("debug context");
+    assert_eq!(failure.partial_effect, Some(PartialEffect::None));
+    assert_eq!(debug["office_error_code"], "InvalidArgument");
+    assert_eq!(debug["anchor_kind"], "after_paragraph_index");
+    assert!(debug.get("base64").is_none());
+    assert!(debug.get("raw_arguments").is_none());
+}
+
+#[test]
+fn maps_structured_debug_context_from_addin_error() {
+    let response = AddinToolResponseMapper::map(&json!({
+        "result": {
+            "ok": false,
+            "error": {
+                "office_mcp_code": "INVALID_ARGUMENT",
+                "message": "Word.js InvalidArgument while running word.insert_image.",
+                "tool": "word.insert_image",
+                "debug": {
+                    "office_error_code": "InvalidArgument",
+                    "error_location": "Range.insertInlinePictureFromBase64",
+                    "anchor_kind": "after_paragraph_index",
+                    "image_byte_length": 1024
+                }
+            }
+        }
+    }));
+
+    let ToolResponse::Failure(failure) = response else {
+        panic!("expected failure response");
+    };
+    let debug = failure.debug.expect("debug context");
+    assert_eq!(debug["office_error_code"], "InvalidArgument");
+    assert_eq!(debug["anchor_kind"], "after_paragraph_index");
+    assert_eq!(debug["image_byte_length"], 1024);
+}

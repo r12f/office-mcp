@@ -227,6 +227,15 @@ Invalid argument names such as `paragraph_index` for a tool that requires
 also validate server-side, but client-visible `tools/list` schemas are the
 source of truth for contract discovery.
 
+Tool failure results must preserve structured, sanitized host diagnostics when
+the add-in can provide them. For Office.js failures, the MCP
+`structuredContent.error.debug` object may include the host error code,
+reported error location, anchor kind, target object type, placement, and a
+short hint. It must not include document text, image bytes/base64, complete raw
+arguments, file contents, auth material, or arbitrary host exception dumps.
+Clients should treat these fields as optional diagnostic aids and continue to
+branch on stable `office_mcp_code` values first.
+
 Each tool's project metadata is carried under MCP `_meta` so the standard tool
 shape remains valid:
 

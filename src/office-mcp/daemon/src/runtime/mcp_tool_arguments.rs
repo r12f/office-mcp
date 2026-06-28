@@ -29,6 +29,7 @@ impl McpToolArgumentPreprocessor {
             tool: Some(tool.to_string()),
             retriable: false,
             partial_effect: Some(PartialEffect::None),
+            debug: None,
         })?;
         let mut updated = arguments.clone();
         if let Some(object) = updated.as_object_mut() {

@@ -21,6 +21,7 @@ pub(crate) fn cancelled_failure(command: &QueuedCommand) -> CommandFailure {
         tool: Some(command.tool.clone()),
         retriable: true,
         partial_effect: Some(PartialEffect::Unknown),
+        debug: None,
     }
 }
 
@@ -36,6 +37,7 @@ pub(crate) fn timeout_failure(command: &QueuedCommand) -> CommandFailure {
         tool: Some(command.tool.clone()),
         retriable: true,
         partial_effect: Some(PartialEffect::Unknown),
+        debug: None,
     }
 }
 

@@ -9,7 +9,8 @@ use crate::addin_mgr::{
 use crate::addin_mgr::{CancelCommand, QueuedCommand};
 use crate::common::{Logger, LoggerLogLevel};
 use std::fs::{read_to_string, remove_dir_all};
-use std::time::{Duration, SystemTime};
+use std::thread::sleep;
+use std::time::{Duration, Instant, SystemTime};
 
 #[test]
 fn validates_upgrade_path_and_origin() {
@@ -248,8 +249,12 @@ fn builds_tool_invoke_and_cancel_payloads() {
 #[test]
 fn writes_structured_tracing_events_for_addin_session_lifecycle() {
     let dir = std::env::temp_dir().join(format!(
-        "office-mcp-addin-channel-log-{}",
-        std::process::id()
+        "office-mcp-addin-channel-log-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("system clock after epoch")
+            .as_nanos()
     ));
     let path = dir.join("office-mcp.log");
     let (subscriber, guard) =
@@ -308,16 +313,37 @@ fn writes_structured_tracing_events_for_addin_session_lifecycle() {
     });
     drop(guard);
 
-    let contents = read_to_string(&path).expect("read tracing log file");
-    assert!(contents.contains("rejected add-in websocket origin"));
-    assert!(contents.contains("registered add-in runtime"));
-    assert!(contents.contains("added add-in document session"));
-    assert!(contents.contains("updated add-in document session"));
-    assert!(contents.contains("removed add-in document session"));
-    assert!(contents.contains("\"component\":\"addin_channel\""));
-    assert!(contents.contains("instance-1"));
-    assert!(contents.contains("session-1"));
+    let expected = [
+        "rejected add-in websocket origin",
+        "registered add-in runtime",
+        "added add-in document session",
+        "updated add-in document session",
+        "removed add-in document session",
+        "\"component\":\"addin_channel\"",
+        "instance-1",
+        "session-1",
+    ];
+    let contents = wait_for_log_contents(&path, &expected);
+    for expected_text in expected {
+        assert!(
+            contents.contains(expected_text),
+            "missing {expected_text:?} in tracing log:\n{contents}"
+        );
+    }
     let _ = remove_dir_all(dir);
+}
+
+fn wait_for_log_contents(path: &std::path::Path, expected: &[&str]) -> String {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let mut contents = String::new();
+    while Instant::now() < deadline {
+        contents = read_to_string(path).expect("read tracing log file");
+        if expected.iter().all(|value| contents.contains(value)) {
+            return contents;
+        }
+        sleep(Duration::from_millis(10));
+    }
+    read_to_string(path).unwrap_or(contents)
 }
 
 fn register_request(instance_id: &str, protocol_version: &str) -> RegisterRequest {

@@ -31,6 +31,7 @@ fn snapshots_redact_sensitive_text_and_cap_history() {
                 tool: Some("word.insert_paragraph".to_string()),
                 retriable: false,
                 partial_effect: Some(PartialEffect::None),
+                debug: None,
             }),
             SystemTime::UNIX_EPOCH + Duration::from_secs(index + 1),
         );
@@ -152,6 +153,7 @@ fn maps_timeout_cancelled_and_thrown_statuses() {
             tool: Some("word.get_text".to_string()),
             retriable: true,
             partial_effect: None,
+            debug: None,
         }),
         SystemTime::UNIX_EPOCH + Duration::from_secs(1),
     );
@@ -169,6 +171,7 @@ fn maps_timeout_cancelled_and_thrown_statuses() {
             tool: None,
             retriable: false,
             partial_effect: None,
+            debug: None,
         }),
         SystemTime::UNIX_EPOCH + Duration::from_secs(1),
     );

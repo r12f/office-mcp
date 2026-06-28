@@ -406,6 +406,30 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'validateDeleteContentControlMode'), /mode must be keep_content or delete_content/);
 });
 
+test('Word task pane preserves safe Office.js error debug context', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const mapBody = functionBody(js, 'mapError');
+  const debugBody = functionBody(js, 'officeErrorDebug');
+
+  assert.match(js, /mapError\(error, message\.params\?\.tool, message\.params\?\.args\)/);
+  assert.match(js, /mapError\(error, tool, args\)/);
+  assert.match(mapBody, /const debug = officeErrorDebug\(error, tool, args\)/);
+  assert.match(mapBody, /if \(debug\) mapped\.debug = debug/);
+  assert.match(functionBody(js, 'classifyOfficeError'), /InvalidArgument\|InvalidObjectPath\|InvalidSelection\|ItemNotFound/);
+  assert.match(functionBody(js, 'errorMessage'), /Word\.js \$\{officeCode\} while running/);
+  assert.match(debugBody, /office_error_code: officeCode/);
+  assert.match(debugBody, /error_location: safeDebugString\(error\.debugInfo\?\.errorLocation/);
+  assert.match(debugBody, /statement: safeDebugString\(error\.debugInfo\?\.statement\)/);
+  assert.match(debugBody, /\.\.\.safeArgumentContext\(args\)/);
+  assert.match(js, /context\.anchor_kind = String\(args\.anchor\.kind\)/);
+  assert.match(js, /context\.placement = String\(args\.placement\)/);
+  assert.match(js, /context\.image_mime_type = String\(args\.image\.mime_type\)/);
+  assert.match(js, /context\.image_byte_length = args\.image\.byte_length/);
+  assert.doesNotMatch(functionBody(js, 'officeErrorDebug'), /base64/);
+  assert.doesNotMatch(functionBody(js, 'officeErrorDebug'), /text_preview|find|replace/);
+  assert.match(functionBody(js, 'looksSensitive'), /base64\|data:image/);
+});
+
 test('Word task pane exposes product UI regions and accessible endpoint settings', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');
   const css = readFileSync(join(ADDIN_ROOT, '..', 'common', 'taskpane.css'), 'utf8');
