@@ -1,5 +1,32 @@
 # Release Notes
 
+## 0.1.8
+
+Office MCP Control 0.1.8 improves agent-facing Word tool planning. MCP
+`tools/list` now exposes rich schemas, examples, side-effect metadata, and
+common error hints directly, and Word mutating tools now support validation-only
+planning calls before writes are queued.
+
+Expected assets:
+
+- `office-mcp-windows-portable-0.1.8-x64.zip`
+- `SHA256SUMS`
+
+Validation gates before promoting the release:
+
+- MCP clients can construct Office tool calls from `tools/list` metadata without
+  inspecting add-in JavaScript or making a secondary discovery call.
+- `office.describe_tool` remains aligned with the richer `tools/list` contract
+  for schemas, examples, side-effect classification, app/category metadata, and
+  common error hints.
+- `word.insert_image`, `word.replace_text`, `word.update_paragraph`, and
+  `word.delete_range` support `validate_only: true` or the existing dry-run
+  alias where documented, returning no-mutation planning results or structured
+  no-effect validation failures.
+- Release CI builds the Windows portable artifact after Rust daemon, Word,
+  Excel, PowerPoint, evidence, packaging, rendered-logo, and catalog-identity
+  gates pass.
+
 ## 0.1.7
 
 Office MCP Control 0.1.7 fixes the native Windows tray menu actions for normal
