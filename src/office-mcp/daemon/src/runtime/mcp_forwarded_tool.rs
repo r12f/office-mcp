@@ -98,6 +98,7 @@ impl McpForwardedToolInvoker {
                 tool: Some(tool.to_string()),
                 retriable: true,
                 partial_effect: Some(crate::addin_mgr::PartialEffect::Unknown),
+                debug: None,
             }),
             Err(AddinConnectionHubError::Timeout) => {
                 Self::send_timeout_cancel(context, queued);
@@ -110,6 +111,7 @@ impl McpForwardedToolInvoker {
                     tool: Some(tool.to_string()),
                     retriable: true,
                     partial_effect: Some(crate::addin_mgr::PartialEffect::Unknown),
+                    debug: None,
                 })
             }
         }

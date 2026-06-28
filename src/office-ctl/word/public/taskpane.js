@@ -393,7 +393,7 @@
     if (isToolInvoke(message)) {
       invokeTool(message).catch((error) => reply(message.id, {
         ok: false,
-        error: mapError(error, message.params?.tool),
+        error: mapError(error, message.params?.tool, message.params?.args),
         elapsed_ms: 0
       }));
     } else if (isPing(message)) {
@@ -528,7 +528,7 @@
       finishTask(requestId, 'success', elapsedMs);
       reply(message.id, { ok: true, data, elapsed_ms: elapsedMs });
     } catch (error) {
-      const mapped = mapError(error, tool);
+      const mapped = mapError(error, tool, args);
       finishTask(requestId, mapped.office_mcp_code === 'CANCELLED' ? 'cancelled' : 'failure', Math.round(performance.now() - started), mapped);
       throw error;
     }
@@ -1862,25 +1862,105 @@
     };
   }
 
-  function mapError(error, tool) {
+  function mapError(error, tool, args) {
     const code = error.officeMcpCode || classifyOfficeError(error);
-    return {
+    const mapped = {
       office_mcp_code: code,
-      message: error.message || String(error),
+      message: errorMessage(error, tool),
       session_id: sessionId,
       tool,
       retriable: Boolean(error.retriable) || code === 'HOST_BUSY' || code === 'TIMEOUT',
       partial_effect: error.partialEffect || 'unknown'
     };
+    const debug = officeErrorDebug(error, tool, args);
+    if (debug) mapped.debug = debug;
+    return mapped;
   }
 
   function classifyOfficeError(error) {
     const code = String(error.code || error.name || '');
     const message = String(error.message || '');
+    if (/InvalidArgument|InvalidObjectPath|InvalidSelection|ItemNotFound/i.test(code + message)) return 'INVALID_ARGUMENT';
     if (/permission|denied|IRM|rights/i.test(code + message)) return 'IRM_DENIED';
     if (/read.?only/i.test(code + message)) return 'DOCUMENT_READ_ONLY';
     if (/STALE_INDEX/i.test(code + message)) return 'STALE_INDEX';
     return 'GENERIC_FAILURE';
+  }
+
+  function errorMessage(error, tool) {
+    const officeCode = officeErrorCode(error);
+    if (officeCode && !error.officeMcpCode) {
+      return `Word.js ${officeCode} while running ${tool || 'tool'}.`;
+    }
+    return error.message || String(error);
+  }
+
+  function officeErrorDebug(error, tool, args) {
+    const officeCode = officeErrorCode(error);
+    if (!officeCode && !error.debugInfo) return null;
+    return compactObject({
+      office_error_code: officeCode,
+      office_error_message: safeOfficeMessage(error.message),
+      error_location: safeDebugString(error.debugInfo?.errorLocation || error.traceMessages?.[0]),
+      statement: safeDebugString(error.debugInfo?.statement),
+      tool,
+      ...safeArgumentContext(args),
+      hint: officeErrorHint(officeCode, tool, args)
+    });
+  }
+
+  function officeErrorCode(error) {
+    const code = error.code || error.name;
+    return code && code !== 'Error' ? String(code).slice(0, 80) : null;
+  }
+
+  function safeArgumentContext(args = {}) {
+    const context = {};
+    if (args.anchor?.kind) context.anchor_kind = String(args.anchor.kind).slice(0, 80);
+    if (args.placement) context.placement = String(args.placement).slice(0, 80);
+    if (args.extent) context.extent = String(args.extent).slice(0, 80);
+    if (args.action) context.action = String(args.action).slice(0, 80);
+    if (args.image?.mime_type) context.image_mime_type = String(args.image.mime_type).slice(0, 120);
+    if (Number.isFinite(args.image?.byte_length)) context.image_byte_length = args.image.byte_length;
+    if (Number.isFinite(args.width_pt)) context.width_pt = args.width_pt;
+    if (Number.isFinite(args.height_pt)) context.height_pt = args.height_pt;
+    if (Number.isInteger(args.index)) context.index = args.index;
+    if (Number.isInteger(args.table_index)) context.table_index = args.table_index;
+    if (Number.isInteger(args.row)) context.row = args.row;
+    if (Number.isInteger(args.col)) context.col = args.col;
+    if (Number.isInteger(args.content_control_id)) context.content_control_id = args.content_control_id;
+    return context;
+  }
+
+  function safeOfficeMessage(message) {
+    if (!message) return null;
+    const value = String(message);
+    if (looksSensitive(value)) return null;
+    return value.slice(0, 240);
+  }
+
+  function safeDebugString(value) {
+    if (!value) return null;
+    const text = String(value);
+    if (looksSensitive(text)) return null;
+    return text.slice(0, 180);
+  }
+
+  function looksSensitive(value) {
+    return /base64|data:image|[A-Za-z0-9+/]{80,}={0,2}/.test(value);
+  }
+
+  function officeErrorHint(officeCode, tool, args = {}) {
+    if (/InvalidArgument/i.test(officeCode || '') && tool === 'word.insert_image') {
+      if (isParagraphAnchor(args.anchor) && !args.placement) return 'Use an explicit paragraph placement such as new_paragraph_after for paragraph anchors.';
+      return 'Check image payload, placement, anchor kind, and dimensions.';
+    }
+    if (/InvalidObjectPath/i.test(officeCode || '')) return 'Retry after re-reading the target object; the Office.js object path became invalid.';
+    return null;
+  }
+
+  function compactObject(value) {
+    return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== null && item !== undefined));
   }
 
   function reply(id, result) {
