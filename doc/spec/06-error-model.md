@@ -14,6 +14,7 @@ failures that an agent can act on.
 | `SESSION_NOT_FOUND` | The `session_id` was never known or has expired. |
 | `SESSION_STALE` | Session is in its reconnect grace period. |
 | `HOST_BUSY` | Office is blocked by a modal dialog or equivalent state. |
+| `HOST_ERROR` | Host API rejected the operation and no more specific symbolic code is known. |
 | `MAX_PENDING_EXCEEDED` | The per-session FIFO queue is full. |
 | `FORBIDDEN_ORIGIN` | A browser-facing request or add-in WSS upgrade came from an untrusted `Origin`. |
 | `IRM_DENIED` | The document policy denied the requested operation. |
@@ -101,6 +102,18 @@ uses JSON-RPC `-32000` with `error.data.office_mcp_code` and the same structured
 fields. Browser `Origin` failures and TLS/front-door failures use their normal
 HTTP status codes before MCP dispatch.
 
+Expected tool execution failures MAY include a `debug` object with sanitized,
+machine-readable context. The object is for diagnosis and recovery, not for
+free-form logs. Allowed fields include Office.js error metadata such as
+`office_error_code`, `office_error_location`, `error_location`, selected tool
+argument categories such as `anchor_kind`, `target_object_type`, `placement`,
+and a short `hint`. The add-in and daemon MUST NOT include full document text,
+image base64, file contents, auth material, or unsanitized raw argument objects
+in `debug`. When Office.js reports an `InvalidArgument` style failure, the
+add-in MUST map it to `INVALID_ARGUMENT` when the rejection is actionable by
+changing tool arguments; otherwise it should use `HOST_ERROR` with the same
+safe Office.js details.
+
 ## 3. Add-in protocol mapping
 
 Malformed or unknown add-in JSON-RPC messages use standard JSON-RPC errors.
@@ -132,6 +145,41 @@ failure is represented as:
 `retriable` is required. When retrying is useful, include
 `retry_after_ms`. Mutation failures also include `partial_effect` as `none`,
 `possible`, or `unknown`.
+
+Add-ins SHOULD preserve safe Office.js diagnostics on operational failures by
+including `debug` under `error`. The daemon MUST forward this sanitized
+`debug` object into the MCP tool result unchanged except for enforcing the same
+redaction boundary. If the add-in provides `partial_effect`, the daemon MUST
+preserve it; otherwise daemon-mapped add-in failures default to `unknown`.
+
+Example Office.js rejection payload:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "55555555-...",
+  "result": {
+    "ok": false,
+    "error": {
+      "office_mcp_code": "INVALID_ARGUMENT",
+      "message": "Word.js InvalidArgument while running word.insert_image.",
+      "session_id": "44444444-...",
+      "tool": "word.insert_image",
+      "retriable": false,
+      "partial_effect": "none",
+      "debug": {
+        "office_error_code": "InvalidArgument",
+        "error_location": "Range.insertInlinePictureFromBase64",
+        "anchor_kind": "after_paragraph_index",
+        "target_object_type": "Paragraph",
+        "placement": "inline",
+        "hint": "Use a paragraph-relative placement such as new_paragraph_after."
+      }
+    },
+    "elapsed_ms": 18
+  }
+}
+```
 
 Schema validation, daemon argument normalization, and add-in semantic preflight
 for mutating tools all happen before Office.js writes are queued. Failures from

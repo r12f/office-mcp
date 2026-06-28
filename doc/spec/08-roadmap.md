@@ -163,6 +163,13 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       supports. The daemon must reject unsupported anchor kinds before
       forwarding mutating calls to Office.js, with `INVALID_ARGUMENTS` and
       `partial_effect: none`.
+- [ ] Preserve structured Office.js error details for actionable host
+      rejections. The add-in should map argument-actionable Office.js failures
+      to `INVALID_ARGUMENT`, use `HOST_ERROR` when no narrower code is known,
+      include safe diagnostic fields such as Office.js code/location, anchor
+      kind, target object type, placement, and hint, and keep document text,
+      image base64, file contents, auth material, and raw arguments out of
+      client-visible errors.
 
 ### M5 — Document IO
 
