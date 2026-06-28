@@ -1,5 +1,5 @@
 param(
-  [string]$Version = "0.1.7",
+  [string]$Version = "",
   [string]$OutputDir = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) "artifacts"),
   [switch]$SkipNpmInstall
 )
@@ -113,6 +113,10 @@ function New-PortableZip([string]$StageRoot, [string]$OutputPath) {
 }
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+if ([string]::IsNullOrWhiteSpace($Version)) {
+  $Version = (Get-Content -Raw -LiteralPath (Join-Path $repoRoot "packaging\package.json") | ConvertFrom-Json).version
+}
+
 $rustDaemonRoot = Join-Path $repoRoot "src\office-mcp\daemon"
 $evidenceRoot = Join-Path $repoRoot "src\office-mcp\daemon\evidence"
 $uiRoot = Join-Path $rustDaemonRoot "src\ui\assets"

@@ -90,6 +90,10 @@ test('Windows packaging includes the tray controller and simplified portable pay
   assert.match(buildScript, /OFFICE_MCP_CONFIG_PATH/);
   assert.match(buildScript, /README-install\.txt/);
   assert.match(buildScript, /office-mcp-windows-portable-\$Version-x64\.zip/);
+  assert.match(buildScript, /\[string\]\$Version = ""/);
+  assert.match(buildScript, /packaging\\package\.json/);
+  assert.match(buildScript, /ConvertFrom-Json\)\.version/);
+  assert.doesNotMatch(buildScript, /\[string\]\$Version = "0\.1\.7"/);
   assert.match(buildScript, /Compress-Archive/);
   assert.match(buildScript, /portable-stage/);
   assert.doesNotMatch(buildScript, /office-mcp-setup|\.msi|dotnet wix|WiX|Wix|wixpdb/i);
