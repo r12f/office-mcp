@@ -186,6 +186,14 @@ for mutating tools all happen before Office.js writes are queued. Failures from
 those phases MUST return `INVALID_ARGUMENT` with `partial_effect: "none"` so
 clients can safely correct the request and retry.
 
+Validation-only tool calls follow the same error model. If `validate_only: true`
+is set, the daemon and add-in MUST return preflight failures before any write is
+queued, and successful responses MUST include `valid: true` and
+`partial_effect: "none"`. Validation-only responses may include safe planning
+metadata such as resolved target type, paragraph index, match count, or a small
+`suggestion` object; they must not include document body text beyond existing
+bounded preview fields.
+
 ## 4. Partial-success semantics
 
 The default is to preflight every deterministic target and argument constraint

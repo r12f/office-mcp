@@ -70,6 +70,9 @@ open document, including in an IRM-protected file where their policy allows the 
 
 - [x] `word.replace_text` (with `dry_run`)
 - [x] `word.update_paragraph`, `word.delete_range`, `word.apply_formatting`
+- [ ] Shared `validate_only` mode for `word.insert_image`,
+      `word.replace_text`, `word.update_paragraph`, and `word.delete_range`,
+      returning no-mutation target validation results before writes are queued.
 - [x] `word.add_comment`, `word.resolve_comment`
 - [x] `word.accept_change`, `word.reject_change`
 - [x] Track Changes interaction: when the user has Track Changes enabled, Word
