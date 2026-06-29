@@ -370,6 +370,15 @@ contract discovery only; it does not require a document session and must not
 mutate host state. The previous single-tool `office.describe_tool` helper is
 not a public tool.
 
+Transport rate limiting must distinguish discovery/read-only requests from
+document-operation requests. `initialize`, `tools/list`, `resources/list`,
+`resources/templates/list`, `resources/read office://sessions`,
+`office.list_sessions`, `office.get_session_info`, and `office.describe_tools`
+are discovery/read-only traffic. These requests use a separate discovery budget
+so client introspection cannot consume the same strict budget as mutating Office
+operations. Other `resources/read` requests and document-affecting
+`tools/call` requests remain protected by the normal operation budget.
+
 Each tool's project metadata is carried under MCP `_meta` so the standard tool
 shape remains valid:
 

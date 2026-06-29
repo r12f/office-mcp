@@ -102,6 +102,15 @@ uses JSON-RPC `-32000` with `error.data.office_mcp_code` and the same structured
 fields. Browser `Origin` failures and TLS/front-door failures use their normal
 HTTP status codes before MCP dispatch.
 
+HTTP rate-limit failures use status `429` before MCP dispatch and must include
+`Retry-After` so clients can back off without guessing. Where the request body
+contains JSON-RPC, the response should also preserve JSON-RPC shape with
+`error.code = -32000` and `error.data.office_mcp_code = "RATE_LIMITED"`.
+Discovery/read-only traffic uses a separate transport rate-limit budget from
+document-operation traffic so recovery calls such as `office://sessions`,
+`resources/list`, and `resources/templates/list` remain available during normal
+client introspection bursts.
+
 Expected tool execution failures MAY include a `debug` object with sanitized,
 machine-readable context. The object is for diagnosis and recovery, not for
 free-form logs. Allowed fields include Office.js error metadata such as

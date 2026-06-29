@@ -40,6 +40,8 @@ fn reject_response_preserves_frontend_headers() {
             status: 429,
             body: "Rate limit exceeded".to_string(),
             headers: BTreeMap::from([("Retry-After".to_string(), "60".to_string())]),
+            json_rpc_code: Some(-32000),
+            office_mcp_code: Some("RATE_LIMITED".to_string()),
         },
         &registry,
         &mut ui_state,
@@ -51,6 +53,7 @@ fn reject_response_preserves_frontend_headers() {
     assert!(text.starts_with("HTTP/1.1 429 Too Many Requests"));
     assert!(text.contains("Retry-After: 60"));
     assert!(text.contains("Rate limit exceeded"));
+    assert!(text.contains("\"office_mcp_code\":\"RATE_LIMITED\""));
 }
 
 #[test]

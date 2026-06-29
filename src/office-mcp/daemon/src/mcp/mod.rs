@@ -20,6 +20,7 @@ pub use http_frontend::McpHttpFrontend;
 pub(crate) use http_frontend_model::RateLimitWindow;
 pub use http_frontend_model::{
     HttpMethod, McpClientSession, McpHttpConfig, McpHttpDecision, McpHttpError, McpHttpRequest,
+    McpHttpRequestClass,
 };
 pub use management_client::McpManagementClient;
 pub use prompt_catalog::{prompt_catalog_json, prompt_description, prompt_messages};
