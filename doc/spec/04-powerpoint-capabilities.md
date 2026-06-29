@@ -267,6 +267,12 @@ and host-denied operations. These map through the standard error model in
   resources but cannot call dynamic app tools. The fallback forwards through
   the same add-in path as PowerPoint tools and must respect daemon Global Tool
   Access policy and session `available_tools` capability checks.
+- The read-only resource fallback must not replace the callable PowerPoint tool
+  surface. If a PowerPoint session reports an action tool in `available_tools`
+  and daemon Global Tool Access allows that tool, MCP `tools/list` must expose
+  the same public tool name as callable and `tools/call` must route it through
+  the existing PowerPoint add-in channel with the normal per-session capability
+  check.
 - The PowerPoint read-only resource templates are:
 
 | URI template | Forwarded tool | Purpose |
