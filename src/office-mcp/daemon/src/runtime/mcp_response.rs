@@ -110,8 +110,27 @@ impl McpHttpResponseService {
                 status,
                 body,
                 headers,
+                json_rpc_code,
+                office_mcp_code,
             } => {
-                let mut response = WireHttpResponse::text(status, body);
+                let mut response = if let Some(code) = json_rpc_code {
+                    let mut error = json!({ "code": code, "message": body });
+                    if let Some(office_mcp_code) = office_mcp_code {
+                        error["data"] = json!({ "office_mcp_code": office_mcp_code });
+                    }
+                    WireHttpResponse::json(
+                        status,
+                        BTreeMap::new(),
+                        json!({
+                            "jsonrpc": "2.0",
+                            "id": request_id.unwrap_or(Value::Null),
+                            "error": error,
+                        })
+                        .to_string(),
+                    )
+                } else {
+                    WireHttpResponse::text(status, body)
+                };
                 response.headers.extend(headers);
                 response
             }

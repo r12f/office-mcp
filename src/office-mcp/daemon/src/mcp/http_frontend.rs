@@ -1,7 +1,7 @@
 use crate::api::{RegisterClientInput, UiClientTransport, UiStateStore};
 use crate::mcp::{
     HttpMethod, McpClientSession, McpHttpConfig, McpHttpDecision, McpHttpError, McpHttpRequest,
-    RateLimitWindow,
+    McpHttpRequestClass, RateLimitWindow,
 };
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime};
@@ -61,7 +61,7 @@ impl McpHttpFrontend {
             );
             return error.into();
         }
-        if let Err(error) = self.check_rate_limit(request.client_key(), now) {
+        if let Err(error) = self.check_rate_limit(request.rate_limit_key(), request.class, now) {
             tracing::warn!(
                 component = "mcp_http_frontend",
                 client = %request.client_key(),
@@ -231,7 +231,12 @@ impl McpHttpFrontend {
         }
     }
 
-    fn check_rate_limit(&mut self, key: String, now: SystemTime) -> Result<(), McpHttpError> {
+    fn check_rate_limit(
+        &mut self,
+        key: String,
+        class: McpHttpRequestClass,
+        now: SystemTime,
+    ) -> Result<(), McpHttpError> {
         let window = self
             .rate_limits
             .entry(key)
@@ -248,7 +253,7 @@ impl McpHttpFrontend {
             window.count = 0;
         }
         window.count += 1;
-        if window.count <= self.config.requests_per_minute {
+        if window.count <= self.config.limit_for(class) {
             Ok(())
         } else {
             Err(McpHttpError::RateLimited)

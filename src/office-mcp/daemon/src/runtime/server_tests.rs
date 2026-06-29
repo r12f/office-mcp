@@ -63,6 +63,7 @@ fn serves_tools_list_after_mcp_session_initialization() {
                 remote_addr: Some("127.0.0.1".to_string()),
                 body_bytes: 0,
                 is_initialize: true,
+                class: crate::mcp::McpHttpRequestClass::Discovery,
             };
             frontend.handle_request(ui_state, &initialize, std::time::SystemTime::UNIX_EPOCH);
         },

@@ -19,6 +19,14 @@ impl McpHttpConfig {
             format!("http://127.0.0.1:{}", self.port),
         ])
     }
+
+    #[must_use]
+    pub(crate) fn limit_for(&self, class: McpHttpRequestClass) -> u64 {
+        match class {
+            McpHttpRequestClass::Discovery => self.requests_per_minute.saturating_mul(10).max(10),
+            McpHttpRequestClass::Operation => self.requests_per_minute,
+        }
+    }
 }
 
 impl Default for McpHttpConfig {
@@ -39,6 +47,7 @@ pub struct McpHttpRequest {
     pub remote_addr: Option<String>,
     pub body_bytes: usize,
     pub is_initialize: bool,
+    pub class: McpHttpRequestClass,
 }
 
 impl McpHttpRequest {
@@ -65,6 +74,27 @@ impl McpHttpRequest {
         self.header("x-office-mcp-client")
             .or_else(|| self.header("user-agent"))
             .map(str::to_string)
+    }
+
+    #[must_use]
+    pub(crate) fn rate_limit_key(&self) -> String {
+        format!("{}:{}", self.client_key(), self.class.rate_limit_suffix())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum McpHttpRequestClass {
+    Discovery,
+    Operation,
+}
+
+impl McpHttpRequestClass {
+    #[must_use]
+    pub(crate) const fn rate_limit_suffix(self) -> &'static str {
+        match self {
+            Self::Discovery => "discovery",
+            Self::Operation => "operation",
+        }
     }
 }
 
@@ -104,6 +134,8 @@ pub enum McpHttpDecision {
         status: u16,
         body: String,
         headers: BTreeMap<String, String>,
+        json_rpc_code: Option<i64>,
+        office_mcp_code: Option<String>,
     },
     JsonRpcError {
         status: u16,
@@ -118,14 +150,18 @@ impl McpHttpDecision {
             status,
             body: body.to_string(),
             headers: BTreeMap::new(),
+            json_rpc_code: None,
+            office_mcp_code: None,
         }
     }
 
-    pub(crate) fn reject_with_header(status: u16, body: &str, name: &str, value: &str) -> Self {
+    pub(crate) fn rate_limited() -> Self {
         Self::Reject {
-            status,
-            body: body.to_string(),
-            headers: BTreeMap::from([(name.to_string(), value.to_string())]),
+            status: 429,
+            body: "Rate limit exceeded".to_string(),
+            headers: BTreeMap::from([("Retry-After".to_string(), "60".to_string())]),
+            json_rpc_code: Some(-32000),
+            office_mcp_code: Some("RATE_LIMITED".to_string()),
         }
     }
 
@@ -149,9 +185,7 @@ impl From<McpHttpError> for McpHttpDecision {
     fn from(error: McpHttpError) -> Self {
         match error {
             McpHttpError::ForbiddenOrigin => Self::reject(403, "Forbidden origin"),
-            McpHttpError::RateLimited => {
-                Self::reject_with_header(429, "Rate limit exceeded", "Retry-After", "60")
-            }
+            McpHttpError::RateLimited => Self::rate_limited(),
             McpHttpError::RequestTooLarge { max_request_bytes } => Self::json_rpc_error(
                 413,
                 -32000,

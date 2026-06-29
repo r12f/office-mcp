@@ -1,4 +1,6 @@
-use super::{HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpError, McpHttpRequest};
+use super::{
+    HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpError, McpHttpRequest, McpHttpRequestClass,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[test]
@@ -34,6 +36,7 @@ fn request_client_key_prefers_forwarded_for_first_hop() {
         remote_addr: Some("127.0.0.1".to_string()),
         body_bytes: 0,
         is_initialize: true,
+        class: McpHttpRequestClass::Discovery,
     };
 
     assert_eq!(request.client_key(), "10.0.0.1");
@@ -53,6 +56,7 @@ fn request_client_name_prefers_explicit_office_mcp_header() {
         remote_addr: None,
         body_bytes: 0,
         is_initialize: true,
+        class: McpHttpRequestClass::Discovery,
     };
 
     assert_eq!(request.client_name().as_deref(), Some("Claude Desktop"));
@@ -66,6 +70,8 @@ fn http_errors_map_to_mcp_decisions() {
             status: 429,
             body: "Rate limit exceeded".to_string(),
             headers: BTreeMap::from([("Retry-After".to_string(), "60".to_string())]),
+            json_rpc_code: Some(-32000),
+            office_mcp_code: Some("RATE_LIMITED".to_string()),
         }
     );
     assert_eq!(

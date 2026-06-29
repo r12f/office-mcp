@@ -1,6 +1,7 @@
 use super::{HttpMethod, McpHttpConfig, McpHttpDecision, McpHttpFrontend, McpHttpRequest};
 use crate::api::UiStateStore;
 use crate::common::{Logger, LoggerLogLevel};
+use crate::mcp::McpHttpRequestClass;
 use std::collections::BTreeMap;
 use std::fs::{read_to_string, remove_dir_all};
 use std::time::{Duration, SystemTime};
@@ -67,14 +68,68 @@ fn rate_limits_per_source_and_resets_after_window() {
         first,
         McpHttpDecision::reject(400, "Invalid or missing MCP session ID")
     );
-    assert_eq!(
-        second,
-        McpHttpDecision::reject_with_header(429, "Rate limit exceeded", "Retry-After", "60")
-    );
+    assert_eq!(second, McpHttpDecision::rate_limited());
     assert_eq!(
         third,
         McpHttpDecision::reject(400, "Invalid or missing MCP session ID")
     );
+}
+
+#[test]
+fn discovery_requests_use_independent_rate_limit_budget() {
+    let mut frontend = McpHttpFrontend::with_config(McpHttpConfig {
+        requests_per_minute: 1,
+        ..McpHttpConfig::default()
+    });
+    let mut ui_state = UiStateStore::new();
+    let McpHttpDecision::InitializeTransport { session_id } = frontend.handle_request(
+        &mut ui_state,
+        &request(HttpMethod::Post, [], true),
+        SystemTime::UNIX_EPOCH,
+    ) else {
+        panic!("expected initialization");
+    };
+
+    let operation = frontend.handle_request(
+        &mut ui_state,
+        &request_with_class(
+            HttpMethod::Post,
+            [("mcp-session-id", session_id.as_str())],
+            false,
+            McpHttpRequestClass::Operation,
+        ),
+        SystemTime::UNIX_EPOCH,
+    );
+    let second_operation = frontend.handle_request(
+        &mut ui_state,
+        &request_with_class(
+            HttpMethod::Post,
+            [("mcp-session-id", session_id.as_str())],
+            false,
+            McpHttpRequestClass::Operation,
+        ),
+        SystemTime::UNIX_EPOCH,
+    );
+    let discovery = frontend.handle_request(
+        &mut ui_state,
+        &request_with_class(
+            HttpMethod::Post,
+            [("mcp-session-id", session_id.as_str())],
+            false,
+            McpHttpRequestClass::Discovery,
+        ),
+        SystemTime::UNIX_EPOCH,
+    );
+
+    assert!(matches!(
+        operation,
+        McpHttpDecision::ForwardToTransport { .. }
+    ));
+    assert_eq!(second_operation, McpHttpDecision::rate_limited());
+    assert!(matches!(
+        discovery,
+        McpHttpDecision::ForwardToTransport { .. }
+    ));
 }
 
 #[test]
@@ -262,6 +317,20 @@ fn request<const N: usize>(
     headers: [(&str, &str); N],
     is_initialize: bool,
 ) -> McpHttpRequest {
+    let class = if is_initialize {
+        McpHttpRequestClass::Discovery
+    } else {
+        McpHttpRequestClass::Operation
+    };
+    request_with_class(method, headers, is_initialize, class)
+}
+
+fn request_with_class<const N: usize>(
+    method: HttpMethod,
+    headers: [(&str, &str); N],
+    is_initialize: bool,
+    class: McpHttpRequestClass,
+) -> McpHttpRequest {
     McpHttpRequest {
         method,
         headers: BTreeMap::from(
@@ -270,5 +339,6 @@ fn request<const N: usize>(
         remote_addr: Some("127.0.0.1".to_string()),
         body_bytes: 0,
         is_initialize,
+        class,
     }
 }
