@@ -403,6 +403,11 @@ pub fn powerpoint_resource_catalog_for_session(session_id: &str) -> Vec<Value> {
             "PowerPoint Slides",
         ),
         resource_json(
+            &format!("office://powerpoint/{session_id}/slides/text?start=0"),
+            "powerpoint.slides.text",
+            "PowerPoint Slides Text",
+        ),
+        resource_json(
             &format!("office://powerpoint/{session_id}/slide/0/text"),
             "powerpoint.slide.text",
             "PowerPoint Slide Text",
@@ -427,6 +432,11 @@ pub fn powerpoint_resource_templates() -> Vec<Value> {
             "office://powerpoint/{session_id}/slides",
             "powerpoint.slides.template",
             "PowerPoint Slides",
+        ),
+        resource_template_json(
+            "office://powerpoint/{session_id}/slides/text{?start,end}",
+            "powerpoint.slides.text.template",
+            "PowerPoint Slides Text",
         ),
         resource_template_json(
             "office://powerpoint/{session_id}/slide/{index}/text",

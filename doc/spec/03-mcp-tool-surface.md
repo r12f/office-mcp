@@ -49,6 +49,15 @@ dynamic app tools can still inspect active workbooks and decks. Outlook will
 ship its own resource table with a future capability doc; app resource types do
 not share a generic "document" abstraction.
 
+The resource fallback is additive. When a host session reports tools in
+`available_tools`, those public tools must still be exposed as callable MCP
+tools through `tools/list` whenever the daemon Global Tool Access policy allows
+them. In particular, PowerPoint action tools such as `powerpoint.add_slide`,
+`powerpoint.add_text_box`, `powerpoint.update_shape`,
+`powerpoint.replace_text`, and `powerpoint.format_text` are not resource-only
+capabilities; clients invoke them with `tools/call` and the daemon then checks
+the target session's `available_tools` before forwarding to the add-in.
+
 | URI pattern | Returns | Notes |
 |---|---|---|
 | `office://sessions` | List of session descriptors across all apps | Roughly `office.list_sessions` as a resource |
@@ -64,6 +73,7 @@ not share a generic "document" abstraction.
 | `office://excel/<session_id>/range/<address>?sheet=<name>` | Range values, text, formulas, dimensions, and formats JSON | Forwards to `excel.read_range` with `address` and optional `sheet`. |
 | `office://powerpoint/<session_id>/presentation` | Presentation metadata JSON | Forwards to `powerpoint.get_presentation_info` and requires that capability in the session. |
 | `office://powerpoint/<session_id>/slides` | Slide inventory JSON | Forwards to `powerpoint.list_slides` and requires that capability in the session. |
+| `office://powerpoint/<session_id>/slides/text?start=0&end=<slide_count>` | Text JSON for a slide range | Forwards to `powerpoint.read_text` with optional `start` and `end`; the range is half-open `[start, end)`, defaults to the full deck, and returns per-slide text groups. |
 | `office://powerpoint/<session_id>/slide/<index>/text` | Slide text JSON | Forwards to `powerpoint.read_text` with `slide_index`. |
 | `office://powerpoint/<session_id>/slide/<index>/shapes` | Shape inventory JSON | Forwards to `powerpoint.list_shapes` for one slide. |
 

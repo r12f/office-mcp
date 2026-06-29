@@ -158,7 +158,9 @@ fn powerpoint_resource_request_from_uri(
     uri: &str,
     rest: &str,
 ) -> Result<ResourceReadRequest, String> {
-    let path = rest.split_once('?').map_or(rest, |(path, _query)| path);
+    let (path, query) = rest
+        .split_once('?')
+        .map_or((rest, ""), |(path, query)| (path, query));
     let segments = path.split('/').collect::<Vec<_>>();
     if segments.len() < 2 {
         return Err(format!("Malformed PowerPoint resource URI {uri}."));
@@ -180,6 +182,21 @@ fn powerpoint_resource_request_from_uri(
             arguments: json!({ "session_id": session_id }),
             check_capability: true,
         }),
+        [_, "slides", "text"] => {
+            let mut arguments = json!({
+                "session_id": session_id,
+                "start": query_param_usize(query, "start", 0)?,
+            });
+            if let Some(end) = query_param_optional_usize(query, "end")? {
+                arguments["end"] = json!(end);
+            }
+            Ok(ResourceReadRequest::Forwarded {
+                uri: uri.to_string(),
+                tool: "powerpoint.read_text",
+                arguments,
+                check_capability: true,
+            })
+        }
         [_, "slide", index, "text"] => Ok(ResourceReadRequest::Forwarded {
             uri: uri.to_string(),
             tool: "powerpoint.read_text",
@@ -217,15 +234,20 @@ fn parse_index(value: &str, name: &str) -> Result<usize, String> {
 }
 
 fn query_param_usize(query: &str, name: &str, default: usize) -> Result<usize, String> {
+    Ok(query_param_optional_usize(query, name)?.unwrap_or(default))
+}
+
+fn query_param_optional_usize(query: &str, name: &str) -> Result<Option<usize>, String> {
     for part in query.split('&').filter(|part| !part.is_empty()) {
         let (key, value) = part.split_once('=').unwrap_or((part, ""));
         if key == name {
             return value
                 .parse::<usize>()
+                .map(Some)
                 .map_err(|_| format!("{name} must be a non-negative integer."));
         }
     }
-    Ok(default)
+    Ok(None)
 }
 
 fn query_param_string(query: &str, name: &str) -> Option<String> {
