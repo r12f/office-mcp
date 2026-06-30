@@ -1,5 +1,42 @@
 # Release Notes
 
+## 0.1.10
+
+Office MCP Control 0.1.10 tightens PowerPoint and MCP discovery behavior after
+the 0.1.9 tool-contract release. PowerPoint presentation resources now report
+real slide counts, the resource fallback includes collection-level slide text,
+and callable PowerPoint action tools are exposed through MCP `tools/list` so
+session metadata and the client-visible tool surface stay aligned. MCP HTTP
+rate limiting now separates read-only discovery traffic from document operation
+traffic and returns structured retry metadata for 429 responses.
+
+Expected assets:
+
+- `office-mcp-windows-portable-0.1.10-x64.zip`
+- `SHA256SUMS`
+
+Validation gates before promoting the release:
+
+- `powerpoint.get_presentation_info` and the
+  `office://powerpoint/<session_id>/presentation` resource report the actual
+  slide count instead of `null`.
+- PowerPoint collection text resources can read slide ranges through
+  `office://powerpoint/<session_id>/slides/text{?start,end}` while preserving
+  single-slide text resources.
+- PowerPoint tools advertised in session metadata, including mutating action
+  tools such as `powerpoint.add_slide`, `powerpoint.add_text_box`, and
+  `powerpoint.update_shape`, are visible through MCP `tools/list` when Global
+  Tool Access allows them and still route through session capability checks.
+- Read-only MCP discovery requests such as `initialize`, `tools/list`,
+  `resources/list`, `resources/templates/list`, `office://sessions`, and
+  `office.describe_tools` use an independent discovery rate-limit budget;
+  operation calls remain protected by the normal operation budget.
+- HTTP 429 responses include `Retry-After`, and JSON-RPC-shaped requests return
+  structured `RATE_LIMITED` error metadata.
+- Release CI builds the Windows portable artifact after Rust daemon, Word,
+  Excel, PowerPoint, evidence, packaging, rendered-logo, and catalog-identity
+  gates pass.
+
 ## 0.1.9
 
 Office MCP Control 0.1.9 improves MCP client planning and resource discovery
