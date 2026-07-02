@@ -270,6 +270,7 @@ test('GitHub release workflow publishes only the Windows portable artifacts', ()
   assert.match(workflow, /\$\{\{ steps\.stage\.outputs\.rendered_logo_sheet \}\}/);
   assert.match(workflow, /\$\{\{ steps\.stage\.outputs\.catalog_identity_review \}\}/);
   assert.match(workflow, /softprops\/action-gh-release@v2/);
+  assert.match(workflow, /tag_name:\s*\$\{\{ needs\.prepare-release\.outputs\.tag \}\}/);
   assert.match(workflow, /draft:\s*true/);
   assert.match(workflow, /prerelease:\s*true/);
   assert.doesNotMatch(workflow, /body_path:/);
