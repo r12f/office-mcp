@@ -261,12 +261,13 @@ test('GitHub release kickoff workflow bumps, commits, and tags the next version'
   assert.match(workflow, /type:\s*choice/);
   assert.match(workflow, /options:[\s\S]*patch[\s\S]*minor[\s\S]*major/);
   assert.doesNotMatch(workflow, /target_version|release_version|version:\s*\n\s*description:/i);
-  assert.match(workflow, /permissions:[\s\S]*contents:\s*write/);
+  assert.match(workflow, /permissions:[\s\S]*actions:\s*write[\s\S]*contents:\s*write/);
   assert.match(workflow, /actions\/checkout@v4/);
   assert.match(workflow, /fetch-depth:\s*0/);
   assert.match(workflow, /github\.event\.inputs\.bump/);
   assert.match(workflow, /packaging\/package\.json/);
   assert.match(workflow, /packaging\/package-lock\.json/);
+  assert.match(workflow, /ConvertFrom-Json -AsHashtable/);
   assert.match(workflow, /src\/office-mcp\/daemon\/Cargo\.toml/);
   assert.match(workflow, /Cargo\.lock/);
   assert.match(workflow, /git ls-remote --exit-code --tags origin/);
@@ -277,7 +278,10 @@ test('GitHub release kickoff workflow bumps, commits, and tags the next version'
   assert.match(workflow, /git push origin HEAD:main/);
   assert.match(workflow, /git tag "v\$version"/);
   assert.match(workflow, /git push origin "v\$version"/);
+  assert.match(workflow, /GH_TOKEN:\s*\$\{\{ secrets\.GITHUB_TOKEN \}\}/);
+  assert.match(workflow, /gh workflow run release\.yml --ref \$tag -f version=\$version/);
   assert.ok(workflow.indexOf('git push origin HEAD:main') < workflow.indexOf('git tag "v$version"'));
+  assert.ok(workflow.indexOf('git push origin "v$version"') < workflow.indexOf('gh workflow run release.yml'));
 });
 
 test('GitHub CI verifies the Windows portable zip using package metadata version', () => {

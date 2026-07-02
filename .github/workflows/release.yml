@@ -99,16 +99,6 @@ jobs:
             throw "Release version mismatch: src/office-mcp/daemon/Cargo.toml has $cargoVersion, expected $version"
           }
 
-          if ('${{ github.ref_type }}' -eq 'tag') {
-            if (-not (Test-Path -LiteralPath 'RELEASE_NOTES.md')) {
-              throw "Release notes mismatch: RELEASE_NOTES.md is required for tag releases"
-            }
-            $releaseNotes = Get-Content -LiteralPath 'RELEASE_NOTES.md' -Raw
-            if ($releaseNotes -notmatch [regex]::Escape($version)) {
-              throw "Release notes mismatch: RELEASE_NOTES.md must mention $version"
-            }
-          }
-
       - name: Check PowerShell scripts syntax
         shell: pwsh
         run: |
@@ -305,4 +295,4 @@ jobs:
             ${{ steps.stage.outputs.rendered_logo_review }}
             ${{ steps.stage.outputs.rendered_logo_sheet }}
             ${{ steps.stage.outputs.catalog_identity_review }}
-          body_path: RELEASE_NOTES.md
+          generate_release_notes: true

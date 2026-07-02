@@ -332,8 +332,9 @@ tag-triggered artifact publisher. The kickoff workflow MUST:
 - Commit the version bump to the default branch with a clear release commit
   message before creating the tag, so `v<version>` points at the versioned
   source state.
-- Push the commit and matching `v<version>` tag. The pushed tag is the handoff
-  to the artifact publisher.
+- Push the commit and matching `v<version>` tag, then explicitly dispatch the
+  release workflow at that tag ref so the draft release build starts even when
+  the tag was created by GitHub Actions automation.
 
 The tag-triggered GitHub Release publisher MUST:
 
