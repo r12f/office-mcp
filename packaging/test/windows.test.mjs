@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -171,12 +171,30 @@ test('GitHub release workflow publishes only the Windows portable artifacts', ()
 
   assert.match(workflow, /name:\s*Release/);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /bump:/);
+  assert.match(workflow, /type:\s*choice/);
+  assert.match(workflow, /options:[\s\S]*patch[\s\S]*minor[\s\S]*major/);
+  assert.doesNotMatch(workflow, /target_version|release_version|version:\s*\n\s*description:/i);
   assert.match(workflow, /tags:\s*\[\s*['"]v\*['"]\s*\]/);
-  assert.match(workflow, /default:\s*''/);
-  assert.match(workflow, /\$version = \(Get-Content -Raw \.\\packaging\\package\.json \| ConvertFrom-Json\)\.version/);
   assert.doesNotMatch(workflow, /default:\s*['"]0\.1\.1['"]/);
+  assert.match(workflow, /Prepare release version/);
+  assert.match(workflow, /needs:\s*prepare-release/);
   assert.match(workflow, /runs-on:\s*windows-latest/);
   assert.match(workflow, /actions\/checkout@v4/);
+  assert.match(workflow, /fetch-depth:\s*0/);
+  assert.match(workflow, /ref:\s*\$\{\{ needs\.prepare-release\.outputs\.tag \}\}/);
+  assert.match(workflow, /github\.event\.inputs\.bump/);
+  assert.match(workflow, /ConvertFrom-Json -AsHashtable/);
+  assert.match(workflow, /packaging\/package-lock\.json/);
+  assert.match(workflow, /Cargo\.lock/);
+  assert.match(workflow, /git ls-remote --exit-code --tags origin/);
+  assert.match(workflow, /Version tag already exists/);
+  assert.match(workflow, /git commit -m "Release v\$version"/);
+  assert.match(workflow, /git push origin HEAD:main/);
+  assert.match(workflow, /git tag "v\$version"/);
+  assert.match(workflow, /git push origin "v\$version"/);
+  assert.ok(workflow.indexOf('git push origin HEAD:main') < workflow.indexOf('git tag "v$version"'));
+  assert.ok(!existsSync(join(repoRoot, '.github', 'workflows', 'release-kickoff.yml')));
   assert.match(workflow, /dtolnay\/rust-toolchain@stable/);
   assert.match(workflow, /actions\/setup-node@v4/);
   assert.match(workflow, /working-directory:\s*packaging[\s\S]*npm ci[\s\S]*npm run check/);
@@ -248,40 +266,8 @@ test('GitHub release workflow publishes only the Windows portable artifacts', ()
   assert.match(workflow, /prerelease:\s*true/);
   assert.doesNotMatch(workflow, /body_path:/);
   assert.match(workflow, /generate_release_notes:\s*true/);
-  assert.match(workflow, /github\.ref_type == 'tag'/);
-});
-
-test('GitHub release kickoff workflow bumps, commits, and tags the next version', () => {
-  const repoRoot = join(PACKAGING_ROOT, '..');
-  const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'release-kickoff.yml'), 'utf8');
-
-  assert.match(workflow, /name:\s*Release Kickoff/);
-  assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /bump:/);
-  assert.match(workflow, /type:\s*choice/);
-  assert.match(workflow, /options:[\s\S]*patch[\s\S]*minor[\s\S]*major/);
-  assert.doesNotMatch(workflow, /target_version|release_version|version:\s*\n\s*description:/i);
-  assert.match(workflow, /permissions:[\s\S]*actions:\s*write[\s\S]*contents:\s*write/);
-  assert.match(workflow, /actions\/checkout@v4/);
-  assert.match(workflow, /fetch-depth:\s*0/);
-  assert.match(workflow, /github\.event\.inputs\.bump/);
-  assert.match(workflow, /packaging\/package\.json/);
-  assert.match(workflow, /packaging\/package-lock\.json/);
-  assert.match(workflow, /ConvertFrom-Json -AsHashtable/);
-  assert.match(workflow, /src\/office-mcp\/daemon\/Cargo\.toml/);
-  assert.match(workflow, /Cargo\.lock/);
-  assert.match(workflow, /git ls-remote --exit-code --tags origin/);
-  assert.match(workflow, /Version tag already exists/);
-  assert.match(workflow, /git config user\.name/);
-  assert.match(workflow, /git config user\.email/);
-  assert.match(workflow, /git commit -m "Release v\$version"/);
-  assert.match(workflow, /git push origin HEAD:main/);
-  assert.match(workflow, /git tag "v\$version"/);
-  assert.match(workflow, /git push origin "v\$version"/);
-  assert.match(workflow, /GH_TOKEN:\s*\$\{\{ secrets\.GITHUB_TOKEN \}\}/);
-  assert.match(workflow, /gh workflow run release\.yml --ref \$tag -f version=\$version/);
-  assert.ok(workflow.indexOf('git push origin HEAD:main') < workflow.indexOf('git tag "v$version"'));
-  assert.ok(workflow.indexOf('git push origin "v$version"') < workflow.indexOf('gh workflow run release.yml'));
+  assert.doesNotMatch(workflow, /github\.ref_type == 'tag'/);
+  assert.match(workflow, /startsWith\(needs\.prepare-release\.outputs\.tag, 'v'\)/);
 });
 
 test('GitHub CI verifies the Windows portable zip using package metadata version', () => {
