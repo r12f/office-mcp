@@ -421,6 +421,7 @@ jobs:
         if: startsWith(needs.prepare-release.outputs.tag, 'v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
           draft: true
           prerelease: true
           files: |
