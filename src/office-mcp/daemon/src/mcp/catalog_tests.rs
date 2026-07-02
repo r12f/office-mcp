@@ -5,6 +5,7 @@ use super::{
     word_resource_templates,
 };
 use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet};
 
 const POWERPOINT_V1_TOOL_NAMES: &[&str] = &[
     "powerpoint.get_presentation_info",
@@ -230,6 +231,11 @@ fn safe_tool_aliases_share_canonical_contract_metadata() {
     assert_eq!(described["canonical_name"], "word.update_table");
     assert_eq!(described["alias_for"], "word.update_table");
     assert_eq!(described["input_schema"], canonical["inputSchema"]);
+}
+
+#[test]
+fn office_tool_exposure_parity_covers_all_layers() {
+    assert_office_tool_exposure_parity();
 }
 
 #[test]
@@ -629,4 +635,228 @@ fn assert_resource_route_covered(
             || templates.iter().any(|uri| uri == template_uri),
         "missing resource discovery coverage for {concrete_uri} / {template_uri}"
     );
+}
+
+fn assert_office_tool_exposure_parity() {
+    let app_layers = [
+        (
+            "word",
+            OfficeToolLayers {
+                taskpane: parse_taskpane_available_tools(include_str!(
+                    "../../../../office-ctl/word/public/taskpane.js"
+                )),
+                daemon: WORD_V1_TOOLS.iter().map(ToString::to_string).collect(),
+                metadata: metadata_tools_for_app("word"),
+                implemented_spec: parse_implemented_capability_tools(include_str!(
+                    "../../../../../doc/spec/04-word-capabilities.md"
+                )),
+                tools_list: tools_list_canonical_for_app("word"),
+                aliases: tools_list_aliases_for_app("word"),
+            },
+        ),
+        (
+            "excel",
+            OfficeToolLayers {
+                taskpane: parse_taskpane_available_tools(include_str!(
+                    "../../../../office-ctl/excel/public/taskpane.js"
+                )),
+                daemon: ExcelToolCatalog::tools()
+                    .iter()
+                    .map(|tool| tool.name)
+                    .map(ToString::to_string)
+                    .collect(),
+                metadata: metadata_tools_for_app("excel"),
+                implemented_spec: parse_implemented_capability_tools(include_str!(
+                    "../../../../../doc/spec/04-excel-capabilities.md"
+                )),
+                tools_list: tools_list_canonical_for_app("excel"),
+                aliases: tools_list_aliases_for_app("excel"),
+            },
+        ),
+        (
+            "powerpoint",
+            OfficeToolLayers {
+                taskpane: parse_taskpane_available_tools(include_str!(
+                    "../../../../office-ctl/powerpoint/public/taskpane.js"
+                )),
+                daemon: PowerPointToolCatalog::tools()
+                    .iter()
+                    .map(|tool| tool.name)
+                    .map(ToString::to_string)
+                    .collect(),
+                metadata: metadata_tools_for_app("powerpoint"),
+                implemented_spec: parse_implemented_capability_tools(include_str!(
+                    "../../../../../doc/spec/04-powerpoint-capabilities.md"
+                )),
+                tools_list: tools_list_canonical_for_app("powerpoint"),
+                aliases: tools_list_aliases_for_app("powerpoint"),
+            },
+        ),
+    ];
+
+    for (app, layers) in app_layers {
+        layers.assert_equal(app);
+    }
+
+    assert_tools_list_alias_integrity();
+    for alias in [
+        "word_update_table",
+        "excel_write_range",
+        "powerpoint_add_slide",
+    ] {
+        assert!(
+            tool_catalog_json()
+                .iter()
+                .any(|tool| tool["name"].as_str() == Some(alias)),
+            "missing representative mutating alias {alias}"
+        );
+    }
+}
+
+struct OfficeToolLayers {
+    taskpane: BTreeSet<String>,
+    daemon: BTreeSet<String>,
+    metadata: BTreeSet<String>,
+    implemented_spec: BTreeSet<String>,
+    tools_list: BTreeSet<String>,
+    aliases: BTreeSet<String>,
+}
+
+impl OfficeToolLayers {
+    fn assert_equal(&self, app: &str) {
+        let layers = [
+            ("taskpane AVAILABLE_TOOLS", &self.taskpane),
+            ("daemon catalog", &self.daemon),
+            ("metadata catalog", &self.metadata),
+            ("implemented spec", &self.implemented_spec),
+            ("tools/list canonical", &self.tools_list),
+            ("tools/list alias", &self.aliases),
+        ];
+        let expected = &self.daemon;
+        let mut errors = Vec::new();
+        for (layer_name, actual) in layers {
+            let missing = expected
+                .difference(actual)
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            let extra = actual
+                .difference(expected)
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            if !missing.is_empty() {
+                errors.push(format!(
+                    "{app} {layer_name} missing tools: {}",
+                    missing.join(", ")
+                ));
+            }
+            if !extra.is_empty() {
+                errors.push(format!(
+                    "{app} {layer_name} extra tools: {}",
+                    extra.join(", ")
+                ));
+            }
+        }
+        assert!(errors.is_empty(), "{}", errors.join("\n"));
+    }
+}
+
+fn parse_taskpane_available_tools(source: &'static str) -> BTreeSet<String> {
+    let start = source
+        .find("const AVAILABLE_TOOLS = [")
+        .expect("AVAILABLE_TOOLS declaration");
+    let rest = &source[start..];
+    let end = rest.find("];").expect("AVAILABLE_TOOLS terminator");
+    parse_quoted_tool_names(&rest[..end])
+}
+
+fn parse_implemented_capability_tools(markdown: &'static str) -> BTreeSet<String> {
+    markdown
+        .lines()
+        .filter_map(|line| {
+            if !line.starts_with("| `") || !line.contains("| implemented |") {
+                return None;
+            }
+            line.split('`').nth(1).map(ToString::to_string)
+        })
+        .collect()
+}
+
+fn parse_quoted_tool_names(source: &'static str) -> BTreeSet<String> {
+    source
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            line.strip_prefix('"')
+                .and_then(|line| line.split_once('"').map(|(tool, _)| tool))
+                .or_else(|| {
+                    line.strip_prefix('\'')
+                        .and_then(|line| line.split_once('\'').map(|(tool, _)| tool))
+                })
+        })
+        .filter(|tool| tool.contains('.'))
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn metadata_tools_for_app(app: &str) -> BTreeSet<String> {
+    crate::mcp::tool_metadata_catalog()
+        .iter()
+        .filter(|metadata| metadata.app == app)
+        .map(|metadata| metadata.name)
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn tools_list_canonical_for_app(app: &str) -> BTreeSet<String> {
+    tool_catalog_json()
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .filter(|name| name.starts_with(app) && name.contains('.'))
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn tools_list_aliases_for_app(app: &str) -> BTreeSet<String> {
+    tool_catalog_json()
+        .iter()
+        .filter_map(|tool| {
+            let name = tool["name"].as_str()?;
+            let canonical = tool["_meta"]["com.office-mcp/alias_for"].as_str()?;
+            (canonical.starts_with(app) && !name.contains('.')).then(|| canonical.to_string())
+        })
+        .collect()
+}
+
+fn assert_tools_list_alias_integrity() {
+    let mut aliases = BTreeMap::new();
+    for tool in tool_catalog_json() {
+        let Some(alias) = tool["name"].as_str().filter(|name| !name.contains('.')) else {
+            continue;
+        };
+        let Some(canonical) = tool["_meta"]["com.office-mcp/alias_for"].as_str() else {
+            continue;
+        };
+        let previous = aliases.insert(alias.to_string(), canonical.to_string());
+        assert_eq!(previous, None, "alias collision for {alias}");
+        assert_eq!(
+            alias,
+            super::mcp_safe_tool_alias(canonical),
+            "alias {alias} must be derived from {canonical}"
+        );
+    }
+
+    let canonical_office_tools = WORD_V1_TOOLS
+        .iter()
+        .copied()
+        .chain(ExcelToolCatalog::tools().iter().map(|tool| tool.name))
+        .chain(PowerPointToolCatalog::tools().iter().map(|tool| tool.name))
+        .collect::<BTreeSet<_>>();
+    for canonical in canonical_office_tools {
+        let alias = super::mcp_safe_tool_alias(canonical);
+        assert_eq!(
+            aliases.get(&alias),
+            Some(&canonical.to_string()),
+            "missing or mismatched alias for {canonical}"
+        );
+    }
 }

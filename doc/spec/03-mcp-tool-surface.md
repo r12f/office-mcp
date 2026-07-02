@@ -419,6 +419,17 @@ tools the daemon will reject. Session-specific support is reported by
 `available_tools`; invoking a listed tool against an incompatible session yields
 a tool execution error, not a protocol error.
 
+The repository MUST keep a permanent Office tool exposure parity gate that
+compares every implemented Word, Excel, and PowerPoint tool across the app
+task pane `AVAILABLE_TOOLS` arrays, the daemon canonical catalog, the daemon
+tool metadata catalog, the implemented capability tables, and MCP `tools/list`.
+That gate MUST fail with app- and layer-specific missing-tool details when any
+public Office tool appears in one layer but not another. It also MUST prove that
+every canonical Office tool has exactly one MCP-safe underscore alias in
+`tools/list`, that aliases do not collide, and that representative mutating
+aliases for all hosts remain exposed, including `word_update_table`,
+`excel_write_range`, and `powerpoint_add_slide`.
+
 Every `tools/call` is still enforced server-side even if the client skipped
 refreshing discovery data. The daemon first checks the global tool access policy
 and returns `TOOL_NOT_AVAILABLE` with `refresh_tools: true` when the tool is no
