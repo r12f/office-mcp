@@ -1,5 +1,5 @@
 use super::{ToolSideEffect, tool_metadata, tool_metadata_catalog};
-use crate::mcp::{ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS};
+use crate::mcp::all_office_tool_names;
 use std::collections::BTreeSet;
 
 #[test]
@@ -47,12 +47,7 @@ fn tool_metadata_catalog_is_daemon_ui_source_of_truth() {
 
 #[test]
 fn tool_metadata_covers_every_forwarded_office_tool() {
-    let forwarded_tools = WORD_V1_TOOLS
-        .iter()
-        .copied()
-        .chain(ExcelToolCatalog::tools().iter().map(|tool| tool.name))
-        .chain(PowerPointToolCatalog::tools().iter().map(|tool| tool.name))
-        .collect::<BTreeSet<_>>();
+    let forwarded_tools = all_office_tool_names().collect::<BTreeSet<_>>();
     let metadata_tools = tool_metadata_catalog()
         .iter()
         .map(|tool| tool.name)

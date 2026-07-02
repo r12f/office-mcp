@@ -1,8 +1,8 @@
 use super::{
-    ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS, excel_resource_catalog_for_session,
-    excel_resource_templates, powerpoint_resource_catalog_for_session,
-    powerpoint_resource_templates, tool_catalog_json, word_resource_catalog_for_session,
-    word_resource_templates,
+    ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS, all_office_tool_names,
+    excel_resource_catalog_for_session, excel_resource_templates, office_tool_catalogs,
+    powerpoint_resource_catalog_for_session, powerpoint_resource_templates, tool_catalog_json,
+    word_resource_catalog_for_session, word_resource_templates,
 };
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -236,6 +236,32 @@ fn safe_tool_aliases_share_canonical_contract_metadata() {
 #[test]
 fn office_tool_exposure_parity_covers_all_layers() {
     assert_office_tool_exposure_parity();
+}
+
+#[test]
+fn shared_office_tool_catalog_path_covers_all_apps() {
+    let catalogs = office_tool_catalogs();
+    assert_eq!(catalogs.len(), 3);
+    assert_eq!(catalogs[0].app(), "word");
+    assert_eq!(catalogs[1].app(), "excel");
+    assert_eq!(catalogs[2].app(), "powerpoint");
+
+    let all_tools = all_office_tool_names().collect::<Vec<_>>();
+    assert_eq!(all_tools.len(), 72);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 72);
+    assert!(all_tools.contains(&"word.update_table"));
+    assert!(all_tools.contains(&"excel.write_range"));
+    assert!(all_tools.contains(&"powerpoint.add_slide"));
+
+    for catalog in catalogs {
+        for tool in catalog.tool_names() {
+            assert!(
+                catalog.contains(tool),
+                "{} should contain {tool}",
+                catalog.app()
+            );
+        }
+    }
 }
 
 #[test]
@@ -662,7 +688,7 @@ fn assert_office_tool_exposure_parity() {
                 )),
                 daemon: ExcelToolCatalog::tools()
                     .iter()
-                    .map(|tool| tool.name)
+                    .copied()
                     .map(ToString::to_string)
                     .collect(),
                 metadata: metadata_tools_for_app("excel"),
@@ -681,7 +707,7 @@ fn assert_office_tool_exposure_parity() {
                 )),
                 daemon: PowerPointToolCatalog::tools()
                     .iter()
-                    .map(|tool| tool.name)
+                    .copied()
                     .map(ToString::to_string)
                     .collect(),
                 metadata: metadata_tools_for_app("powerpoint"),
@@ -848,8 +874,8 @@ fn assert_tools_list_alias_integrity() {
     let canonical_office_tools = WORD_V1_TOOLS
         .iter()
         .copied()
-        .chain(ExcelToolCatalog::tools().iter().map(|tool| tool.name))
-        .chain(PowerPointToolCatalog::tools().iter().map(|tool| tool.name))
+        .chain(ExcelToolCatalog::tools().iter().copied())
+        .chain(PowerPointToolCatalog::tools().iter().copied())
         .collect::<BTreeSet<_>>();
     for canonical in canonical_office_tools {
         let alias = super::mcp_safe_tool_alias(canonical);

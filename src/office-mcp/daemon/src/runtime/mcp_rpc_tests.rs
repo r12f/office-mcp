@@ -1311,7 +1311,7 @@ fn registry_with_excel_session() -> SessionRegistry {
             },
             available_tools: crate::mcp::ExcelToolCatalog::tools()
                 .iter()
-                .map(|tool| tool.name.to_string())
+                .map(|tool| (*tool).to_string())
                 .collect(),
             is_active: Some(true),
         },
@@ -1348,7 +1348,7 @@ fn registry_with_powerpoint_session() -> SessionRegistry {
             },
             available_tools: crate::mcp::PowerPointToolCatalog::tools()
                 .iter()
-                .map(|tool| tool.name.to_string())
+                .map(|tool| (*tool).to_string())
                 .collect(),
             is_active: Some(true),
         },

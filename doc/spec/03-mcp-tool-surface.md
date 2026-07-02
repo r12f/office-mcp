@@ -210,6 +210,14 @@ Tool names are not re-listed here on purpose — the per-app doc is the single
 source of truth, and any list in this file would drift on the first PR that
 adds or renames a tool.
 
+The daemon implementation MUST keep Word, Excel, and PowerPoint public tool
+catalogs on a shared catalog representation or shared helper path. App-specific
+catalog data may differ, but common operations such as iterating canonical tool
+names, checking membership, generating MCP-safe aliases, and comparing parity
+with task pane `AVAILABLE_TOOLS` arrays MUST NOT depend on duplicated per-app
+definition structs or duplicated wrapper logic unless an app has real
+app-specific fields or behavior.
+
 ## 6. Anchor model
 
 Many tools take an `anchor` argument that describes *where* in the document to act.
