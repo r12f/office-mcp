@@ -230,7 +230,7 @@ commands is not installable software.
       artifacts for every run, and attach release assets only for tag builds.
       Current implementation uses the checked release workflow on tag pushes
       and `workflow_dispatch`, uploads the portable zip and `SHA256SUMS` on every run,
-      and creates a draft pre-release only when `github.ref_type == 'tag'`.
+      and creates a draft pre-release from the resolved `v<version>` tag.
 - [x] Make the release workflow reuse the existing packaging path instead of
       inventing another installer flow: install Rust, Node, add-in dependencies,
       evidence dependencies, and packaging dependencies; run packaging smoke
@@ -299,20 +299,19 @@ to manually choose and type the exact version before tagging. The release system
 already has enough repository metadata to compute the next SemVer version from a
 small set of safe bump choices.
 
-- [x] Add a separate `.github/workflows/release-kickoff.yml` workflow with a
-      manual `workflow_dispatch` choice input for `patch`, `minor`, and `major`.
-      The workflow computes the next version from the checked package metadata,
-      updates npm and Cargo version files, commits the bump to `main`, creates
-      `v<version>`, and pushes the commit before the tag.
-- [x] Keep `.github/workflows/release.yml` as the tag-triggered artifact
-      publisher. The kickoff workflow hands off to it by pushing a version tag;
-      the release workflow still supports an explicit staging dispatch for an
-      already-computed version, but normal releases no longer require typing the
-      target version.
-- [x] Add static packaging tests that lock the kickoff workflow contract: choice
+- [x] Extend the single `.github/workflows/release.yml` workflow with a manual
+      `workflow_dispatch` choice input for `patch`, `minor`, and `major`. In
+      manual mode the workflow computes the next version from the checked
+      package metadata, updates npm and Cargo version files, commits the bump to
+      `main`, creates `v<version>`, pushes the commit before the tag, and then
+      builds the release artifacts from that tag ref.
+- [x] Keep tag pushes as a direct publishing mode in the same workflow. A
+      `v<version>` tag build skips version mutation and only validates/builds
+      the already-versioned source.
+- [x] Add static packaging tests that lock the release workflow contract: choice
       input values, duplicate-tag refusal, package and Cargo metadata updates,
-      bump commit before tag push, and no manual target-version input for the
-      normal kickoff path.
+      bump commit before tag push, generated release notes, and no separate
+      release kickoff workflow.
 
 **Exit criterion**: A maintainer can start a normal release by choosing only
 `patch`, `minor`, or `major` in GitHub Actions. The workflow bumps all release

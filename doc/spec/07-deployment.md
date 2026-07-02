@@ -317,8 +317,8 @@ be produced by GitHub Actions from an immutable version tag and published as
 GitHub Release assets so a non-developer can download and inspect the product
 without cloning the repository.
 
-The GitHub Release pipeline is split into a maintainer-initiated kickoff and a
-tag-triggered artifact publisher. The kickoff workflow MUST:
+The single GitHub Release workflow MUST support both manual kickoff and
+tag-triggered artifact publishing. In manual `workflow_dispatch` mode it MUST:
 
 - Expose a `workflow_dispatch` choice input named `bump` with exactly `patch`,
   `minor`, and `major` options. Maintainers must not have to type the target
@@ -332,15 +332,13 @@ tag-triggered artifact publisher. The kickoff workflow MUST:
 - Commit the version bump to the default branch with a clear release commit
   message before creating the tag, so `v<version>` points at the versioned
   source state.
-- Push the commit and matching `v<version>` tag, then explicitly dispatch the
-  release workflow at that tag ref so the draft release build starts even when
-  the tag was created by GitHub Actions automation.
+- Push the commit and matching `v<version>` tag, then continue the same workflow
+  run from the versioned tag ref for artifact build and release creation.
 
-The tag-triggered GitHub Release publisher MUST:
+In tag-triggered mode the same workflow MUST:
 
-- Trigger on version tags such as `v0.1.0` and support an explicit
-  `workflow_dispatch` dry run for maintainers that stages an already-computed
-  version without creating tags.
+- Trigger on version tags such as `v0.1.0` without creating another bump commit
+  or tag.
 - Build the Windows portable zip on `windows-latest` from the tagged source using
   `packaging/windows/build-windows-portable.ps1 -SkipNpmInstall` after installing
   Rust, Node, and all add-in dependencies.
