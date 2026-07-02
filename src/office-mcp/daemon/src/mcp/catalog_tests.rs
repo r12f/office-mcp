@@ -233,6 +233,11 @@ fn safe_tool_aliases_share_canonical_contract_metadata() {
 }
 
 #[test]
+fn office_tool_exposure_parity_covers_all_layers() {
+    assert_office_tool_exposure_parity();
+}
+
+#[test]
 fn representative_word_schemas_are_specific() {
     let describe = schema_for("office.describe_tools");
     assert_required(&describe, &["tools"]);
