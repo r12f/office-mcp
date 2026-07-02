@@ -37,6 +37,10 @@ jobs:
         id: version
         shell: pwsh
         run: |
+          if (Get-Variable PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+
           if ('${{ github.ref_type }}' -eq 'tag') {
             $version = '${{ github.ref_name }}'.TrimStart('v')
             if ($version -notmatch '^\d+\.\d+\.\d+(-[A-Za-z0-9.-]+)?$') {
@@ -70,14 +74,21 @@ jobs:
 
           $version = "$major.$minor.$patch"
           $tag = "v$version"
-          if (git rev-parse -q --verify "refs/tags/$tag") {
+          git show-ref --tags --verify --quiet "refs/tags/$tag"
+          $localTagExit = $LASTEXITCODE
+          if ($localTagExit -eq 0) {
             throw "Version tag already exists locally: $tag"
           }
+          if ($localTagExit -ne 1) {
+            throw "Unable to check local tag state for $tag"
+          }
+
           git ls-remote --exit-code --tags origin "refs/tags/$tag" | Out-Null
-          if ($LASTEXITCODE -eq 0) {
+          $remoteTagExit = $LASTEXITCODE
+          if ($remoteTagExit -eq 0) {
             throw "Version tag already exists on origin: $tag"
           }
-          if ($LASTEXITCODE -ne 2) {
+          if ($remoteTagExit -ne 2) {
             throw "Unable to check remote tag state for $tag"
           }
 
