@@ -255,7 +255,11 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
 
     for catalog in catalogs {
         for tool in catalog.tool_names() {
-            assert!(catalog.contains(tool), "{} should contain {tool}", catalog.app());
+            assert!(
+                catalog.contains(tool),
+                "{} should contain {tool}",
+                catalog.app()
+            );
         }
     }
 }
@@ -684,7 +688,7 @@ fn assert_office_tool_exposure_parity() {
                 )),
                 daemon: ExcelToolCatalog::tools()
                     .iter()
-                    .map(|tool| tool.name)
+                    .copied()
                     .map(ToString::to_string)
                     .collect(),
                 metadata: metadata_tools_for_app("excel"),
@@ -703,7 +707,7 @@ fn assert_office_tool_exposure_parity() {
                 )),
                 daemon: PowerPointToolCatalog::tools()
                     .iter()
-                    .map(|tool| tool.name)
+                    .copied()
                     .map(ToString::to_string)
                     .collect(),
                 metadata: metadata_tools_for_app("powerpoint"),
@@ -870,8 +874,8 @@ fn assert_tools_list_alias_integrity() {
     let canonical_office_tools = WORD_V1_TOOLS
         .iter()
         .copied()
-        .chain(ExcelToolCatalog::tools().iter().map(|tool| tool.name))
-        .chain(PowerPointToolCatalog::tools().iter().map(|tool| tool.name))
+        .chain(ExcelToolCatalog::tools().iter().copied())
+        .chain(PowerPointToolCatalog::tools().iter().copied())
         .collect::<BTreeSet<_>>();
     for canonical in canonical_office_tools {
         let alias = super::mcp_safe_tool_alias(canonical);

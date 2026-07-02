@@ -5,10 +5,9 @@ use crate::addin_mgr::{
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::mcp::{
-    ExcelToolCatalog, PowerPointToolCatalog, ResourceReadRequest, ToolAccessPolicy, WORD_V1_TOOLS,
-    canonical_tool_name, describe_tool_contract, resource_request_from_uri, tool_failure,
-    tool_failure_without_effect, tool_not_available_by_policy, tool_success, unknown_tool_contract,
-    validate_tool_arguments,
+    ResourceReadRequest, ToolAccessPolicy, canonical_tool_name, describe_tool_contract,
+    is_office_tool, resource_request_from_uri, tool_failure, tool_failure_without_effect,
+    tool_not_available_by_policy, tool_success, unknown_tool_contract, validate_tool_arguments,
 };
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_catalog_response::McpCatalogResponder;
@@ -171,13 +170,7 @@ impl McpJsonRpcRuntime {
             })),
             "office.get_session_info" => Self::get_session_info(context.registry, arguments),
             "office.describe_tools" => Self::describe_tools(arguments),
-            tool if WORD_V1_TOOLS.contains(&tool) => {
-                Self::call_forwarded_tool(context, value, tool, arguments)
-            }
-            tool if ExcelToolCatalog::contains(tool) => {
-                Self::call_forwarded_tool(context, value, tool, arguments)
-            }
-            tool if PowerPointToolCatalog::contains(tool) => {
+            tool if is_office_tool(tool) => {
                 Self::call_forwarded_tool(context, value, tool, arguments)
             }
             _ => tool_failure(
@@ -258,9 +251,7 @@ impl McpJsonRpcRuntime {
     }
 
     fn is_forwarded_tool(name: &str) -> bool {
-        WORD_V1_TOOLS.contains(&name)
-            || ExcelToolCatalog::contains(name)
-            || PowerPointToolCatalog::contains(name)
+        is_office_tool(name)
     }
 
     fn is_known_tool(name: &str) -> bool {

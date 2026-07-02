@@ -31,155 +31,118 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.update_tracked_change",
 ];
 
-const EXCEL_V1_TOOLS: &[ExcelToolDefinition] = &[
-    ExcelToolDefinition {
-        name: "excel.add_sheet",
-    },
-    ExcelToolDefinition {
-        name: "excel.apply_filter",
-    },
-    ExcelToolDefinition {
-        name: "excel.clear_range",
-    },
-    ExcelToolDefinition {
-        name: "excel.create_chart",
-    },
-    ExcelToolDefinition {
-        name: "excel.create_pivot_table",
-    },
-    ExcelToolDefinition {
-        name: "excel.create_table",
-    },
-    ExcelToolDefinition {
-        name: "excel.delete_sheet",
-    },
-    ExcelToolDefinition {
-        name: "excel.find_replace_cells",
-    },
-    ExcelToolDefinition {
-        name: "excel.format_range",
-    },
-    ExcelToolDefinition {
-        name: "excel.get_used_range",
-    },
-    ExcelToolDefinition {
-        name: "excel.get_workbook_info",
-    },
-    ExcelToolDefinition {
-        name: "excel.list_sheets",
-    },
-    ExcelToolDefinition {
-        name: "excel.read_range",
-    },
-    ExcelToolDefinition {
-        name: "excel.set_formula",
-    },
-    ExcelToolDefinition {
-        name: "excel.sort_range",
-    },
-    ExcelToolDefinition {
-        name: "excel.update_chart",
-    },
-    ExcelToolDefinition {
-        name: "excel.update_pivot_table",
-    },
-    ExcelToolDefinition {
-        name: "excel.update_table",
-    },
-    ExcelToolDefinition {
-        name: "excel.update_sheet",
-    },
-    ExcelToolDefinition {
-        name: "excel.write_range",
-    },
+const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
+    "excel.add_sheet",
+    "excel.apply_filter",
+    "excel.clear_range",
+    "excel.create_chart",
+    "excel.create_pivot_table",
+    "excel.create_table",
+    "excel.delete_sheet",
+    "excel.find_replace_cells",
+    "excel.format_range",
+    "excel.get_used_range",
+    "excel.get_workbook_info",
+    "excel.list_sheets",
+    "excel.read_range",
+    "excel.set_formula",
+    "excel.sort_range",
+    "excel.update_chart",
+    "excel.update_pivot_table",
+    "excel.update_table",
+    "excel.update_sheet",
+    "excel.write_range",
 ];
 
-const POWERPOINT_V1_TOOLS: &[PowerPointToolDefinition] = &[
-    PowerPointToolDefinition {
-        name: "powerpoint.get_presentation_info",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.get_active_view",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.export_file",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.update_tags",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.list_slides",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.add_slide",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.update_slide",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.delete_slide",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.move_slide",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.export_slide",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.list_layouts",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.apply_layout",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.get_selection",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.set_selection",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.list_shapes",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.add_text_box",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.add_shape",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.insert_image",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.update_shape",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.read_text",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.replace_text",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.format_text",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.add_table",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.read_table",
-    },
-    PowerPointToolDefinition {
-        name: "powerpoint.update_table",
-    },
+const POWERPOINT_V1_TOOLS: &[OfficeToolDefinition] = &[
+    "powerpoint.get_presentation_info",
+    "powerpoint.get_active_view",
+    "powerpoint.export_file",
+    "powerpoint.update_tags",
+    "powerpoint.list_slides",
+    "powerpoint.add_slide",
+    "powerpoint.update_slide",
+    "powerpoint.delete_slide",
+    "powerpoint.move_slide",
+    "powerpoint.export_slide",
+    "powerpoint.list_layouts",
+    "powerpoint.apply_layout",
+    "powerpoint.get_selection",
+    "powerpoint.set_selection",
+    "powerpoint.list_shapes",
+    "powerpoint.add_text_box",
+    "powerpoint.add_shape",
+    "powerpoint.insert_image",
+    "powerpoint.update_shape",
+    "powerpoint.read_text",
+    "powerpoint.replace_text",
+    "powerpoint.format_text",
+    "powerpoint.add_table",
+    "powerpoint.read_table",
+    "powerpoint.update_table",
 ];
+
+pub type OfficeToolDefinition = &'static str;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ExcelToolDefinition {
-    pub name: &'static str,
+pub struct OfficeToolCatalog {
+    app: &'static str,
+    tools: &'static [OfficeToolDefinition],
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointToolDefinition {
-    pub name: &'static str,
+impl OfficeToolCatalog {
+    const fn new(app: &'static str, tools: &'static [OfficeToolDefinition]) -> Self {
+        Self { app, tools }
+    }
+
+    #[must_use]
+    pub const fn app(self) -> &'static str {
+        self.app
+    }
+
+    #[must_use]
+    pub const fn tools(self) -> &'static [OfficeToolDefinition] {
+        self.tools
+    }
+
+    pub fn tool_names(self) -> impl Iterator<Item = &'static str> {
+        self.tools.iter().copied()
+    }
+
+    #[must_use]
+    pub fn contains(self, name: &str) -> bool {
+        self.tools.contains(&name)
+    }
+}
+
+const WORD_TOOL_CATALOG: OfficeToolCatalog = OfficeToolCatalog::new("word", WORD_V1_TOOLS);
+const EXCEL_TOOL_CATALOG: OfficeToolCatalog = OfficeToolCatalog::new("excel", EXCEL_V1_TOOLS);
+const POWERPOINT_TOOL_CATALOG: OfficeToolCatalog =
+    OfficeToolCatalog::new("powerpoint", POWERPOINT_V1_TOOLS);
+const OFFICE_TOOL_CATALOGS: &[OfficeToolCatalog] = &[
+    WORD_TOOL_CATALOG,
+    EXCEL_TOOL_CATALOG,
+    POWERPOINT_TOOL_CATALOG,
+];
+
+#[must_use]
+pub const fn office_tool_catalogs() -> &'static [OfficeToolCatalog] {
+    OFFICE_TOOL_CATALOGS
+}
+
+pub fn all_office_tool_names() -> impl Iterator<Item = &'static str> {
+    office_tool_catalogs()
+        .iter()
+        .copied()
+        .flat_map(OfficeToolCatalog::tool_names)
+}
+
+#[must_use]
+pub fn is_office_tool(name: &str) -> bool {
+    office_tool_catalogs()
+        .iter()
+        .copied()
+        .any(|catalog| catalog.contains(name))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,13 +150,13 @@ pub struct ExcelToolCatalog;
 
 impl ExcelToolCatalog {
     #[must_use]
-    pub const fn tools() -> &'static [ExcelToolDefinition] {
-        EXCEL_V1_TOOLS
+    pub const fn tools() -> &'static [OfficeToolDefinition] {
+        EXCEL_TOOL_CATALOG.tools()
     }
 
     #[must_use]
     pub fn contains(name: &str) -> bool {
-        Self::tools().iter().any(|tool| tool.name == name)
+        EXCEL_TOOL_CATALOG.contains(name)
     }
 }
 
@@ -202,13 +165,13 @@ pub struct PowerPointToolCatalog;
 
 impl PowerPointToolCatalog {
     #[must_use]
-    pub const fn tools() -> &'static [PowerPointToolDefinition] {
-        POWERPOINT_V1_TOOLS
+    pub const fn tools() -> &'static [OfficeToolDefinition] {
+        POWERPOINT_TOOL_CATALOG.tools()
     }
 
     #[must_use]
     pub fn contains(name: &str) -> bool {
-        Self::tools().iter().any(|tool| tool.name == name)
+        POWERPOINT_TOOL_CATALOG.contains(name)
     }
 }
 
@@ -238,37 +201,28 @@ pub fn tool_catalog_json_for_policy(policy: &ToolAccessPolicy) -> Vec<Value> {
         "Describe Office Tools",
         "Return runtime contracts, examples, and common errors for multiple Office MCP tools.",
     );
-    for name in WORD_V1_TOOLS.iter().filter(|name| policy.allows_tool(name)) {
-        push_tool_with_aliases(
-            &mut tools,
-            name,
-            name,
-            "Forward this Word tool call to the selected Office document session.",
-        );
-    }
-    for tool in ExcelToolCatalog::tools()
-        .iter()
-        .filter(|tool| policy.allows_tool(tool.name))
-    {
-        push_tool_with_aliases(
-            &mut tools,
-            tool.name,
-            tool.name,
-            "Forward this Excel tool call to the selected Office workbook session.",
-        );
-    }
-    for tool in PowerPointToolCatalog::tools()
-        .iter()
-        .filter(|tool| policy.allows_tool(tool.name))
-    {
-        push_tool_with_aliases(
-            &mut tools,
-            tool.name,
-            tool.name,
-            "Forward this PowerPoint tool call to the selected Office presentation session.",
-        );
+    for catalog in office_tool_catalogs().iter().copied() {
+        for tool in catalog.tool_names().filter(|tool| policy.allows_tool(tool)) {
+            push_tool_with_aliases(
+                &mut tools,
+                tool,
+                tool,
+                forwarded_tool_description(catalog.app()),
+            );
+        }
     }
     tools
+}
+
+const fn forwarded_tool_description(app: &str) -> &'static str {
+    match app.as_bytes() {
+        b"word" => "Forward this Word tool call to the selected Office document session.",
+        b"excel" => "Forward this Excel tool call to the selected Office workbook session.",
+        b"powerpoint" => {
+            "Forward this PowerPoint tool call to the selected Office presentation session."
+        }
+        _ => "Forward this Office tool call to the selected Office document session.",
+    }
 }
 
 fn push_tool_with_aliases(tools: &mut Vec<Value>, name: &str, title: &str, description: &str) {
@@ -290,9 +244,7 @@ pub fn canonical_tool_name(tool: &str) -> &str {
     for candidate in management_tool_names()
         .iter()
         .copied()
-        .chain(WORD_V1_TOOLS.iter().copied())
-        .chain(ExcelToolCatalog::tools().iter().map(|tool| tool.name))
-        .chain(PowerPointToolCatalog::tools().iter().map(|tool| tool.name))
+        .chain(all_office_tool_names())
     {
         if mcp_safe_tool_alias(candidate) == tool {
             return candidate;
