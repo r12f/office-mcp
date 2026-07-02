@@ -219,55 +219,94 @@ pub fn tool_catalog_json() -> Vec<Value> {
 
 #[must_use]
 pub fn tool_catalog_json_for_policy(policy: &ToolAccessPolicy) -> Vec<Value> {
-    let mut tools = vec![
-        tool_json(
-            "office.list_sessions",
-            "List Office Sessions",
-            "List connected Office document sessions.",
-        ),
-        tool_json(
-            "office.get_session_info",
-            "Get Office Session Info",
-            "Return metadata and supported tools for one Office document session.",
-        ),
-        tool_json(
-            "office.describe_tools",
-            "Describe Office Tools",
-            "Return runtime contracts, examples, and common errors for multiple Office MCP tools.",
-        ),
-    ];
-    tools.extend(
-        WORD_V1_TOOLS
-            .iter()
-            .filter(|name| policy.allows_tool(name))
-            .map(|name| {
-                tool_json(
-                    name,
-                    name,
-                    "Forward this Word tool call to the selected Office document session.",
-                )
-            }),
+    let mut tools = Vec::new();
+    push_tool_with_aliases(
+        &mut tools,
+        "office.list_sessions",
+        "List Office Sessions",
+        "List connected Office document sessions.",
     );
-    tools.extend(
-        ExcelToolCatalog::tools()
-            .iter()
-            .filter(|tool| policy.allows_tool(tool.name))
-            .map(|tool| {
-                tool_json(
-                    tool.name,
-                    tool.name,
-                    "Forward this Excel tool call to the selected Office workbook session.",
-                )
-            }),
+    push_tool_with_aliases(
+        &mut tools,
+        "office.get_session_info",
+        "Get Office Session Info",
+        "Return metadata and supported tools for one Office document session.",
     );
-    tools.extend(PowerPointToolCatalog::tools().iter().filter(|tool| policy.allows_tool(tool.name)).map(|tool| {
-        tool_json(
+    push_tool_with_aliases(
+        &mut tools,
+        "office.describe_tools",
+        "Describe Office Tools",
+        "Return runtime contracts, examples, and common errors for multiple Office MCP tools.",
+    );
+    for name in WORD_V1_TOOLS.iter().filter(|name| policy.allows_tool(name)) {
+        push_tool_with_aliases(
+            &mut tools,
+            name,
+            name,
+            "Forward this Word tool call to the selected Office document session.",
+        );
+    }
+    for tool in ExcelToolCatalog::tools()
+        .iter()
+        .filter(|tool| policy.allows_tool(tool.name))
+    {
+        push_tool_with_aliases(
+            &mut tools,
+            tool.name,
+            tool.name,
+            "Forward this Excel tool call to the selected Office workbook session.",
+        );
+    }
+    for tool in PowerPointToolCatalog::tools()
+        .iter()
+        .filter(|tool| policy.allows_tool(tool.name))
+    {
+        push_tool_with_aliases(
+            &mut tools,
             tool.name,
             tool.name,
             "Forward this PowerPoint tool call to the selected Office presentation session.",
-        )
-    }));
+        );
+    }
     tools
+}
+
+fn push_tool_with_aliases(tools: &mut Vec<Value>, name: &str, title: &str, description: &str) {
+    tools.push(tool_json(name, title, description));
+    let alias = mcp_safe_tool_alias(name);
+    tools.push(tool_json(&alias, title, description));
+}
+
+#[must_use]
+pub fn mcp_safe_tool_alias(tool: &str) -> String {
+    tool.replace('.', "_")
+}
+
+#[must_use]
+pub fn canonical_tool_name(tool: &str) -> &str {
+    if tool.contains('.') {
+        return tool;
+    }
+    for candidate in management_tool_names()
+        .iter()
+        .copied()
+        .chain(WORD_V1_TOOLS.iter().copied())
+        .chain(ExcelToolCatalog::tools().iter().map(|tool| tool.name))
+        .chain(PowerPointToolCatalog::tools().iter().map(|tool| tool.name))
+    {
+        if mcp_safe_tool_alias(candidate) == tool {
+            return candidate;
+        }
+    }
+    tool
+}
+
+const fn management_tool_names() -> &'static [&'static str] {
+    &[
+        "office.list_sessions",
+        "office.get_session_info",
+        "office.describe_tools",
+    ]
 }
 
 #[must_use]
@@ -470,20 +509,25 @@ fn resource_template_json(uri_template: &str, name: &str, title: &str) -> Value 
 }
 
 fn tool_json(name: &str, title: &str, description: &str) -> Value {
-    let side_effect = tool_side_effect(name).unwrap_or("read");
+    let canonical_name = canonical_tool_name(name);
+    let side_effect = tool_side_effect(canonical_name).unwrap_or("read");
     let mut tool = json!({
         "name": name,
         "title": title,
         "description": description,
-        "inputSchema": input_schema_for_tool(name),
+        "inputSchema": input_schema_for_tool(canonical_name),
         "annotations": tool_annotations(side_effect),
         "_meta": {
+            "com.office-mcp/canonical_name": canonical_name,
             "com.office-mcp/side_effects": side_effect,
-            "com.office-mcp/common_errors": common_errors_for_tool(name),
-            "com.office-mcp/examples": examples_for_tool(name)
+            "com.office-mcp/common_errors": common_errors_for_tool(canonical_name),
+            "com.office-mcp/examples": examples_for_tool(canonical_name)
         }
     });
-    if let Some(metadata) = tool_metadata(name) {
+    if name != canonical_name {
+        tool["_meta"]["com.office-mcp/alias_for"] = json!(canonical_name);
+    }
+    if let Some(metadata) = tool_metadata(canonical_name) {
         tool["_meta"]["com.office-mcp/app"] = json!(metadata.app);
         tool["_meta"]["com.office-mcp/category"] = json!(metadata.category);
     }
@@ -507,6 +551,7 @@ fn tool_annotations(side_effect: &str) -> Value {
 /// Returns an error when `arguments` is not an object, includes an unknown
 /// top-level field, or omits a required top-level field.
 pub fn validate_tool_arguments(tool: &str, arguments: &Value) -> Result<(), String> {
+    let tool = canonical_tool_name(tool);
     let schema = input_schema_for_tool(tool);
     let Some(arguments) = arguments.as_object() else {
         return Err(format!("{tool} arguments must be a JSON object."));
@@ -536,23 +581,28 @@ pub fn validate_tool_arguments(tool: &str, arguments: &Value) -> Result<(), Stri
 
 #[must_use]
 pub fn input_schema_for_tool(tool: &str) -> Value {
-    let spec = tool_input_spec(tool);
+    let spec = tool_input_spec(canonical_tool_name(tool));
     object_schema(tool, spec.required, spec.properties)
 }
 
 #[must_use]
 pub fn describe_tool_contract(tool: &str) -> Option<Value> {
-    let side_effect = tool_side_effect(tool)?;
-    let input_schema = input_schema_for_tool(tool);
+    let canonical_name = canonical_tool_name(tool);
+    let side_effect = tool_side_effect(canonical_name)?;
+    let input_schema = input_schema_for_tool(canonical_name);
     let mut contract = json!({
         "name": tool,
+        "canonical_name": canonical_name,
         "input_schema": input_schema,
         "parameters": parameters_for_schema(&input_schema),
-        "examples": examples_for_tool(tool),
+        "examples": examples_for_tool(canonical_name),
         "side_effect": side_effect,
-        "common_errors": common_errors_for_tool(tool)
+        "common_errors": common_errors_for_tool(canonical_name)
     });
-    if let Some(metadata) = tool_metadata(tool) {
+    if tool != canonical_name {
+        contract["alias_for"] = json!(canonical_name);
+    }
+    if let Some(metadata) = tool_metadata(canonical_name) {
         contract["app"] = json!(metadata.app);
         contract["category"] = json!(metadata.category);
     }

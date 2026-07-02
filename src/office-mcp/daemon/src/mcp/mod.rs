@@ -10,8 +10,8 @@ pub mod tool_metadata;
 pub mod tool_result;
 
 pub use catalog::{
-    ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS, describe_tool_contract,
-    excel_resource_catalog_for_session, excel_resource_templates,
+    ExcelToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS, canonical_tool_name,
+    describe_tool_contract, excel_resource_catalog_for_session, excel_resource_templates,
     powerpoint_resource_catalog_for_session, powerpoint_resource_templates, tool_catalog_json,
     tool_catalog_json_for_policy, unknown_tool_contract, validate_tool_arguments,
     word_resource_catalog_for_session, word_resource_templates,

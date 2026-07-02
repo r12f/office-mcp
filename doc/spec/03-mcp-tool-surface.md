@@ -4,10 +4,21 @@ What the `office-mcp` server exposes to MCP clients (the AI side).
 
 ## 1. Naming & namespacing
 
-- Tool names are `<app>.<verb_object>` — e.g. `word.insert_paragraph`,
-  `word.replace_text`, `excel.read_range`, `outlook.draft_reply`.
-  `<app>` is the Office application the tool targets
-  (`word`, `excel`, `outlook`, ...).
+- Canonical tool names are `<app>.<verb_object>` — e.g.
+  `word.insert_paragraph`, `word.replace_text`, `excel.read_range`,
+  `outlook.draft_reply`. `<app>` is the Office application the tool targets
+  (`word`, `excel`, `outlook`, ...). Canonical names are the names used in
+  add-in `available_tools`, audit logs, errors, and daemon-to-add-in forwarding.
+- MCP `tools/list` also exposes a client-safe underscore alias for every public
+  tool, formed by replacing the namespace dot with `_`, for example
+  `word_insert_paragraph`, `word_replace_text`, and `excel_read_range`. These
+  aliases exist for MCP clients that only surface function-like tool names.
+  Alias entries MUST carry the same schema, annotations, side-effect metadata,
+  examples, and common errors as their canonical tool, plus
+  `_meta["com.office-mcp/alias_for"]` and
+  `_meta["com.office-mcp/canonical_name"]` pointing at the canonical dotted
+  name. A `tools/call` using either spelling MUST execute the same canonical
+  tool and forward the canonical dotted name to the add-in.
 - A small set of cross-app management tools live under `office.*`:
   `office.list_sessions`, `office.get_session_info`, `office.describe_tools`.
 - Resource URIs use a custom scheme:

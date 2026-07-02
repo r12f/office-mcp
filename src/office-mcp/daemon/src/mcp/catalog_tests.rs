@@ -43,10 +43,14 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
         .collect::<Vec<_>>();
 
     assert!(names.contains(&"office.list_sessions"));
+    assert!(names.contains(&"office_list_sessions"));
     assert!(names.contains(&"office.get_session_info"));
+    assert!(names.contains(&"office_get_session_info"));
     assert!(names.contains(&"office.describe_tools"));
+    assert!(names.contains(&"office_describe_tools"));
     assert!(!names.contains(&"office.describe_tool"));
     assert!(names.contains(&"word.get_text"));
+    assert!(names.contains(&"word_get_text"));
     assert!(names.contains(&"word.resolve_anchor"));
     assert!(names.contains(&"word.list_content_controls"));
     assert!(names.contains(&"word.insert_content_control"));
@@ -54,6 +58,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word.delete_content_control"));
     assert!(names.contains(&"word.resize_image"));
     assert!(names.contains(&"word.update_table"));
+    assert!(names.contains(&"word_update_table"));
     assert!(names.contains(&"word.update_tracked_change"));
     assert!(!names.contains(&"word.insert_heading"));
     assert!(!names.contains(&"word.set_heading_level"));
@@ -64,6 +69,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"word.accept_change"));
     assert!(!names.contains(&"word.reject_change"));
     assert!(names.contains(&"excel.read_range"));
+    assert!(names.contains(&"excel_read_range"));
     assert!(names.contains(&"excel.sort_range"));
     assert!(names.contains(&"excel.apply_filter"));
     assert!(names.contains(&"excel.update_table"));
@@ -79,7 +85,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert_eq!(WORD_V1_TOOLS.len(), 27);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 75);
+    assert_eq!(tools.len(), 150);
 }
 
 #[test]
@@ -197,6 +203,33 @@ fn tools_list_contract_metadata_matches_describe_tool_contract() {
             described["side_effect"]
         );
     }
+}
+
+#[test]
+fn safe_tool_aliases_share_canonical_contract_metadata() {
+    let canonical = tool_for("word.update_table");
+    let alias = tool_for("word_update_table");
+
+    assert_eq!(
+        alias["_meta"]["com.office-mcp/alias_for"],
+        "word.update_table"
+    );
+    assert_eq!(
+        alias["_meta"]["com.office-mcp/canonical_name"],
+        "word.update_table"
+    );
+    assert_eq!(alias["inputSchema"], canonical["inputSchema"]);
+    assert_eq!(alias["annotations"], canonical["annotations"]);
+    assert_eq!(
+        alias["_meta"]["com.office-mcp/side_effects"],
+        canonical["_meta"]["com.office-mcp/side_effects"]
+    );
+
+    let described = super::describe_tool_contract("word_update_table").expect("alias contract");
+    assert_eq!(described["name"], "word_update_table");
+    assert_eq!(described["canonical_name"], "word.update_table");
+    assert_eq!(described["alias_for"], "word.update_table");
+    assert_eq!(described["input_schema"], canonical["inputSchema"]);
 }
 
 #[test]

@@ -6,8 +6,9 @@ use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::mcp::{
     ExcelToolCatalog, PowerPointToolCatalog, ResourceReadRequest, ToolAccessPolicy, WORD_V1_TOOLS,
-    describe_tool_contract, resource_request_from_uri, tool_failure, tool_failure_without_effect,
-    tool_not_available_by_policy, tool_success, unknown_tool_contract, validate_tool_arguments,
+    canonical_tool_name, describe_tool_contract, resource_request_from_uri, tool_failure,
+    tool_failure_without_effect, tool_not_available_by_policy, tool_success, unknown_tool_contract,
+    validate_tool_arguments,
 };
 use crate::runtime::json_rpc;
 use crate::runtime::mcp_catalog_response::McpCatalogResponder;
@@ -137,26 +138,29 @@ impl McpJsonRpcRuntime {
         let Some(name) = params.get("name").and_then(Value::as_str) else {
             return json_rpc::error(id, -32602, "Missing tool name");
         };
+        let canonical_name = canonical_tool_name(name);
         let arguments = params.get("arguments").unwrap_or(&Value::Null);
-        if Self::is_forwarded_tool(name) && !context.tool_access_policy.allows_tool(name) {
-            return json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": tool_not_available_by_policy(name)
-            })
-            .to_string();
-        }
-        if Self::is_known_tool(name)
-            && let Err(message) = validate_tool_arguments(name, arguments)
+        if Self::is_forwarded_tool(canonical_name)
+            && !context.tool_access_policy.allows_tool(canonical_name)
         {
             return json!({
                 "jsonrpc": "2.0",
                 "id": id,
-                "result": tool_failure_without_effect("INVALID_ARGUMENTS", &message, Some(name), false)
+                "result": tool_not_available_by_policy(canonical_name)
             })
             .to_string();
         }
-        let result = match name {
+        if Self::is_known_tool(canonical_name)
+            && let Err(message) = validate_tool_arguments(canonical_name, arguments)
+        {
+            return json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": tool_failure_without_effect("INVALID_ARGUMENTS", &message, Some(canonical_name), false)
+            })
+            .to_string();
+        }
+        let result = match canonical_name {
             "office.list_sessions" => tool_success(&json!({
                 "sessions": context
                     .registry

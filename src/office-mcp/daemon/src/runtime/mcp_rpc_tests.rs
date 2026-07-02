@@ -19,92 +19,42 @@ fn mcp_json_rpc_lists_tools_and_connected_sessions() {
         br#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}"#,
     );
     let tools: serde_json::Value = serde_json::from_str(&tools).expect("tools json");
-    let mut names = tools["result"]["tools"]
+    let names = tools["result"]["tools"]
         .as_array()
         .expect("tools")
         .iter()
         .filter_map(|tool| tool["name"].as_str())
         .collect::<Vec<_>>();
-    names.sort_unstable();
+    assert!(names.contains(&"office.list_sessions"));
+    assert!(names.contains(&"office_list_sessions"));
+    assert!(names.contains(&"office.get_session_info"));
+    assert!(names.contains(&"office_get_session_info"));
+    assert!(names.contains(&"office.describe_tools"));
+    assert!(names.contains(&"office_describe_tools"));
+    assert!(names.contains(&"word.get_text"));
+    assert!(names.contains(&"word_get_text"));
+    assert!(names.contains(&"word.update_table"));
+    assert!(names.contains(&"word_update_table"));
+    assert!(names.contains(&"excel.read_range"));
+    assert!(names.contains(&"excel_read_range"));
+    assert!(names.contains(&"powerpoint.add_slide"));
+    assert!(names.contains(&"powerpoint_add_slide"));
+    assert!(names.contains(&"powerpoint.replace_text"));
+    assert!(names.contains(&"powerpoint_replace_text"));
+
+    let word_update_table_alias = tools["result"]["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|tool| tool["name"] == "word_update_table")
+        .expect("word_update_table alias");
     assert_eq!(
-        names,
-        vec![
-            "excel.add_sheet",
-            "excel.apply_filter",
-            "excel.clear_range",
-            "excel.create_chart",
-            "excel.create_pivot_table",
-            "excel.create_table",
-            "excel.delete_sheet",
-            "excel.find_replace_cells",
-            "excel.format_range",
-            "excel.get_used_range",
-            "excel.get_workbook_info",
-            "excel.list_sheets",
-            "excel.read_range",
-            "excel.set_formula",
-            "excel.sort_range",
-            "excel.update_chart",
-            "excel.update_pivot_table",
-            "excel.update_sheet",
-            "excel.update_table",
-            "excel.write_range",
-            "office.describe_tools",
-            "office.get_session_info",
-            "office.list_sessions",
-            "powerpoint.add_shape",
-            "powerpoint.add_slide",
-            "powerpoint.add_table",
-            "powerpoint.add_text_box",
-            "powerpoint.apply_layout",
-            "powerpoint.delete_slide",
-            "powerpoint.export_file",
-            "powerpoint.export_slide",
-            "powerpoint.format_text",
-            "powerpoint.get_active_view",
-            "powerpoint.get_presentation_info",
-            "powerpoint.get_selection",
-            "powerpoint.insert_image",
-            "powerpoint.list_layouts",
-            "powerpoint.list_shapes",
-            "powerpoint.list_slides",
-            "powerpoint.move_slide",
-            "powerpoint.read_table",
-            "powerpoint.read_text",
-            "powerpoint.replace_text",
-            "powerpoint.set_selection",
-            "powerpoint.update_shape",
-            "powerpoint.update_slide",
-            "powerpoint.update_table",
-            "powerpoint.update_tags",
-            "word.add_comment",
-            "word.apply_formatting",
-            "word.apply_style",
-            "word.delete_content_control",
-            "word.delete_range",
-            "word.find_text",
-            "word.get_outline",
-            "word.get_paragraph",
-            "word.get_selection",
-            "word.get_text",
-            "word.insert_content_control",
-            "word.insert_image",
-            "word.insert_list",
-            "word.insert_page_break",
-            "word.insert_paragraph",
-            "word.insert_table",
-            "word.list_content_controls",
-            "word.read_table",
-            "word.replace_text",
-            "word.resize_image",
-            "word.resolve_anchor",
-            "word.resolve_comment",
-            "word.save",
-            "word.update_content_control",
-            "word.update_paragraph",
-            "word.update_table",
-            "word.update_tracked_change",
-        ]
+        word_update_table_alias["_meta"]["com.office-mcp/alias_for"],
+        "word.update_table"
+    );
+    assert_eq!(
+        word_update_table_alias["_meta"]["com.office-mcp/canonical_name"],
+        "word.update_table"
     );
 
     let sessions = mcp_handle_body(
@@ -730,6 +680,54 @@ fn mcp_json_rpc_forwarded_word_tool_invokes_addin_connection() {
             .current_tasks
             .is_empty()
     );
+}
+
+#[test]
+fn mcp_json_rpc_safe_word_tool_alias_forwards_canonical_tool_name() {
+    let registry = registry_with_word_session_with_tools(vec!["word.update_table"]);
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection("connection-1");
+    connection_hub.bind_instance("connection-1", "instance-1");
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = thread::spawn(move || {
+        let outbound = loop {
+            let outbound = response_hub.take_outbound("connection-1");
+            if !outbound.is_empty() {
+                break outbound;
+            }
+            thread::sleep(std::time::Duration::from_millis(5));
+        };
+        assert_eq!(outbound.len(), 1);
+        let invoke: serde_json::Value = serde_json::from_str(&outbound[0]).expect("invoke json");
+        assert_eq!(invoke["method"], "tool.invoke");
+        assert_eq!(invoke["params"]["session_id"], "session-1");
+        assert_eq!(invoke["params"]["tool"], "word.update_table");
+        let request_id = invoke["id"].as_str().expect("request id");
+        assert!(response_hub.complete_from_text(&format!(
+            r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{{"updated":true}}}}}}"#
+        )));
+    });
+
+    let mut context = McpDispatchContext {
+        registry: &registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+        tool_access_policy: &ToolAccessPolicy::default(),
+    };
+    let reply = McpJsonRpcRuntime::handle_body(
+        &mut context,
+        br#"{"jsonrpc":"2.0","id":"call-alias","method":"tools/call","params":{"name":"word_update_table","arguments":{"session_id":"session-1","action":"update_cell","table_index":0,"row":0,"col":0,"text":"x"}}}"#,
+    );
+    response_thread.join().expect("response thread");
+    let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
+    assert_eq!(reply["result"]["structuredContent"]["updated"], true);
 }
 
 #[test]
