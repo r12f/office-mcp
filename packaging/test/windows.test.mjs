@@ -193,6 +193,9 @@ test('GitHub release workflow publishes only the Windows portable artifacts', ()
   assert.match(workflow, /\$remoteTagExit = \$LASTEXITCODE/);
   assert.match(workflow, /git ls-remote --exit-code --tags origin/);
   assert.match(workflow, /Version tag already exists/);
+  assert.match(workflow, /"tag=v\$version" >> \$env:GITHUB_OUTPUT\s+exit 0/);
+  assert.match(workflow, /"tag=\$tag" >> \$env:GITHUB_OUTPUT\s+exit 0/);
+  assert.doesNotMatch(workflow, /"tag=v\$version" >> \$env:GITHUB_OUTPUT\s+return/);
   assert.doesNotMatch(workflow, /if \(git rev-parse/);
   assert.match(workflow, /git commit -m "Release v\$version"/);
   assert.match(workflow, /git push origin HEAD:main/);
