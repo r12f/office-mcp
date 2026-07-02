@@ -1,0 +1,134 @@
+name: Release Kickoff
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Semantic version bump to release.'
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  bump-tag:
+    name: Bump version and push release tag
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute next version
+        id: version
+        shell: pwsh
+        run: |
+          $bump = '${{ github.event.inputs.bump }}'
+          if ($bump -notin @('patch', 'minor', 'major')) {
+            throw "Invalid bump selection: $bump"
+          }
+
+          $package = Get-Content -LiteralPath 'packaging/package.json' -Raw | ConvertFrom-Json
+          $currentVersion = [string]$package.version
+          $match = [regex]::Match($currentVersion, '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$')
+          if (-not $match.Success) {
+            throw "Current package version is not a plain SemVer release: $currentVersion"
+          }
+
+          $major = [int]$match.Groups['major'].Value
+          $minor = [int]$match.Groups['minor'].Value
+          $patch = [int]$match.Groups['patch'].Value
+          switch ($bump) {
+            'major' { $major += 1; $minor = 0; $patch = 0 }
+            'minor' { $minor += 1; $patch = 0 }
+            'patch' { $patch += 1 }
+          }
+
+          $version = "$major.$minor.$patch"
+          $tag = "v$version"
+          if (git rev-parse -q --verify "refs/tags/$tag") {
+            throw "Version tag already exists locally: $tag"
+          }
+          git ls-remote --exit-code --tags origin "refs/tags/$tag" | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Version tag already exists on origin: $tag"
+          }
+          if ($LASTEXITCODE -ne 2) {
+            throw "Unable to check remote tag state for $tag"
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Update version metadata
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $jsonEncoding = New-Object System.Text.UTF8Encoding($false)
+
+          $packagePath = 'packaging/package.json'
+          $package = Get-Content -LiteralPath $packagePath -Raw | ConvertFrom-Json -AsHashtable
+          $package['version'] = $version
+          [System.IO.File]::WriteAllText($packagePath, (($package | ConvertTo-Json -Depth 20) + "`n"), $jsonEncoding)
+
+          $lockPath = 'packaging/package-lock.json'
+          $lock = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json -AsHashtable
+          $lock['version'] = $version
+          $lock['packages']['']['version'] = $version
+          [System.IO.File]::WriteAllText($lockPath, (($lock | ConvertTo-Json -Depth 20) + "`n"), $jsonEncoding)
+
+          $cargoTomlPath = 'src/office-mcp/daemon/Cargo.toml'
+          $cargoToml = Get-Content -LiteralPath $cargoTomlPath -Raw
+          $cargoToml = [regex]::Replace(
+            $cargoToml,
+            '(?m)^version\s*=\s*"[^"]+"',
+            "version = `"$version`"",
+            1
+          )
+          [System.IO.File]::WriteAllText($cargoTomlPath, $cargoToml, $jsonEncoding)
+
+          $cargoLockPath = 'Cargo.lock'
+          $cargoLock = Get-Content -LiteralPath $cargoLockPath -Raw
+          $cargoLock = [regex]::Replace(
+            $cargoLock,
+            '(?ms)(\[\[package\]\]\s+name = "office-mcp-daemon"\s+version = ")[^"]+("\s+dependencies = \[)',
+            "`${1}$version`${2}",
+            1
+          )
+          [System.IO.File]::WriteAllText($cargoLockPath, $cargoLock, $jsonEncoding)
+
+      - name: Commit version bump and push tag
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $tag = '${{ steps.version.outputs.tag }}'
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git status --short
+          git diff --check
+          git add packaging/package.json packaging/package-lock.json src/office-mcp/daemon/Cargo.toml Cargo.lock
+          git diff --cached --exit-code --quiet && throw "No version metadata changes were staged for $tag"
+          git commit -m "Release v$version"
+          git push origin HEAD:main
+          git tag "v$version"
+          git push origin "v$version"
+
+      - name: Dispatch tag release workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $tag = '${{ steps.version.outputs.tag }}'
+          gh workflow run release.yml --ref $tag -f version=$version

@@ -237,7 +237,7 @@ test('GitHub release workflow publishes only the Windows portable artifacts', ()
   assert.doesNotMatch(workflow, /office-mcp-setup|\.msi|\$\{\{ steps\.stage\.outputs\.msi \}\}/i);
   assert.match(workflow, /SHA256SUMS/);
   assert.match(workflow, /Get-FileHash[\s\S]*Split-Path -Leaf \$releaseZip[\s\S]*logo-rendered-size-review\.json[\s\S]*logo-rendered-size-review\.png[\s\S]*catalog-identity-review\.json/);
-  assert.match(workflow, /RELEASE_NOTES\.md/);
+  assert.doesNotMatch(workflow, /RELEASE_NOTES\.md/);
   assert.match(workflow, /Get-FileHash/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
   assert.match(workflow, /\$\{\{ steps\.stage\.outputs\.rendered_logo_review \}\}/);
@@ -246,8 +246,42 @@ test('GitHub release workflow publishes only the Windows portable artifacts', ()
   assert.match(workflow, /softprops\/action-gh-release@v2/);
   assert.match(workflow, /draft:\s*true/);
   assert.match(workflow, /prerelease:\s*true/);
-  assert.match(workflow, /body_path:\s*RELEASE_NOTES\.md/);
+  assert.doesNotMatch(workflow, /body_path:/);
+  assert.match(workflow, /generate_release_notes:\s*true/);
   assert.match(workflow, /github\.ref_type == 'tag'/);
+});
+
+test('GitHub release kickoff workflow bumps, commits, and tags the next version', () => {
+  const repoRoot = join(PACKAGING_ROOT, '..');
+  const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'release-kickoff.yml'), 'utf8');
+
+  assert.match(workflow, /name:\s*Release Kickoff/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /bump:/);
+  assert.match(workflow, /type:\s*choice/);
+  assert.match(workflow, /options:[\s\S]*patch[\s\S]*minor[\s\S]*major/);
+  assert.doesNotMatch(workflow, /target_version|release_version|version:\s*\n\s*description:/i);
+  assert.match(workflow, /permissions:[\s\S]*actions:\s*write[\s\S]*contents:\s*write/);
+  assert.match(workflow, /actions\/checkout@v4/);
+  assert.match(workflow, /fetch-depth:\s*0/);
+  assert.match(workflow, /github\.event\.inputs\.bump/);
+  assert.match(workflow, /packaging\/package\.json/);
+  assert.match(workflow, /packaging\/package-lock\.json/);
+  assert.match(workflow, /ConvertFrom-Json -AsHashtable/);
+  assert.match(workflow, /src\/office-mcp\/daemon\/Cargo\.toml/);
+  assert.match(workflow, /Cargo\.lock/);
+  assert.match(workflow, /git ls-remote --exit-code --tags origin/);
+  assert.match(workflow, /Version tag already exists/);
+  assert.match(workflow, /git config user\.name/);
+  assert.match(workflow, /git config user\.email/);
+  assert.match(workflow, /git commit -m "Release v\$version"/);
+  assert.match(workflow, /git push origin HEAD:main/);
+  assert.match(workflow, /git tag "v\$version"/);
+  assert.match(workflow, /git push origin "v\$version"/);
+  assert.match(workflow, /GH_TOKEN:\s*\$\{\{ secrets\.GITHUB_TOKEN \}\}/);
+  assert.match(workflow, /gh workflow run release\.yml --ref \$tag -f version=\$version/);
+  assert.ok(workflow.indexOf('git push origin HEAD:main') < workflow.indexOf('git tag "v$version"'));
+  assert.ok(workflow.indexOf('git push origin "v$version"') < workflow.indexOf('gh workflow run release.yml'));
 });
 
 test('GitHub CI verifies the Windows portable zip using package metadata version', () => {
@@ -312,30 +346,4 @@ test('README is a compact landing page with install and MCP config first', () =>
   assert.doesNotMatch(readme, /^## Verification$/m);
   assert.doesNotMatch(readme, /^## Repository layout$/m);
   assert.doesNotMatch(readme, /^## Run the MVP locally$/m);
-});
-
-test('Release notes document the Windows portable pre-release gate', () => {
-  const repoRoot = join(PACKAGING_ROOT, '..');
-  const releaseNotes = readFileSync(join(repoRoot, 'RELEASE_NOTES.md'), 'utf8');
-
-  assert.match(releaseNotes, /# Release Notes/);
-  assert.match(releaseNotes, /## 0\.1\.5/);
-  assert.doesNotMatch(releaseNotes, /office-mcp-setup|\.msi|MSI/i);
-  assert.match(releaseNotes, /office-mcp-windows-portable-0\.1\.5-x64\.zip/);
-  assert.match(releaseNotes, /https:\/\/localhost:8765\/ui\/` returns `HTTP\/1\.1 200 OK`/);
-  assert.match(releaseNotes, /README-install\.txt/);
-  assert.match(releaseNotes, /install\.ps1/);
-  assert.match(releaseNotes, /uninstall\.ps1/);
-  assert.doesNotMatch(releaseNotes, /install-user\.ps1/);
-  assert.doesNotMatch(releaseNotes, /start-daemon\.ps1/);
-  assert.doesNotMatch(releaseNotes, /uninstall-user\.ps1/);
-  assert.match(releaseNotes, /SHA256SUMS/);
-  assert.match(releaseNotes, /one-line installer/i);
-  assert.match(releaseNotes, /portable zip root/i);
-  assert.match(releaseNotes, /Windows desktop/i);
-  assert.match(releaseNotes, /Office MCP Control/);
-  assert.match(releaseNotes, /Word, Excel, or PowerPoint is running/);
-  assert.match(releaseNotes, /WEF add-in caches/);
-  assert.match(releaseNotes, /duplicate launcher wrappers/i);
-  assert.ok(releaseNotes.includes('http://127.0.0.1:8800/mcp'));
 });

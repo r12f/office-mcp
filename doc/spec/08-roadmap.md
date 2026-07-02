@@ -251,13 +251,13 @@ commands is not installable software.
 - [x] Generate and publish `SHA256SUMS` for every release artifact. If signing
       is not implemented yet, unsigned pre-releases must be explicitly labeled
       as unsigned rather than silently looking production-signed. Current
-      workflow generates `SHA256SUMS`, uploads it with the portable zip, and uses
-      `RELEASE_NOTES.md`, which labels 0.1.0 artifacts as unsigned.
-- [x] Keep releases draft or pre-release by default until release notes, manual
+      workflow generates `SHA256SUMS`, uploads it with the portable zip, and
+      publishes GitHub-generated release notes.
+- [x] Keep releases draft or pre-release by default until generated release notes, manual
       tray evidence, portable package smoke evidence, and required live Office evidence
       are attached or explicitly waived for that pre-release. Current workflow
-      sets `draft: true`, `prerelease: true`, requires `RELEASE_NOTES.md` for
-      tag releases, and publishes that file as the release body.
+      sets `draft: true`, `prerelease: true`, and asks GitHub to generate the
+      release body for tag releases.
 - [x] Add a README user installation section before the source/developer setup.
       It must explain how to download `office-mcp-windows-portable-<ver>-x64.zip` from
       GitHub Releases, verify checksums, extract it, run `install.ps1`, restart/open Office,
@@ -270,7 +270,7 @@ commands is not installable software.
       daemon UI/tray first-run verification, Office Shared Folder activation,
       MCP endpoint configuration, log collection, and uninstall steps. Current
       packaging static tests cover the release workflow, README install guide,
-      and release notes gate.
+      and generated release notes gate.
 
 Current local verification for the release-pipeline implementation:
 
@@ -291,6 +291,33 @@ workflow in GitHub Actions to capture the actual hosted Release artifact URL.
 pre-release with a downloadable Windows portable zip and checksums. A Windows
 desktop user can install from README instructions without cloning the repository
 or running developer build commands.
+
+### M6.3 — Release kickoff version bump workflow
+
+User-reported release automation gap: the release pipeline required a maintainer
+to manually choose and type the exact version before tagging. The release system
+already has enough repository metadata to compute the next SemVer version from a
+small set of safe bump choices.
+
+- [x] Add a separate `.github/workflows/release-kickoff.yml` workflow with a
+      manual `workflow_dispatch` choice input for `patch`, `minor`, and `major`.
+      The workflow computes the next version from the checked package metadata,
+      updates npm and Cargo version files, commits the bump to `main`, creates
+      `v<version>`, and pushes the commit before the tag.
+- [x] Keep `.github/workflows/release.yml` as the tag-triggered artifact
+      publisher. The kickoff workflow hands off to it by pushing a version tag;
+      the release workflow still supports an explicit staging dispatch for an
+      already-computed version, but normal releases no longer require typing the
+      target version.
+- [x] Add static packaging tests that lock the kickoff workflow contract: choice
+      input values, duplicate-tag refusal, package and Cargo metadata updates,
+      bump commit before tag push, and no manual target-version input for the
+      normal kickoff path.
+
+**Exit criterion**: A maintainer can start a normal release by choosing only
+`patch`, `minor`, or `major` in GitHub Actions. The workflow bumps all release
+metadata, commits it, pushes `v<version>`, and the existing tag-triggered
+release workflow creates the draft prerelease artifacts.
 
 ### M6.2 — Fixed-root Windows installer and safe upgrades
 
