@@ -317,10 +317,29 @@ be produced by GitHub Actions from an immutable version tag and published as
 GitHub Release assets so a non-developer can download and inspect the product
 without cloning the repository.
 
-The GitHub Release pipeline MUST:
+The GitHub Release pipeline is split into a maintainer-initiated kickoff and a
+tag-triggered artifact publisher. The kickoff workflow MUST:
+
+- Expose a `workflow_dispatch` choice input named `bump` with exactly `patch`,
+  `minor`, and `major` options. Maintainers must not have to type the target
+  version for the normal release path.
+- Read the current repository package version, compute the next SemVer version
+  from the selected bump, and fail before mutation if the computed `v<version>`
+  tag already exists locally or remotely.
+- Update every checked version metadata file that must agree for releases:
+  `packaging/package.json`, `packaging/package-lock.json`,
+  `src/office-mcp/daemon/Cargo.toml`, and `Cargo.lock`.
+- Commit the version bump to the default branch with a clear release commit
+  message before creating the tag, so `v<version>` points at the versioned
+  source state.
+- Push the commit and matching `v<version>` tag. The pushed tag is the handoff
+  to the artifact publisher.
+
+The tag-triggered GitHub Release publisher MUST:
 
 - Trigger on version tags such as `v0.1.0` and support an explicit
-  `workflow_dispatch` dry run for maintainers.
+  `workflow_dispatch` dry run for maintainers that stages an already-computed
+  version without creating tags.
 - Build the Windows portable zip on `windows-latest` from the tagged source using
   `packaging/windows/build-windows-portable.ps1 -SkipNpmInstall` after installing
   Rust, Node, and all add-in dependencies.
@@ -340,14 +359,14 @@ The GitHub Release pipeline MUST:
 - Upload artifacts with `actions/upload-artifact` for every run and attach them
   to a GitHub Release with `softprops/action-gh-release` or `gh release` only
   when the run is for a version tag.
-- Publish draft releases by default until signing, release notes, manual tray
+- Publish draft releases by default until signing, generated release notes, manual tray
   evidence, and any required live Office evidence are attached or explicitly
   waived for a pre-release.
 - Keep signing as a separate gate: if signing secrets are unavailable, the
   pipeline may publish unsigned pre-release artifacts but MUST label them as
   unsigned and MUST still publish `SHA256SUMS`.
-- Fail rather than publish when the version in the tag, portable zip file name, package
-  metadata, and release notes disagree.
+- Fail rather than publish when the version in the tag, portable zip file name,
+  and package metadata disagree.
 
 The repository README is the project landing page, not the full operations
 manual. It MUST keep this top-level flow and move longer operational details
