@@ -346,7 +346,38 @@ fn representative_word_schemas_are_specific() {
     assert_required(&paragraph, &["session_id", "index"]);
     assert_eq!(paragraph["properties"]["index"]["type"], "integer");
     assert_eq!(paragraph["properties"]["index"]["minimum"], 0);
+    assert_eq!(
+        paragraph["properties"]["include_formatting"]["type"],
+        "boolean"
+    );
     assert!(paragraph["properties"].get("paragraph_index").is_none());
+
+    let apply_formatting = schema_for("word.apply_formatting");
+    assert_required(&apply_formatting, &["session_id", "anchor"]);
+    assert!(
+        !apply_formatting["required"]
+            .as_array()
+            .expect("required")
+            .iter()
+            .any(|value| value == "formatting"),
+        "word.apply_formatting should allow paragraph-only formatting"
+    );
+    assert_eq!(
+        apply_formatting["properties"]["paragraph"]["properties"]["alignment"]["enum"][1],
+        "center"
+    );
+    assert_eq!(
+        apply_formatting["properties"]["paragraph"]["properties"]["line_spacing_pt"]
+            ["exclusiveMinimum"],
+        0
+    );
+    assert!(
+        apply_formatting
+            .get("anyOf")
+            .and_then(|value| value.as_array())
+            .is_some_and(|items| items.len() == 2),
+        "schema should require at least formatting or paragraph"
+    );
 
     let image = schema_for("word.insert_image");
     assert_required(&image, &["session_id", "anchor", "image"]);
