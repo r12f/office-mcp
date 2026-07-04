@@ -453,7 +453,7 @@ test('Word hyperlink tools are advertised, grouped, and dispatched through range
   assert.match(invokeBody, /case 'word\.list_hyperlinks':\s*data = await listHyperlinks\(args \|\| \{\}\);/);
   assert.match(invokeBody, /case 'word\.remove_hyperlink':\s*data = await removeHyperlink\(args\);/);
   assert.match(functionBody(js, 'insertHyperlink'), /range\.hyperlink = url/);
-  assert.match(functionBody(js, 'listHyperlinks'), /getHyperlinkRanges\(\)/);
+  assert.match(js, /async function listHyperlinks[\s\S]*getHyperlinkRanges\(\)/);
   assert.match(functionBody(js, 'removeHyperlink'), /range\.hyperlink = ''/);
 });
 
@@ -585,7 +585,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.list_sections'/);
   assert.match(js, /'word\.update_page_setup'/);
   assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.save'\] \}/);
-  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image'\] \}/);

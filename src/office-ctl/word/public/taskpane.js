@@ -72,6 +72,8 @@
     'word.update_page_setup',
     'word.update_header_footer',
     'word.insert_list',
+    'word.insert_hyperlink',
+    'word.remove_hyperlink',
     'word.replace_text',
     'word.update_paragraph',
     'word.delete_range',
@@ -103,6 +105,9 @@
     'word.list_sections',
     'word.update_page_setup',
     'word.insert_list',
+    'word.insert_hyperlink',
+    'word.list_hyperlinks',
+    'word.remove_hyperlink',
     'word.replace_text',
     'word.update_paragraph',
     'word.delete_range',
@@ -121,7 +126,7 @@
   ];
   const TOOL_GROUPS = [
     { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.save'] },
-    { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
+    { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
     { label: 'Media', tools: ['word.insert_image', 'word.resize_image'] },
@@ -146,6 +151,9 @@
     ['word.update_page_setup', { category: 'Document & structure', sideEffect: 'mutating', description: 'Update document or section page setup.' }],
     ['word.update_header_footer', { category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer.' }],
     ['word.insert_list', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a list.' }],
+    ['word.insert_hyperlink', { category: 'Range & selection', sideEffect: 'mutating', description: 'Insert or apply a hyperlink at an anchored range.' }],
+    ['word.list_hyperlinks', { category: 'Range & selection', sideEffect: 'read', description: 'List document hyperlinks with paragraph-relative locations.' }],
+    ['word.remove_hyperlink', { category: 'Range & selection', sideEffect: 'mutating', description: 'Remove a hyperlink while preserving text by default.' }],
     ['word.replace_text', { category: 'Range & selection', sideEffect: 'mutating', description: 'Replace matching document text.' }],
     ['word.update_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Update paragraph text and style.' }],
     ['word.delete_range', { category: 'Range & selection', sideEffect: 'mutating', description: 'Delete text resolved from an anchor.' }],
@@ -500,6 +508,15 @@
         case 'word.insert_list':
           data = await insertList(args);
           break;
+        case 'word.insert_hyperlink':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await insertHyperlink(args);
+          break;
+        case 'word.list_hyperlinks':
+          data = await listHyperlinks(args || {});
+          break;
+        case 'word.remove_hyperlink':
+          data = await removeHyperlink(args);
+          break;
         case 'word.replace_text':
           data = await replaceText(args);
           break;
@@ -617,6 +634,13 @@
         requireAnchor(tool, args.anchor);
         validateInsertListArgs(args);
         break;
+      case 'word.insert_hyperlink':
+        requireAnchor(tool, args.anchor);
+        validateHyperlinkArgs(tool, args);
+        break;
+      case 'word.remove_hyperlink':
+        validateRemoveHyperlinkArgs(args);
+        break;
       case 'word.replace_text':
         validateReplaceTextArgs(args);
         break;
@@ -680,6 +704,8 @@
     switch (tool) {
       case 'word.insert_image':
         return validateInsertImageOnly(args);
+      case 'word.insert_hyperlink':
+        return validateInsertHyperlinkOnly(args);
       case 'word.replace_text':
         return validateReplaceTextOnly(args);
       case 'word.update_paragraph':
@@ -746,6 +772,23 @@
     });
   }
 
+  async function validateInsertHyperlinkOnly(args) {
+    return Word.run(async (context) => {
+      validateHyperlinkArgs('word.insert_hyperlink', args);
+      const resolved = args.text !== undefined
+        ? await resolveValidationAnchor(context, args.anchor)
+        : await validateHyperlinkTarget(context, args.anchor, args.extent);
+      return validationSuccess('word.insert_hyperlink', {
+        resolved_target: {
+          ...resolved,
+          url: validateHyperlinkUrl(args.url),
+          inserts_text: args.text !== undefined,
+          text_length: args.text !== undefined ? args.text.length : undefined
+        }
+      });
+    });
+  }
+
   async function validateUpdateParagraphOnly(args) {
     return Word.run(async (context) => {
       const paragraph = await getParagraphByIndex(context, args.index);
@@ -787,6 +830,16 @@
     return {
       ...validationTargetForAnchor(anchor),
       current_text_length: (resolved.text || '').length
+    };
+  }
+
+  async function validateHyperlinkTarget(context, anchor, extent) {
+    const target = extent === 'selection' ? context.document.getSelection() : await resolveAnchor(context, anchor);
+    target.load('text');
+    await context.sync();
+    return {
+      ...validationTargetForAnchor(anchor || { kind: 'selection' }),
+      current_text_length: (target.text || '').length
     };
   }
 
@@ -1228,6 +1281,108 @@
       await context.sync();
       return { inserted_items: args.items.length, kind: args.kind ?? 'bulleted', level: args.level ?? 0 };
     });
+  }
+
+  async function insertHyperlink(args) {
+    validateHyperlinkArgs('word.insert_hyperlink', args);
+    return Word.run(async (context) => {
+      const url = validateHyperlinkUrl(args.url);
+      let range;
+      if (args.text !== undefined) {
+        range = await insertHyperlinkTextAtAnchor(context, args.anchor, args.text);
+      } else {
+        range = await hyperlinkTargetRange(context, args.anchor, args.extent);
+      }
+      range.hyperlink = url;
+      range.load('text,hyperlink');
+      await context.sync();
+      return {
+        inserted: true,
+        url: range.hyperlink || url,
+        text: range.text || args.text || null
+      };
+    });
+  }
+
+  async function listHyperlinks(args = {}) {
+    const offset = args.offset ?? 0;
+    const limit = args.limit ?? 50;
+    if (!Number.isInteger(offset) || offset < 0) throw invalidArgument('word.list_hyperlinks offset must be a non-negative integer.');
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw invalidArgument('word.list_hyperlinks limit must be an integer from 1 to 200.');
+
+    return Word.run(async (context) => {
+      const paragraphs = context.document.body.paragraphs;
+      paragraphs.load('items');
+      await context.sync();
+
+      const hyperlinkRanges = [];
+      for (let paragraphIndex = 0; paragraphIndex < paragraphs.items.length; paragraphIndex++) {
+        const ranges = paragraphs.items[paragraphIndex].getRange().getHyperlinkRanges();
+        ranges.load('items/text,items/hyperlink');
+        hyperlinkRanges.push({ paragraphIndex, ranges });
+      }
+      await context.sync();
+
+      const all = [];
+      for (const { paragraphIndex, ranges } of hyperlinkRanges) {
+        ranges.items.forEach((range, occurrence) => {
+          all.push({
+            paragraph_index: paragraphIndex,
+            occurrence_in_paragraph: occurrence,
+            text: range.text || '',
+            url: range.hyperlink || ''
+          });
+        });
+      }
+      return {
+        hyperlinks: all.slice(offset, offset + limit),
+        count: all.length,
+        truncated: offset + limit < all.length,
+        untrusted_source: true
+      };
+    });
+  }
+
+  async function removeHyperlink(args) {
+    validateRemoveHyperlinkArgs(args);
+    return Word.run(async (context) => {
+      const range = await hyperlinkTargetRange(context, args.anchor);
+      range.load('text,hyperlink');
+      await context.sync();
+      const oldUrl = range.hyperlink || null;
+      const oldText = range.text || '';
+      if (args.keep_text === false) {
+        range.delete();
+      } else {
+        range.hyperlink = '';
+      }
+      await context.sync();
+      return {
+        removed: true,
+        keep_text: args.keep_text !== false,
+        old_url: oldUrl,
+        text: args.keep_text === false ? null : oldText
+      };
+    });
+  }
+
+  async function insertHyperlinkTextAtAnchor(context, anchor, text) {
+    if (anchor.kind === 'start_of_document') {
+      return context.document.body.insertText(text, Word.InsertLocation.start);
+    }
+    if (anchor.kind === 'end_of_document') {
+      return context.document.body.insertText(text, Word.InsertLocation.end);
+    }
+    const target = await resolveAnchor(context, anchor);
+    const location = isBeforeAnchor(anchor) ? Word.InsertLocation.before : Word.InsertLocation.after;
+    return target.insertText(text, location);
+  }
+
+  async function hyperlinkTargetRange(context, anchor, extent) {
+    const target = extent === 'selection' ? context.document.getSelection() : await resolveAnchor(context, anchor);
+    if (target.getRange) return target.getRange();
+    if (target.hyperlink !== undefined) return target;
+    throw invalidArgument('word hyperlink target must resolve to a range, paragraph, or selection.');
   }
 
   async function replaceText(args) {
@@ -2189,6 +2344,47 @@
     const kind = args.kind ?? 'bulleted';
     if (kind !== 'bulleted' && kind !== 'numbered') {
       throw invalidArgument('word.insert_list kind must be bulleted or numbered.');
+    }
+  }
+
+  function validateHyperlinkArgs(tool, args) {
+    if (!args.url || typeof args.url !== 'string') {
+      throw invalidArgument('word.insert_hyperlink requires a non-empty url.');
+    }
+    validateHyperlinkUrl(args.url);
+    if (args.text !== undefined && typeof args.text !== 'string') {
+      throw invalidArgument(`${tool} text must be a string.`);
+    }
+    if (args.extent !== undefined && args.extent !== 'range' && args.extent !== 'selection') {
+      throw invalidArgument(`${tool} extent must be range or selection.`);
+    }
+  }
+
+  function validateHyperlinkUrl(url) {
+    const value = String(url || '').trim();
+    if (!value) throw invalidArgument('word.insert_hyperlink requires a non-empty url.');
+    if (value.startsWith('#')) {
+      if (value.length === 1) throw invalidArgument('word.insert_hyperlink bookmark target must not be empty.');
+      return value;
+    }
+    let parsed;
+    try {
+      parsed = new URL(value);
+    } catch {
+      throw invalidArgument('word.insert_hyperlink url must be https, http, mailto, or an in-document #Bookmark target.');
+    }
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol === 'https:' || protocol === 'http:' || protocol === 'mailto:') return value;
+    if (protocol === 'file:' || protocol === 'javascript:') {
+      throw invalidArgument('word.insert_hyperlink file: and javascript: URLs are not allowed.');
+    }
+    throw invalidArgument('word.insert_hyperlink url must be https, http, mailto, or an in-document #Bookmark target.');
+  }
+
+  function validateRemoveHyperlinkArgs(args) {
+    requireAnchor('word.remove_hyperlink', args.anchor);
+    if (args.keep_text !== undefined && typeof args.keep_text !== 'boolean') {
+      throw invalidArgument('word.remove_hyperlink keep_text must be a boolean.');
     }
   }
 
