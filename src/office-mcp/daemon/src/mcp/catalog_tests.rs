@@ -319,8 +319,9 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 86);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 86);
+    assert_eq!(all_tools.len(), 87);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 87);
+    assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));
@@ -403,6 +404,14 @@ fn representative_word_schemas_are_specific() {
             .len(),
         2
     );
+
+    let update_comment = schema_for("word.update_comment");
+    assert_required(&update_comment, &["session_id", "comment_id", "action"]);
+    assert_eq!(update_comment["properties"]["comment_id"]["minLength"], 1);
+    assert_eq!(update_comment["properties"]["reply_id"]["minLength"], 1);
+    assert_eq!(update_comment["properties"]["action"]["enum"][0], "reply");
+    assert_eq!(update_comment["properties"]["action"]["enum"][3], "reopen");
+    assert_eq!(update_comment["properties"]["validate_only"]["type"], "boolean");
 
     let resolve_anchor = schema_for("word.resolve_anchor");
     assert_required(&resolve_anchor, &["session_id", "anchor"]);

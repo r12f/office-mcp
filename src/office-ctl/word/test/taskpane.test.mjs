@@ -640,6 +640,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.delete_content_control'/);
   assert.match(js, /'word\.resize_image'/);
   assert.match(js, /'word\.update_tracked_change'/);
+  assert.match(js, /'word\.update_comment'/);
   assert.match(js, /'word\.insert_note'/);
   assert.match(js, /'word\.list_notes'/);
   assert.match(js, /'word\.update_note'/);
@@ -657,7 +658,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image'\] \}/);
   assert.match(js, /\{ label: 'Content controls', tools: \['word\.list_content_controls', 'word\.insert_content_control', 'word\.update_content_control', 'word\.delete_content_control'\] \}/);
   assert.match(js, /\{ label: 'Notes', tools: \['word\.insert_note', 'word\.list_notes', 'word\.update_note', 'word\.delete_note'\] \}/);
-  assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.update_tracked_change'\] \}/);
+  assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.update_comment', 'word\.update_tracked_change'\] \}/);
   assert.doesNotMatch(js, /'word\.insert_heading'/);
   assert.doesNotMatch(js, /'word\.set_heading_level'/);
   assert.doesNotMatch(js, /'word\.update_cell'/);
@@ -687,6 +688,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.update_note', \{ category: 'Notes', sideEffect: 'mutating', description: 'Replace a footnote or endnote body by index\.' \}\]/);
   assert.match(js, /\['word\.delete_note', \{ category: 'Notes', sideEffect: 'destructive', description: 'Delete a footnote or endnote by index\.' \}\]/);
   assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint\.' \}\]/);
+  assert.match(js, /\['word\.update_comment', \{ category: 'Review', sideEffect: 'destructive', description: 'Reply, edit, delete, or reopen a comment thread\.' \}\]/);
   assert.match(js, /case 'word\.get_header_footer':\s*data = await getHeaderFooter\(args\);/);
   assert.match(js, /case 'word\.update_header_footer':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateHeaderFooter\(args\);/);
   assert.match(js, /case 'word\.insert_break':\s*data = await insertBreak\(args\);/);
@@ -708,6 +710,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /case 'word\.list_notes':\s*data = await listNotes\(args \|\| \{\}\);/);
   assert.match(js, /case 'word\.update_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateNote\(args\);/);
   assert.match(js, /case 'word\.delete_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await deleteNote\(args\);/);
+  assert.match(js, /case 'word\.update_comment':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateComment\(args\);/);
   assert.match(js, /case 'word\.update_tracked_change':\s*data = await updateTrackedChange\(args\);/);
   assert.match(js, /async function insertTable\(args\)/);
   assert.match(js, /table_index: tableIndex/);
@@ -724,11 +727,17 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /async function listNotes\(args\)/);
   assert.match(js, /async function updateNote\(args\)/);
   assert.match(js, /async function deleteNote\(args\)/);
+  assert.match(js, /async function updateComment\(args\)/);
+  assert.match(js, /async function validateUpdateCommentOnly\(args\)/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.insert_bookmark':\s*requireAnchor\(tool, args\.anchor\);\s*validateBookmarkName\(tool, args\.name\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.delete_bookmark':\s*validateBookmarkName\(tool, args\.name, \{ strictPattern: false \}\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.insert_note':\s*validateInsertNoteArgs\(tool, args\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.update_note':\s*validateUpdateNoteArgs\(tool, args\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.delete_note':\s*validateDeleteNoteArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.update_comment':\s*validateUpdateCommentArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'getComments'), /replies: commentRepliesMetadata\(comment\)/);
+  assert.match(js, /function commentRepliesMetadata\(comment\)/);
+  assert.match(js, /function validateUpdateCommentArgs\(tool, args\)/);
   assert.match(js, /function validateBookmarkName\(tool, name/);
   assert.match(js, /control\.load\('id'\);\s*await context\.sync\(\);\s*const id = control\.id;/);
   assert.match(js, /async function updateTrackedChange\(args\)/);
