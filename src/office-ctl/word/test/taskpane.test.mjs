@@ -379,6 +379,8 @@ test('Word mutating tools run preflight validation before Office mutation dispat
   assert.match(preflightBody, /requirePositiveInteger\(tool, 'rows', args\.rows\)/);
   assert.match(preflightBody, /case 'word\.insert_list':/);
   assert.match(preflightBody, /validateInsertListArgs\(args\)/);
+  assert.match(preflightBody, /case 'word\.update_header_footer':/);
+  assert.match(preflightBody, /validateHeaderFooterArgs\(tool, args, true\)/);
   assert.match(preflightBody, /case 'word\.replace_text':/);
   assert.match(preflightBody, /validateReplaceTextArgs\(args\)/);
   assert.match(preflightBody, /case 'word\.delete_range':/);
@@ -400,6 +402,9 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'mapError'), /mapped\.suggestion = error\.suggestion/);
   assert.match(functionBody(js, 'validateInsertListArgs'), /word\.insert_list requires a non-empty items array/);
   assert.match(functionBody(js, 'validateInsertListArgs'), /word\.insert_list kind must be bulleted or numbered/);
+  assert.match(functionBody(js, 'validateHeaderFooterArgs'), /set_text[\s\S]*requires text/);
+  assert.match(functionBody(js, 'normalizedHeaderFooterLocation'), /header\/footer location must be header or footer/);
+  assert.match(functionBody(js, 'normalizedHeaderFooterAction'), /set_text, append_paragraph, or clear/);
   assert.match(functionBody(js, 'validateReplaceTextArgs'), /word\.replace_text requires non-empty find text/);
   assert.match(functionBody(js, 'validateReplaceTextArgs'), /scope\.paragraph_range must be \[start, end\]/);
   assert.match(functionBody(js, 'validateExtentToolArgs'), /extent must be paragraph, sentence, or selection/);
@@ -545,7 +550,9 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.resize_image'/);
   assert.match(js, /'word\.update_tracked_change'/);
   assert.match(js, /'word\.resolve_anchor'/);
-  assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.insert_page_break', 'word\.save'\] \}/);
+  assert.match(js, /'word\.get_header_footer'/);
+  assert.match(js, /'word\.update_header_footer'/);
+  assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.insert_page_break', 'word\.save'\] \}/);
   assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
@@ -567,7 +574,11 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.delete_content_control', \{ category: 'Content controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling\.' \}\]/);
   assert.match(js, /\['word\.resize_image', \{ category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image\.' \}\]/);
   assert.match(js, /\['word\.resolve_anchor', \{ category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata\.' \}\]/);
+  assert.match(js, /\['word\.get_header_footer', \{ category: 'Document & structure', sideEffect: 'read', description: 'Read section header or footer text\.' \}\]/);
+  assert.match(js, /\['word\.update_header_footer', \{ category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer\.' \}\]/);
   assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint\.' \}\]/);
+  assert.match(js, /case 'word\.get_header_footer':\s*data = await getHeaderFooter\(args\);/);
+  assert.match(js, /case 'word\.update_header_footer':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateHeaderFooter\(args\);/);
   assert.match(js, /case 'word\.update_table':\s*data = await updateTable\(args\);/);
   assert.match(js, /case 'word\.list_content_controls':\s*data = await listContentControls\(args\);/);
   assert.match(js, /case 'word\.insert_content_control':\s*data = await insertContentControl\(args\);/);

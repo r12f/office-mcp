@@ -94,6 +94,25 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'untrusted_source', value: true }] }
     }
   }],
+  ['word.get_header_footer', {
+    setup: {
+      actions: [
+        { tool: 'word.update_header_footer', arguments: { location: 'header', action: 'set_text', text: 'Header read E2E' } }
+      ]
+    },
+    args: { location: 'header', include_metadata: true },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        contains: ['Header read E2E'],
+        pathEquals: [
+          { path: 'location', value: 'header' },
+          { path: 'header_footer_type', value: 'primary' },
+          { path: 'untrusted_source', value: true }
+        ]
+      }
+    }
+  }],
   ['word.insert_paragraph', {
     setup: {
       actions: [
@@ -159,6 +178,20 @@ const WORD_E2E_CASES = Object.fromEntries([
     verify: {
       kind: 'direct-result',
       expect: { pathEquals: [{ path: 'inserted', value: true }, { path: 'break_type', value: 'page' }] }
+    }
+  }],
+  ['word.update_header_footer', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'header footer update setup' } }
+      ]
+    },
+    args: { location: 'footer', action: 'set_text', text: 'Footer update E2E' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_header_footer',
+      readbackArguments: { location: 'footer' },
+      expect: { contains: ['Footer update E2E'], pathEquals: [{ path: 'is_empty', value: false }] }
     }
   }],
   ['word.insert_list', {

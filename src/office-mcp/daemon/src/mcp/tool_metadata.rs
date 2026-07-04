@@ -78,6 +78,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Read,
     ),
     tool(
+        "word.get_header_footer",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Read,
+    ),
+    tool(
         "word.get_paragraph",
         "word",
         "Paragraphs & lists",
@@ -136,6 +142,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "word",
         "Paragraphs & lists",
         ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.update_header_footer",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Destructive,
     ),
     tool(
         "word.replace_text",

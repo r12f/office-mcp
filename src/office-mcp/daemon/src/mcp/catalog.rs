@@ -8,6 +8,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.delete_content_control",
     "word.delete_range",
     "word.find_text",
+    "word.get_header_footer",
     "word.get_outline",
     "word.get_paragraph",
     "word.get_selection",
@@ -25,6 +26,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.resolve_comment",
     "word.resize_image",
     "word.save",
+    "word.update_header_footer",
     "word.update_content_control",
     "word.update_paragraph",
     "word.update_table",
@@ -799,6 +801,17 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "anchor", "include_text_preview"]
     ),
     tool_spec!("word.get_selection", ["session_id"], ["session_id"]),
+    tool_spec!(
+        "word.get_header_footer",
+        ["session_id", "location"],
+        [
+            "session_id",
+            "location",
+            "header_footer_type",
+            "section_index",
+            "include_metadata"
+        ]
+    ),
     tool_spec!("word.save", ["session_id"], ["session_id"]),
     tool_spec!(
         "word.insert_paragraph",
@@ -868,6 +881,21 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "ordered",
             "style",
             "match_case"
+        ]
+    ),
+    tool_spec!(
+        "word.update_header_footer",
+        ["session_id", "location", "action"],
+        [
+            "session_id",
+            "location",
+            "header_footer_type",
+            "section_index",
+            "action",
+            "text",
+            "style",
+            "formatting",
+            "validate_only"
         ]
     ),
     tool_spec!(
@@ -1497,7 +1525,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "session_id" => json!({ "type": "string", "description": "Office document session ID." }),
         "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
         | "table_index" | "change_index" | "content_control_id" | "position" | "slice_size"
-        | "slide_index" | "target_index" | "row_index" | "column_index" | "row_count"
+        | "section_index" | "slide_index" | "target_index" | "row_index" | "column_index" | "row_count"
         | "column_count" | "count" | "max_depth" => json!({ "type": "integer", "minimum": 0 }),
         "heading_level" | "level" | "columns" => json!({ "type": "integer", "minimum": 1 }),
         "width_pt" | "height_pt" | "scale_percent" | "width" | "height" | "left" | "top"
@@ -1544,6 +1572,15 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
         "image" => image_schema(),
         "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
+        "location" if tool == "word.get_header_footer" || tool == "word.update_header_footer" => {
+            json!({ "enum": ["header", "footer"] })
+        }
+        "header_footer_type" => {
+            json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" })
+        }
+        "action" if tool == "word.update_header_footer" => {
+            json!({ "enum": ["set_text", "append_paragraph", "clear"] })
+        }
         "formatting" => formatting_schema(),
         "title_box" | "content_box" => shape_box_schema(),
         "tools" | "values" | "data" | "formulas" | "number_formats" | "items" | "fields"
