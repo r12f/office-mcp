@@ -117,15 +117,15 @@ fn word_field_tools_expose_expected_contracts() {
         list_fields["inputSchema"]["required"],
         serde_json::json!(["session_id"])
     );
-    assert_eq!(list_fields["inputSchema"]["properties"]["limit"]["minimum"], 1);
+    assert_eq!(
+        list_fields["inputSchema"]["properties"]["limit"]["minimum"],
+        1
+    );
     assert_eq!(
         list_fields["inputSchema"]["properties"]["limit"]["maximum"],
         200
     );
-    assert_eq!(
-        list_fields["_meta"]["com.office-mcp/side_effects"],
-        "read"
-    );
+    assert_eq!(list_fields["_meta"]["com.office-mcp/side_effects"], "read");
 
     let insert_field = tool_for("word.insert_field");
     assert_eq!(
@@ -673,19 +673,28 @@ fn word_field_schemas_are_specific() {
     assert_required(&insert_field, &["session_id", "anchor", "field_type"]);
     assert_eq!(insert_field["properties"]["field_type"]["enum"][0], "toc");
     assert_eq!(insert_field["properties"]["code_options"]["type"], "string");
-    assert_eq!(insert_field["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        insert_field["properties"]["validate_only"]["type"],
+        "boolean"
+    );
     assert!(anchor_kinds(&insert_field).contains(&"bookmark"));
 
     let update_field = schema_for("word.update_field");
     assert_required(&update_field, &["session_id", "action"]);
     assert_eq!(update_field["properties"]["field_index"]["minimum"], 0);
     assert_eq!(update_field["properties"]["expected_count"]["minimum"], 0);
-    assert_eq!(update_field["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        update_field["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 
     let delete_field = schema_for("word.delete_field");
     assert_required(&delete_field, &["session_id", "field_index"]);
     assert_eq!(delete_field["properties"]["field_index"]["minimum"], 0);
-    assert_eq!(delete_field["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        delete_field["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 }
 
 #[test]

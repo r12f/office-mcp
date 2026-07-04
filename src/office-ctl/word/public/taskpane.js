@@ -71,6 +71,9 @@
     'word.insert_page_break',
     'word.update_page_setup',
     'word.update_header_footer',
+    'word.insert_field',
+    'word.update_field',
+    'word.delete_field',
     'word.insert_list',
     'word.insert_hyperlink',
     'word.remove_hyperlink',
@@ -113,6 +116,10 @@
     'word.insert_break',
     'word.list_sections',
     'word.update_page_setup',
+    'word.list_fields',
+    'word.insert_field',
+    'word.update_field',
+    'word.delete_field',
     'word.insert_list',
     'word.insert_hyperlink',
     'word.list_hyperlinks',
@@ -139,7 +146,7 @@
     'word.save'
   ];
   const TOOL_GROUPS = [
-    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.save'] },
+    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.list_fields', 'word.insert_field', 'word.update_field', 'word.delete_field', 'word.save'] },
     { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
@@ -167,6 +174,10 @@
     ['word.insert_page_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page break.' }],
     ['word.list_sections', { category: 'Document & structure', sideEffect: 'read', description: 'List document sections.' }],
     ['word.update_page_setup', { category: 'Document & structure', sideEffect: 'mutating', description: 'Update document or section page setup.' }],
+    ['word.list_fields', { category: 'Document & structure', sideEffect: 'read', description: 'List document fields with bounded previews.' }],
+    ['word.insert_field', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a curated Word field at an anchored range.' }],
+    ['word.update_field', { category: 'Document & structure', sideEffect: 'mutating', description: 'Refresh, lock, or unlock Word fields.' }],
+    ['word.delete_field', { category: 'Document & structure', sideEffect: 'destructive', description: 'Delete a Word field by current index.' }],
     ['word.update_header_footer', { category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer.' }],
     ['word.insert_list', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a list.' }],
     ['word.insert_hyperlink', { category: 'Range & selection', sideEffect: 'mutating', description: 'Insert or apply a hyperlink at an anchored range.' }],
@@ -546,6 +557,18 @@
         case 'word.update_page_setup':
           data = await updatePageSetup(args || {});
           break;
+        case 'word.list_fields':
+          data = await listFields(args || {});
+          break;
+        case 'word.insert_field':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await insertField(args);
+          break;
+        case 'word.update_field':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateField(args);
+          break;
+        case 'word.delete_field':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await deleteField(args);
+          break;
         case 'word.update_header_footer':
           data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateHeaderFooter(args);
           break;
@@ -677,6 +700,15 @@
       case 'word.update_header_footer':
         validateHeaderFooterArgs(tool, args, true);
         break;
+      case 'word.insert_field':
+        validateInsertFieldArgs(tool, args);
+        break;
+      case 'word.update_field':
+        validateUpdateFieldArgs(tool, args);
+        break;
+      case 'word.delete_field':
+        validateDeleteFieldArgs(tool, args);
+        break;
       case 'word.insert_list':
         requireAnchor(tool, args.anchor);
         validateInsertListArgs(args);
@@ -778,10 +810,16 @@
         return validateUpdateParagraphOnly(args);
       case 'word.update_note':
         return validateUpdateNoteOnly(args);
+      case 'word.insert_field':
+        return validateInsertFieldOnly(args);
+      case 'word.update_field':
+        return validateUpdateFieldOnly(args);
       case 'word.delete_range':
         return validateDeleteRangeOnly(args);
       case 'word.delete_note':
         return validateDeleteNoteOnly(args);
+      case 'word.delete_field':
+        return validateDeleteFieldOnly(args);
       case 'word.update_header_footer':
         return validateUpdateHeaderFooterOnly(args);
       default:
@@ -909,6 +947,49 @@
       await context.sync();
       return validationSuccess('word.delete_note', {
         resolved_target: noteMetadata(note, args.index, validateNoteKind(args.kind))
+      });
+    });
+  }
+
+  async function validateInsertFieldOnly(args) {
+    return Word.run(async (context) => {
+      validateInsertFieldArgs('word.insert_field', args);
+      const resolved = await resolveValidationAnchor(context, args.anchor);
+      return validationSuccess('word.insert_field', {
+        resolved_target: {
+          ...resolved,
+          field_type: validateFieldType(args.field_type),
+          code: fieldCodeForArgs(args)
+        }
+      });
+    });
+  }
+
+  async function validateUpdateFieldOnly(args) {
+    return Word.run(async (context) => {
+      validateUpdateFieldArgs('word.update_field', args);
+      const action = normalizedFieldAction(args.action);
+      if (action === 'refresh_all') {
+        const fields = await fieldCollectionItems(context);
+        if (fields.length !== args.expected_count) {
+          throw Object.assign(new Error('Field count mismatch; re-read list_fields before refreshing all fields.'), { officeMcpCode: 'STALE_INDEX' });
+        }
+        return validationSuccess('word.update_field', { action, count: fields.length });
+      }
+      const { field } = await getFieldByIndex(context, args.field_index);
+      return validationSuccess('word.update_field', {
+        resolved_target: fieldMetadata(field, args.field_index),
+        action
+      });
+    });
+  }
+
+  async function validateDeleteFieldOnly(args) {
+    return Word.run(async (context) => {
+      validateDeleteFieldArgs('word.delete_field', args);
+      const { field } = await getFieldByIndex(context, args.field_index);
+      return validationSuccess('word.delete_field', {
+        resolved_target: fieldMetadata(field, args.field_index)
       });
     });
   }
@@ -1947,6 +2028,72 @@
     });
   }
 
+  async function listFields(args) {
+    return Word.run(async (context) => {
+      const fields = await fieldCollectionItems(context);
+      const typeFilter = args.type ? String(args.type).trim().toLowerCase() : null;
+      const filtered = typeFilter ? fields.filter((field) => normalizedFieldType(field.type) === typeFilter) : fields;
+      const offset = args.offset ?? 0;
+      const limit = args.limit ?? 50;
+      const selected = filtered.slice(offset, offset + limit);
+      const items = selected.map((field, index) => fieldMetadata(field, offset + index));
+      return {
+        fields: items,
+        count: filtered.length,
+        offset,
+        limit,
+        truncated: offset + selected.length < filtered.length,
+        untrusted_source: true
+      };
+    });
+  }
+
+  async function insertField(args) {
+    return Word.run(async (context) => {
+      validateInsertFieldArgs('word.insert_field', args);
+      const field = await insertFieldAtAnchor(context, args);
+      field.load('type,code,result,locked');
+      await context.sync();
+      return { inserted: true, field: fieldMetadata(field, 0) };
+    });
+  }
+
+  async function updateField(args) {
+    const action = normalizedFieldAction(args.action);
+    if (action === 'refresh_all') return refreshAllFields(args);
+    return Word.run(async (context) => {
+      const { field } = await getFieldByIndex(context, args.field_index);
+      if (action === 'refresh') field.updateResult();
+      else field.locked = action === 'lock';
+      field.load('type,code,result,locked');
+      await context.sync();
+      return { updated: true, action, field: fieldMetadata(field, args.field_index) };
+    });
+  }
+
+  async function refreshAllFields(args) {
+    return Word.run(async (context) => {
+      const fields = await fieldCollectionItems(context);
+      const liveCount = fields.length;
+      if (liveCount !== args.expected_count) {
+        throw Object.assign(new Error('Field count mismatch; re-read list_fields before refreshing all fields.'), { officeMcpCode: 'STALE_INDEX' });
+      }
+      fields.forEach((field) => field.updateResult());
+      await context.sync();
+      return { updated: true, action: 'refresh_all', expected_count: args.expected_count, count: liveCount };
+    });
+  }
+
+  async function deleteField(args) {
+    return Word.run(async (context) => {
+      const { field } = await getFieldByIndex(context, args.field_index);
+      field.delete();
+      await context.sync();
+      const remaining = await fieldCollectionItems(context);
+      return { deleted: true, field_index: args.field_index, count: remaining.length };
+    });
+  }
+
   async function setHeadingLevel(args) {
     return Word.run(async (context) => {
       const paragraph = await getParagraphByIndex(context, args.index);
@@ -2281,6 +2428,107 @@
     if (!preview) return null;
     const index = paragraphs.items.findIndex((paragraph) => safeTextPreview(paragraph.text).includes(preview));
     return index >= 0 ? index : null;
+  }
+
+  async function fieldCollectionItems(context) {
+    const fields = context.document.body.fields;
+    fields.load('items/type,items/code,items/result,items/locked');
+    await context.sync();
+    return fields.items || [];
+  }
+
+  async function getFieldByIndex(context, index) {
+    const fields = await fieldCollectionItems(context);
+    const field = fields[index];
+    if (!field) throw Object.assign(new Error(`Field index ${index} is out of range.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE' });
+    return { field, count: fields.length };
+  }
+
+  async function insertFieldAtAnchor(context, args) {
+    const fieldType = fieldTypeToOffice(args.field_type);
+    const code = fieldCodeForArgs(args);
+    if (args.anchor.kind === 'start_of_document') {
+      return context.document.body.getRange().insertField(Word.InsertLocation.start, fieldType, code, false);
+    }
+    if (args.anchor.kind === 'end_of_document') {
+      return context.document.body.getRange().insertField(Word.InsertLocation.end, fieldType, code, false);
+    }
+    const target = await resolveAnchor(context, args.anchor);
+    const range = target.getRange ? target.getRange() : target;
+    const location = args.anchor.kind === 'selection' ? Word.InsertLocation.replace : (isBeforeAnchor(args.anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
+    return range.insertField(location, fieldType, code, false);
+  }
+
+  function fieldMetadata(field, index) {
+    return {
+      index,
+      type: normalizedFieldType(field.type),
+      code: field.code || '',
+      result_preview: safeTextPreview(field.result),
+      locked: Boolean(field.locked),
+      paragraph_index: null,
+      untrusted_source: true
+    };
+  }
+
+  function normalizedFieldType(type) {
+    const value = String(type || '').trim();
+    if (!value) return 'unknown';
+    return value.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/[\s-]+/g, '_').toLowerCase();
+  }
+
+  function fieldTypeToOffice(type) {
+    const normalized = validateFieldType(type);
+    const fieldTypes = Word.FieldType || {};
+    const mappings = {
+      toc: fieldTypes.toc || fieldTypes.tableOfContents || 'TOC',
+      page: fieldTypes.page || 'PAGE',
+      num_pages: fieldTypes.numPages || fieldTypes.numberOfPages || 'NUMPAGES',
+      date: fieldTypes.date || 'DATE',
+      time: fieldTypes.time || 'TIME',
+      ref: fieldTypes.ref || 'REF',
+      hyperlink: fieldTypes.hyperlink || 'HYPERLINK',
+      seq: fieldTypes.sequence || fieldTypes.seq || 'SEQ',
+      styleref: fieldTypes.styleRef || fieldTypes.styleref || 'STYLEREF'
+    };
+    return mappings[normalized];
+  }
+
+  function validateFieldType(type) {
+    const normalized = String(type || '').trim().toLowerCase();
+    const blocked = ['includetext', 'include_text', 'import', 'includepicture', 'include_picture', 'database', 'dde', 'ddeauto'];
+    if (blocked.includes(normalized)) throw invalidArgument('Unsupported or unsafe field type INCLUDETEXT, IMPORT, INCLUDEPICTURE, DATABASE, DDE, or DDEAUTO.');
+    const allowed = ['toc', 'page', 'num_pages', 'date', 'time', 'ref', 'hyperlink', 'seq', 'styleref'];
+    if (!allowed.includes(normalized)) throw invalidArgument(`Unsupported field type ${type}.`);
+    return normalized;
+  }
+
+  function fieldCodeForArgs(args) {
+    const type = validateFieldType(args.field_type);
+    const options = args.code_options !== undefined ? String(args.code_options).trim() : '';
+    validateFieldCodeOptions(type, options);
+    if (type === 'toc') return options || '\\o "1-3" \\h \\z \\u';
+    const names = {
+      page: 'PAGE',
+      num_pages: 'NUMPAGES',
+      date: 'DATE',
+      time: 'TIME',
+      ref: 'REF',
+      hyperlink: 'HYPERLINK',
+      seq: 'SEQ',
+      styleref: 'STYLEREF'
+    };
+    return options ? `${names[type]} ${options}` : names[type];
+  }
+
+  function validateFieldCodeOptions(type, options) {
+    if (!options) return;
+    if (/\b(INCLUDETEXT|IMPORT|INCLUDEPICTURE|DATABASE|DDE|DDEAUTO)\b/i.test(options)) {
+      throw invalidArgument('Field code options must not reference unsafe external-content field types.');
+    }
+    if ((type === 'hyperlink') && /\b(file:|javascript:)\b/i.test(options)) {
+      throw invalidArgument('Hyperlink field options must not use file: or javascript: URLs.');
+    }
   }
 
   function resolvedAnchorObjectType(anchor) {
@@ -2790,6 +3038,34 @@
     if (!Number.isInteger(args.index) || args.index < 0) {
       throw invalidArgument(`${tool} requires a non-negative integer index.`);
     }
+  }
+
+  function validateInsertFieldArgs(tool, args) {
+    requireAnchor(tool, args.anchor);
+    validateFieldType(args.field_type);
+    if (args.code_options !== undefined && typeof args.code_options !== 'string') {
+      throw invalidArgument(`${tool} code_options must be a string.`);
+    }
+    fieldCodeForArgs(args);
+  }
+
+  function validateUpdateFieldArgs(tool, args) {
+    const action = normalizedFieldAction(args.action);
+    if (action === 'refresh_all') {
+      requireNonNegativeInteger(tool, 'expected_count', args.expected_count);
+      return;
+    }
+    requireNonNegativeInteger(tool, 'field_index', args.field_index);
+  }
+
+  function validateDeleteFieldArgs(tool, args) {
+    requireNonNegativeInteger(tool, 'field_index', args.field_index);
+  }
+
+  function normalizedFieldAction(action) {
+    const normalized = String(action || '').trim().toLowerCase();
+    if (normalized === 'refresh' || normalized === 'refresh_all' || normalized === 'lock' || normalized === 'unlock') return normalized;
+    throw invalidArgument(`Unsupported field action ${action}.`);
   }
 
   function validateReplaceTextArgs(args) {
@@ -3410,11 +3686,15 @@
 
   function availableToolsForRequirements(requirements = probeRequirementSets()) {
     const supportsNotes = Boolean(requirements.WordApi_1_5);
+    const supportsFieldListing = Boolean(requirements.WordApi_1_4);
+    const supportsFieldMutation = Boolean(requirements.WordApi_1_5);
     return AVAILABLE_TOOLS.filter((tool) => {
       if (tool === 'word.update_page_setup') return Boolean(requirements.WordApiDesktop_1_3);
       if (['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'].includes(tool)) {
         return supportsNotes;
       }
+      if (tool === 'word.list_fields') return supportsFieldListing;
+      if (['word.insert_field', 'word.update_field', 'word.delete_field'].includes(tool)) return supportsFieldMutation;
       return true;
     });
   }

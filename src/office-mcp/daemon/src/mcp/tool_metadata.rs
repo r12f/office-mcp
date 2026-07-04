@@ -150,6 +150,30 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
+        "word.list_fields",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Read,
+    ),
+    tool(
+        "word.insert_field",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.update_field",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.delete_field",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Destructive,
+    ),
+    tool(
         "word.insert_list",
         "word",
         "Paragraphs & lists",
