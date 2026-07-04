@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 31 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 33 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -75,7 +75,7 @@ The per-tool JSON Schemas follow in §2-§9.
 |---|---|
 | **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.save` |
 | **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
-| **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
+| **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list`, `word.list_lists`, `word.update_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
 | **Media** | `word.insert_image`, `word.resize_image` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 41 tools. It deliberately consolidates specialized tools
+The target surface has 43 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -119,6 +119,8 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.list_sections` | implemented | Document & structure | read | `WordApi 1.3` | List document sections with paragraph range and header/footer metadata. |
 | `word.update_page_setup` | implemented | Document & structure | edit | `WordApiDesktop 1.3` | Update document or section page setup such as orientation, margins, and page size. |
 | `word.insert_list` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a numbered or bulleted list. |
+| `word.list_lists` | implemented | Paragraphs & lists | read | `WordApi 1.3` | List existing document lists and their paragraph items so callers can address list mutations. |
+| `word.update_list` | implemented | Paragraphs & lists | edit/destructive | `WordApi 1.3` | Add items, change item levels, attach/detach paragraphs, and update list level formatting for existing lists. |
 | `word.replace_text` | implemented | Range & selection | edit | `WordApi 1.3` | Find and replace text, with dry-run support. |
 | `word.update_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Replace one paragraph's text wholesale. |
 | `word.delete_range` | implemented | Range & selection | destructive | `WordApi 1.3` | Delete an anchored paragraph, sentence, or selection. |
@@ -170,6 +172,10 @@ Tool ownership rules:
   of scope for these tools.
 - `word.read_table` owns table content reads. `word.update_table` owns table
   structure, cell value, table/cell formatting, and deletion mutations.
+- `word.insert_list` owns new list creation. `word.list_lists` owns list
+  discovery. `word.update_list` owns mutations of existing list membership,
+  item level, and level formatting. Deleting a list item remains paragraph
+  deletion and is owned by `word.delete_range`.
 - `word.insert_image` owns new image insertion. `word.resize_image` owns in-place
   resizing of an existing inline image and must not require re-uploading image
   bytes or alter surrounding paragraphs.
@@ -780,6 +786,94 @@ Failures return `INVALID_ARGUMENT` with `partial_effect: "none"`.
   }
 }
 ```
+
+`word.insert_list` creates a new list from plain text items at an anchor. Existing
+list membership and formatting changes belong to `word.update_list`.
+
+### 3.10 `word.list_lists`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "offset": { "type": "integer", "minimum": 0, "default": 0 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns:
+
+```json
+{
+  "lists": [
+    {
+      "list_id": 1,
+      "kind": "bulleted",
+      "item_count": 2,
+      "first_paragraph_index": 3,
+      "items": [
+        { "paragraph_index": 3, "text": "First", "level": 0, "list_string": "•" }
+      ]
+    }
+  ],
+  "count": 1,
+  "truncated": false,
+  "untrusted_source": true
+}
+```
+
+`list_id` is the host list id for the current document session. It must be
+treated like other runtime identifiers: re-read `word.list_lists` before
+mutating after large document edits. Empty documents return `count: 0`.
+
+### 3.11 `word.update_list`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "action"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "action": { "enum": ["add_item", "set_item_level", "attach_paragraph", "detach_paragraph", "set_level_format"] },
+    "list_id": { "type": "integer", "minimum": 0 },
+    "paragraph_index": { "type": "integer", "minimum": 0 },
+    "text": { "type": "string" },
+    "position": { "enum": ["start", "end", "after_paragraph"], "default": "end" },
+    "level": { "type": "integer", "minimum": 0, "maximum": 8 },
+    "numbering": { "enum": ["bullet", "arabic", "upper_roman", "lower_roman", "upper_letter", "lower_letter", "none"] },
+    "bullet_char": { "type": "string", "maxLength": 1 },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Action semantics:
+
+- `add_item` requires `list_id` and `text`. It inserts a paragraph into the
+  target list at `position`, defaulting to the end of the list. `level` defaults
+  to `0`.
+- `set_item_level` requires `paragraph_index` and `level`. The paragraph must be
+  a list item.
+- `attach_paragraph` requires `paragraph_index`; with `list_id` it attaches the
+  paragraph to that list, and without `list_id` it starts a new list from the
+  paragraph. `level` defaults to `0`.
+- `detach_paragraph` requires `paragraph_index` and converts a list item back to
+  body text without deleting text.
+- `set_level_format` requires `list_id`, `level`, and `numbering`; `numbering:
+  "bullet"` may use `bullet_char`, while numbered formats map to Word list
+  numbering styles where supported.
+
+Unknown list ids, stale paragraph indices, non-list paragraph targets for
+list-only actions, and action/argument mismatches return `INVALID_ARGUMENT` or
+`INDEX_OUT_OF_RANGE` with `partial_effect: "none"`. `validate_only: true`
+performs argument and target validation without invoking mutating Office.js list
+APIs and returns `{ valid: true, operation: "word.update_list", partial_effect:
+"none", action }`.
 
 ## 4. Edit
 
