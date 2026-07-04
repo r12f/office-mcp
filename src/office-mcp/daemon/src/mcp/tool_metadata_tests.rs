@@ -14,6 +14,16 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(anchor.category, "Range & selection");
     assert_eq!(anchor.side_effect, ToolSideEffect::Read);
 
+    let sections = tool_metadata("word.list_sections").expect("sections metadata");
+    assert_eq!(sections.app, "word");
+    assert_eq!(sections.category, "Document & structure");
+    assert_eq!(sections.side_effect, ToolSideEffect::Read);
+
+    let page_setup = tool_metadata("word.update_page_setup").expect("page setup metadata");
+    assert_eq!(page_setup.app, "word");
+    assert_eq!(page_setup.category, "Document & structure");
+    assert_eq!(page_setup.side_effect, ToolSideEffect::Mutating);
+
     let mutating = tool_metadata("excel.write_range").expect("excel metadata");
     assert_eq!(mutating.app, "excel");
     assert_eq!(mutating.category, "Range");

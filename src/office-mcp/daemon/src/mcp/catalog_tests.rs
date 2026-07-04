@@ -54,6 +54,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word_get_text"));
     assert!(names.contains(&"word.get_header_footer"));
     assert!(names.contains(&"word.update_header_footer"));
+    assert!(names.contains(&"word.insert_break"));
+    assert!(names.contains(&"word.list_sections"));
+    assert!(names.contains(&"word.update_page_setup"));
     assert!(names.contains(&"word.resolve_anchor"));
     assert!(names.contains(&"word.list_content_controls"));
     assert!(names.contains(&"word.insert_content_control"));
@@ -71,6 +74,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"word.format_cell"));
     assert!(!names.contains(&"word.accept_change"));
     assert!(!names.contains(&"word.reject_change"));
+    assert!(!names.contains(&"word.insert_page_break"));
     assert!(names.contains(&"excel.read_range"));
     assert!(names.contains(&"excel_read_range"));
     assert!(names.contains(&"excel.sort_range"));
@@ -85,10 +89,66 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 29);
+    assert_eq!(WORD_V1_TOOLS.len(), 31);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 154);
+    assert_eq!(tools.len(), 158);
+}
+
+#[test]
+fn word_section_tools_expose_expected_contracts() {
+    let insert_break = tool_for("word.insert_break");
+    assert_eq!(
+        insert_break["inputSchema"]["required"],
+        serde_json::json!(["session_id", "anchor"])
+    );
+    assert_eq!(
+        insert_break["inputSchema"]["properties"]["break_type"]["enum"],
+        serde_json::json!([
+            "page",
+            "line",
+            "section_next",
+            "section_continuous",
+            "section_even",
+            "section_odd"
+        ])
+    );
+    assert_eq!(
+        insert_break["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
+
+    let list_sections = tool_for("word.list_sections");
+    assert_eq!(
+        list_sections["inputSchema"]["required"],
+        serde_json::json!(["session_id"])
+    );
+    assert_eq!(
+        list_sections["inputSchema"]["properties"]["include_page_setup"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        list_sections["_meta"]["com.office-mcp/side_effects"],
+        "read"
+    );
+
+    let update_page_setup = tool_for("word.update_page_setup");
+    assert_eq!(
+        update_page_setup["inputSchema"]["required"],
+        serde_json::json!(["session_id"])
+    );
+    assert_eq!(
+        update_page_setup["inputSchema"]["properties"]["orientation"]["enum"],
+        serde_json::json!(["portrait", "landscape"])
+    );
+    assert_eq!(
+        update_page_setup["inputSchema"]["properties"]["margins_pt"]["properties"]["top"]["minimum"],
+        0
+    );
+    assert_eq!(
+        update_page_setup["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
 }
 
 #[test]

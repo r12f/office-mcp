@@ -168,16 +168,55 @@ const WORD_E2E_CASES = Object.fromEntries([
     args: { anchor: { kind: 'after_text', text: 'table anchor marker' }, rows: 1, cols: 2, data: [['E2E-A', 'E2E-B']] },
     verify: wordReadback.table(0, { contains: ['E2E-A', 'E2E-B'] })
   }],
+  ['word.insert_break', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'section break anchor marker' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'section break anchor marker' }, break_type: 'section_next' },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'inserted', value: true }, { path: 'break_type', value: 'section_next' }] }
+    }
+  }],
+  ['word.list_sections', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'section listing marker' } },
+        { tool: 'word.insert_break', arguments: { anchor: { kind: 'after_text', text: 'section listing marker' }, break_type: 'section_next' } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'count', value: 2 }, { path: 'sections.0.index', value: 0 }, { path: 'sections.1.index', value: 1 }] }
+    }
+  }],
+  ['word.update_page_setup', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'page setup anchor marker' } }
+      ]
+    },
+    args: { orientation: 'landscape', margins_pt: { top: 72, bottom: 72, left: 54, right: 54 } },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_sections',
+      readbackArguments: { include_page_setup: true },
+      expect: { pathEquals: [{ path: 'sections.0.page_setup.orientation', value: 'landscape' }, { path: 'sections.0.page_setup.margins_pt.left', value: 54 }] }
+    }
+  }],
   ['word.insert_page_break', {
     setup: {
       actions: [
-        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'page break anchor marker' } }
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'compat page break anchor marker' } }
       ]
     },
-    args: { anchor: { kind: 'after_text', text: 'page break anchor marker' } },
+    args: { anchor: { kind: 'after_text', text: 'compat page break anchor marker' } },
     verify: {
       kind: 'direct-result',
-      expect: { pathEquals: [{ path: 'inserted', value: true }, { path: 'break_type', value: 'page' }] }
+      expect: { pathEquals: [{ path: 'inserted', value: true }, { path: 'break_type', value: 'page' }, { path: 'superseded_by', value: 'word.insert_break' }] }
     }
   }],
   ['word.update_header_footer', {
