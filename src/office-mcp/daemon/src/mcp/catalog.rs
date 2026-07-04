@@ -667,25 +667,9 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
                 "delete_contents": false
             }
         })],
-        "word.insert_bookmark" => vec![json!({
-            "description": "Create a bookmark around a located section heading.",
-            "arguments": {
-                "session_id": "session-1",
-                "name": "ResultsSection",
-                "anchor": { "kind": "heading", "text": "Results", "level": 2 }
-            }
-        })],
-        "word.list_bookmarks" => vec![json!({
-            "description": "List visible bookmarks and bounded previews.",
-            "arguments": { "session_id": "session-1" }
-        })],
-        "word.delete_bookmark" => vec![json!({
-            "description": "Delete a bookmark marker while keeping its text.",
-            "arguments": {
-                "session_id": "session-1",
-                "name": "ResultsSection"
-            }
-        })],
+        "word.insert_bookmark" | "word.list_bookmarks" | "word.delete_bookmark" => {
+            bookmark_examples_for_tool(tool)
+        }
         "word.update_table" => vec![json!({
             "description": "Replace one table cell by row and column index.",
             "arguments": {
@@ -716,6 +700,31 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
                 "row_index": 0,
                 "column_index": 1,
                 "text": "Q4"
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
+fn bookmark_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.insert_bookmark" => vec![json!({
+            "description": "Create a bookmark around a located section heading.",
+            "arguments": {
+                "session_id": "session-1",
+                "name": "ResultsSection",
+                "anchor": { "kind": "heading", "text": "Results", "level": 2 }
+            }
+        })],
+        "word.list_bookmarks" => vec![json!({
+            "description": "List visible bookmarks and bounded previews.",
+            "arguments": { "session_id": "session-1" }
+        })],
+        "word.delete_bookmark" => vec![json!({
+            "description": "Delete a bookmark marker while keeping its text.",
+            "arguments": {
+                "session_id": "session-1",
+                "name": "ResultsSection"
             }
         })],
         _ => Vec::new(),
