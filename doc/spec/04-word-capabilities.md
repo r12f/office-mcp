@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 36 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 39 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -73,7 +73,7 @@ The per-tool JSON Schemas follow in §2-§9.
 
 | Category | Tools |
 |---|---|
-| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.list_fields`, `word.insert_field`, `word.update_field`, `word.delete_field`, `word.save` |
+| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.list_fields`, `word.insert_field`, `word.update_field`, `word.delete_field`, `word.list_styles`, `word.create_style`, `word.update_style`, `word.save` |
 | **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 46 tools. It deliberately consolidates specialized tools
+The target surface has 49 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -122,6 +122,9 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.insert_field` | implemented | Document & structure | edit | `WordApi 1.5` | Insert curated Word fields, including a default table of contents, at an anchored range. |
 | `word.update_field` | implemented | Document & structure | edit | `WordApi 1.5` | Refresh, lock, or unlock one field, or refresh all fields after an expected-count stale check. |
 | `word.delete_field` | implemented | Document & structure | destructive | `WordApi 1.5` | Delete one field and its current result by current field index. |
+| `word.list_styles` | implemented | Document & structure | read | `WordApi 1.5` | List built-in and custom document styles with type, built-in, in-use, base-style, and priority metadata. |
+| `word.create_style` | implemented | Document & structure | edit | `WordApi 1.5` | Create a paragraph, character, table, or list style with optional base style and formatting. |
+| `word.update_style` | implemented | Document & structure | edit | `WordApi 1.5` | Update an existing style's base style, font formatting, or paragraph formatting. |
 | `word.insert_list` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a numbered or bulleted list. |
 | `word.replace_text` | implemented | Range & selection | edit | `WordApi 1.3` | Find and replace text, with dry-run support. |
 | `word.update_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Replace one paragraph's text wholesale. |
@@ -165,10 +168,12 @@ Tool ownership rules:
   but mutation tools must not duplicate each other's writes.
 - `word.insert_paragraph` owns paragraph creation, including headings. Do not add
   a separate heading insertion tool after migration.
-- `word.apply_style` owns semantic Office style changes, including heading level.
-  `word.apply_formatting` owns direct character/run and paragraph layout
-  formatting. Direct paragraph layout includes alignment, indentation, spacing,
-  and outline level; named styles remain owned by `word.apply_style`.
+- `word.list_styles`, `word.create_style`, and `word.update_style` own the
+  document style catalog. `word.apply_style` owns applying an existing semantic
+  Office style to a range, including heading level. `word.apply_formatting`
+  owns direct character/run and paragraph layout formatting. Direct paragraph
+  layout includes alignment, indentation, spacing, and outline level; named
+  style definitions remain owned by the style-catalog tools.
 - `word.insert_hyperlink`, `word.list_hyperlinks`, and
   `word.remove_hyperlink` own hyperlink lifecycle. Generic run styling remains
   owned by `word.apply_formatting`, and bookmark creation/deletion remains out
@@ -220,7 +225,7 @@ runtime and advertises only tools whose complete implementation is supported:
 |---|---|---|
 | Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection |
 | Review | `WordApi 1.4` | comments, bookmark anchors, bookmark lifecycle tools, and field listing |
-| Notes, content controls, and fields | `WordApi 1.5` | footnote/endnote lifecycle, content-control lifecycle, and field insertion/update/deletion tools |
+| Notes, content controls, fields, and styles | `WordApi 1.5` | footnote/endnote lifecycle, content-control lifecycle, field insertion/update/deletion tools, and style-catalog tools |
 | Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
 | Host-specific | explicit successful probe | page setup, active-window, and protection metadata |
 
@@ -1227,8 +1232,77 @@ Level `0` converts the paragraph to body text.
 Callers must provide either `style` or `heading_level`. `heading_level` is the
 target replacement for `word.set_heading_level`.
 
-`word.create_style` is reserved for a future capability set after its
-cross-platform Office.js behavior is verified.
+### 6.3 `word.list_styles`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "type": { "enum": ["paragraph", "character", "table", "list"] },
+    "built_in": { "type": "boolean" },
+    "in_use_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns `{ styles, count }`. Each style item includes `name_local`, `type`,
+`built_in`, `in_use`, `base_style`, and `priority`. The tool uses
+`Document.getStyles()` and is advertised only when the `WordApi 1.5` probe
+passes.
+
+### 6.4 `word.create_style`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "name", "type"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1 },
+    "type": { "enum": ["paragraph", "character", "table", "list"] },
+    "base_style": { "type": "string", "minLength": 1 },
+    "font": { "$ref": "#/$defs/run_formatting" },
+    "paragraph": { "$ref": "#/$defs/paragraph_formatting" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Creates a document style via `Document.addStyle(name, type)`, then applies
+optional base-style, font, and paragraph-formatting properties. Duplicate style
+names fail before mutation with `INVALID_ARGUMENT` and `partial_effect: none`.
+`validate_only: true` resolves existing styles and validates arguments without
+creating the style.
+
+### 6.5 `word.update_style`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "name"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1 },
+    "base_style": { "type": "string", "minLength": 1 },
+    "font": { "$ref": "#/$defs/run_formatting" },
+    "paragraph": { "$ref": "#/$defs/paragraph_formatting" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Callers must provide at least one of `base_style`, `font`, or `paragraph`.
+Unknown style names and unknown `base_style` names fail before mutation with
+`INVALID_ARGUMENT` and `partial_effect: none`. Built-in styles may be updated
+when Word allows it; responses include `built_in` so clients can present an
+appropriate warning. Style deletion remains out of scope for this tool because
+deleting an in-use style changes document content fallback behavior and needs a
+separate destructive contract.
 
 ## 7. Content Controls
 
