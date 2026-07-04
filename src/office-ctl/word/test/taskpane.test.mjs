@@ -484,6 +484,31 @@ test('Word validation-only mode validates required mutating tools without writes
   assert.doesNotMatch(validateOnlyBody, /insertField\(/);
 });
 
+test('Word style tools are advertised, grouped, gated, and dispatched through document owners', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const preflightBody = functionBody(js, 'preflightWordMutatingTool');
+
+  assert.match(js, /'word\.list_styles'/);
+  assert.match(js, /'word\.create_style'/);
+  assert.match(js, /'word\.update_style'/);
+  assert.match(js, /\{ label: 'Document & structure', tools: \[[\s\S]*'word\.list_styles'[\s\S]*'word\.create_style'[\s\S]*'word\.update_style'[\s\S]*\] \}/);
+  assert.match(js, /\['word\.list_styles', \{ category: 'Document & structure', sideEffect: 'read', description: 'List built-in and custom document styles\.' \}\]/);
+  assert.match(js, /\['word\.create_style', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Create a document style definition\.' \}\]/);
+  assert.match(js, /\['word\.update_style', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Update a document style definition\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.list_styles':\s*data = await listStyles\(args \|\| \{\}\);/);
+  assert.match(invokeBody, /case 'word\.create_style':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await createStyle\(args\);/);
+  assert.match(invokeBody, /case 'word\.update_style':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateStyle\(args\);/);
+  assert.match(preflightBody, /case 'word\.create_style':\s*validateCreateStyleArgs\(tool, args\);/);
+  assert.match(preflightBody, /case 'word\.update_style':\s*validateUpdateStyleArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'availableToolsForRequirements'), /WordApi_1_5[\s\S]*word\.list_styles/);
+  assert.match(js, /async function listStyles\(args/);
+  assert.match(js, /async function createStyle\(args/);
+  assert.match(js, /async function updateStyle\(args/);
+  assert.match(js, /function styleTypeToOffice\(type\)/);
+  assert.match(js, /function applyStyleDefinitionFormatting\(style, args\)/);
+});
+
 test('Word field tools are advertised, grouped, gated, and dispatched through document owners', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const invokeBody = functionBody(js, 'invokeTool');
@@ -716,7 +741,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.insert_break'/);
   assert.match(js, /'word\.list_sections'/);
   assert.match(js, /'word\.update_page_setup'/);
-  assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.list_fields', 'word\.insert_field', 'word\.update_field', 'word\.delete_field', 'word\.save'\] \}/);
+  assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.list_fields', 'word\.insert_field', 'word\.update_field', 'word\.delete_field', 'word\.list_styles', 'word\.create_style', 'word\.update_style', 'word\.save'\] \}/);
   assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
@@ -752,6 +777,9 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.insert_field', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a curated Word field at an anchored range\.' \}\]/);
   assert.match(js, /\['word\.update_field', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Refresh, lock, or unlock Word fields\.' \}\]/);
   assert.match(js, /\['word\.delete_field', \{ category: 'Document & structure', sideEffect: 'destructive', description: 'Delete a Word field by current index\.' \}\]/);
+  assert.match(js, /\['word\.list_styles', \{ category: 'Document & structure', sideEffect: 'read', description: 'List built-in and custom document styles\.' \}\]/);
+  assert.match(js, /\['word\.create_style', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Create a document style definition\.' \}\]/);
+  assert.match(js, /\['word\.update_style', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Update a document style definition\.' \}\]/);
   assert.match(js, /\['word\.insert_note', \{ category: 'Notes', sideEffect: 'mutating', description: 'Insert a footnote or endnote at an anchored range\.' \}\]/);
   assert.match(js, /\['word\.list_notes', \{ category: 'Notes', sideEffect: 'read', description: 'List footnotes or endnotes with reference locations\.' \}\]/);
   assert.match(js, /\['word\.update_note', \{ category: 'Notes', sideEffect: 'mutating', description: 'Replace a footnote or endnote body by index\.' \}\]/);

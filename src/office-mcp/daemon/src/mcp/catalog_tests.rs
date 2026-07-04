@@ -76,6 +76,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word.insert_field"));
     assert!(names.contains(&"word.update_field"));
     assert!(names.contains(&"word.delete_field"));
+    assert!(names.contains(&"word.list_styles"));
+    assert!(names.contains(&"word.create_style"));
+    assert!(names.contains(&"word.update_style"));
     assert!(names.contains(&"word.resize_image"));
     assert!(names.contains(&"word.update_table"));
     assert!(names.contains(&"word_update_table"));
@@ -104,10 +107,68 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 46);
+    assert_eq!(WORD_V1_TOOLS.len(), 49);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 188);
+    assert_eq!(tools.len(), 194);
+}
+
+#[test]
+fn word_style_tools_expose_expected_contracts() {
+    let list_styles = tool_for("word.list_styles");
+    assert_eq!(
+        list_styles["inputSchema"]["required"],
+        serde_json::json!(["session_id"])
+    );
+    assert_eq!(
+        list_styles["inputSchema"]["properties"]["type"]["enum"],
+        serde_json::json!(["paragraph", "character", "table", "list"])
+    );
+    assert_eq!(
+        list_styles["inputSchema"]["properties"]["in_use_only"]["type"],
+        "boolean"
+    );
+    assert_eq!(list_styles["_meta"]["com.office-mcp/side_effects"], "read");
+
+    let create_style = tool_for("word.create_style");
+    assert_eq!(
+        create_style["inputSchema"]["required"],
+        serde_json::json!(["session_id", "name", "type"])
+    );
+    assert_eq!(
+        create_style["inputSchema"]["properties"]["name"]["minLength"],
+        1
+    );
+    assert_eq!(
+        create_style["inputSchema"]["properties"]["font"]["properties"]["bold"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        create_style["inputSchema"]["properties"]["paragraph"]["properties"]["alignment"]["enum"],
+        serde_json::json!(["left", "center", "right", "justified"])
+    );
+    assert_eq!(
+        create_style["inputSchema"]["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
+    let update_style = tool_for("word.update_style");
+    assert_eq!(
+        update_style["inputSchema"]["required"],
+        serde_json::json!(["session_id", "name"])
+    );
+    assert_eq!(
+        update_style["inputSchema"]["anyOf"],
+        serde_json::json!([
+            { "required": ["base_style"] },
+            { "required": ["font"] },
+            { "required": ["paragraph"] }
+        ])
+    );
+    assert_eq!(
+        update_style["inputSchema"]["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 }
 
 #[test]
@@ -433,8 +494,8 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 91);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 91);
+    assert_eq!(all_tools.len(), 94);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 94);
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));
@@ -698,6 +759,36 @@ fn word_field_schemas_are_specific() {
 }
 
 #[test]
+fn word_style_schemas_are_specific() {
+    let list_styles = schema_for("word.list_styles");
+    assert_required(&list_styles, &["session_id"]);
+    assert_eq!(list_styles["properties"]["type"]["enum"][0], "paragraph");
+    assert_eq!(list_styles["properties"]["built_in"]["type"], "boolean");
+    assert_eq!(list_styles["properties"]["in_use_only"]["type"], "boolean");
+
+    let create_style = schema_for("word.create_style");
+    assert_required(&create_style, &["session_id", "name", "type"]);
+    assert_eq!(create_style["properties"]["name"]["minLength"], 1);
+    assert_eq!(create_style["properties"]["type"]["enum"][1], "character");
+    assert_eq!(
+        create_style["properties"]["font"]["properties"]["color"]["type"],
+        "string"
+    );
+    assert_eq!(
+        create_style["properties"]["paragraph"]["properties"]["outline_level"]["maximum"],
+        9
+    );
+
+    let update_style = schema_for("word.update_style");
+    assert_required(&update_style, &["session_id", "name"]);
+    assert_eq!(update_style["properties"]["base_style"]["minLength"], 1);
+    assert_eq!(
+        update_style["anyOf"][0]["required"],
+        serde_json::json!(["base_style"])
+    );
+}
+
+#[test]
 fn word_validation_only_schemas_accept_validate_only_flag() {
     for tool in [
         "word.insert_image",
@@ -708,6 +799,8 @@ fn word_validation_only_schemas_accept_validate_only_flag() {
         "word.update_note",
         "word.insert_field",
         "word.update_field",
+        "word.create_style",
+        "word.update_style",
         "word.delete_range",
         "word.delete_note",
         "word.delete_field",

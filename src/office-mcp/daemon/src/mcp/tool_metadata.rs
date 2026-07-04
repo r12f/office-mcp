@@ -174,6 +174,24 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Destructive,
     ),
     tool(
+        "word.list_styles",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Read,
+    ),
+    tool(
+        "word.create_style",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.update_style",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
         "word.insert_list",
         "word",
         "Paragraphs & lists",

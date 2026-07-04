@@ -74,6 +74,8 @@
     'word.insert_field',
     'word.update_field',
     'word.delete_field',
+    'word.create_style',
+    'word.update_style',
     'word.insert_list',
     'word.insert_hyperlink',
     'word.remove_hyperlink',
@@ -120,6 +122,9 @@
     'word.insert_field',
     'word.update_field',
     'word.delete_field',
+    'word.list_styles',
+    'word.create_style',
+    'word.update_style',
     'word.insert_list',
     'word.insert_hyperlink',
     'word.list_hyperlinks',
@@ -146,7 +151,7 @@
     'word.save'
   ];
   const TOOL_GROUPS = [
-    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.list_fields', 'word.insert_field', 'word.update_field', 'word.delete_field', 'word.save'] },
+    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.list_fields', 'word.insert_field', 'word.update_field', 'word.delete_field', 'word.list_styles', 'word.create_style', 'word.update_style', 'word.save'] },
     { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
@@ -178,6 +183,9 @@
     ['word.insert_field', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a curated Word field at an anchored range.' }],
     ['word.update_field', { category: 'Document & structure', sideEffect: 'mutating', description: 'Refresh, lock, or unlock Word fields.' }],
     ['word.delete_field', { category: 'Document & structure', sideEffect: 'destructive', description: 'Delete a Word field by current index.' }],
+    ['word.list_styles', { category: 'Document & structure', sideEffect: 'read', description: 'List built-in and custom document styles.' }],
+    ['word.create_style', { category: 'Document & structure', sideEffect: 'mutating', description: 'Create a document style definition.' }],
+    ['word.update_style', { category: 'Document & structure', sideEffect: 'mutating', description: 'Update a document style definition.' }],
     ['word.update_header_footer', { category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer.' }],
     ['word.insert_list', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a list.' }],
     ['word.insert_hyperlink', { category: 'Range & selection', sideEffect: 'mutating', description: 'Insert or apply a hyperlink at an anchored range.' }],
@@ -569,6 +577,15 @@
         case 'word.delete_field':
           data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await deleteField(args);
           break;
+        case 'word.list_styles':
+          data = await listStyles(args || {});
+          break;
+        case 'word.create_style':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await createStyle(args);
+          break;
+        case 'word.update_style':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateStyle(args);
+          break;
         case 'word.update_header_footer':
           data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateHeaderFooter(args);
           break;
@@ -709,6 +726,12 @@
       case 'word.delete_field':
         validateDeleteFieldArgs(tool, args);
         break;
+      case 'word.create_style':
+        validateCreateStyleArgs(tool, args);
+        break;
+      case 'word.update_style':
+        validateUpdateStyleArgs(tool, args);
+        break;
       case 'word.insert_list':
         requireAnchor(tool, args.anchor);
         validateInsertListArgs(args);
@@ -820,6 +843,10 @@
         return validateDeleteNoteOnly(args);
       case 'word.delete_field':
         return validateDeleteFieldOnly(args);
+      case 'word.create_style':
+        return validateCreateStyleOnly(args);
+      case 'word.update_style':
+        return validateUpdateStyleOnly(args);
       case 'word.update_header_footer':
         return validateUpdateHeaderFooterOnly(args);
       default:
@@ -990,6 +1017,33 @@
       const { field } = await getFieldByIndex(context, args.field_index);
       return validationSuccess('word.delete_field', {
         resolved_target: fieldMetadata(field, args.field_index)
+      });
+    });
+  }
+
+  async function validateCreateStyleOnly(args) {
+    return Word.run(async (context) => {
+      validateCreateStyleArgs('word.create_style', args);
+      await ensureStyleNameAvailable(context, args.name);
+      if (args.base_style) await getStyleByName(context, args.base_style);
+      return validationSuccess('word.create_style', {
+        name: args.name,
+        type: normalizedStyleType(args.type),
+        has_font: Boolean(args.font),
+        has_paragraph: Boolean(args.paragraph)
+      });
+    });
+  }
+
+  async function validateUpdateStyleOnly(args) {
+    return Word.run(async (context) => {
+      validateUpdateStyleArgs('word.update_style', args);
+      const style = await getStyleByName(context, args.name);
+      if (args.base_style) await getStyleByName(context, args.base_style);
+      return validationSuccess('word.update_style', {
+        resolved_target: styleMetadata(style),
+        has_font: Boolean(args.font),
+        has_paragraph: Boolean(args.paragraph)
       });
     });
   }
@@ -2094,6 +2148,47 @@
     });
   }
 
+  async function listStyles(args = {}) {
+    return Word.run(async (context) => {
+      const styles = context.document.getStyles();
+      styles.load('items/nameLocal,items/type,items/builtIn,items/inUse,items/baseStyle,items/priority');
+      await context.sync();
+      const requestedType = args.type ? normalizedStyleType(args.type) : null;
+      const requestedBuiltIn = typeof args.built_in === 'boolean' ? args.built_in : null;
+      const items = styles.items
+        .map(styleMetadata)
+        .filter((style) => !requestedType || style.type === requestedType)
+        .filter((style) => requestedBuiltIn === null || style.built_in === requestedBuiltIn)
+        .filter((style) => !args.in_use_only || style.in_use);
+      return { styles: items, count: items.length };
+    });
+  }
+
+  async function createStyle(args) {
+    return Word.run(async (context) => {
+      validateCreateStyleArgs('word.create_style', args);
+      await ensureStyleNameAvailable(context, args.name);
+      if (args.base_style) await getStyleByName(context, args.base_style);
+      const style = context.document.addStyle(args.name, styleTypeToOffice(args.type));
+      applyStyleDefinitionFormatting(style, args);
+      style.load('nameLocal,type,builtIn,inUse,baseStyle,priority');
+      await context.sync();
+      return { created: true, style: styleMetadata(style) };
+    });
+  }
+
+  async function updateStyle(args) {
+    return Word.run(async (context) => {
+      validateUpdateStyleArgs('word.update_style', args);
+      const style = await getStyleByName(context, args.name);
+      if (args.base_style) await getStyleByName(context, args.base_style);
+      applyStyleDefinitionFormatting(style, args);
+      style.load('nameLocal,type,builtIn,inUse,baseStyle,priority');
+      await context.sync();
+      return { updated: true, style: styleMetadata(style) };
+    });
+  }
+
   async function setHeadingLevel(args) {
     return Word.run(async (context) => {
       const paragraph = await getParagraphByIndex(context, args.index);
@@ -3062,6 +3157,41 @@
     requireNonNegativeInteger(tool, 'field_index', args.field_index);
   }
 
+  function validateCreateStyleArgs(tool, args) {
+    validateStyleName(tool, args.name);
+    normalizedStyleType(args.type);
+    validateStyleFormattingArgs(tool, args);
+  }
+
+  function validateUpdateStyleArgs(tool, args) {
+    validateStyleName(tool, args.name);
+    if (!args.base_style && !args.font && !args.paragraph) {
+      throw invalidArgument(`${tool} requires base_style, font, or paragraph.`);
+    }
+    validateStyleFormattingArgs(tool, args);
+  }
+
+  function validateStyleFormattingArgs(tool, args) {
+    if (args.base_style !== undefined) validateStyleName(tool, args.base_style, 'base_style');
+    validateFormattingArg(tool, args.font);
+    validateParagraphFormattingArg(tool, args.paragraph);
+    if (args.base_style !== undefined && !supportsWordApi('1.6')) {
+      throw Object.assign(new Error(`${tool} base_style requires WordApi 1.6.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+    }
+  }
+
+  function validateStyleName(tool, value, field = 'name') {
+    if (typeof value !== 'string' || value.trim().length < 1) {
+      throw invalidArgument(`${tool} ${field} must be a non-empty string.`);
+    }
+  }
+
+  function normalizedStyleType(type) {
+    const value = String(type || '').trim().toLowerCase();
+    if (value === 'paragraph' || value === 'character' || value === 'table' || value === 'list') return value;
+    throw invalidArgument('Word style type must be paragraph, character, table, or list.');
+  }
+
   function normalizedFieldAction(action) {
     const normalized = String(action || '').trim().toLowerCase();
     if (normalized === 'refresh' || normalized === 'refresh_all' || normalized === 'lock' || normalized === 'unlock') return normalized;
@@ -3269,6 +3399,59 @@
     if (typeof formatting.font_size_pt === 'number') font.size = formatting.font_size_pt;
     if (formatting.color) font.color = formatting.color;
     if (formatting.highlight) font.highlightColor = formatting.highlight;
+  }
+
+  function applyStyleDefinitionFormatting(style, args) {
+    if (args.base_style) style.baseStyle = args.base_style;
+    if (args.font) applyRunFormatting(style.font, args.font);
+    if (args.paragraph) applyParagraphFormattingToParagraph(style.paragraphFormat, args.paragraph);
+  }
+
+  function styleTypeToOffice(type) {
+    const normalized = normalizedStyleType(type);
+    if (normalized === 'paragraph') return Word.StyleType.paragraph;
+    if (normalized === 'character') return Word.StyleType.character;
+    if (normalized === 'table') return Word.StyleType.table;
+    return Word.StyleType.list;
+  }
+
+  function normalizedStyleTypeFromOffice(type) {
+    const value = String(type || '').trim().toLowerCase();
+    if (value === 'paragraph') return 'paragraph';
+    if (value === 'character') return 'character';
+    if (value === 'table') return 'table';
+    if (value === 'list') return 'list';
+    return value || null;
+  }
+
+  function styleMetadata(style) {
+    return {
+      name_local: style.nameLocal || null,
+      type: normalizedStyleTypeFromOffice(style.type),
+      built_in: Boolean(style.builtIn),
+      in_use: Boolean(style.inUse),
+      base_style: style.baseStyle || null,
+      priority: typeof style.priority === 'number' ? style.priority : null
+    };
+  }
+
+  async function getStyleByName(context, name) {
+    const style = context.document.getStyles().getByNameOrNullObject(name);
+    style.load('isNullObject,nameLocal,type,builtIn,inUse,baseStyle,priority');
+    await context.sync();
+    if (style.isNullObject) throw invalidArgument(`Style ${name} was not found.`);
+    return style;
+  }
+
+  async function ensureStyleNameAvailable(context, name) {
+    const style = context.document.getStyles().getByNameOrNullObject(name);
+    style.load('isNullObject');
+    await context.sync();
+    if (!style.isNullObject) throw invalidArgument(`Style ${name} already exists.`);
+  }
+
+  function supportsWordApi(version) {
+    return Office.context?.requirements?.isSetSupported?.('WordApi', version) === true;
   }
 
   async function applyParagraphFormatting(context, range, paragraph) {
@@ -3688,6 +3871,7 @@
     const supportsNotes = Boolean(requirements.WordApi_1_5);
     const supportsFieldListing = Boolean(requirements.WordApi_1_4);
     const supportsFieldMutation = Boolean(requirements.WordApi_1_5);
+    const supportsStyles = Boolean(requirements.WordApi_1_5);
     return AVAILABLE_TOOLS.filter((tool) => {
       if (tool === 'word.update_page_setup') return Boolean(requirements.WordApiDesktop_1_3);
       if (['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'].includes(tool)) {
@@ -3695,6 +3879,7 @@
       }
       if (tool === 'word.list_fields') return supportsFieldListing;
       if (['word.insert_field', 'word.update_field', 'word.delete_field'].includes(tool)) return supportsFieldMutation;
+      if (['word.list_styles', 'word.create_style', 'word.update_style'].includes(tool)) return supportsStyles;
       return true;
     });
   }

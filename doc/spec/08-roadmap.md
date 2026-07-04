@@ -205,6 +205,12 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       for mutations, treats field indices as current collection positions, and
       exposes a safe table-of-contents insertion path while excluding
       external-content field types.
+- [x] Add style-catalog tools: `word.list_styles`, `word.create_style`, and
+      `word.update_style`. The contract keeps style definition reads and
+      mutations in Document & structure, uses `WordApi 1.5`, preserves
+      `word.apply_style` as the range-level style application owner, and keeps
+      style deletion out of scope until a separate destructive contract is
+      specified.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.
