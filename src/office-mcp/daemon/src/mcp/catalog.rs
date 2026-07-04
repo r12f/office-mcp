@@ -1525,8 +1525,10 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "session_id" => json!({ "type": "string", "description": "Office document session ID." }),
         "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
         | "table_index" | "change_index" | "content_control_id" | "position" | "slice_size"
-        | "section_index" | "slide_index" | "target_index" | "row_index" | "column_index" | "row_count"
-        | "column_count" | "count" | "max_depth" => json!({ "type": "integer", "minimum": 0 }),
+        | "section_index" | "slide_index" | "target_index" | "row_index" | "column_index"
+        | "row_count" | "column_count" | "count" | "max_depth" => {
+            json!({ "type": "integer", "minimum": 0 })
+        }
         "heading_level" | "level" | "columns" => json!({ "type": "integer", "minimum": 1 }),
         "width_pt" | "height_pt" | "scale_percent" | "width" | "height" | "left" | "top"
         | "rotation" | "fill_transparency" | "line_weight" | "line_transparency" | "font_size" => {

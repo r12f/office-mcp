@@ -320,14 +320,29 @@ fn representative_word_schemas_are_specific() {
 
     let get_header_footer = schema_for("word.get_header_footer");
     assert_required(&get_header_footer, &["session_id", "location"]);
-    assert_eq!(get_header_footer["properties"]["location"]["enum"][0], "header");
-    assert_eq!(get_header_footer["properties"]["header_footer_type"]["default"], "primary");
-    assert_eq!(get_header_footer["properties"]["section_index"]["minimum"], 0);
+    assert_eq!(
+        get_header_footer["properties"]["location"]["enum"][0],
+        "header"
+    );
+    assert_eq!(
+        get_header_footer["properties"]["header_footer_type"]["default"],
+        "primary"
+    );
+    assert_eq!(
+        get_header_footer["properties"]["section_index"]["minimum"],
+        0
+    );
 
     let update_header_footer = schema_for("word.update_header_footer");
     assert_required(&update_header_footer, &["session_id", "location", "action"]);
-    assert_eq!(update_header_footer["properties"]["action"]["enum"][0], "set_text");
-    assert_eq!(update_header_footer["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        update_header_footer["properties"]["action"]["enum"][0],
+        "set_text"
+    );
+    assert_eq!(
+        update_header_footer["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 }
 
 #[test]
