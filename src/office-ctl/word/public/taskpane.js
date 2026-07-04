@@ -79,6 +79,9 @@
     'word.delete_range',
     'word.insert_bookmark',
     'word.delete_bookmark',
+    'word.insert_note',
+    'word.update_note',
+    'word.delete_note',
     'word.apply_formatting',
     'word.update_table',
     'word.insert_content_control',
@@ -123,6 +126,10 @@
     'word.insert_content_control',
     'word.update_content_control',
     'word.delete_content_control',
+    'word.insert_note',
+    'word.list_notes',
+    'word.update_note',
+    'word.delete_note',
     'word.apply_style',
     'word.add_comment',
     'word.resolve_comment',
@@ -136,6 +143,7 @@
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
     { label: 'Media', tools: ['word.insert_image', 'word.resize_image'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
+    { label: 'Notes', tools: ['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'] },
     { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_tracked_change'] }
   ];
   const TOOL_METADATA = new Map([
@@ -172,6 +180,10 @@
     ['word.insert_content_control', { category: 'Content controls', sideEffect: 'mutating', description: 'Create a content control around an anchored range.' }],
     ['word.update_content_control', { category: 'Content controls', sideEffect: 'mutating', description: 'Update content-control metadata, locks, or text.' }],
     ['word.delete_content_control', { category: 'Content controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling.' }],
+    ['word.insert_note', { category: 'Notes', sideEffect: 'mutating', description: 'Insert a footnote or endnote at an anchored range.' }],
+    ['word.list_notes', { category: 'Notes', sideEffect: 'read', description: 'List footnotes or endnotes with reference locations.' }],
+    ['word.update_note', { category: 'Notes', sideEffect: 'mutating', description: 'Replace a footnote or endnote body by index.' }],
+    ['word.delete_note', { category: 'Notes', sideEffect: 'destructive', description: 'Delete a footnote or endnote by index.' }],
     ['word.apply_style', { category: 'Range & selection', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
     ['word.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a comment to an anchored range.' }],
     ['word.resolve_comment', { category: 'Review', sideEffect: 'mutating', description: 'Resolve an existing comment.' }],
@@ -489,6 +501,18 @@
         case 'word.delete_bookmark':
           data = await deleteBookmark(args);
           break;
+        case 'word.insert_note':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await insertNote(args);
+          break;
+        case 'word.list_notes':
+          data = await listNotes(args || {});
+          break;
+        case 'word.update_note':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateNote(args);
+          break;
+        case 'word.delete_note':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await deleteNote(args);
+          break;
         case 'word.get_selection':
           data = await getSelection(args);
           break;
@@ -674,6 +698,15 @@
       case 'word.delete_bookmark':
         validateBookmarkName(tool, args.name, { strictPattern: false });
         break;
+      case 'word.insert_note':
+        validateInsertNoteArgs(tool, args);
+        break;
+      case 'word.update_note':
+        validateUpdateNoteArgs(tool, args);
+        break;
+      case 'word.delete_note':
+        validateDeleteNoteArgs(tool, args);
+        break;
       case 'word.apply_formatting':
         validateExtentToolArgs(tool, args);
         validateFormattingArg(tool, args.formatting, true);
@@ -730,12 +763,18 @@
         return validateInsertImageOnly(args);
       case 'word.insert_hyperlink':
         return validateInsertHyperlinkOnly(args);
+      case 'word.insert_note':
+        return validateInsertNoteOnly(args);
       case 'word.replace_text':
         return validateReplaceTextOnly(args);
       case 'word.update_paragraph':
         return validateUpdateParagraphOnly(args);
+      case 'word.update_note':
+        return validateUpdateNoteOnly(args);
       case 'word.delete_range':
         return validateDeleteRangeOnly(args);
+      case 'word.delete_note':
+        return validateDeleteNoteOnly(args);
       case 'word.update_header_footer':
         return validateUpdateHeaderFooterOnly(args);
       default:
@@ -825,6 +864,44 @@
           current_text_length: (paragraph.text || '').length,
           style: paragraph.style || null
         }
+      });
+    });
+  }
+
+  async function validateInsertNoteOnly(args) {
+    return Word.run(async (context) => {
+      validateInsertNoteArgs('word.insert_note', args);
+      const resolved = await resolveValidationAnchor(context, args.anchor);
+      return validationSuccess('word.insert_note', {
+        resolved_target: {
+          ...resolved,
+          kind: validateNoteKind(args.kind),
+          text_length: args.text.length
+        }
+      });
+    });
+  }
+
+  async function validateUpdateNoteOnly(args) {
+    return Word.run(async (context) => {
+      validateUpdateNoteArgs('word.update_note', args);
+      const note = await getNoteByIndex(context, args.kind, args.index);
+      note.body.load('text');
+      await context.sync();
+      return validationSuccess('word.update_note', {
+        resolved_target: noteMetadata(note, args.index, validateNoteKind(args.kind))
+      });
+    });
+  }
+
+  async function validateDeleteNoteOnly(args) {
+    return Word.run(async (context) => {
+      validateDeleteNoteArgs('word.delete_note', args);
+      const note = await getNoteByIndex(context, args.kind, args.index);
+      note.body.load('text');
+      await context.sync();
+      return validationSuccess('word.delete_note', {
+        resolved_target: noteMetadata(note, args.index, validateNoteKind(args.kind))
       });
     });
   }
@@ -989,6 +1066,117 @@
         untrusted_source: true
       };
     });
+  }
+
+  async function insertNote(args) {
+    validateInsertNoteArgs('word.insert_note', args);
+    return Word.run(async (context) => {
+      const kind = validateNoteKind(args.kind);
+      const target = await resolveAnchor(context, args.anchor);
+      const text = String(args.text);
+      const note = kind === 'footnote' ? target.insertFootnote(text) : target.insertEndnote(text);
+      note.body.load('text');
+      const collection = noteCollectionForKind(context, kind);
+      collection.load('items');
+      await context.sync();
+      const index = noteIndexInCollection(collection, note);
+      return {
+        inserted: true,
+        note: noteMetadata(note, index, kind),
+        count: collection.items.length
+      };
+    });
+  }
+
+  async function listNotes(args) {
+    args = args || {};
+    const kind = validateNoteKind(args.kind);
+    const offset = args.offset ?? 0;
+    const limit = args.limit ?? 50;
+    if (!Number.isInteger(offset) || offset < 0) throw invalidArgument('word.list_notes offset must be a non-negative integer.');
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw invalidArgument('word.list_notes limit must be an integer from 1 to 200.');
+    return Word.run(async (context) => {
+      const collection = noteCollectionForKind(context, kind);
+      collection.load('items');
+      await context.sync();
+      const count = collection.items.length;
+      const selected = collection.items.slice(offset, offset + limit);
+      selected.forEach((note) => {
+        note.body.load('text');
+        note.reference.load('text');
+      });
+      const paragraphs = context.document.body.paragraphs;
+      paragraphs.load('items/text');
+      await context.sync();
+      const notes = selected.map((note, index) => noteMetadata(
+        note,
+        offset + index,
+        kind,
+        referenceParagraphIndex(paragraphs.items, note.reference?.text)
+      ));
+      return { notes, count, truncated: offset + limit < count, untrusted_source: true };
+    });
+  }
+
+  async function updateNote(args) {
+    validateUpdateNoteArgs('word.update_note', args);
+    return Word.run(async (context) => {
+      const kind = validateNoteKind(args.kind);
+      const note = await getNoteByIndex(context, kind, args.index);
+      note.body.insertText(String(args.text), Word.InsertLocation.replace);
+      note.body.load('text');
+      await context.sync();
+      return { updated: true, note: noteMetadata(note, args.index, kind) };
+    });
+  }
+
+  async function deleteNote(args) {
+    validateDeleteNoteArgs('word.delete_note', args);
+    return Word.run(async (context) => {
+      const kind = validateNoteKind(args.kind);
+      const note = await getNoteByIndex(context, kind, args.index);
+      note.delete();
+      const collection = noteCollectionForKind(context, kind);
+      collection.load('items');
+      await context.sync();
+      return { deleted: true, kind, index: args.index, count: collection.items.length };
+    });
+  }
+
+  function noteCollectionForKind(context, kind) {
+    return kind === 'footnote' ? context.document.body.footnotes : context.document.body.endnotes;
+  }
+
+  async function getNoteByIndex(context, kind, index) {
+    const normalized = validateNoteKind(kind);
+    const collection = noteCollectionForKind(context, normalized);
+    collection.load('items');
+    await context.sync();
+    const note = collection.items[index];
+    if (!note) throw invalidArgument(`word.${normalized} note index ${index} is out of range.`);
+    return note;
+  }
+
+  function noteMetadata(note, index, kind, referenceParagraphIndexValue = null) {
+    const data = {
+      index,
+      kind,
+      text: note.body?.text || '',
+      reference_paragraph_index: referenceParagraphIndexValue,
+      untrusted_source: true
+    };
+    return data;
+  }
+
+  function noteIndexInCollection(collection, note) {
+    const index = collection.items.findIndex((item) => item === note);
+    return index >= 0 ? index : Math.max(0, collection.items.length - 1);
+  }
+
+  function referenceParagraphIndex(paragraphs, referenceText) {
+    if (!referenceText) return null;
+    const index = paragraphs.findIndex((paragraph) => (paragraph.text || '').includes(referenceText));
+    return index >= 0 ? index : null;
   }
 
   async function getHeaderFooter(args) {
@@ -2499,6 +2687,35 @@
     }
   }
 
+  function validateNoteKind(kind) {
+    const value = String(kind || '').trim().toLowerCase();
+    if (value === 'footnote' || value === 'endnote') return value;
+    throw invalidArgument('word note kind must be footnote or endnote.');
+  }
+
+  function validateInsertNoteArgs(tool, args) {
+    requireAnchor(tool, args.anchor);
+    validateNoteKind(args.kind);
+    if (typeof args.text !== 'string' || args.text.length < 1) {
+      throw invalidArgument(`${tool} requires non-empty text.`);
+    }
+  }
+
+  function validateUpdateNoteArgs(tool, args) {
+    validateNoteKind(args.kind);
+    if (!Number.isInteger(args.index) || args.index < 0) {
+      throw invalidArgument(`${tool} requires a non-negative integer index.`);
+    }
+    if (typeof args.text !== 'string') throw invalidArgument(`${tool} text must be a string.`);
+  }
+
+  function validateDeleteNoteArgs(tool, args) {
+    validateNoteKind(args.kind);
+    if (!Number.isInteger(args.index) || args.index < 0) {
+      throw invalidArgument(`${tool} requires a non-negative integer index.`);
+    }
+  }
+
   function validateReplaceTextArgs(args) {
     if (!args.find) throw invalidArgument('word.replace_text requires non-empty find text.');
     if (args.limit !== undefined && (!Number.isInteger(args.limit) || args.limit < 1)) {
@@ -3025,9 +3242,19 @@
     return AVAILABLE_TOOLS.filter((tool) => isToolSupported(tool) && isToolEnabled(tool) && isToolAllowedByMode(tool));
   }
 
+  function availableToolsForRequirements(requirements = probeRequirementSets()) {
+    const supportsNotes = Boolean(requirements.WordApi_1_5);
+    return AVAILABLE_TOOLS.filter((tool) => {
+      if (tool === 'word.update_page_setup') return Boolean(requirements.WordApiDesktop_1_3);
+      if (['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'].includes(tool)) {
+        return supportsNotes;
+      }
+      return true;
+    });
+  }
+
   function isToolSupported(tool) {
-    if (tool === 'word.update_page_setup') return supportsWordApiDesktop13();
-    return true;
+    return availableToolsForRequirements().includes(tool);
   }
 
   function isToolAllowedByMode(tool) {

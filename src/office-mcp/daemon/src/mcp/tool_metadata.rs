@@ -216,6 +216,25 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Destructive,
     ),
     tool(
+        "word.insert_note",
+        "word",
+        "Notes",
+        ToolSideEffect::Mutating,
+    ),
+    tool("word.list_notes", "word", "Notes", ToolSideEffect::Read),
+    tool(
+        "word.update_note",
+        "word",
+        "Notes",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.delete_note",
+        "word",
+        "Notes",
+        ToolSideEffect::Destructive,
+    ),
+    tool(
         "word.apply_formatting",
         "word",
         "Range & selection",

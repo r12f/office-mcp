@@ -319,8 +319,8 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 82);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 82);
+    assert_eq!(all_tools.len(), 86);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 86);
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));
@@ -481,7 +481,10 @@ fn word_note_schemas_are_specific() {
     assert_eq!(insert_note["properties"]["kind"]["enum"][0], "footnote");
     assert_eq!(insert_note["properties"]["kind"]["enum"][1], "endnote");
     assert_eq!(insert_note["properties"]["text"]["minLength"], 1);
-    assert_eq!(insert_note["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        insert_note["properties"]["validate_only"]["type"],
+        "boolean"
+    );
     assert_eq!(
         insert_note["properties"]["anchor"]["oneOf"]
             .as_array()
@@ -499,12 +502,18 @@ fn word_note_schemas_are_specific() {
     let update_note = schema_for("word.update_note");
     assert_required(&update_note, &["session_id", "kind", "index", "text"]);
     assert_eq!(update_note["properties"]["index"]["minimum"], 0);
-    assert_eq!(update_note["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        update_note["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 
     let delete_note = schema_for("word.delete_note");
     assert_required(&delete_note, &["session_id", "kind", "index"]);
     assert_eq!(delete_note["properties"]["index"]["minimum"], 0);
-    assert_eq!(delete_note["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        delete_note["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 }
 
 #[test]
