@@ -367,8 +367,7 @@ fn representative_word_schemas_are_specific() {
         "center"
     );
     assert_eq!(
-        apply_formatting["properties"]["paragraph"]["properties"]["line_spacing_pt"]
-            ["exclusiveMinimum"],
+        apply_formatting["properties"]["paragraph"]["properties"]["line_spacing_pt"]["exclusiveMinimum"],
         0
     );
     assert!(

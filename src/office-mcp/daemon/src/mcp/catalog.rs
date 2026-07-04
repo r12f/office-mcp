@@ -915,7 +915,7 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     tool_spec!(
         "word.get_paragraph",
         ["session_id", "index"],
-        ["session_id", "index"]
+        ["session_id", "index", "include_formatting"]
     ),
     tool_spec!(
         "word.find_text",
@@ -1146,8 +1146,14 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     ),
     tool_spec!(
         "word.apply_formatting",
-        ["session_id", "anchor", "formatting"],
-        ["session_id", "anchor", "formatting", "match_case"]
+        ["session_id", "anchor"],
+        [
+            "session_id",
+            "anchor",
+            "formatting",
+            "paragraph",
+            "match_case"
+        ]
     ),
     tool_spec!(
         "word.apply_style",
@@ -1722,12 +1728,19 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
     for property in properties {
         map.insert((*property).to_string(), property_schema(tool, property));
     }
-    json!({
+    let mut schema = json!({
         "type": "object",
         "required": required,
         "properties": map,
         "additionalProperties": false
-    })
+    });
+    if tool == "word.apply_formatting" {
+        schema["anyOf"] = json!([
+            { "required": ["formatting"] },
+            { "required": ["paragraph"] }
+        ]);
+    }
+    schema
 }
 
 fn property_schema(tool: &str, name: &str) -> Value {
@@ -1822,6 +1835,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
             json!({ "enum": ["set_text", "append_paragraph", "clear"] })
         }
         "formatting" => formatting_schema(),
+        "paragraph" if tool == "word.apply_formatting" => paragraph_formatting_schema(),
         "title_box" | "content_box" => shape_box_schema(),
         "tools" | "values" | "data" | "formulas" | "number_formats" | "items" | "fields"
         | "borders" | "criteria" | "selected_items" | "shape_ids" | "row_indices"
@@ -1996,6 +2010,25 @@ fn formatting_schema() -> Value {
             "font_color": { "type": "string" },
             "highlight_color": { "type": "string" },
             "font_size": { "type": "number" }
+        },
+        "additionalProperties": false
+    })
+}
+
+fn paragraph_formatting_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "alignment": { "enum": ["left", "center", "right", "justified"] },
+            "left_indent_pt": { "type": "number", "minimum": 0 },
+            "right_indent_pt": { "type": "number", "minimum": 0 },
+            "first_line_indent_pt": { "type": "number" },
+            "line_spacing_pt": { "type": "number", "exclusiveMinimum": 0 },
+            "line_unit_before": { "type": "number", "minimum": 0 },
+            "line_unit_after": { "type": "number", "minimum": 0 },
+            "space_before_pt": { "type": "number", "minimum": 0 },
+            "space_after_pt": { "type": "number", "minimum": 0 },
+            "outline_level": { "type": "integer", "minimum": 0, "maximum": 9 }
         },
         "additionalProperties": false
     })
