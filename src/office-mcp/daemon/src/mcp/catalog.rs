@@ -17,14 +17,17 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.insert_bookmark",
     "word.insert_content_control",
     "word.insert_break",
+    "word.insert_hyperlink",
     "word.insert_image",
     "word.insert_list",
     "word.insert_paragraph",
     "word.insert_table",
     "word.list_bookmarks",
     "word.list_content_controls",
+    "word.list_hyperlinks",
     "word.list_sections",
     "word.read_table",
+    "word.remove_hyperlink",
     "word.replace_text",
     "word.resolve_anchor",
     "word.resolve_comment",
@@ -640,6 +643,9 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
                 "anchor": { "kind": "before_text", "text": "Remove this paragraph", "occurrence": 1 }
             }
         })],
+        "word.insert_hyperlink" | "word.list_hyperlinks" | "word.remove_hyperlink" => {
+            word_hyperlink_examples(tool)
+        }
         "word.insert_content_control" => vec![json!({
             "description": "Wrap inserted review text in a tagged content control.",
             "arguments": {
@@ -706,6 +712,37 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
     }
 }
 
+fn word_hyperlink_examples(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.insert_hyperlink" => vec![json!({
+            "description": "Insert linked text after a paragraph marker.",
+            "arguments": {
+                "session_id": "session-1",
+                "anchor": { "kind": "after_text", "text": "See also:" },
+                "text": "Project plan",
+                "url": "https://example.com/project-plan"
+            }
+        })],
+        "word.list_hyperlinks" => vec![json!({
+            "description": "List the first page of document hyperlinks.",
+            "arguments": {
+                "session_id": "session-1",
+                "offset": 0,
+                "limit": 50
+            }
+        })],
+        "word.remove_hyperlink" => vec![json!({
+            "description": "Remove a hyperlink while keeping the linked text.",
+            "arguments": {
+                "session_id": "session-1",
+                "anchor": { "kind": "after_text", "text": "Project plan" },
+                "keep_text": true
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
 fn bookmark_examples_for_tool(tool: &str) -> Vec<Value> {
     match tool {
         "word.insert_bookmark" => vec![json!({
@@ -754,6 +791,10 @@ fn common_errors_for_tool(tool: &str) -> Vec<Value> {
         "word.delete_range" => errors.push(json!({
             "code": "INVALID_ARGUMENTS",
             "cause": "The anchor must resolve to a deletable range, not the whole document body."
+        })),
+        "word.insert_hyperlink" | "word.remove_hyperlink" => errors.push(json!({
+            "code": "INVALID_ARGUMENTS",
+            "cause": "The anchor must resolve to a range, and hyperlink URLs must use http, https, mailto, or an in-document bookmark target."
         })),
         "word.insert_bookmark" | "word.delete_bookmark" => {
             errors.push(json!({
@@ -944,6 +985,29 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "style",
             "match_case"
         ]
+    ),
+    tool_spec!(
+        "word.insert_hyperlink",
+        ["session_id", "anchor", "url"],
+        [
+            "session_id",
+            "anchor",
+            "url",
+            "text",
+            "extent",
+            "match_case",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
+        "word.list_hyperlinks",
+        ["session_id"],
+        ["session_id", "offset", "limit"]
+    ),
+    tool_spec!(
+        "word.remove_hyperlink",
+        ["session_id", "anchor"],
+        ["session_id", "anchor", "keep_text", "match_case"]
     ),
     tool_spec!(
         "word.update_header_footer",
@@ -1595,6 +1659,12 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
 fn property_schema(tool: &str, name: &str) -> Value {
     match name {
         "session_id" => json!({ "type": "string", "description": "Office document session ID." }),
+        "limit" if tool == "word.list_hyperlinks" => {
+            json!({ "type": "integer", "minimum": 1, "maximum": 200 })
+        }
+        "keep_text" if tool == "word.remove_hyperlink" => {
+            json!({ "type": "boolean", "default": true })
+        }
         "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
         | "table_index" | "change_index" | "content_control_id" | "position" | "slice_size"
         | "section_index" | "slide_index" | "target_index" | "row_index" | "column_index"
@@ -1644,6 +1714,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
         | "line_visible"
         | "lock_aspect_ratio"
         | "delete_contents"
+        | "keep_text"
         | "overwrite"
         | "validate_only" => json!({ "type": "boolean" }),
         "anchor" => anchor_schema_for_tool(tool),

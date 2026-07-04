@@ -381,6 +381,10 @@ test('Word mutating tools run preflight validation before Office mutation dispat
   assert.match(preflightBody, /validateInsertListArgs\(args\)/);
   assert.match(preflightBody, /case 'word\.update_header_footer':/);
   assert.match(preflightBody, /validateHeaderFooterArgs\(tool, args, true\)/);
+  assert.match(preflightBody, /case 'word\.insert_hyperlink':/);
+  assert.match(preflightBody, /validateHyperlinkArgs\(tool, args\)/);
+  assert.match(preflightBody, /case 'word\.remove_hyperlink':/);
+  assert.match(preflightBody, /validateRemoveHyperlinkArgs\(args\)/);
   assert.match(preflightBody, /case 'word\.replace_text':/);
   assert.match(preflightBody, /validateReplaceTextArgs\(args\)/);
   assert.match(preflightBody, /case 'word\.delete_range':/);
@@ -405,6 +409,10 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'validateHeaderFooterArgs'), /set_text[\s\S]*requires text/);
   assert.match(functionBody(js, 'normalizedHeaderFooterLocation'), /header\/footer location must be header or footer/);
   assert.match(functionBody(js, 'normalizedHeaderFooterAction'), /set_text, append_paragraph, or clear/);
+  assert.match(functionBody(js, 'validateHyperlinkArgs'), /word\.insert_hyperlink requires a non-empty url/);
+  assert.match(functionBody(js, 'validateHyperlinkUrl'), /https[\s\S]*http[\s\S]*mailto/);
+  assert.match(functionBody(js, 'validateHyperlinkUrl'), /file: and javascript: URLs are not allowed/);
+  assert.match(functionBody(js, 'validateRemoveHyperlinkArgs'), /keep_text must be a boolean/);
   assert.match(functionBody(js, 'validateReplaceTextArgs'), /word\.replace_text requires non-empty find text/);
   assert.match(functionBody(js, 'validateReplaceTextArgs'), /scope\.paragraph_range must be \[start, end\]/);
   assert.match(functionBody(js, 'validateExtentToolArgs'), /extent must be paragraph, sentence, or selection/);
@@ -419,14 +427,34 @@ test('Word validation-only mode validates required mutating tools without writes
   const validateOnlyBody = functionBody(js, 'validateWordMutationOnly');
 
   assert.match(invokeBody, /if \(args\?\.validate_only\) data = await validateWordMutationOnly\(tool, args \|\| \{\}\)/);
-  for (const tool of ['word.insert_image', 'word.replace_text', 'word.update_paragraph', 'word.delete_range']) {
+  for (const tool of ['word.insert_image', 'word.insert_hyperlink', 'word.replace_text', 'word.update_paragraph', 'word.delete_range']) {
     assert.match(validateOnlyBody, new RegExp(`case '${tool.replace('.', '\\.')}'`));
   }
   assert.match(validateOnlyBody, /partial_effect: 'none'/);
   assert.match(validateOnlyBody, /valid: true/);
   assert.doesNotMatch(validateOnlyBody, /insertText\(/);
   assert.doesNotMatch(validateOnlyBody, /delete\(/);
+  assert.doesNotMatch(validateOnlyBody, /\.hyperlink\s*=/);
   assert.doesNotMatch(validateOnlyBody, /insertInlinePictureFromBase64\(/);
+});
+
+test('Word hyperlink tools are advertised, grouped, and dispatched through range owners', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+
+  assert.match(js, /'word\.insert_hyperlink'/);
+  assert.match(js, /'word\.list_hyperlinks'/);
+  assert.match(js, /'word\.remove_hyperlink'/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \[[\s\S]*'word\.insert_hyperlink'[\s\S]*'word\.list_hyperlinks'[\s\S]*'word\.remove_hyperlink'[\s\S]*\] \}/);
+  assert.match(js, /\['word\.insert_hyperlink', \{ category: 'Range & selection', sideEffect: 'mutating', description: 'Insert or apply a hyperlink at an anchored range\.' \}\]/);
+  assert.match(js, /\['word\.list_hyperlinks', \{ category: 'Range & selection', sideEffect: 'read', description: 'List document hyperlinks with paragraph-relative locations\.' \}\]/);
+  assert.match(js, /\['word\.remove_hyperlink', \{ category: 'Range & selection', sideEffect: 'mutating', description: 'Remove a hyperlink while preserving text by default\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.insert_hyperlink':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await insertHyperlink\(args\);/);
+  assert.match(invokeBody, /case 'word\.list_hyperlinks':\s*data = await listHyperlinks\(args \|\| \{\}\);/);
+  assert.match(invokeBody, /case 'word\.remove_hyperlink':\s*data = await removeHyperlink\(args\);/);
+  assert.match(functionBody(js, 'insertHyperlink'), /range\.hyperlink = url/);
+  assert.match(js, /async function listHyperlinks[\s\S]*getHyperlinkRanges\(\)/);
+  assert.match(functionBody(js, 'removeHyperlink'), /range\.hyperlink = ''/);
 });
 
 test('word.resolve_anchor returns safe anchor diagnostics without mutating', () => {
@@ -560,7 +588,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.list_sections'/);
   assert.match(js, /'word\.update_page_setup'/);
   assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.save'\] \}/);
-  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image'\] \}/);

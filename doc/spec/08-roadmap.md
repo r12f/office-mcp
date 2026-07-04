@@ -96,7 +96,7 @@ review the result like a normal collaborator's edits.
 Research basis: Microsoft Word add-in docs identify the core object model as
 `Document` -> sections/body -> `Range`, with paragraphs, lists, tables, content
 controls, comments, and tracked changes as the high-value user-facing objects.
-The refined catalog should be about 25 tools and must apply Occam's razor: do
+The refined catalog should stay compact and must apply Occam's razor: do
 not keep a separate tool when it only repeats another tool's object owner and
 user intent.
 
@@ -106,7 +106,8 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_paragraph`,
 `word.insert_table`, `word.insert_image`, `word.resize_image`,
 `word.insert_break`, `word.list_sections`, `word.update_page_setup`,
-`word.insert_list`, `word.replace_text`,
+`word.insert_list`, `word.insert_hyperlink`, `word.list_hyperlinks`,
+`word.remove_hyperlink`, `word.replace_text`,
 `word.update_paragraph`, `word.delete_range`, `word.apply_formatting`,
 `word.apply_style`, `word.read_table`, `word.update_table`,
 `word.list_content_controls`, `word.insert_content_control`,
@@ -1693,6 +1694,12 @@ channel, and MCP `tools/call` dispatch.
       evidence: `node --test src\office-ctl\common\test\tool-e2e-contract.test.mjs`
       and `npm run e2e:tools` in `src/office-ctl/word`,
       `src/office-ctl/excel`, and `src/office-ctl/powerpoint`.
+- [ ] Add Word hyperlink lifecycle E2E coverage for `word.insert_hyperlink`,
+      `word.list_hyperlinks`, and `word.remove_hyperlink`: insert a URL on
+      selection, insert linked text after an anchor, reject unsafe schemes with
+      `partial_effect: "none"`, verify list pagination returns
+      paragraph-relative locations, and remove a link while preserving text by
+      default.
 - [x] Add readback verifier helpers for common Office objects so tool cases do
       not duplicate boilerplate: Word document text/paragraph/table/content
       control/comment state, Excel workbook/sheet/range/table/chart/pivot state,

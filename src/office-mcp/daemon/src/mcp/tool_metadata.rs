@@ -156,6 +156,24 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
+        "word.insert_hyperlink",
+        "word",
+        "Range & selection",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.list_hyperlinks",
+        "word",
+        "Range & selection",
+        ToolSideEffect::Read,
+    ),
+    tool(
+        "word.remove_hyperlink",
+        "word",
+        "Range & selection",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
         "word.update_header_footer",
         "word",
         "Document & structure",

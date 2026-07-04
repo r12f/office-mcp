@@ -58,7 +58,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | Category | Tools |
 |---|---|
 | **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.save` |
-| **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
+| **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
 | **Media** | `word.insert_image`, `word.resize_image` |
@@ -73,7 +73,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 34 tools. It deliberately consolidates specialized tools
+The target surface has 37 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -91,6 +91,9 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.list_bookmarks` | implemented | Range & selection | read | `WordApi 1.4` | List bookmark names and bounded location previews without returning full document text. |
 | `word.delete_bookmark` | implemented | Range & selection | destructive | `WordApi 1.4` | Delete a bookmark marker without deleting the bookmarked text. |
 | `word.get_selection` | implemented | Range & selection | read | `WordApi 1.3` | Read current selection text and simple selection metadata. |
+| `word.insert_hyperlink` | implemented | Range & selection | edit | `WordApi 1.3` | Create a hyperlink on an anchored range or inserted text with URL scheme validation. |
+| `word.list_hyperlinks` | implemented | Range & selection | read | `WordApi 1.3` | List hyperlink text and URLs with paragraph-relative locations. |
+| `word.remove_hyperlink` | implemented | Range & selection | edit | `WordApi 1.3` | Remove hyperlink targets from an anchored range while preserving text by default. |
 | `word.insert_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a paragraph at an anchor; also owns heading insertion through style or heading-level arguments after migration. |
 | `word.insert_table` | implemented | Tables | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
 | `word.insert_image` | implemented | Media | edit | `WordApi 1.3` | Insert a validated image from base64 or a daemon-fetched HTTPS URL. |
@@ -138,6 +141,10 @@ Tool ownership rules:
   a separate heading insertion tool after migration.
 - `word.apply_style` owns semantic Office style changes, including heading level.
   `word.apply_formatting` owns direct character/run formatting only.
+- `word.insert_hyperlink`, `word.list_hyperlinks`, and
+  `word.remove_hyperlink` own hyperlink lifecycle. Generic run styling remains
+  owned by `word.apply_formatting`, and bookmark creation/deletion remains out
+  of scope for these tools.
 - `word.read_table` owns table content reads. `word.update_table` owns table
   structure, cell value, table/cell formatting, and deletion mutations.
 - `word.insert_image` owns new image insertion. `word.resize_image` owns in-place
@@ -781,7 +788,76 @@ the same bounded `matches`, `skipped_count`, and `replaced_count: 0` shape plus
 `valid: true`. If both flags are provided, either truthy value selects the
 no-mutation path.
 
-### 4.2 `word.update_paragraph`
+### 4.2 `word.insert_hyperlink`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor", "url"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "url": { "type": "string" },
+    "text": { "type": "string" },
+    "extent": { "$ref": "#/$defs/extent" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+If `text` is provided, the add-in inserts that text at the resolved anchor and
+hyperlinks the inserted range. Otherwise it applies the hyperlink to the
+resolved anchor range. URL schemes are restricted to `https`, `http`, `mailto`,
+and in-document bookmark targets beginning with `#`. `file:`, `javascript:`,
+and other schemes fail with `INVALID_ARGUMENT` and `partial_effect: "none"`
+before any write is queued.
+
+With `validate_only: true`, the add-in resolves the anchor and URL policy and
+returns `valid: true`, `operation: "word.insert_hyperlink"`,
+`partial_effect: "none"`, and a `resolved_target` summary without setting
+`Range.hyperlink` or inserting text.
+
+### 4.3 `word.list_hyperlinks`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "offset": { "type": "integer", "minimum": 0, "default": 0 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns `{ hyperlinks: [{ paragraph_index, occurrence_in_paragraph, text, url }],
+count, truncated }`. The implementation enumerates paragraphs and uses
+`Range.getHyperlinkRanges()` so locations stay paragraph-relative rather than
+promising stable character offsets.
+
+### 4.4 `word.remove_hyperlink`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "keep_text": { "type": "boolean", "default": true }
+  },
+  "additionalProperties": false
+}
+```
+
+With `keep_text: true`, the add-in clears `Range.hyperlink` and preserves the
+range text. With `keep_text: false`, it deletes the resolved range using the
+same preflight and partial-effect rules as other range deletion paths.
+
+### 4.5 `word.update_paragraph`
 
 Replace one paragraph's text wholesale.
 
@@ -806,7 +882,7 @@ safe metadata such as the current paragraph text length and style when
 available, and returns `valid: true`, `operation: "word.update_paragraph"`, and
 `resolved_target.paragraph_index` without calling `insertText`.
 
-### 4.3 `word.delete_range`
+### 4.6 `word.delete_range`
 
 ```json
 {
@@ -847,7 +923,7 @@ before any write is queued. Name matching is case-insensitive. The success
 response includes `{ deleted: true, name, count }`, where `count` is the number
 of remaining visible bookmarks after deletion.
 
-### 4.5 `word.apply_formatting`
+### 4.7 `word.apply_formatting`
 
 ```json
 {

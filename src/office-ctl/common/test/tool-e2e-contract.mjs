@@ -173,6 +173,9 @@ export const wordReadback = Object.freeze({
   contentControls(tag, expect, args = {}) {
     return readbackByTool('word.list_content_controls', { arguments: { tag, ...args }, expect });
   },
+  hyperlinks(expect, args = {}) {
+    return readbackByTool('word.list_hyperlinks', { arguments: args, expect });
+  },
   bookmarks(expect, args = {}) {
     return readbackByTool('word.list_bookmarks', { arguments: args, expect });
   },
