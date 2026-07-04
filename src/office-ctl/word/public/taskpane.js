@@ -150,7 +150,7 @@
     ['word.get_text', { category: 'Document & structure', sideEffect: 'read', description: 'Read document text by paragraph range.' }],
     ['word.get_outline', { category: 'Document & structure', sideEffect: 'read', description: 'Read heading outline and structure.' }],
     ['word.get_header_footer', { category: 'Document & structure', sideEffect: 'read', description: 'Read section header or footer text.' }],
-    ['word.get_paragraph', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'Read a single paragraph by index.' }],
+    ['word.get_paragraph', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'Read a single paragraph by index with optional formatting metadata.' }],
     ['word.find_text', { category: 'Range & selection', sideEffect: 'read', description: 'Find text matches in the document body.' }],
     ['word.resolve_anchor', { category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata.' }],
     ['word.insert_bookmark', { category: 'Range & selection', sideEffect: 'mutating', description: 'Create a named bookmark around an anchored range.' }],
@@ -173,7 +173,7 @@
     ['word.replace_text', { category: 'Range & selection', sideEffect: 'mutating', description: 'Replace matching document text.' }],
     ['word.update_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Update paragraph text and style.' }],
     ['word.delete_range', { category: 'Range & selection', sideEffect: 'mutating', description: 'Delete text resolved from an anchor.' }],
-    ['word.apply_formatting', { category: 'Range & selection', sideEffect: 'mutating', description: 'Apply formatting to an anchored range.' }],
+    ['word.apply_formatting', { category: 'Range & selection', sideEffect: 'mutating', description: 'Apply direct run or paragraph formatting to an anchored range.' }],
     ['word.read_table', { category: 'Tables', sideEffect: 'read', description: 'Read table dimensions and cell values.' }],
     ['word.update_table', { category: 'Tables', sideEffect: 'destructive', description: 'Update table cells, rows, columns, formatting, or lifecycle.' }],
     ['word.list_content_controls', { category: 'Content controls', sideEffect: 'read', description: 'List content-control metadata.' }],
@@ -709,7 +709,7 @@
         break;
       case 'word.apply_formatting':
         validateExtentToolArgs(tool, args);
-        validateFormattingArg(tool, args.formatting, true);
+        validateFormattingBlocks(tool, args.formatting, args.paragraph);
         break;
       case 'word.update_table':
         validateUpdateTableArgs(args);
@@ -995,11 +995,13 @@
   async function getParagraph(args) {
     return Word.run(async (context) => {
       const paragraphs = context.document.body.paragraphs;
-      paragraphs.load('items/text,items/style');
+      paragraphs.load('items/text,items/style,items/alignment,items/leftIndent,items/rightIndent,items/firstLineIndent,items/lineSpacing,items/lineUnitBefore,items/lineUnitAfter,items/spaceBefore,items/spaceAfter,items/outlineLevel');
       await context.sync();
       const paragraph = paragraphs.items[args.index];
       if (!paragraph) throw Object.assign(new Error(`Paragraph index ${args.index} is out of range.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE' });
-      return { index: args.index, text: paragraph.text, style: paragraph.style || null, untrusted_source: true };
+      const data = { index: args.index, text: paragraph.text, style: paragraph.style || null, untrusted_source: true };
+      if (args.include_formatting) data.formatting = paragraphFormattingMetadata(paragraph);
+      return data;
     });
   }
 
@@ -1719,7 +1721,8 @@
     return Word.run(async (context) => {
       const target = args.extent === 'selection' ? context.document.getSelection() : await resolveAnchor(context, args.anchor);
       const range = args.extent === 'sentence' ? await rangeSentenceOrSelf(context, target) : target;
-      applyRunFormatting(range.font, args.formatting);
+      if (args.formatting) applyRunFormatting(range.font, args.formatting);
+      if (args.paragraph) await applyParagraphFormatting(context, range, args.paragraph);
       await context.sync();
       return { formatted: true };
     });
@@ -2625,6 +2628,45 @@
     validateOptionalPositiveNumber(tool, 'formatting.font_size_pt', formatting.font_size_pt);
   }
 
+  function validateFormattingBlocks(tool, formatting, paragraph) {
+    validateFormattingArg(tool, formatting);
+    validateParagraphFormattingArg(tool, paragraph);
+    if (!hasFormattingFields(formatting) && !hasParagraphFormattingFields(paragraph)) {
+      throw invalidArgument(`${tool} requires formatting or paragraph fields.`);
+    }
+  }
+
+  function hasFormattingFields(formatting) {
+    return Boolean(formatting && typeof formatting === 'object' && !Array.isArray(formatting) && Object.keys(formatting).length > 0);
+  }
+
+  function hasParagraphFormattingFields(paragraph) {
+    return Boolean(paragraph && typeof paragraph === 'object' && !Array.isArray(paragraph) && Object.keys(paragraph).length > 0);
+  }
+
+  function validateParagraphFormattingArg(tool, paragraph) {
+    if (paragraph === undefined) return;
+    if (!paragraph || typeof paragraph !== 'object' || Array.isArray(paragraph)) {
+      throw invalidArgument(`${tool} paragraph must be an object.`);
+    }
+    if (paragraph.alignment !== undefined && !['left', 'center', 'right', 'justified'].includes(paragraph.alignment)) {
+      throw invalidArgument(`${tool} paragraph.alignment must be left, center, right, or justified.`);
+    }
+    validateOptionalNonNegativeNumber(tool, 'paragraph.left_indent_pt', paragraph.left_indent_pt, false);
+    validateOptionalNonNegativeNumber(tool, 'paragraph.right_indent_pt', paragraph.right_indent_pt, false);
+    if (paragraph.first_line_indent_pt !== undefined && (typeof paragraph.first_line_indent_pt !== 'number' || !Number.isFinite(paragraph.first_line_indent_pt))) {
+      throw invalidArgument(`${tool} paragraph.first_line_indent_pt must be a finite number.`);
+    }
+    validateOptionalNonNegativeNumber(tool, 'paragraph.line_spacing_pt', paragraph.line_spacing_pt, true);
+    validateOptionalNonNegativeNumber(tool, 'paragraph.line_unit_before', paragraph.line_unit_before, false);
+    validateOptionalNonNegativeNumber(tool, 'paragraph.line_unit_after', paragraph.line_unit_after, false);
+    validateOptionalNonNegativeNumber(tool, 'paragraph.space_before_pt', paragraph.space_before_pt, false);
+    validateOptionalNonNegativeNumber(tool, 'paragraph.space_after_pt', paragraph.space_after_pt, false);
+    if (paragraph.outline_level !== undefined && (!Number.isInteger(paragraph.outline_level) || paragraph.outline_level < 0 || paragraph.outline_level > 9)) {
+      throw invalidArgument(`${tool} paragraph.outline_level must be an integer from 0 to 9.`);
+    }
+  }
+
   function validateInsertImagePreflight(args) {
     const base64 = args.image?.base64;
     if (!base64) throw invalidArgument('word.insert_image requires image.base64 after daemon preprocessing.');
@@ -2882,6 +2924,61 @@
     if (typeof formatting.font_size_pt === 'number') font.size = formatting.font_size_pt;
     if (formatting.color) font.color = formatting.color;
     if (formatting.highlight) font.highlightColor = formatting.highlight;
+  }
+
+  async function applyParagraphFormatting(context, range, paragraph) {
+    const paragraphs = range.paragraphs;
+    paragraphs.load('items');
+    await context.sync();
+    const items = paragraphs.items.length > 0 ? paragraphs.items : [range.paragraphs.getFirst()];
+    for (const item of items) applyParagraphFormattingToParagraph(item, paragraph);
+  }
+
+  function applyParagraphFormattingToParagraph(paragraph, formatting) {
+    if (formatting.alignment !== undefined) {
+      if (formatting.alignment === 'center') paragraph.alignment = Word.Alignment.centered;
+      else if (formatting.alignment === 'right') paragraph.alignment = Word.Alignment.right;
+      else if (formatting.alignment === 'justified') paragraph.alignment = Word.Alignment.justified;
+      else paragraph.alignment = Word.Alignment.left;
+    }
+    if (formatting.left_indent_pt !== undefined) paragraph.leftIndent = formatting.left_indent_pt;
+    if (formatting.right_indent_pt !== undefined) paragraph.rightIndent = formatting.right_indent_pt;
+    if (formatting.first_line_indent_pt !== undefined) paragraph.firstLineIndent = formatting.first_line_indent_pt;
+    if (formatting.line_spacing_pt !== undefined) paragraph.lineSpacing = formatting.line_spacing_pt;
+    if (formatting.line_unit_before !== undefined) paragraph.lineUnitBefore = formatting.line_unit_before;
+    if (formatting.line_unit_after !== undefined) paragraph.lineUnitAfter = formatting.line_unit_after;
+    if (formatting.space_before_pt !== undefined) paragraph.spaceBefore = formatting.space_before_pt;
+    if (formatting.space_after_pt !== undefined) paragraph.spaceAfter = formatting.space_after_pt;
+    if (formatting.outline_level !== undefined) paragraph.outlineLevel = formatting.outline_level;
+  }
+
+  function paragraphFormattingMetadata(paragraph) {
+    return {
+      alignment: normalizedParagraphAlignment(paragraph.alignment),
+      left_indent_pt: paragraph.leftIndent,
+      right_indent_pt: paragraph.rightIndent,
+      first_line_indent_pt: paragraph.firstLineIndent,
+      line_spacing_pt: paragraph.lineSpacing,
+      line_unit_before: paragraph.lineUnitBefore,
+      line_unit_after: paragraph.lineUnitAfter,
+      space_before_pt: paragraph.spaceBefore,
+      space_after_pt: paragraph.spaceAfter,
+      outline_level: normalizedOutlineLevel(paragraph.outlineLevel),
+      style: paragraph.style || null
+    };
+  }
+
+  function normalizedParagraphAlignment(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized.includes('center')) return 'center';
+    if (normalized.includes('right')) return 'right';
+    if (normalized.includes('just')) return 'justified';
+    return 'left';
+  }
+
+  function normalizedOutlineLevel(value) {
+    const number = Number(value);
+    return Number.isInteger(number) && number >= 0 && number <= 9 ? number : null;
   }
 
   function paragraphStyleFromArgs(args) {

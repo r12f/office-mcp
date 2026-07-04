@@ -342,13 +342,15 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.apply_formatting', {
     setup: {
       actions: [
-        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Format this E2E paragraph' } }
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'start_of_document' }, text: 'Format this E2E paragraph' } }
       ]
     },
-    args: { anchor: { kind: 'after_text', text: 'Format this E2E paragraph' }, formatting: { bold: true, color: '#1F4E79' } },
+    args: { anchor: { kind: 'after_text', text: 'Format this E2E paragraph' }, paragraph: { alignment: 'center', left_indent_pt: 18, space_after_pt: 6 } },
     verify: {
-      kind: 'direct-result',
-      expect: { pathEquals: [{ path: 'formatted', value: true }] }
+      kind: 'readback',
+      readbackTool: 'word.get_paragraph',
+      readbackArguments: { index: 0, include_formatting: true },
+      expect: { contains: ['Format this E2E paragraph'], pathEquals: [{ path: 'formatting.alignment', value: 'center' }, { path: 'formatting.left_indent_pt', value: 18 }, { path: 'formatting.space_after_pt', value: 6 }] }
     }
   }],
   ['word.read_table', {

@@ -521,6 +521,30 @@ test('word.resolve_anchor returns safe anchor diagnostics without mutating', () 
   assert.doesNotMatch(functionBody(js, 'describeResolvedAnchor'), /document\.body\.text|body\.load\('text'/);
 });
 
+test('word.apply_formatting supports paragraph layout formatting and readback metadata', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const preflightBody = functionBody(js, 'preflightWordMutatingTool');
+  const applyBody = functionBody(js, 'applyFormatting');
+  const getParagraphBody = functionBody(js, 'getParagraph');
+
+  assert.match(js, /function validateParagraphFormattingArg\(tool, paragraph/);
+  assert.match(js, /function hasFormattingFields\(formatting\)/);
+  assert.match(js, /function hasParagraphFormattingFields\(paragraph\)/);
+  assert.match(preflightBody, /case 'word\.apply_formatting':[\s\S]*validateFormattingBlocks\(tool, args\.formatting, args\.paragraph\)/);
+  assert.match(applyBody, /if \(args\.formatting\) applyRunFormatting\(range\.font, args\.formatting\);/);
+  assert.match(applyBody, /if \(args\.paragraph\) await applyParagraphFormatting\(context, range, args\.paragraph\);/);
+  assert.match(js, /async function applyParagraphFormatting\(context, range, paragraph\)/);
+  assert.match(functionBody(js, 'applyParagraphFormatting'), /paragraphs\.load\('items'\)/);
+  assert.match(functionBody(js, 'applyParagraphFormatting'), /applyParagraphFormattingToParagraph\(item, paragraph\)/);
+  assert.match(js, /function applyParagraphFormattingToParagraph\(paragraph, formatting\)/);
+  assert.match(functionBody(js, 'applyParagraphFormattingToParagraph'), /paragraph\.alignment = Word\.Alignment\.centered/);
+  assert.match(functionBody(js, 'applyParagraphFormattingToParagraph'), /paragraph\.firstLineIndent = formatting\.first_line_indent_pt/);
+  assert.match(getParagraphBody, /args\.include_formatting/);
+  assert.match(js, /function paragraphFormattingMetadata\(paragraph\)/);
+  assert.match(functionBody(js, 'paragraphFormattingMetadata'), /alignment: normalizedParagraphAlignment\(paragraph\.alignment\)/);
+  assert.match(functionBody(js, 'paragraphFormattingMetadata'), /space_after_pt: paragraph\.spaceAfter/);
+});
+
 test('Word task pane preserves safe Office.js error debug context', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const mapBody = functionBody(js, 'mapError');

@@ -70,6 +70,7 @@ open document, including in an IRM-protected file where their policy allows the 
 
 - [x] `word.replace_text` (with `dry_run`)
 - [x] `word.update_paragraph`, `word.delete_range`, `word.apply_formatting`
+      for direct run and paragraph formatting
 - [ ] Shared `validate_only` mode for `word.insert_image`,
       `word.replace_text`, `word.update_paragraph`, and `word.delete_range`,
       returning no-mutation target validation results before writes are queued.
