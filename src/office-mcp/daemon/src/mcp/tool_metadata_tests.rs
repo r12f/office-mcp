@@ -59,6 +59,18 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(page_setup.category, "Document & structure");
     assert_eq!(page_setup.side_effect, ToolSideEffect::Mutating);
 
+    let set_change_tracking =
+        tool_metadata("word.set_change_tracking").expect("change tracking metadata");
+    assert_eq!(set_change_tracking.app, "word");
+    assert_eq!(set_change_tracking.category, "Review");
+    assert_eq!(set_change_tracking.side_effect, ToolSideEffect::Mutating);
+
+    let tracked_change =
+        tool_metadata("word.update_tracked_change").expect("tracked change metadata");
+    assert_eq!(tracked_change.app, "word");
+    assert_eq!(tracked_change.category, "Review");
+    assert_eq!(tracked_change.side_effect, ToolSideEffect::Destructive);
+
     let mutating = tool_metadata("excel.write_range").expect("excel metadata");
     assert_eq!(mutating.app, "excel");
     assert_eq!(mutating.category, "Range");

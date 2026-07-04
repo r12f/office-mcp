@@ -35,6 +35,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.resolve_comment",
     "word.resize_image",
     "word.save",
+    "word.set_change_tracking",
     "word.update_header_footer",
     "word.update_content_control",
     "word.update_note",
@@ -1225,18 +1226,19 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "comment_id"]
     ),
     tool_spec!(
+        "word.set_change_tracking",
+        ["session_id", "mode"],
+        ["session_id", "mode"]
+    ),
+    tool_spec!(
         "word.update_tracked_change",
+        ["session_id", "action"],
         [
             "session_id",
             "action",
             "change_index",
-            "expected_fingerprint"
-        ],
-        [
-            "session_id",
-            "action",
-            "change_index",
-            "expected_fingerprint"
+            "expected_fingerprint",
+            "expected_count"
         ]
     ),
     tool_spec!("excel.get_workbook_info", ["session_id"], ["session_id"]),
@@ -1740,6 +1742,18 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             { "required": ["paragraph"] }
         ]);
     }
+    if tool == "word.update_tracked_change" {
+        schema["allOf"] = json!([
+            {
+                "if": { "properties": { "action": { "enum": ["accept", "reject"] } } },
+                "then": { "required": ["change_index", "expected_fingerprint"] }
+            },
+            {
+                "if": { "properties": { "action": { "enum": ["accept_all", "reject_all"] } } },
+                "then": { "required": ["expected_count"] }
+            }
+        ]);
+    }
     schema
 }
 
@@ -1758,7 +1772,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
         | "table_index" | "change_index" | "content_control_id" | "position" | "slice_size"
         | "section_index" | "slide_index" | "target_index" | "row_index" | "column_index"
-        | "row_count" | "column_count" | "count" | "max_depth" => {
+        | "row_count" | "column_count" | "count" | "max_depth" | "expected_count" => {
             json!({ "type": "integer", "minimum": 0 })
         }
         "heading_level" | "level" | "columns" => json!({ "type": "integer", "minimum": 1 }),
@@ -1833,6 +1847,12 @@ fn property_schema(tool: &str, name: &str) -> Value {
         }),
         "action" if tool == "word.update_header_footer" => {
             json!({ "enum": ["set_text", "append_paragraph", "clear"] })
+        }
+        "action" if tool == "word.update_tracked_change" => {
+            json!({ "enum": ["accept", "reject", "accept_all", "reject_all"] })
+        }
+        "mode" if tool == "word.set_change_tracking" => {
+            json!({ "enum": ["off", "track_all", "track_mine_only"] })
         }
         "formatting" => formatting_schema(),
         "paragraph" if tool == "word.apply_formatting" => paragraph_formatting_schema(),

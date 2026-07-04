@@ -290,6 +290,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
+        "word.set_change_tracking",
+        "word",
+        "Review",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
         "word.update_tracked_change",
         "word",
         "Review",

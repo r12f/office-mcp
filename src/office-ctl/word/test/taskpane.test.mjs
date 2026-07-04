@@ -392,7 +392,7 @@ test('Word mutating tools run preflight validation before Office mutation dispat
   assert.match(preflightBody, /case 'word\.update_table':/);
   assert.match(preflightBody, /validateUpdateTableArgs\(args\)/);
   assert.match(preflightBody, /case 'word\.update_tracked_change':/);
-  assert.match(preflightBody, /validateTrackedChangeAction\(args\.action\)/);
+  assert.match(preflightBody, /validateTrackedChangeArgs\(args\)/);
   assert.match(preflightBody, /case 'word\.insert_note':/);
   assert.match(preflightBody, /validateInsertNoteArgs\(tool, args\)/);
   assert.match(preflightBody, /case 'word\.update_note':/);
@@ -429,6 +429,33 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'validateInsertNoteArgs'), /requires non-empty text/);
   assert.match(functionBody(js, 'validateUpdateNoteArgs'), /requires a non-negative integer index/);
   assert.match(functionBody(js, 'validateDeleteNoteArgs'), /requires a non-negative integer index/);
+  assert.match(functionBody(js, 'validateChangeTrackingMode'), /mode must be off, track_all, or track_mine_only/);
+  assert.match(functionBody(js, 'validateTrackedChangeArgs'), /requires expected_fingerprint/);
+  assert.match(functionBody(js, 'validateTrackedChangeArgs'), /requires expected_count/);
+});
+
+test('Word change-tracking tools are advertised, grouped, gated, and dispatched through review owners', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const preflightBody = functionBody(js, 'preflightWordMutatingTool');
+
+  assert.match(js, /'word\.set_change_tracking'/);
+  assert.match(js, /'word\.update_tracked_change'/);
+  assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.set_change_tracking', 'word\.update_tracked_change'\] \}/);
+  assert.match(js, /\['word\.set_change_tracking', \{ category: 'Review', sideEffect: 'mutating', description: 'Set Track Changes mode\.' \}\]/);
+  assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept, reject, or bulk-finalize tracked changes\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.set_change_tracking':\s*data = await setChangeTracking\(args\);/);
+  assert.match(invokeBody, /case 'word\.update_tracked_change':\s*data = await updateTrackedChange\(args\);/);
+  assert.match(preflightBody, /case 'word\.set_change_tracking':\s*validateChangeTrackingMode\(args\.mode\);/);
+  assert.match(preflightBody, /case 'word\.update_tracked_change':\s*validateTrackedChangeArgs\(args\);/);
+  assert.match(js, /async function setChangeTracking\(args\)/);
+  assert.match(js, /async function mutateAllTrackedChanges\(args, action\)/);
+  assert.match(functionBody(js, 'updateTrackedChange'), /accept_all/);
+  assert.match(functionBody(js, 'updateTrackedChange'), /reject_all/);
+  assert.match(functionBody(js, 'mutateAllTrackedChanges'), /expected_count/);
+  assert.match(functionBody(js, 'mutateAllTrackedChanges'), /acceptAll\(\)|rejectAll\(\)/);
+  assert.match(functionBody(js, 'changeTrackingModeFromArg'), /Word\.ChangeTrackingMode\.trackAll/);
+  assert.match(functionBody(js, 'changeTrackingModeToResult'), /track_mine_only/);
 });
 
 test('Word validation-only mode validates required mutating tools without writes', () => {
@@ -640,6 +667,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.delete_content_control'/);
   assert.match(js, /'word\.resize_image'/);
   assert.match(js, /'word\.update_tracked_change'/);
+  assert.match(js, /'word\.set_change_tracking'/);
   assert.match(js, /'word\.insert_note'/);
   assert.match(js, /'word\.list_notes'/);
   assert.match(js, /'word\.update_note'/);
@@ -657,7 +685,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image'\] \}/);
   assert.match(js, /\{ label: 'Content controls', tools: \['word\.list_content_controls', 'word\.insert_content_control', 'word\.update_content_control', 'word\.delete_content_control'\] \}/);
   assert.match(js, /\{ label: 'Notes', tools: \['word\.insert_note', 'word\.list_notes', 'word\.update_note', 'word\.delete_note'\] \}/);
-  assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.update_tracked_change'\] \}/);
+  assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.set_change_tracking', 'word\.update_tracked_change'\] \}/);
   assert.doesNotMatch(js, /'word\.insert_heading'/);
   assert.doesNotMatch(js, /'word\.set_heading_level'/);
   assert.doesNotMatch(js, /'word\.update_cell'/);
@@ -686,7 +714,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.list_notes', \{ category: 'Notes', sideEffect: 'read', description: 'List footnotes or endnotes with reference locations\.' \}\]/);
   assert.match(js, /\['word\.update_note', \{ category: 'Notes', sideEffect: 'mutating', description: 'Replace a footnote or endnote body by index\.' \}\]/);
   assert.match(js, /\['word\.delete_note', \{ category: 'Notes', sideEffect: 'destructive', description: 'Delete a footnote or endnote by index\.' \}\]/);
-  assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint\.' \}\]/);
+  assert.match(js, /\['word\.set_change_tracking', \{ category: 'Review', sideEffect: 'mutating', description: 'Set Track Changes mode\.' \}\]/);
+  assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept, reject, or bulk-finalize tracked changes\.' \}\]/);
   assert.match(js, /case 'word\.get_header_footer':\s*data = await getHeaderFooter\(args\);/);
   assert.match(js, /case 'word\.update_header_footer':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateHeaderFooter\(args\);/);
   assert.match(js, /case 'word\.insert_break':\s*data = await insertBreak\(args\);/);
@@ -708,6 +737,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /case 'word\.list_notes':\s*data = await listNotes\(args \|\| \{\}\);/);
   assert.match(js, /case 'word\.update_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateNote\(args\);/);
   assert.match(js, /case 'word\.delete_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await deleteNote\(args\);/);
+  assert.match(js, /case 'word\.set_change_tracking':\s*data = await setChangeTracking\(args\);/);
   assert.match(js, /case 'word\.update_tracked_change':\s*data = await updateTrackedChange\(args\);/);
   assert.match(js, /async function insertTable\(args\)/);
   assert.match(js, /table_index: tableIndex/);
@@ -732,6 +762,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /function validateBookmarkName\(tool, name/);
   assert.match(js, /control\.load\('id'\);\s*await context\.sync\(\);\s*const id = control\.id;/);
   assert.match(js, /async function updateTrackedChange\(args\)/);
+  assert.match(js, /async function setChangeTracking\(args\)/);
   assert.match(js, /return mutateTrackedChange\(args, action\);/);
   assert.match(js, /function targetContentControl\(context, args\)/);
   assert.match(js, /function contentControlMetadata\(control, index\)/);

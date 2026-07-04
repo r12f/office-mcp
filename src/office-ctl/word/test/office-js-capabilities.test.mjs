@@ -9,8 +9,12 @@ const TASKPANE = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8')
 
 test('Office.js Word typings expose tracked-change read and mutation primitives used by v1', () => {
   assert.match(OFFICE_JS_TYPES, /getTrackedChanges\(\): Word\.TrackedChangeCollection/);
+  assert.match(OFFICE_JS_TYPES, /changeTrackingMode: Word\.ChangeTrackingMode/);
+  assert.match(OFFICE_JS_TYPES, /enum ChangeTrackingMode/);
   assert.match(OFFICE_JS_TYPES, /accept\(\): void/);
   assert.match(OFFICE_JS_TYPES, /reject\(\): void/);
+  assert.match(OFFICE_JS_TYPES, /acceptAll\(\): void/);
+  assert.match(OFFICE_JS_TYPES, /rejectAll\(\): void/);
 });
 
 test('Office.js Word typings expose save but not portable save-as or PDF export APIs', () => {
