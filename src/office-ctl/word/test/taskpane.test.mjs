@@ -393,6 +393,12 @@ test('Word mutating tools run preflight validation before Office mutation dispat
   assert.match(preflightBody, /validateUpdateTableArgs\(args\)/);
   assert.match(preflightBody, /case 'word\.update_tracked_change':/);
   assert.match(preflightBody, /validateTrackedChangeAction\(args\.action\)/);
+  assert.match(preflightBody, /case 'word\.insert_note':/);
+  assert.match(preflightBody, /validateInsertNoteArgs\(tool, args\)/);
+  assert.match(preflightBody, /case 'word\.update_note':/);
+  assert.match(preflightBody, /validateUpdateNoteArgs\(tool, args\)/);
+  assert.match(preflightBody, /case 'word\.delete_note':/);
+  assert.match(preflightBody, /validateDeleteNoteArgs\(tool, args\)/);
 });
 
 test('Word mutating preflight helpers return specific no-effect validation errors', () => {
@@ -419,6 +425,10 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'validateUpdateTableArgs'), /Unsupported table action/);
   assert.match(functionBody(js, 'validateContentControlTargetArgs'), /requires content_control_id, tag, or title/);
   assert.match(functionBody(js, 'validateDeleteContentControlMode'), /mode must be keep_content or delete_content/);
+  assert.match(functionBody(js, 'validateNoteKind'), /kind must be footnote or endnote/);
+  assert.match(functionBody(js, 'validateInsertNoteArgs'), /requires non-empty text/);
+  assert.match(functionBody(js, 'validateUpdateNoteArgs'), /requires a non-negative integer index/);
+  assert.match(functionBody(js, 'validateDeleteNoteArgs'), /requires a non-negative integer index/);
 });
 
 test('Word validation-only mode validates required mutating tools without writes', () => {
@@ -427,7 +437,7 @@ test('Word validation-only mode validates required mutating tools without writes
   const validateOnlyBody = functionBody(js, 'validateWordMutationOnly');
 
   assert.match(invokeBody, /if \(args\?\.validate_only\) data = await validateWordMutationOnly\(tool, args \|\| \{\}\)/);
-  for (const tool of ['word.insert_image', 'word.insert_hyperlink', 'word.replace_text', 'word.update_paragraph', 'word.delete_range']) {
+  for (const tool of ['word.insert_image', 'word.insert_hyperlink', 'word.insert_note', 'word.replace_text', 'word.update_paragraph', 'word.update_note', 'word.delete_range', 'word.delete_note']) {
     assert.match(validateOnlyBody, new RegExp(`case '${tool.replace('.', '\\.')}'`));
   }
   assert.match(validateOnlyBody, /partial_effect: 'none'/);
@@ -436,6 +446,31 @@ test('Word validation-only mode validates required mutating tools without writes
   assert.doesNotMatch(validateOnlyBody, /delete\(/);
   assert.doesNotMatch(validateOnlyBody, /\.hyperlink\s*=/);
   assert.doesNotMatch(validateOnlyBody, /insertInlinePictureFromBase64\(/);
+  assert.doesNotMatch(validateOnlyBody, /insertFootnote\(/);
+  assert.doesNotMatch(validateOnlyBody, /insertEndnote\(/);
+});
+
+test('Word note tools are advertised, grouped, gated, and dispatched through note owners', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+
+  assert.match(js, /'word\.insert_note'/);
+  assert.match(js, /'word\.list_notes'/);
+  assert.match(js, /'word\.update_note'/);
+  assert.match(js, /'word\.delete_note'/);
+  assert.match(js, /\{ label: 'Notes', tools: \['word\.insert_note', 'word\.list_notes', 'word\.update_note', 'word\.delete_note'\] \}/);
+  assert.match(js, /\['word\.insert_note', \{ category: 'Notes', sideEffect: 'mutating', description: 'Insert a footnote or endnote at an anchored range\.' \}\]/);
+  assert.match(js, /\['word\.list_notes', \{ category: 'Notes', sideEffect: 'read', description: 'List footnotes or endnotes with reference locations\.' \}\]/);
+  assert.match(js, /\['word\.update_note', \{ category: 'Notes', sideEffect: 'mutating', description: 'Replace a footnote or endnote body by index\.' \}\]/);
+  assert.match(js, /\['word\.delete_note', \{ category: 'Notes', sideEffect: 'destructive', description: 'Delete a footnote or endnote by index\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.insert_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await insertNote\(args\);/);
+  assert.match(invokeBody, /case 'word\.list_notes':\s*data = await listNotes\(args \|\| \{\}\);/);
+  assert.match(invokeBody, /case 'word\.update_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateNote\(args\);/);
+  assert.match(invokeBody, /case 'word\.delete_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await deleteNote\(args\);/);
+  assert.match(js, /WordApi_1_5: requirements\.isSetSupported\('WordApi', '1\.5'\) \? '1\.5' : null/);
+  assert.match(functionBody(js, 'availableToolsForRequirements'), /WordApi_1_5[\s\S]*word\.insert_note/);
+  assert.match(functionBody(js, 'insertNote'), /insertFootnote\(text\)|insertEndnote\(text\)/);
+  assert.match(functionBody(js, 'noteCollectionForKind'), /footnotes[\s\S]*endnotes/);
 });
 
 test('Word hyperlink tools are advertised, grouped, and dispatched through range owners', () => {
@@ -581,6 +616,10 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.delete_content_control'/);
   assert.match(js, /'word\.resize_image'/);
   assert.match(js, /'word\.update_tracked_change'/);
+  assert.match(js, /'word\.insert_note'/);
+  assert.match(js, /'word\.list_notes'/);
+  assert.match(js, /'word\.update_note'/);
+  assert.match(js, /'word\.delete_note'/);
   assert.match(js, /'word\.resolve_anchor'/);
   assert.match(js, /'word\.get_header_footer'/);
   assert.match(js, /'word\.update_header_footer'/);
@@ -593,6 +632,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image'\] \}/);
   assert.match(js, /\{ label: 'Content controls', tools: \['word\.list_content_controls', 'word\.insert_content_control', 'word\.update_content_control', 'word\.delete_content_control'\] \}/);
+  assert.match(js, /\{ label: 'Notes', tools: \['word\.insert_note', 'word\.list_notes', 'word\.update_note', 'word\.delete_note'\] \}/);
   assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.update_tracked_change'\] \}/);
   assert.doesNotMatch(js, /'word\.insert_heading'/);
   assert.doesNotMatch(js, /'word\.set_heading_level'/);
@@ -618,6 +658,10 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.insert_break', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page, line, or section break\.' \}\]/);
   assert.match(js, /\['word\.list_sections', \{ category: 'Document & structure', sideEffect: 'read', description: 'List document sections\.' \}\]/);
   assert.match(js, /\['word\.update_page_setup', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Update document or section page setup\.' \}\]/);
+  assert.match(js, /\['word\.insert_note', \{ category: 'Notes', sideEffect: 'mutating', description: 'Insert a footnote or endnote at an anchored range\.' \}\]/);
+  assert.match(js, /\['word\.list_notes', \{ category: 'Notes', sideEffect: 'read', description: 'List footnotes or endnotes with reference locations\.' \}\]/);
+  assert.match(js, /\['word\.update_note', \{ category: 'Notes', sideEffect: 'mutating', description: 'Replace a footnote or endnote body by index\.' \}\]/);
+  assert.match(js, /\['word\.delete_note', \{ category: 'Notes', sideEffect: 'destructive', description: 'Delete a footnote or endnote by index\.' \}\]/);
   assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint\.' \}\]/);
   assert.match(js, /case 'word\.get_header_footer':\s*data = await getHeaderFooter\(args\);/);
   assert.match(js, /case 'word\.update_header_footer':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateHeaderFooter\(args\);/);
@@ -636,6 +680,10 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /case 'word\.insert_bookmark':\s*data = await insertBookmark\(args\);/);
   assert.match(js, /case 'word\.list_bookmarks':\s*data = await listBookmarks\(args \|\| \{\}\);/);
   assert.match(js, /case 'word\.delete_bookmark':\s*data = await deleteBookmark\(args\);/);
+  assert.match(js, /case 'word\.insert_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await insertNote\(args\);/);
+  assert.match(js, /case 'word\.list_notes':\s*data = await listNotes\(args \|\| \{\}\);/);
+  assert.match(js, /case 'word\.update_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateNote\(args\);/);
+  assert.match(js, /case 'word\.delete_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await deleteNote\(args\);/);
   assert.match(js, /case 'word\.update_tracked_change':\s*data = await updateTrackedChange\(args\);/);
   assert.match(js, /async function insertTable\(args\)/);
   assert.match(js, /table_index: tableIndex/);
@@ -648,8 +696,15 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /async function insertBookmark\(args\)/);
   assert.match(js, /async function listBookmarks\(args\)/);
   assert.match(js, /async function deleteBookmark\(args\)/);
+  assert.match(js, /async function insertNote\(args\)/);
+  assert.match(js, /async function listNotes\(args\)/);
+  assert.match(js, /async function updateNote\(args\)/);
+  assert.match(js, /async function deleteNote\(args\)/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.insert_bookmark':\s*requireAnchor\(tool, args\.anchor\);\s*validateBookmarkName\(tool, args\.name\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.delete_bookmark':\s*validateBookmarkName\(tool, args\.name, \{ strictPattern: false \}\);/);
+  assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.insert_note':\s*validateInsertNoteArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.update_note':\s*validateUpdateNoteArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.delete_note':\s*validateDeleteNoteArgs\(tool, args\);/);
   assert.match(js, /function validateBookmarkName\(tool, name/);
   assert.match(js, /control\.load\('id'\);\s*await context\.sync\(\);\s*const id = control\.id;/);
   assert.match(js, /async function updateTrackedChange\(args\)/);

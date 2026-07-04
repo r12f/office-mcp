@@ -426,6 +426,48 @@ const WORD_E2E_CASES = Object.fromEntries([
     args: { content_control_id: '${controlResult.content_control.content_control_id}', mode: 'keep_content' },
     verify: wordReadback.contentControls('e2e-delete-control', { notContains: ['e2e-delete-control', 'Delete Control'] })
   }],
+  ['word.insert_note', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Footnote insert target' } }
+      ]
+    },
+    args: { kind: 'footnote', anchor: { kind: 'after_text', text: 'Footnote insert target' }, text: 'Inserted footnote body' },
+    verify: wordReadback.notes('footnote', { contains: ['Inserted footnote body'], pathEquals: [{ path: 'count', value: 1 }] })
+  }],
+  ['word.list_notes', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Endnote list target' } },
+        { tool: 'word.insert_note', arguments: { kind: 'endnote', anchor: { kind: 'after_text', text: 'Endnote list target' }, text: 'Listed endnote body' } }
+      ]
+    },
+    args: { kind: 'endnote', offset: 0, limit: 10 },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['Listed endnote body'], pathEquals: [{ path: 'count', value: 1 }, { path: 'notes.0.kind', value: 'endnote' }, { path: 'notes.0.index', value: 0 }] }
+    }
+  }],
+  ['word.update_note', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Footnote update target' } },
+        { tool: 'word.insert_note', arguments: { kind: 'footnote', anchor: { kind: 'after_text', text: 'Footnote update target' }, text: 'Before note update' } }
+      ]
+    },
+    args: { kind: 'footnote', index: 0, text: 'Updated footnote body' },
+    verify: wordReadback.notes('footnote', { contains: ['Updated footnote body'], notContains: ['Before note update'] })
+  }],
+  ['word.delete_note', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Endnote delete target' } },
+        { tool: 'word.insert_note', arguments: { kind: 'endnote', anchor: { kind: 'after_text', text: 'Endnote delete target' }, text: 'Delete endnote body' } }
+      ]
+    },
+    args: { kind: 'endnote', index: 0 },
+    verify: wordReadback.notes('endnote', { notContains: ['Delete endnote body'], pathEquals: [{ path: 'count', value: 0 }] })
+  }],
   ['word.apply_style', {
     setup: {
       actions: [

@@ -68,6 +68,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word.insert_content_control"));
     assert!(names.contains(&"word.update_content_control"));
     assert!(names.contains(&"word.delete_content_control"));
+    assert!(names.contains(&"word.insert_note"));
+    assert!(names.contains(&"word.list_notes"));
+    assert!(names.contains(&"word.update_note"));
+    assert!(names.contains(&"word.delete_note"));
     assert!(names.contains(&"word.resize_image"));
     assert!(names.contains(&"word.update_table"));
     assert!(names.contains(&"word_update_table"));
@@ -95,10 +99,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 37);
+    assert_eq!(WORD_V1_TOOLS.len(), 41);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 170);
+    assert_eq!(tools.len(), 178);
 }
 
 #[test]
@@ -471,13 +475,49 @@ fn word_bookmark_schemas_are_specific() {
 }
 
 #[test]
+fn word_note_schemas_are_specific() {
+    let insert_note = schema_for("word.insert_note");
+    assert_required(&insert_note, &["session_id", "anchor", "kind", "text"]);
+    assert_eq!(insert_note["properties"]["kind"]["enum"][0], "footnote");
+    assert_eq!(insert_note["properties"]["kind"]["enum"][1], "endnote");
+    assert_eq!(insert_note["properties"]["text"]["minLength"], 1);
+    assert_eq!(insert_note["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        insert_note["properties"]["anchor"]["oneOf"]
+            .as_array()
+            .expect("anchor oneOf")
+            .len(),
+        6
+    );
+
+    let list_notes = schema_for("word.list_notes");
+    assert_required(&list_notes, &["session_id", "kind"]);
+    assert_eq!(list_notes["properties"]["offset"]["minimum"], 0);
+    assert_eq!(list_notes["properties"]["limit"]["minimum"], 1);
+    assert_eq!(list_notes["properties"]["limit"]["maximum"], 200);
+
+    let update_note = schema_for("word.update_note");
+    assert_required(&update_note, &["session_id", "kind", "index", "text"]);
+    assert_eq!(update_note["properties"]["index"]["minimum"], 0);
+    assert_eq!(update_note["properties"]["validate_only"]["type"], "boolean");
+
+    let delete_note = schema_for("word.delete_note");
+    assert_required(&delete_note, &["session_id", "kind", "index"]);
+    assert_eq!(delete_note["properties"]["index"]["minimum"], 0);
+    assert_eq!(delete_note["properties"]["validate_only"]["type"], "boolean");
+}
+
+#[test]
 fn word_validation_only_schemas_accept_validate_only_flag() {
     for tool in [
         "word.insert_image",
         "word.insert_hyperlink",
+        "word.insert_note",
         "word.replace_text",
         "word.update_paragraph",
+        "word.update_note",
         "word.delete_range",
+        "word.delete_note",
         "word.update_header_footer",
     ] {
         let schema = schema_for(tool);

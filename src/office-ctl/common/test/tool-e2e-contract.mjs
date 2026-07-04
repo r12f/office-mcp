@@ -179,6 +179,9 @@ export const wordReadback = Object.freeze({
   bookmarks(expect, args = {}) {
     return readbackByTool('word.list_bookmarks', { arguments: args, expect });
   },
+  notes(kind, expect, args = {}) {
+    return readbackByTool('word.list_notes', { arguments: { kind, ...args }, expect });
+  },
   comments(expect) {
     return readbackByResource('office://word/${session_id}/comments', { expect });
   },
