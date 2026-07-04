@@ -1950,23 +1950,64 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = word_range_marker_property_schema(tool, name) {
         return schema;
     }
+    if (tool != "word.list_notes" || name != "limit")
+        && let Some(schema) = generic_property_schema(name)
+    {
+        return schema;
+    }
     match name {
         "session_id" => json!({ "type": "string", "description": "Office document session ID." }),
         "limit" if tool == "word.list_notes" => {
             json!({ "type": "integer", "minimum": 1, "maximum": 200 })
         }
+        "anchor" => anchor_schema_for_tool(tool),
+        "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
+        "image" => image_schema(),
+        "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
+        "break_type" => {
+            json!({ "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" })
+        }
+        "orientation" => json!({ "enum": ["portrait", "landscape"] }),
+        "margins_pt" => json!({
+            "type": "object",
+            "properties": {
+                "top": { "type": "number", "minimum": 0 },
+                "bottom": { "type": "number", "minimum": 0 },
+                "left": { "type": "number", "minimum": 0 },
+                "right": { "type": "number", "minimum": 0 }
+            },
+            "additionalProperties": false
+        }),
+        "formatting" | "font" => formatting_schema(),
+        "paragraph"
+            if tool == "word.apply_formatting"
+                || tool == "word.create_style"
+                || tool == "word.update_style" =>
+        {
+            paragraph_formatting_schema()
+        }
+        "title_box" | "content_box" => shape_box_schema(),
+        "tools" | "values" | "data" | "formulas" | "number_formats" | "items" | "fields"
+        | "borders" | "criteria" | "selected_items" | "shape_ids" | "row_indices"
+        | "column_indices" => {
+            json!({ "type": "array" })
+        }
+        _ => json!({ "type": "string" }),
+    }
+}
+
+fn generic_property_schema(name: &str) -> Option<Value> {
+    match name {
         "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
         | "table_index" | "change_index" | "content_control_id" | "position" | "slice_size"
         | "section_index" | "slide_index" | "target_index" | "row_index" | "column_index"
         | "row_count" | "column_count" | "count" | "max_depth" | "expected_count" => {
-            json!({ "type": "integer", "minimum": 0 })
+            Some(json!({ "type": "integer", "minimum": 0 }))
         }
-        "heading_level" | "level" | "columns" => json!({ "type": "integer", "minimum": 1 }),
+        "heading_level" | "level" | "columns" => Some(json!({ "type": "integer", "minimum": 1 })),
         "width_pt" | "height_pt" | "scale_percent" | "width" | "height" | "left" | "top"
         | "page_width_pt" | "page_height_pt" | "rotation" | "fill_transparency" | "line_weight"
-        | "line_transparency" | "font_size" => {
-            json!({ "type": "number" })
-        }
+        | "line_transparency" | "font_size" => Some(json!({ "type": "number" })),
         "match_case"
         | "whole_word"
         | "wildcards"
@@ -2006,40 +2047,16 @@ fn property_schema(tool: &str, name: &str) -> Value {
         | "delete_contents"
         | "keep_text"
         | "overwrite"
-        | "validate_only" => json!({ "type": "boolean" }),
-        "anchor" => anchor_schema_for_tool(tool),
-        "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
-        "image" => image_schema(),
-        "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
-        "break_type" => {
-            json!({ "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" })
-        }
-        "orientation" => json!({ "enum": ["portrait", "landscape"] }),
-        "margins_pt" => json!({
-            "type": "object",
-            "properties": {
-                "top": { "type": "number", "minimum": 0 },
-                "bottom": { "type": "number", "minimum": 0 },
-                "left": { "type": "number", "minimum": 0 },
-                "right": { "type": "number", "minimum": 0 }
-            },
-            "additionalProperties": false
-        }),
-        "formatting" => formatting_schema(),
-        "font" => formatting_schema(),
-        "paragraph" if tool == "word.apply_formatting" || tool == "word.create_style" || tool == "word.update_style" => paragraph_formatting_schema(),
-        "title_box" | "content_box" => shape_box_schema(),
-        "tools" | "values" | "data" | "formulas" | "number_formats" | "items" | "fields"
-        | "borders" | "criteria" | "selected_items" | "shape_ids" | "row_indices"
-        | "column_indices" => {
-            json!({ "type": "array" })
-        }
-        _ => json!({ "type": "string" }),
+        | "validate_only" => Some(json!({ "type": "boolean" })),
+        _ => None,
     }
 }
 
 fn word_style_property_schema(tool: &str, name: &str) -> Option<Value> {
-    let is_style_tool = matches!(tool, "word.list_styles" | "word.create_style" | "word.update_style");
+    let is_style_tool = matches!(
+        tool,
+        "word.list_styles" | "word.create_style" | "word.update_style"
+    );
     match (is_style_tool, name) {
         (true, "type") => Some(json!({ "enum": ["paragraph", "character", "table", "list"] })),
         (true, "name" | "base_style") => Some(json!({ "type": "string", "minLength": 1 })),

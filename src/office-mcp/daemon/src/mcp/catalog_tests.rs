@@ -494,8 +494,8 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 91);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 91);
+    assert_eq!(all_tools.len(), 94);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 94);
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));
@@ -770,7 +770,10 @@ fn word_style_schemas_are_specific() {
     assert_required(&create_style, &["session_id", "name", "type"]);
     assert_eq!(create_style["properties"]["name"]["minLength"], 1);
     assert_eq!(create_style["properties"]["type"]["enum"][1], "character");
-    assert_eq!(create_style["properties"]["font"]["properties"]["color"]["type"], "string");
+    assert_eq!(
+        create_style["properties"]["font"]["properties"]["color"]["type"],
+        "string"
+    );
     assert_eq!(
         create_style["properties"]["paragraph"]["properties"]["outline_level"]["maximum"],
         9
@@ -779,7 +782,10 @@ fn word_style_schemas_are_specific() {
     let update_style = schema_for("word.update_style");
     assert_required(&update_style, &["session_id", "name"]);
     assert_eq!(update_style["properties"]["base_style"]["minLength"], 1);
-    assert_eq!(update_style["anyOf"][0]["required"], serde_json::json!(["base_style"]));
+    assert_eq!(
+        update_style["anyOf"][0]["required"],
+        serde_json::json!(["base_style"])
+    );
 }
 
 #[test]
