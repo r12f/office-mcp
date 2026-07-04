@@ -14,6 +14,21 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(anchor.category, "Range & selection");
     assert_eq!(anchor.side_effect, ToolSideEffect::Read);
 
+    let list_bookmarks = tool_metadata("word.list_bookmarks").expect("bookmark list metadata");
+    assert_eq!(list_bookmarks.app, "word");
+    assert_eq!(list_bookmarks.category, "Range & selection");
+    assert_eq!(list_bookmarks.side_effect, ToolSideEffect::Read);
+
+    let insert_bookmark = tool_metadata("word.insert_bookmark").expect("bookmark insert metadata");
+    assert_eq!(insert_bookmark.app, "word");
+    assert_eq!(insert_bookmark.category, "Range & selection");
+    assert_eq!(insert_bookmark.side_effect, ToolSideEffect::Mutating);
+
+    let delete_bookmark = tool_metadata("word.delete_bookmark").expect("bookmark delete metadata");
+    assert_eq!(delete_bookmark.app, "word");
+    assert_eq!(delete_bookmark.category, "Range & selection");
+    assert_eq!(delete_bookmark.side_effect, ToolSideEffect::Destructive);
+
     let sections = tool_metadata("word.list_sections").expect("sections metadata");
     assert_eq!(sections.app, "word");
     assert_eq!(sections.category, "Document & structure");

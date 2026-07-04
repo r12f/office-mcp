@@ -58,7 +58,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | Category | Tools |
 |---|---|
 | **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.save` |
-| **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
+| **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
 | **Media** | `word.insert_image`, `word.resize_image` |
@@ -73,7 +73,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 31 tools. It deliberately consolidates specialized tools
+The target surface has 34 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -87,6 +87,9 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.get_paragraph` | implemented | Paragraphs & lists | read | `WordApi 1.3` | Read one paragraph by index. |
 | `word.find_text` | implemented | Range & selection | read | `WordApi 1.3` | Search text with Word search options and return portable paragraph-relative matches. |
 | `word.resolve_anchor` | implemented | Range & selection | read | `WordApi 1.3` | Resolve an anchor to safe diagnostic metadata without returning full document text. |
+| `word.insert_bookmark` | implemented | Range & selection | edit | `WordApi 1.4` | Create or move a named bookmark at an anchored range with explicit duplicate handling. |
+| `word.list_bookmarks` | implemented | Range & selection | read | `WordApi 1.4` | List bookmark names and bounded location previews without returning full document text. |
+| `word.delete_bookmark` | implemented | Range & selection | destructive | `WordApi 1.4` | Delete a bookmark marker without deleting the bookmarked text. |
 | `word.get_selection` | implemented | Range & selection | read | `WordApi 1.3` | Read current selection text and simple selection metadata. |
 | `word.insert_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a paragraph at an anchor; also owns heading insertion through style or heading-level arguments after migration. |
 | `word.insert_table` | implemented | Tables | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
@@ -168,7 +171,7 @@ runtime and advertises only tools whose complete implementation is supported:
 | Tier | Requirement | Additional tools/features |
 |---|---|---|
 | Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection |
-| Review | `WordApi 1.4` | comments, bookmark anchors |
+| Review | `WordApi 1.4` | comments, bookmark anchors and bookmark lifecycle tools |
 | Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
 | Host-specific | explicit successful probe | page setup, active-window, and protection metadata |
 
@@ -300,6 +303,34 @@ promised because Word does not expose portable document offsets.
 
 Returns `{ text, paragraph_count, is_empty }`. A selection may span multiple
 paragraphs; portable character offsets are intentionally not exposed.
+
+### 2.6 `word.list_bookmarks`
+
+List named bookmark markers without dumping the bookmarked text body.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "include_hidden": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns `{ bookmarks, count }`. Each bookmark includes `name`, a best-effort
+`paragraph_index` when the referenced range can be located in the current body,
+and a bounded `text_preview` of at most 80 characters. Names are reported as
+returned by Word. The tool MUST NOT return full bookmarked text; callers that
+need body text use `word.get_text` or `word.resolve_anchor` with a bookmark
+anchor.
+
+Hidden bookmarks are omitted by default. `include_hidden: true` passes through
+Word's hidden-bookmark enumeration support and may reveal host-generated names;
+clients should treat those names as implementation details unless the user
+explicitly requested them.
 
 ## 3. Insert
 
@@ -617,6 +648,41 @@ header-footer layout to be enabled. If the layout is disabled, the tool fails
 with `INVALID_ARGUMENT` rather than reading a header/footer slot that Word will
 not render for the user.
 
+### 3.11 `word.insert_bookmark`
+
+Create a named bookmark around an anchored range.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "name", "anchor"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,39}$" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "extent": { "$ref": "#/$defs/extent" },
+    "overwrite": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+The name pattern mirrors Word bookmark names: it must start with a letter or
+underscore, contain only letters, digits, and underscores, and be at most 40
+characters. Word treats bookmark names case-insensitively; the add-in MUST
+perform duplicate checks case-insensitively before queuing a write.
+
+When `overwrite` is false and a bookmark with the same name already exists, the
+call fails with `INVALID_ARGUMENT` and `partial_effect: "none"`. When
+`overwrite` is true, the existing bookmark marker may be moved to the newly
+resolved range. The tool returns `{ bookmark: { name, paragraph_index,
+text_preview }, overwritten }` after the write is synchronized.
+
+`extent` follows the shared anchored range contract. For point-like anchors
+such as `start_of_document` and `end_of_document`, the bookmark is collapsed at
+the resolved location unless the implementation can safely expand a caller
+provided extent.
+
 ### 3.8 `word.update_header_footer`
 
 ```json
@@ -760,7 +826,28 @@ selection and returns `valid: true`, `operation: "word.delete_range"`, and a
 `resolved_target` summary that includes the requested extent and target object
 type when known. It MUST NOT call `delete`.
 
-### 4.4 `word.apply_formatting`
+### 4.4 `word.delete_bookmark`
+
+Delete a bookmark marker without deleting the bookmarked text.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "name"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}
+```
+
+Missing bookmarks fail with `INVALID_ARGUMENT` and `partial_effect: "none"`
+before any write is queued. Name matching is case-insensitive. The success
+response includes `{ deleted: true, name, count }`, where `count` is the number
+of remaining visible bookmarks after deletion.
+
+### 4.5 `word.apply_formatting`
 
 ```json
 {
@@ -1076,6 +1163,25 @@ provided, the anchored range is replaced with that text before wrapping it.
 ```
 
 The default preserves contents while removing the content-control wrapper.
+
+## 7A. Bookmark Lifecycle
+
+Bookmark lifecycle tools are Range & selection tools because bookmarks are
+named range markers, not review annotations. They are listed here together to
+make their Office.js mapping explicit.
+
+| Operation | API | Requirement set |
+|---|---|---|
+| Insert | `Range.insertBookmark(name)` | `WordApi 1.4` |
+| Enumerate | `Range.getBookmarks(includeHidden, includeAdjacent)` | `WordApi 1.4` |
+| Resolve to range | `Document.getBookmarkRange(name)` / `getBookmarkRangeOrNullObject(name)` | `WordApi 1.4` |
+| Delete | `Document.deleteBookmark(name)` | `WordApi 1.4` |
+
+The lifecycle tools share the same name validation and case-insensitive
+existence checks described in §3.11 and §4.4. A bookmark anchor remains part of
+the shared anchor vocabulary whether or not the lifecycle tools are enabled;
+however, the lifecycle tools themselves are advertised only when the `WordApi
+1.4` review tier is available.
 
 ## 8. Review
 
