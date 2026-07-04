@@ -111,8 +111,10 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.update_paragraph`, `word.delete_range`, `word.apply_formatting`,
 `word.apply_style`, `word.read_table`, `word.update_table`,
 `word.list_content_controls`, `word.insert_content_control`,
-`word.update_content_control`, `word.delete_content_control`, `word.add_comment`,
-`word.resolve_comment`, `word.update_tracked_change`, and `word.save`.
+`word.update_content_control`, `word.delete_content_control`,
+`word.insert_note`, `word.list_notes`, `word.update_note`,
+`word.delete_note`, `word.add_comment`, `word.resolve_comment`,
+`word.update_tracked_change`, and `word.save`.
 
 Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 `word.insert_page_break`, `word.update_cell`, `word.add_row`, `word.add_column`,
@@ -182,6 +184,12 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       handles duplicate names explicitly with `overwrite`, and preserves the
       existing bookmark anchor as the stable target used by `word.resolve_anchor`
       and anchored mutation tools.
+- [x] Add footnote/endnote lifecycle tools: `word.insert_note`,
+      `word.list_notes`, `word.update_note`, and `word.delete_note`. The
+      contract keeps note body creation, enumeration, replacement, and deletion
+      in a Notes category, uses `WordApi 1.5`, treats note indices as current
+      collection positions that must be re-read after insertion/deletion, and
+      gates destructive deletion through the All permission ceiling.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.

@@ -63,6 +63,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
 | **Media** | `word.insert_image`, `word.resize_image` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
+| **Notes** | `word.insert_note`, `word.list_notes`, `word.update_note`, `word.delete_note` |
 | **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_tracked_change` |
 
 ### 1.2 Target refined Word tool surface
@@ -73,7 +74,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 37 tools. It deliberately consolidates specialized tools
+The target surface has 41 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -113,6 +114,10 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.insert_content_control` | implemented | Content controls | edit | `WordApi 1.5` | Create a content control around an anchored range or inserted placeholder content. |
 | `word.update_content_control` | implemented | Content controls | edit | `WordApi 1.5` | Update content control metadata, locked state, or contained text through the content-control owner. |
 | `word.delete_content_control` | implemented | Content controls | destructive | `WordApi 1.5` | Delete a content control, preserving or deleting contents according to an explicit mode. |
+| `word.insert_note` | implemented | Notes | edit | `WordApi 1.5` | Insert a footnote or endnote at an anchored range. |
+| `word.list_notes` | implemented | Notes | read | `WordApi 1.5` | List footnotes or endnotes with bounded note text and reference paragraph locations. |
+| `word.update_note` | implemented | Notes | edit | `WordApi 1.5` | Replace one footnote or endnote body by current note index. |
+| `word.delete_note` | implemented | Notes | destructive | `WordApi 1.5` | Delete one footnote or endnote reference and body by current note index. |
 | `word.add_comment` | implemented | Review | comment | `WordApi 1.4` | Add a comment to an anchored range as the signed-in Office user. |
 | `word.resolve_comment` | implemented | Review | comment | `WordApi 1.4` | Resolve an existing comment. |
 | `word.update_tracked_change` | implemented | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint. |
@@ -153,6 +158,10 @@ Tool ownership rules:
 - Content-control tools own content-control lifecycle and metadata. Generic text
   edits inside a known range remain owned by range/paragraph tools unless the
   caller is explicitly targeting a content control.
+- Note tools own footnote and endnote lifecycle. Main body range tools may place
+  the reference anchor, but note body creation, enumeration, body replacement,
+  and deletion are owned by `word.insert_note`, `word.list_notes`,
+  `word.update_note`, and `word.delete_note`.
 - `word.update_tracked_change` owns tracked-change accept/reject actions. The
   tracked-change resource remains the read owner for current indices and
   fingerprints.
@@ -179,6 +188,7 @@ runtime and advertises only tools whose complete implementation is supported:
 |---|---|---|
 | Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection |
 | Review | `WordApi 1.4` | comments, bookmark anchors and bookmark lifecycle tools |
+| Notes and content controls | `WordApi 1.5` | footnote/endnote lifecycle and content-control lifecycle tools |
 | Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
 | Host-specific | explicit successful probe | page setup, active-window, and protection metadata |
 
@@ -1259,6 +1269,115 @@ the shared anchor vocabulary whether or not the lifecycle tools are enabled;
 however, the lifecycle tools themselves are advertised only when the `WordApi
 1.4` review tier is available.
 
+## 7B. Note Lifecycle
+
+Footnotes and endnotes share one lifecycle owner because they use the same Word
+note object model and differ only by collection. Note indices are current
+collection positions. Clients that need stable addressing across edits must
+re-read `word.list_notes` after any insertion or deletion because Word shifts
+indices when note references move or disappear.
+
+### 7B.1 `word.insert_note`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor", "kind", "text"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "kind": { "enum": ["footnote", "endnote"] },
+    "text": { "type": "string", "minLength": 1 },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+The add-in resolves the anchor, inserts the note reference at the resolved
+range, and sets the note body text with `Range.insertFootnote(text)` or
+`Range.insertEndnote(text)`. With `validate_only: true`, the add-in resolves
+the anchor and validates `kind` and `text`, then returns `valid: true`,
+`operation: "word.insert_note"`, and `partial_effect: "none"` without creating
+a note.
+
+### 7B.2 `word.list_notes`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "kind"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "kind": { "enum": ["footnote", "endnote"] },
+    "offset": { "type": "integer", "minimum": 0, "default": 0 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns `{ notes: [{ index, kind, text, reference_paragraph_index }], count,
+truncated }` from `Body.footnotes` or `Body.endnotes`. Note body text is the
+note content, not surrounding body text. `reference_paragraph_index` is
+best-effort paragraph-relative metadata for the note reference location.
+
+### 7B.3 `word.update_note`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "kind", "index", "text"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "kind": { "enum": ["footnote", "endnote"] },
+    "index": { "type": "integer", "minimum": 0 },
+    "text": { "type": "string" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Replaces the addressed note body text wholesale. Out-of-range indices fail with
+`INVALID_ARGUMENT` and `partial_effect: "none"` before any write is queued. With
+`validate_only: true`, the add-in resolves the note and returns safe current
+metadata without replacing note body text.
+
+### 7B.4 `word.delete_note`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "kind", "index"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "kind": { "enum": ["footnote", "endnote"] },
+    "index": { "type": "integer", "minimum": 0 },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Deletes the addressed note reference and note body with `NoteItem.delete()`.
+Out-of-range indices fail with `INVALID_ARGUMENT` and `partial_effect: "none"`
+before any deletion. The success response includes `{ deleted: true, kind,
+index, count }`, where `count` is the remaining number of notes of that kind.
+With `validate_only: true`, the add-in resolves the target note and returns the
+same current metadata without deleting it.
+
+| Operation | API | Requirement set |
+|---|---|---|
+| Insert footnote/endnote | `Range.insertFootnote(text)` / `Range.insertEndnote(text)` | `WordApi 1.5` |
+| Enumerate notes | `Body.footnotes` / `Body.endnotes` | `WordApi 1.5` |
+| Read/edit note body | `NoteItem.body` | `WordApi 1.5` |
+| Locate note reference | `NoteItem.reference` | `WordApi 1.5` |
+| Delete note | `NoteItem.delete()` | `WordApi 1.5` |
+
+Note lifecycle tools are advertised only when the `WordApi 1.5` notes and
+content-controls tier is available.
+
 ## 8. Review
 
 ### 8.1 `word.add_comment`
@@ -1433,6 +1552,7 @@ The following table describes the conceptual right required by each category:
 | Edit | `edit` |
 | Tables | `edit` |
 | Structure | `edit` |
+| Notes | `edit` |
 | Review | `comment` (or `edit` if `comment` not granted by policy) |
 | Document.save | `edit` |
 

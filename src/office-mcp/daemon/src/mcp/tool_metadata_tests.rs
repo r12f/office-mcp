@@ -29,6 +29,26 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(delete_bookmark.category, "Range & selection");
     assert_eq!(delete_bookmark.side_effect, ToolSideEffect::Destructive);
 
+    let list_notes = tool_metadata("word.list_notes").expect("note list metadata");
+    assert_eq!(list_notes.app, "word");
+    assert_eq!(list_notes.category, "Notes");
+    assert_eq!(list_notes.side_effect, ToolSideEffect::Read);
+
+    let insert_note = tool_metadata("word.insert_note").expect("note insert metadata");
+    assert_eq!(insert_note.app, "word");
+    assert_eq!(insert_note.category, "Notes");
+    assert_eq!(insert_note.side_effect, ToolSideEffect::Mutating);
+
+    let update_note = tool_metadata("word.update_note").expect("note update metadata");
+    assert_eq!(update_note.app, "word");
+    assert_eq!(update_note.category, "Notes");
+    assert_eq!(update_note.side_effect, ToolSideEffect::Mutating);
+
+    let delete_note = tool_metadata("word.delete_note").expect("note delete metadata");
+    assert_eq!(delete_note.app, "word");
+    assert_eq!(delete_note.category, "Notes");
+    assert_eq!(delete_note.side_effect, ToolSideEffect::Destructive);
+
     let sections = tool_metadata("word.list_sections").expect("sections metadata");
     assert_eq!(sections.app, "word");
     assert_eq!(sections.category, "Document & structure");

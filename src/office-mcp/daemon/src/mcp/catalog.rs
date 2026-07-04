@@ -20,11 +20,13 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.insert_hyperlink",
     "word.insert_image",
     "word.insert_list",
+    "word.insert_note",
     "word.insert_paragraph",
     "word.insert_table",
     "word.list_bookmarks",
     "word.list_content_controls",
     "word.list_hyperlinks",
+    "word.list_notes",
     "word.list_sections",
     "word.read_table",
     "word.remove_hyperlink",
@@ -35,10 +37,12 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.save",
     "word.update_header_footer",
     "word.update_content_control",
+    "word.update_note",
     "word.update_page_setup",
     "word.update_paragraph",
     "word.update_table",
     "word.update_tracked_change",
+    "word.delete_note",
 ];
 
 const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
@@ -676,6 +680,9 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
         "word.insert_bookmark" | "word.list_bookmarks" | "word.delete_bookmark" => {
             bookmark_examples_for_tool(tool)
         }
+        "word.insert_note" | "word.list_notes" | "word.update_note" | "word.delete_note" => {
+            note_examples_for_tool(tool)
+        }
         "word.update_table" => vec![json!({
             "description": "Replace one table cell by row and column index.",
             "arguments": {
@@ -768,6 +775,47 @@ fn bookmark_examples_for_tool(tool: &str) -> Vec<Value> {
     }
 }
 
+fn note_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.insert_note" => vec![json!({
+            "description": "Insert a footnote after a cited sentence.",
+            "arguments": {
+                "session_id": "session-1",
+                "kind": "footnote",
+                "anchor": { "kind": "after_text", "text": "Market data source" },
+                "text": "Source: internal finance workbook."
+            }
+        })],
+        "word.list_notes" => vec![json!({
+            "description": "List the first page of footnotes.",
+            "arguments": {
+                "session_id": "session-1",
+                "kind": "footnote",
+                "offset": 0,
+                "limit": 50
+            }
+        })],
+        "word.update_note" => vec![json!({
+            "description": "Replace the first endnote body after reviewing current note indices.",
+            "arguments": {
+                "session_id": "session-1",
+                "kind": "endnote",
+                "index": 0,
+                "text": "Updated citation text."
+            }
+        })],
+        "word.delete_note" => vec![json!({
+            "description": "Delete the first footnote after re-reading current note indices.",
+            "arguments": {
+                "session_id": "session-1",
+                "kind": "footnote",
+                "index": 0
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
 fn common_errors_for_tool(tool: &str) -> Vec<Value> {
     let mut errors = vec![json!({
         "code": "INVALID_ARGUMENTS",
@@ -806,6 +854,12 @@ fn common_errors_for_tool(tool: &str) -> Vec<Value> {
             errors.push(json!({
                 "code": "INVALID_ARGUMENTS",
                 "cause": "Content control IDs are runtime identifiers; refresh the list before updating stale IDs."
+            }));
+        }
+        "word.insert_note" | "word.update_note" | "word.delete_note" => {
+            errors.push(json!({
+                "code": "INVALID_ARGUMENTS",
+                "cause": "Note kind must be footnote or endnote, and note indices must be refreshed after insertion or deletion."
             }));
         }
         "word.update_table" | "excel.update_table" | "powerpoint.update_table" => {
@@ -1069,6 +1123,26 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         "word.delete_bookmark",
         ["session_id", "name"],
         ["session_id", "name"]
+    ),
+    tool_spec!(
+        "word.insert_note",
+        ["session_id", "anchor", "kind", "text"],
+        ["session_id", "anchor", "kind", "text", "validate_only"]
+    ),
+    tool_spec!(
+        "word.list_notes",
+        ["session_id", "kind"],
+        ["session_id", "kind", "offset", "limit"]
+    ),
+    tool_spec!(
+        "word.update_note",
+        ["session_id", "kind", "index", "text"],
+        ["session_id", "kind", "index", "text", "validate_only"]
+    ),
+    tool_spec!(
+        "word.delete_note",
+        ["session_id", "kind", "index"],
+        ["session_id", "kind", "index", "validate_only"]
     ),
     tool_spec!(
         "word.apply_formatting",
@@ -1657,13 +1731,16 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
 }
 
 fn property_schema(tool: &str, name: &str) -> Value {
+    if let Some(schema) = word_note_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_range_marker_property_schema(tool, name) {
+        return schema;
+    }
     match name {
         "session_id" => json!({ "type": "string", "description": "Office document session ID." }),
-        "limit" if tool == "word.list_hyperlinks" => {
+        "limit" if tool == "word.list_notes" => {
             json!({ "type": "integer", "minimum": 1, "maximum": 200 })
-        }
-        "keep_text" if tool == "word.remove_hyperlink" => {
-            json!({ "type": "boolean", "default": true })
         }
         "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
         | "table_index" | "change_index" | "content_control_id" | "position" | "slice_size"
@@ -1727,10 +1804,6 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "header_footer_type" => {
             json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" })
         }
-        "name" if tool == "word.insert_bookmark" => {
-            json!({ "type": "string", "minLength": 1, "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,39}$" })
-        }
-        "name" if tool == "word.delete_bookmark" => json!({ "type": "string", "minLength": 1 }),
         "break_type" => {
             json!({ "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" })
         }
@@ -1756,6 +1829,38 @@ fn property_schema(tool: &str, name: &str) -> Value {
             json!({ "type": "array" })
         }
         _ => json!({ "type": "string" }),
+    }
+}
+
+fn word_range_marker_property_schema(tool: &str, name: &str) -> Option<Value> {
+    match (tool, name) {
+        ("word.list_hyperlinks", "limit") => {
+            Some(json!({ "type": "integer", "minimum": 1, "maximum": 200 }))
+        }
+        ("word.remove_hyperlink", "keep_text") => {
+            Some(json!({ "type": "boolean", "default": true }))
+        }
+        ("word.insert_bookmark", "name") => Some(json!({
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,39}$"
+        })),
+        ("word.delete_bookmark", "name") => Some(json!({ "type": "string", "minLength": 1 })),
+        _ => None,
+    }
+}
+
+fn word_note_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_note_tool = matches!(
+        tool,
+        "word.insert_note" | "word.list_notes" | "word.update_note" | "word.delete_note"
+    );
+    match (is_note_tool, name) {
+        (true, "kind") => Some(json!({ "enum": ["footnote", "endnote"] })),
+        (true, "text") if tool == "word.insert_note" => {
+            Some(json!({ "type": "string", "minLength": 1 }))
+        }
+        _ => None,
     }
 }
 
