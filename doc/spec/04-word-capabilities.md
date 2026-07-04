@@ -36,6 +36,22 @@ assembled with these shared definitions:
         "highlight": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
       },
       "additionalProperties": false
+    },
+    "paragraph_formatting": {
+      "type": "object",
+      "properties": {
+        "alignment": { "enum": ["left", "center", "right", "justified"] },
+        "left_indent_pt": { "type": "number", "minimum": 0 },
+        "right_indent_pt": { "type": "number", "minimum": 0 },
+        "first_line_indent_pt": { "type": "number" },
+        "line_spacing_pt": { "type": "number", "exclusiveMinimum": 0 },
+        "line_unit_before": { "type": "number", "minimum": 0 },
+        "line_unit_after": { "type": "number", "minimum": 0 },
+        "space_before_pt": { "type": "number", "minimum": 0 },
+        "space_after_pt": { "type": "number", "minimum": 0 },
+        "outline_level": { "type": "integer", "minimum": 0, "maximum": 9 }
+      },
+      "additionalProperties": false
     }
   }
 }
@@ -85,7 +101,7 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.get_outline` | implemented | Document & structure | read | `WordApi 1.3` | Read headings and lightweight document structure without body text. |
 | `word.get_header_footer` | implemented | Document & structure | read | `WordApi 1.1` | Read section-scoped header or footer text and optional paragraph metadata; non-primary layout validation uses `WordApiDesktop 1.3` when required. |
 | `word.update_header_footer` | implemented | Document & structure | edit/destructive | `WordApi 1.1` | Replace, append to, or clear a section-scoped header or footer body; non-primary layout validation uses `WordApiDesktop 1.3` when required. |
-| `word.get_paragraph` | implemented | Paragraphs & lists | read | `WordApi 1.3` | Read one paragraph by index. |
+| `word.get_paragraph` | implemented | Paragraphs & lists | read | `WordApi 1.3` | Read one paragraph by index, optionally including direct paragraph formatting metadata. |
 | `word.find_text` | implemented | Range & selection | read | `WordApi 1.3` | Search text with Word search options and return portable paragraph-relative matches. |
 | `word.resolve_anchor` | implemented | Range & selection | read | `WordApi 1.3` | Resolve an anchor to safe diagnostic metadata without returning full document text. |
 | `word.insert_bookmark` | implemented | Range & selection | edit | `WordApi 1.4` | Create or move a named bookmark at an anchored range with explicit duplicate handling. |
@@ -106,7 +122,7 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.replace_text` | implemented | Range & selection | edit | `WordApi 1.3` | Find and replace text, with dry-run support. |
 | `word.update_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Replace one paragraph's text wholesale. |
 | `word.delete_range` | implemented | Range & selection | destructive | `WordApi 1.3` | Delete an anchored paragraph, sentence, or selection. |
-| `word.apply_formatting` | implemented | Range & selection | edit | `WordApi 1.3` | Apply character/run formatting to an anchored range. |
+| `word.apply_formatting` | implemented | Range & selection | edit | `WordApi 1.3` | Apply direct run and/or paragraph formatting to an anchored range. |
 | `word.apply_style` | implemented | Range & selection | edit | `WordApi 1.3` | Apply an Office style to an anchored range; also owns heading-level changes after migration. |
 | `word.read_table` | implemented | Table | read | `WordApi 1.3` | Read table dimensions, header state, and cell text. |
 | `word.update_table` | implemented | Table | edit/destructive | `WordApi 1.3` | Update table cells, rows, columns, table/cell formatting, and table deletion through one table-owner tool. |
@@ -145,7 +161,9 @@ Tool ownership rules:
 - `word.insert_paragraph` owns paragraph creation, including headings. Do not add
   a separate heading insertion tool after migration.
 - `word.apply_style` owns semantic Office style changes, including heading level.
-  `word.apply_formatting` owns direct character/run formatting only.
+  `word.apply_formatting` owns direct character/run and paragraph layout
+  formatting. Direct paragraph layout includes alignment, indentation, spacing,
+  and outline level; named styles remain owned by `word.apply_style`.
 - `word.insert_hyperlink`, `word.list_hyperlinks`, and
   `word.remove_hyperlink` own hyperlink lifecycle. Generic run styling remains
   owned by `word.apply_formatting`, and bookmark creation/deletion remains out
@@ -284,10 +302,17 @@ Returns nested tree of `{ text, level, paragraph_index, children: [...] }`.
   "required": ["session_id", "index"],
   "properties": {
     "session_id": { "type": "string" },
-    "index": { "type": "integer", "minimum": 0 }
+    "index": { "type": "integer", "minimum": 0 },
+    "include_formatting": { "type": "boolean", "default": false }
   }
 }
 ```
+
+When `include_formatting` is true, the response includes a `formatting` object
+with the same direct paragraph-layout fields accepted by
+`word.apply_formatting.paragraph`, plus `style` when available. This read-back
+shape is intended for round-trip verification; it is not a substitute for
+semantic style inspection.
 
 ### 2.4 `word.find_text`
 
@@ -938,13 +963,19 @@ of remaining visible bookmarks after deletion.
 ```json
 {
   "type": "object",
-  "required": ["session_id", "anchor", "formatting"],
+  "required": ["session_id", "anchor"],
   "properties": {
     "session_id": { "type": "string" },
     "anchor": { "$ref": "#/$defs/anchor" },
     "extent": { "$ref": "#/$defs/extent" },
-    "formatting": { "$ref": "#/$defs/run_formatting" }
-  }
+    "formatting": { "$ref": "#/$defs/run_formatting" },
+    "paragraph": { "$ref": "#/$defs/paragraph_formatting" }
+  },
+  "anyOf": [
+    { "required": ["formatting"] },
+    { "required": ["paragraph"] }
+  ],
+  "additionalProperties": false
 }
 ```
 
@@ -965,6 +996,34 @@ of remaining visible bookmarks after deletion.
   }
 }
 ```
+
+`paragraph_formatting`:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "alignment": { "enum": ["left", "center", "right", "justified"] },
+    "left_indent_pt": { "type": "number", "minimum": 0 },
+    "right_indent_pt": { "type": "number", "minimum": 0 },
+    "first_line_indent_pt": { "type": "number" },
+    "line_spacing_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "line_unit_before": { "type": "number", "minimum": 0 },
+    "line_unit_after": { "type": "number", "minimum": 0 },
+    "space_before_pt": { "type": "number", "minimum": 0 },
+    "space_after_pt": { "type": "number", "minimum": 0 },
+    "outline_level": { "type": "integer", "minimum": 0, "maximum": 9 }
+  },
+  "additionalProperties": false
+}
+```
+
+At least one of `formatting` or `paragraph` is required. A call that passes
+neither block, or passes an empty block, fails with `INVALID_ARGUMENT` and
+`partial_effect: "none"`. When both blocks are present, run formatting applies
+to the resolved range font and paragraph formatting applies to every paragraph
+intersecting the resolved range. Negative `first_line_indent_pt` expresses a
+hanging indent using Word's native `Paragraph.firstLineIndent` semantics.
 
 ## 5. Tables
 
