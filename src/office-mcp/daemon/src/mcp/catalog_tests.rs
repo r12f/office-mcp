@@ -58,6 +58,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word.list_sections"));
     assert!(names.contains(&"word.update_page_setup"));
     assert!(names.contains(&"word.resolve_anchor"));
+    assert!(names.contains(&"word.insert_bookmark"));
+    assert!(names.contains(&"word.list_bookmarks"));
+    assert!(names.contains(&"word.delete_bookmark"));
     assert!(names.contains(&"word.list_content_controls"));
     assert!(names.contains(&"word.insert_content_control"));
     assert!(names.contains(&"word.update_content_control"));
@@ -89,10 +92,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 31);
+    assert_eq!(WORD_V1_TOOLS.len(), 34);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 158);
+    assert_eq!(tools.len(), 164);
 }
 
 #[test]
@@ -377,6 +380,29 @@ fn representative_word_schemas_are_specific() {
             .len(),
         6
     );
+
+    let insert_bookmark = schema_for("word.insert_bookmark");
+    assert_required(&insert_bookmark, &["session_id", "name", "anchor"]);
+    assert_eq!(
+        insert_bookmark["properties"]["name"]["pattern"],
+        "^[A-Za-z_][A-Za-z0-9_]{0,39}$"
+    );
+    assert_eq!(
+        insert_bookmark["properties"]["overwrite"]["type"],
+        "boolean"
+    );
+    assert!(anchor_kinds(&insert_bookmark).contains(&"bookmark"));
+
+    let list_bookmarks = schema_for("word.list_bookmarks");
+    assert_required(&list_bookmarks, &["session_id"]);
+    assert_eq!(
+        list_bookmarks["properties"]["include_hidden"]["type"],
+        "boolean"
+    );
+
+    let delete_bookmark = schema_for("word.delete_bookmark");
+    assert_required(&delete_bookmark, &["session_id", "name"]);
+    assert_eq!(delete_bookmark["properties"]["name"]["minLength"], 1);
 
     let get_header_footer = schema_for("word.get_header_footer");
     assert_required(&get_header_footer, &["session_id", "location"]);

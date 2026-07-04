@@ -83,6 +83,43 @@ const WORD_E2E_CASES = Object.fromEntries([
       }
     }
   }],
+  ['word.insert_bookmark', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Bookmark insert E2E paragraph' } }
+      ]
+    },
+    args: { name: 'E2E_Insert_Bookmark', anchor: { kind: 'after_text', text: 'Bookmark insert E2E paragraph' } },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.resolve_anchor',
+      readbackArguments: { anchor: { kind: 'bookmark', name: 'E2E_Insert_Bookmark' } },
+      expect: { contains: ['Bookmark insert E2E paragraph'], pathEquals: [{ path: 'resolved', value: true }] }
+    }
+  }],
+  ['word.list_bookmarks', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Bookmark list E2E paragraph' } },
+        { tool: 'word.insert_bookmark', arguments: { name: 'E2E_List_Bookmark', anchor: { kind: 'after_text', text: 'Bookmark list E2E paragraph' } } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E_List_Bookmark', 'Bookmark list E2E paragraph'] }
+    }
+  }],
+  ['word.delete_bookmark', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Bookmark delete E2E paragraph' } },
+        { tool: 'word.insert_bookmark', arguments: { name: 'E2E_Delete_Bookmark', anchor: { kind: 'after_text', text: 'Bookmark delete E2E paragraph' } } }
+      ]
+    },
+    args: { name: 'E2E_Delete_Bookmark' },
+    verify: wordReadback.bookmarks({ notContains: ['E2E_Delete_Bookmark'] })
+  }],
   ['word.get_selection', {
     setup: {
       actions: [

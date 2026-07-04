@@ -436,6 +436,9 @@ test('word.resolve_anchor returns safe anchor diagnostics without mutating', () 
   const describeBody = functionBody(js, 'describeResolvedAnchor');
 
   assert.match(js, /'word\.resolve_anchor'/);
+  assert.match(js, /'word\.insert_bookmark'/);
+  assert.match(js, /'word\.list_bookmarks'/);
+  assert.match(js, /'word\.delete_bookmark'/);
   assert.match(js, /\['word\.resolve_anchor', \{ category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata\.' \}\]/);
   assert.match(invokeBody, /case 'word\.resolve_anchor':\s*data = await resolveAnchorTool\(args\);/);
   assert.match(resolveBody, /requireAnchor\('word\.resolve_anchor', args\.anchor\)/);
@@ -557,7 +560,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.list_sections'/);
   assert.match(js, /'word\.update_page_setup'/);
   assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.save'\] \}/);
-  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image'\] \}/);
@@ -579,6 +582,9 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.delete_content_control', \{ category: 'Content controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling\.' \}\]/);
   assert.match(js, /\['word\.resize_image', \{ category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image\.' \}\]/);
   assert.match(js, /\['word\.resolve_anchor', \{ category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata\.' \}\]/);
+  assert.match(js, /\['word\.insert_bookmark', \{ category: 'Range & selection', sideEffect: 'mutating', description: 'Create a named bookmark around an anchored range\.' \}\]/);
+  assert.match(js, /\['word\.list_bookmarks', \{ category: 'Range & selection', sideEffect: 'read', description: 'List bookmark names and locations\.' \}\]/);
+  assert.match(js, /\['word\.delete_bookmark', \{ category: 'Range & selection', sideEffect: 'destructive', description: 'Delete a bookmark marker without deleting text\.' \}\]/);
   assert.match(js, /\['word\.get_header_footer', \{ category: 'Document & structure', sideEffect: 'read', description: 'Read section header or footer text\.' \}\]/);
   assert.match(js, /\['word\.update_header_footer', \{ category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer\.' \}\]/);
   assert.match(js, /\['word\.insert_break', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page, line, or section break\.' \}\]/);
@@ -599,6 +605,9 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /case 'word\.delete_content_control':\s*data = await deleteContentControl\(args\);/);
   assert.match(js, /case 'word\.resize_image':\s*data = await resizeImage\(args\);/);
   assert.match(js, /case 'word\.resolve_anchor':\s*data = await resolveAnchorTool\(args\);/);
+  assert.match(js, /case 'word\.insert_bookmark':\s*data = await insertBookmark\(args\);/);
+  assert.match(js, /case 'word\.list_bookmarks':\s*data = await listBookmarks\(args \|\| \{\}\);/);
+  assert.match(js, /case 'word\.delete_bookmark':\s*data = await deleteBookmark\(args\);/);
   assert.match(js, /case 'word\.update_tracked_change':\s*data = await updateTrackedChange\(args\);/);
   assert.match(js, /async function insertTable\(args\)/);
   assert.match(js, /table_index: tableIndex/);
@@ -608,6 +617,12 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /async function updateContentControl\(args\)/);
   assert.match(js, /async function deleteContentControl\(args\)/);
   assert.match(js, /async function resizeImage\(args\)/);
+  assert.match(js, /async function insertBookmark\(args\)/);
+  assert.match(js, /async function listBookmarks\(args\)/);
+  assert.match(js, /async function deleteBookmark\(args\)/);
+  assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.insert_bookmark':\s*requireAnchor\(tool, args\.anchor\);\s*validateBookmarkName\(tool, args\.name\);/);
+  assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.delete_bookmark':\s*validateBookmarkName\(tool, args\.name, \{ strictPattern: false \}\);/);
+  assert.match(js, /function validateBookmarkName\(tool, name/);
   assert.match(js, /control\.load\('id'\);\s*await context\.sync\(\);\s*const id = control\.id;/);
   assert.match(js, /async function updateTrackedChange\(args\)/);
   assert.match(js, /return mutateTrackedChange\(args, action\);/);
