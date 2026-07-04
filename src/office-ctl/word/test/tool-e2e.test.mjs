@@ -230,6 +230,41 @@ const WORD_E2E_CASES = Object.fromEntries([
     args: { anchor: { kind: 'after_text', text: 'list anchor marker' }, items: ['E2E One', 'E2E Two'] },
     verify: wordReadback.documentText({ contains: ['E2E One', 'E2E Two'] })
   }],
+  ['word.insert_hyperlink', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'hyperlink anchor marker' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'hyperlink anchor marker' }, text: 'OpenAI', url: 'https://openai.com' },
+    verify: wordReadback.hyperlinks({ contains: ['OpenAI', 'https://openai.com'], pathEquals: [{ path: 'count', value: 1 }] })
+  }],
+  ['word.list_hyperlinks', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_hyperlink', arguments: { anchor: { kind: 'end_of_document' }, text: 'List Link', url: 'mailto:test@example.com' } }
+      ]
+    },
+    args: { offset: 0, limit: 10 },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['List Link', 'mailto:test@example.com'], pathEquals: [{ path: 'count', value: 1 }, { path: 'hyperlinks.0.occurrence_in_paragraph', value: 0 }] }
+    }
+  }],
+  ['word.remove_hyperlink', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_hyperlink', arguments: { anchor: { kind: 'end_of_document' }, text: 'Remove Link', url: 'https://example.com/remove' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'Remove Link' }, keep_text: true },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_hyperlinks',
+      readbackArguments: {},
+      expect: { notContains: ['https://example.com/remove'] }
+    }
+  }],
   ['word.replace_text', {
     setup: {
       actions: [
