@@ -115,7 +115,7 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.update_content_control`, `word.delete_content_control`,
 `word.insert_note`, `word.list_notes`, `word.update_note`,
 `word.delete_note`, `word.add_comment`, `word.resolve_comment`,
-`word.update_tracked_change`, and `word.save`.
+`word.update_comment`, `word.update_tracked_change`, and `word.save`.
 
 Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 `word.insert_page_break`, `word.update_cell`, `word.add_row`, `word.add_column`,
