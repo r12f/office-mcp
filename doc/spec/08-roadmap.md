@@ -101,14 +101,15 @@ not keep a separate tool when it only repeats another tool's object owner and
 user intent.
 
 Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
-`word.find_text`, `word.resolve_anchor`, `word.get_selection`, `word.insert_paragraph`,
-`word.insert_table`, `word.insert_image`, `word.resize_image`, `word.insert_page_break`,
-`word.insert_list`, `word.replace_text`, `word.update_paragraph`,
-`word.delete_range`, `word.apply_formatting`, `word.apply_style`,
-`word.read_table`, `word.update_table`, `word.list_content_controls`,
-`word.insert_content_control`, `word.update_content_control`,
-`word.delete_content_control`, `word.add_comment`, `word.resolve_comment`,
-`word.update_tracked_change`, and `word.save`.
+`word.find_text`, `word.resolve_anchor`, `word.get_selection`,
+`word.get_header_footer`, `word.update_header_footer`, `word.insert_paragraph`,
+`word.insert_table`, `word.insert_image`, `word.resize_image`,
+`word.insert_page_break`, `word.insert_list`, `word.replace_text`,
+`word.update_paragraph`, `word.delete_range`, `word.apply_formatting`,
+`word.apply_style`, `word.read_table`, `word.update_table`,
+`word.list_content_controls`, `word.insert_content_control`,
+`word.update_content_control`, `word.delete_content_control`, `word.add_comment`,
+`word.resolve_comment`, `word.update_tracked_change`, and `word.save`.
 
 Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 `word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell`,
@@ -142,6 +143,13 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       supports rich text and plain text controls, lists metadata without
       duplicating contained document text, updates tag/title/lock/text metadata,
       and deletes controls with explicit keep/delete content handling.
+- [x] Add header/footer CRUD tools: `word.get_header_footer` and
+      `word.update_header_footer`, keeping main-body reads and writes owned by
+      body/range/paragraph tools. Current implementation reads section-scoped
+      primary/first-page/even-pages header and footer bodies, supports replace,
+      append, clear, and validation-only mutation preflight, and rejects
+      first-page/even-pages targets when the corresponding layout flag is not
+      enabled.
 - [x] Implement `word.update_tracked_change` with an explicit `action` argument
       for accept/reject, then retire `word.accept_change` and
       `word.reject_change` from the advertised catalog. Current implementation
