@@ -207,18 +207,6 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'sections.0.page_setup.orientation', value: 'landscape' }, { path: 'sections.0.page_setup.margins_pt.left', value: 54 }] }
     }
   }],
-  ['word.insert_page_break', {
-    setup: {
-      actions: [
-        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'compat page break anchor marker' } }
-      ]
-    },
-    args: { anchor: { kind: 'after_text', text: 'compat page break anchor marker' } },
-    verify: {
-      kind: 'direct-result',
-      expect: { pathEquals: [{ path: 'inserted', value: true }, { path: 'break_type', value: 'page' }, { path: 'superseded_by', value: 'word.insert_break' }] }
-    }
-  }],
   ['word.update_header_footer', {
     setup: {
       actions: [

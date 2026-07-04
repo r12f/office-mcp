@@ -14,12 +14,13 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.get_selection",
     "word.get_text",
     "word.insert_content_control",
+    "word.insert_break",
     "word.insert_image",
     "word.insert_list",
-    "word.insert_page_break",
     "word.insert_paragraph",
     "word.insert_table",
     "word.list_content_controls",
+    "word.list_sections",
     "word.read_table",
     "word.replace_text",
     "word.resolve_anchor",
@@ -28,6 +29,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.save",
     "word.update_header_footer",
     "word.update_content_control",
+    "word.update_page_setup",
     "word.update_paragraph",
     "word.update_table",
     "word.update_tracked_change",
@@ -814,6 +816,11 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     ),
     tool_spec!("word.save", ["session_id"], ["session_id"]),
     tool_spec!(
+        "word.list_sections",
+        ["session_id"],
+        ["session_id", "include_page_setup"]
+    ),
+    tool_spec!(
         "word.insert_paragraph",
         ["session_id", "anchor", "text"],
         [
@@ -867,9 +874,22 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!(
-        "word.insert_page_break",
+        "word.insert_break",
         ["session_id", "anchor"],
-        ["session_id", "anchor", "match_case"]
+        ["session_id", "anchor", "break_type", "match_case"]
+    ),
+    tool_spec!(
+        "word.update_page_setup",
+        ["session_id"],
+        [
+            "session_id",
+            "section_index",
+            "orientation",
+            "paper_size",
+            "margins_pt",
+            "page_width_pt",
+            "page_height_pt"
+        ]
     ),
     tool_spec!(
         "word.insert_list",
@@ -1531,7 +1551,8 @@ fn property_schema(tool: &str, name: &str) -> Value {
         }
         "heading_level" | "level" | "columns" => json!({ "type": "integer", "minimum": 1 }),
         "width_pt" | "height_pt" | "scale_percent" | "width" | "height" | "left" | "top"
-        | "rotation" | "fill_transparency" | "line_weight" | "line_transparency" | "font_size" => {
+        | "page_width_pt" | "page_height_pt" | "rotation" | "fill_transparency" | "line_weight"
+        | "line_transparency" | "font_size" => {
             json!({ "type": "number" })
         }
         "match_case"
@@ -1544,6 +1565,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
         | "include_formatting"
         | "include_formulas"
         | "include_selection"
+        | "include_page_setup"
         | "include_tags"
         | "ordered"
         | "all"
@@ -1580,6 +1602,20 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "header_footer_type" => {
             json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" })
         }
+        "break_type" => {
+            json!({ "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" })
+        }
+        "orientation" => json!({ "enum": ["portrait", "landscape"] }),
+        "margins_pt" => json!({
+            "type": "object",
+            "properties": {
+                "top": { "type": "number", "minimum": 0 },
+                "bottom": { "type": "number", "minimum": 0 },
+                "left": { "type": "number", "minimum": 0 },
+                "right": { "type": "number", "minimum": 0 }
+            },
+            "additionalProperties": false
+        }),
         "action" if tool == "word.update_header_footer" => {
             json!({ "enum": ["set_text", "append_paragraph", "clear"] })
         }

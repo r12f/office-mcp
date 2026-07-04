@@ -309,8 +309,8 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 74);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 74);
+    assert_eq!(all_tools.len(), 76);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 76);
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));

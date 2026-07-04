@@ -132,7 +132,19 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
-        "word.insert_page_break",
+        "word.insert_break",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.list_sections",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Read,
+    ),
+    tool(
+        "word.update_page_setup",
         "word",
         "Document & structure",
         ToolSideEffect::Mutating,
