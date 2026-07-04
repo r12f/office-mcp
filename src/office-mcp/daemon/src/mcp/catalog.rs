@@ -7,6 +7,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.apply_style",
     "word.delete_bookmark",
     "word.delete_content_control",
+    "word.delete_field",
     "word.delete_range",
     "word.find_text",
     "word.get_header_footer",
@@ -17,6 +18,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.insert_bookmark",
     "word.insert_content_control",
     "word.insert_break",
+    "word.insert_field",
     "word.insert_hyperlink",
     "word.insert_image",
     "word.insert_list",
@@ -25,6 +27,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.insert_table",
     "word.list_bookmarks",
     "word.list_content_controls",
+    "word.list_fields",
     "word.list_hyperlinks",
     "word.list_notes",
     "word.list_sections",
@@ -38,6 +41,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.set_change_tracking",
     "word.update_header_footer",
     "word.update_content_control",
+    "word.update_field",
     "word.update_note",
     "word.update_page_setup",
     "word.update_paragraph",
@@ -684,6 +688,9 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
         "word.insert_note" | "word.list_notes" | "word.update_note" | "word.delete_note" => {
             note_examples_for_tool(tool)
         }
+        "word.list_fields" | "word.insert_field" | "word.update_field" | "word.delete_field" => {
+            field_examples_for_tool(tool)
+        }
         "word.update_table" => vec![json!({
             "description": "Replace one table cell by row and column index.",
             "arguments": {
@@ -817,6 +824,43 @@ fn note_examples_for_tool(tool: &str) -> Vec<Value> {
     }
 }
 
+fn field_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.list_fields" => vec![json!({
+            "description": "List document fields with bounded previews.",
+            "arguments": {
+                "session_id": "session-1",
+                "offset": 0,
+                "limit": 50
+            }
+        })],
+        "word.insert_field" => vec![json!({
+            "description": "Insert a hyperlinkable table of contents at the document start.",
+            "arguments": {
+                "session_id": "session-1",
+                "anchor": { "kind": "start_of_document" },
+                "field_type": "toc"
+            }
+        })],
+        "word.update_field" => vec![json!({
+            "description": "Refresh all fields after confirming the current count.",
+            "arguments": {
+                "session_id": "session-1",
+                "action": "refresh_all",
+                "expected_count": 3
+            }
+        })],
+        "word.delete_field" => vec![json!({
+            "description": "Delete one field by current index after re-listing fields.",
+            "arguments": {
+                "session_id": "session-1",
+                "field_index": 0
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
 fn common_errors_for_tool(tool: &str) -> Vec<Value> {
     let mut errors = vec![json!({
         "code": "INVALID_ARGUMENTS",
@@ -861,6 +905,12 @@ fn common_errors_for_tool(tool: &str) -> Vec<Value> {
             errors.push(json!({
                 "code": "INVALID_ARGUMENTS",
                 "cause": "Note kind must be footnote or endnote, and note indices must be refreshed after insertion or deletion."
+            }));
+        }
+        "word.insert_field" | "word.update_field" | "word.delete_field" => {
+            errors.push(json!({
+                "code": "INVALID_ARGUMENTS",
+                "cause": "Field type must be allowlisted, and field indices or expected counts must be refreshed after document edits."
             }));
         }
         "word.update_table" | "excel.update_table" | "powerpoint.update_table" => {
@@ -957,6 +1007,11 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         "word.list_sections",
         ["session_id"],
         ["session_id", "include_page_setup"]
+    ),
+    tool_spec!(
+        "word.list_fields",
+        ["session_id"],
+        ["session_id", "type", "offset", "limit"]
     ),
     tool_spec!(
         "word.insert_paragraph",
@@ -1080,6 +1135,17 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!(
+        "word.insert_field",
+        ["session_id", "anchor", "field_type"],
+        [
+            "session_id",
+            "anchor",
+            "field_type",
+            "code_options",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
         "word.insert_bookmark",
         ["session_id", "name", "anchor"],
         ["session_id", "name", "anchor", "extent", "overwrite"]
@@ -1144,6 +1210,22 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         "word.delete_note",
         ["session_id", "kind", "index"],
         ["session_id", "kind", "index", "validate_only"]
+    ),
+    tool_spec!(
+        "word.update_field",
+        ["session_id", "action"],
+        [
+            "session_id",
+            "action",
+            "field_index",
+            "expected_count",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
+        "word.delete_field",
+        ["session_id", "field_index"],
+        ["session_id", "field_index", "validate_only"]
     ),
     tool_spec!(
         "word.apply_formatting",
@@ -1754,10 +1836,25 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             }
         ]);
     }
+    if tool == "word.update_field" {
+        schema["allOf"] = json!([
+            {
+                "if": { "properties": { "action": { "enum": ["refresh", "lock", "unlock"] } } },
+                "then": { "required": ["field_index"] }
+            },
+            {
+                "if": { "properties": { "action": { "const": "refresh_all" } } },
+                "then": { "required": ["expected_count"] }
+            }
+        ]);
+    }
     schema
 }
 
 fn property_schema(tool: &str, name: &str) -> Value {
+    if let Some(schema) = word_field_property_schema(tool, name) {
+        return schema;
+    }
     if let Some(schema) = word_review_property_schema(tool, name) {
         return schema;
     }
@@ -1854,6 +1951,27 @@ fn property_schema(tool: &str, name: &str) -> Value {
             json!({ "type": "array" })
         }
         _ => json!({ "type": "string" }),
+    }
+}
+
+fn word_field_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_field_tool = matches!(
+        tool,
+        "word.list_fields" | "word.insert_field" | "word.update_field" | "word.delete_field"
+    );
+    match (is_field_tool, tool, name) {
+        (true, "word.list_fields", "limit") => {
+            Some(json!({ "type": "integer", "minimum": 1, "maximum": 200 }))
+        }
+        (true, _, "field_index") => Some(json!({ "type": "integer", "minimum": 0 })),
+        (true, "word.insert_field", "field_type") => Some(json!({
+            "enum": ["toc", "page", "num_pages", "date", "time", "ref", "hyperlink", "seq", "styleref"]
+        })),
+        (true, "word.update_field", "action") => {
+            Some(json!({ "enum": ["refresh", "refresh_all", "lock", "unlock"] }))
+        }
+        (true, _, "type" | "code_options") => Some(json!({ "type": "string" })),
+        _ => None,
     }
 }
 

@@ -72,6 +72,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word.list_notes"));
     assert!(names.contains(&"word.update_note"));
     assert!(names.contains(&"word.delete_note"));
+    assert!(names.contains(&"word.list_fields"));
+    assert!(names.contains(&"word.insert_field"));
+    assert!(names.contains(&"word.update_field"));
+    assert!(names.contains(&"word.delete_field"));
     assert!(names.contains(&"word.resize_image"));
     assert!(names.contains(&"word.update_table"));
     assert!(names.contains(&"word_update_table"));
@@ -100,10 +104,80 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 42);
+    assert_eq!(WORD_V1_TOOLS.len(), 46);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 180);
+    assert_eq!(tools.len(), 188);
+}
+
+#[test]
+fn word_field_tools_expose_expected_contracts() {
+    let list_fields = tool_for("word.list_fields");
+    assert_eq!(
+        list_fields["inputSchema"]["required"],
+        serde_json::json!(["session_id"])
+    );
+    assert_eq!(
+        list_fields["inputSchema"]["properties"]["limit"]["minimum"],
+        1
+    );
+    assert_eq!(
+        list_fields["inputSchema"]["properties"]["limit"]["maximum"],
+        200
+    );
+    assert_eq!(list_fields["_meta"]["com.office-mcp/side_effects"], "read");
+
+    let insert_field = tool_for("word.insert_field");
+    assert_eq!(
+        insert_field["inputSchema"]["required"],
+        serde_json::json!(["session_id", "anchor", "field_type"])
+    );
+    assert_eq!(
+        insert_field["inputSchema"]["properties"]["field_type"]["enum"],
+        serde_json::json!([
+            "toc",
+            "page",
+            "num_pages",
+            "date",
+            "time",
+            "ref",
+            "hyperlink",
+            "seq",
+            "styleref"
+        ])
+    );
+    assert_eq!(
+        insert_field["inputSchema"]["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
+    let update_field = tool_for("word.update_field");
+    assert_eq!(
+        update_field["inputSchema"]["required"],
+        serde_json::json!(["session_id", "action"])
+    );
+    assert_eq!(
+        update_field["inputSchema"]["properties"]["action"]["enum"],
+        serde_json::json!(["refresh", "refresh_all", "lock", "unlock"])
+    );
+    assert_eq!(
+        update_field["inputSchema"]["allOf"][0]["then"]["required"],
+        serde_json::json!(["field_index"])
+    );
+    assert_eq!(
+        update_field["inputSchema"]["allOf"][1]["then"]["required"],
+        serde_json::json!(["expected_count"])
+    );
+
+    let delete_field = tool_for("word.delete_field");
+    assert_eq!(
+        delete_field["inputSchema"]["required"],
+        serde_json::json!(["session_id", "field_index"])
+    );
+    assert_eq!(
+        delete_field["_meta"]["com.office-mcp/side_effects"],
+        "destructive"
+    );
 }
 
 #[test]
@@ -359,8 +433,8 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 87);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 87);
+    assert_eq!(all_tools.len(), 91);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 91);
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));
@@ -587,6 +661,43 @@ fn word_note_schemas_are_specific() {
 }
 
 #[test]
+fn word_field_schemas_are_specific() {
+    let list_fields = schema_for("word.list_fields");
+    assert_required(&list_fields, &["session_id"]);
+    assert_eq!(list_fields["properties"]["offset"]["minimum"], 0);
+    assert_eq!(list_fields["properties"]["limit"]["minimum"], 1);
+    assert_eq!(list_fields["properties"]["limit"]["maximum"], 200);
+    assert_eq!(list_fields["properties"]["type"]["type"], "string");
+
+    let insert_field = schema_for("word.insert_field");
+    assert_required(&insert_field, &["session_id", "anchor", "field_type"]);
+    assert_eq!(insert_field["properties"]["field_type"]["enum"][0], "toc");
+    assert_eq!(insert_field["properties"]["code_options"]["type"], "string");
+    assert_eq!(
+        insert_field["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+    assert!(anchor_kinds(&insert_field).contains(&"bookmark"));
+
+    let update_field = schema_for("word.update_field");
+    assert_required(&update_field, &["session_id", "action"]);
+    assert_eq!(update_field["properties"]["field_index"]["minimum"], 0);
+    assert_eq!(update_field["properties"]["expected_count"]["minimum"], 0);
+    assert_eq!(
+        update_field["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
+    let delete_field = schema_for("word.delete_field");
+    assert_required(&delete_field, &["session_id", "field_index"]);
+    assert_eq!(delete_field["properties"]["field_index"]["minimum"], 0);
+    assert_eq!(
+        delete_field["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+}
+
+#[test]
 fn word_validation_only_schemas_accept_validate_only_flag() {
     for tool in [
         "word.insert_image",
@@ -595,8 +706,11 @@ fn word_validation_only_schemas_accept_validate_only_flag() {
         "word.replace_text",
         "word.update_paragraph",
         "word.update_note",
+        "word.insert_field",
+        "word.update_field",
         "word.delete_range",
         "word.delete_note",
+        "word.delete_field",
         "word.update_header_footer",
     ] {
         let schema = schema_for(tool);

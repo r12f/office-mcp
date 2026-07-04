@@ -244,6 +244,59 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'sections.0.page_setup.orientation', value: 'landscape' }, { path: 'sections.0.page_setup.margins_pt.left', value: 54 }] }
     }
   }],
+  ['word.insert_field', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'start_of_document' }, text: 'E2E Field Heading', heading_level: 1 } }
+      ]
+    },
+    args: { anchor: { kind: 'start_of_document' }, field_type: 'toc' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_fields',
+      readbackArguments: { limit: 10 },
+      expect: { contains: ['toc'], pathEquals: [{ path: 'count', value: 1 }, { path: 'fields.0.index', value: 0 }] }
+    }
+  }],
+  ['word.list_fields', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_field', arguments: { anchor: { kind: 'start_of_document' }, field_type: 'date' } }
+      ]
+    },
+    args: { offset: 0, limit: 10 },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['date'], pathEquals: [{ path: 'count', value: 1 }, { path: 'fields.0.index', value: 0 }] }
+    }
+  }],
+  ['word.update_field', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_field', arguments: { anchor: { kind: 'start_of_document' }, field_type: 'date' } },
+        { tool: 'word.list_fields', saveAs: 'fieldList', arguments: { limit: 10 } }
+      ]
+    },
+    args: { action: 'refresh_all', expected_count: '${fieldList.count}' },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'updated', value: true }, { path: 'action', value: 'refresh_all' }] }
+    }
+  }],
+  ['word.delete_field', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_field', arguments: { anchor: { kind: 'start_of_document' }, field_type: 'date' } }
+      ]
+    },
+    args: { field_index: 0 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_fields',
+      readbackArguments: { limit: 10 },
+      expect: { pathEquals: [{ path: 'count', value: 0 }] }
+    }
+  }],
   ['word.update_header_footer', {
     setup: {
       actions: [

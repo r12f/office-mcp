@@ -49,6 +49,26 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(delete_note.category, "Notes");
     assert_eq!(delete_note.side_effect, ToolSideEffect::Destructive);
 
+    let list_fields = tool_metadata("word.list_fields").expect("field list metadata");
+    assert_eq!(list_fields.app, "word");
+    assert_eq!(list_fields.category, "Document & structure");
+    assert_eq!(list_fields.side_effect, ToolSideEffect::Read);
+
+    let insert_field = tool_metadata("word.insert_field").expect("field insert metadata");
+    assert_eq!(insert_field.app, "word");
+    assert_eq!(insert_field.category, "Document & structure");
+    assert_eq!(insert_field.side_effect, ToolSideEffect::Mutating);
+
+    let update_field = tool_metadata("word.update_field").expect("field update metadata");
+    assert_eq!(update_field.app, "word");
+    assert_eq!(update_field.category, "Document & structure");
+    assert_eq!(update_field.side_effect, ToolSideEffect::Mutating);
+
+    let delete_field = tool_metadata("word.delete_field").expect("field delete metadata");
+    assert_eq!(delete_field.app, "word");
+    assert_eq!(delete_field.category, "Document & structure");
+    assert_eq!(delete_field.side_effect, ToolSideEffect::Destructive);
+
     let sections = tool_metadata("word.list_sections").expect("sections metadata");
     assert_eq!(sections.app, "word");
     assert_eq!(sections.category, "Document & structure");

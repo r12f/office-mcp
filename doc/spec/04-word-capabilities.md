@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 32 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 36 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -73,7 +73,7 @@ The per-tool JSON Schemas follow in §2-§9.
 
 | Category | Tools |
 |---|---|
-| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.save` |
+| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.list_fields`, `word.insert_field`, `word.update_field`, `word.delete_field`, `word.save` |
 | **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 42 tools. It deliberately consolidates specialized tools
+The target surface has 46 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -118,6 +118,10 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.insert_break` | implemented | Document & structure | edit | `WordApi 1.3` | Insert a page, line, or section break at an anchor. |
 | `word.list_sections` | implemented | Document & structure | read | `WordApi 1.3` | List document sections with paragraph range and header/footer metadata. |
 | `word.update_page_setup` | implemented | Document & structure | edit | `WordApiDesktop 1.3` | Update document or section page setup such as orientation, margins, and page size. |
+| `word.list_fields` | implemented | Document & structure | read | `WordApi 1.4` | List document fields with current indices, code, result preview, locked state, and paragraph location hints. |
+| `word.insert_field` | implemented | Document & structure | edit | `WordApi 1.5` | Insert curated Word fields, including a default table of contents, at an anchored range. |
+| `word.update_field` | implemented | Document & structure | edit | `WordApi 1.5` | Refresh, lock, or unlock one field, or refresh all fields after an expected-count stale check. |
+| `word.delete_field` | implemented | Document & structure | destructive | `WordApi 1.5` | Delete one field and its current result by current field index. |
 | `word.insert_list` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a numbered or bulleted list. |
 | `word.replace_text` | implemented | Range & selection | edit | `WordApi 1.3` | Find and replace text, with dry-run support. |
 | `word.update_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Replace one paragraph's text wholesale. |
@@ -200,6 +204,12 @@ Tool ownership rules:
 - `word.update_page_setup` owns page layout mutations for the document or a
   single section and is advertised only after a successful
   `WordApiDesktop 1.3` probe.
+- Field tools own Word field lifecycle. `word.list_fields` reads current field
+  indices and bounded previews; `word.insert_field` owns curated field
+  insertion, including the table-of-contents convenience path; `word.update_field`
+  owns refresh/lock/unlock; and `word.delete_field` owns removal. Paragraph,
+  style, and header/footer tools may create text that fields reference, but they
+  must not create, refresh, or delete fields implicitly.
 
 ### 1.3 Runtime capability tiers
 
@@ -209,8 +219,8 @@ runtime and advertises only tools whose complete implementation is supported:
 | Tier | Requirement | Additional tools/features |
 |---|---|---|
 | Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection |
-| Review | `WordApi 1.4` | comments, bookmark anchors and bookmark lifecycle tools |
-| Notes and content controls | `WordApi 1.5` | footnote/endnote lifecycle and content-control lifecycle tools |
+| Review | `WordApi 1.4` | comments, bookmark anchors, bookmark lifecycle tools, and field listing |
+| Notes, content controls, and fields | `WordApi 1.5` | footnote/endnote lifecycle, content-control lifecycle, and field insertion/update/deletion tools |
 | Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
 | Host-specific | explicit successful probe | page setup, active-window, and protection metadata |
 
@@ -1441,6 +1451,143 @@ same current metadata without deleting it.
 Note lifecycle tools are advertised only when the `WordApi 1.5` notes and
 content-controls tier is available.
 
+## 7C. Field Lifecycle
+
+Word fields are document-structure objects used for generated furniture such as
+tables of contents, page numbers, dates, cross-references, sequence numbers,
+and style references. Field tools own field lifecycle. The field allowlist is
+curated; field types that can import external content or execute unsafe host
+behavior, such as `INCLUDETEXT` or `IMPORT`, are not exposed.
+
+Field indices are current collection positions. Clients that need stable
+addressing across edits must re-read `word.list_fields` after any insert,
+delete, or document edit that can add or remove fields.
+
+### 7C.1 `word.list_fields`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "type": { "type": "string" },
+    "offset": { "type": "integer", "minimum": 0, "default": 0 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns `{ fields: [{ index, type, code, result_preview, locked,
+paragraph_index }], count, truncated }` from `Document.fields`. The optional
+`type` filter accepts the normalized field type names returned by this tool;
+unknown filters return an empty list rather than an error. `code` and
+`result_preview` are bounded previews and must not duplicate full document text.
+
+### 7C.2 `word.insert_field`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor", "field_type"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "field_type": { "enum": ["toc", "page", "num_pages", "date", "time", "ref", "hyperlink", "seq", "styleref"] },
+    "code_options": { "type": "string" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+The add-in resolves the anchor and maps the curated `field_type` to a Word
+field insertion. `field_type: "toc"` uses a safe default table-of-contents
+field code when `code_options` is omitted: `\\o "1-3" \\h \\z \\u`, producing
+a hyperlinkable three-level TOC. Other field types use either the matching
+`Word.FieldType` value or a safe field-code construction when Office.js requires
+code text.
+
+`code_options` is limited to field switches and arguments for the selected
+allowlisted type. The add-in rejects unsupported field types, external-content
+field names, and malformed options with `INVALID_ARGUMENT` and
+`partial_effect: "none"` before queuing writes. With `validate_only: true`, the
+add-in resolves the anchor and validates the field type and options, then
+returns `{ valid: true, operation: "word.insert_field", partial_effect: "none" }`
+without inserting a field.
+
+### 7C.3 `word.update_field`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "action"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "action": { "enum": ["refresh", "refresh_all", "lock", "unlock"] },
+    "field_index": { "type": "integer", "minimum": 0 },
+    "expected_count": { "type": "integer", "minimum": 0 },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "enum": ["refresh", "lock", "unlock"] } } },
+      "then": { "required": ["field_index"] }
+    },
+    {
+      "if": { "properties": { "action": { "const": "refresh_all" } } },
+      "then": { "required": ["expected_count"] }
+    }
+  ]
+}
+```
+
+`refresh` calls `Field.updateResult()` for one current field index. `lock` and
+`unlock` set `Field.locked`. `refresh_all` reloads `Document.fields`, compares
+the live count to `expected_count`, and refreshes every field only when the
+count still matches. Count mismatches fail with `STALE_INDEX` and no mutation.
+Out-of-range indices fail with `INVALID_ARGUMENT` and `partial_effect: "none"`
+before any write is queued. With `validate_only: true`, the add-in resolves the
+target or count guard and returns current metadata without changing the field.
+
+### 7C.4 `word.delete_field`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "field_index"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "field_index": { "type": "integer", "minimum": 0 },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Deletes the addressed field with `Field.delete()`. Deletion removes the field
+and its current result text; it does not preserve a plain-text copy. Out-of-range
+indices fail with `INVALID_ARGUMENT` and `partial_effect: "none"` before any
+deletion. The success response includes `{ deleted: true, field_index, count }`,
+where `count` is the remaining number of fields. With `validate_only: true`, the
+add-in resolves the target field and returns the same current metadata without
+deleting it.
+
+| Operation | API | Requirement set |
+|---|---|---|
+| Enumerate fields | `Document.fields` / `Range.fields` | `WordApi 1.4` |
+| Read field metadata | `Field.type`, `Field.code`, `Field.result`, `Field.locked` | `WordApi 1.4` |
+| Insert field | `Range.insertField(insertLocation, fieldType, text, removeFormatting)` | `WordApi 1.5` |
+| Refresh field result | `Field.updateResult()` | `WordApi 1.5` |
+| Lock/unlock field | `Field.locked` | `WordApi 1.5` |
+| Delete field | `Field.delete()` | `WordApi 1.5` |
+
+`word.list_fields` is advertised when `WordApi 1.4` is available. Mutating
+field tools are advertised only when the `WordApi 1.5` notes, content-controls,
+and fields tier is available.
+
 ## 8. Review
 
 ### 8.1 `word.add_comment`
@@ -1617,11 +1764,13 @@ information is available.
 
 ### 10.3 Validation-only mode
 
-`word.insert_image`, `word.replace_text`, `word.update_paragraph`, and
-`word.delete_range` MUST support `validate_only: true`. Validation-only mode is
-not a transaction preview; it is a no-write preflight. The add-in MAY call
-read-only Office.js APIs and `context.sync()` to resolve anchors, count matches,
-or load target metadata, but it MUST NOT queue a write before returning.
+Mutating tools that advertise `validate_only: true`, including
+`word.insert_image`, `word.replace_text`, `word.update_paragraph`,
+`word.delete_range`, note lifecycle mutations, header/footer updates, and field
+lifecycle mutations, MUST implement validation-only mode as a no-write preflight.
+Validation-only mode is not a transaction preview. The add-in MAY call read-only
+Office.js APIs and `context.sync()` to resolve anchors, count matches, or load
+target metadata, but it MUST NOT queue a write before returning.
 
 Successful validation-only responses MUST include:
 

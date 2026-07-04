@@ -114,8 +114,10 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.list_content_controls`, `word.insert_content_control`,
 `word.update_content_control`, `word.delete_content_control`,
 `word.insert_note`, `word.list_notes`, `word.update_note`,
-`word.delete_note`, `word.add_comment`, `word.resolve_comment`,
-`word.set_change_tracking`, `word.update_tracked_change`, and `word.save`.
+`word.delete_note`, `word.list_fields`, `word.insert_field`,
+`word.update_field`, `word.delete_field`, `word.add_comment`,
+`word.resolve_comment`, `word.set_change_tracking`,
+`word.update_tracked_change`, and `word.save`.
 
 Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 `word.insert_page_break`, `word.update_cell`, `word.add_row`, `word.add_column`,
@@ -196,6 +198,13 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       in a Notes category, uses `WordApi 1.5`, treats note indices as current
       collection positions that must be re-read after insertion/deletion, and
       gates destructive deletion through the All permission ceiling.
+- [x] Add field lifecycle tools: `word.list_fields`, `word.insert_field`,
+      `word.update_field`, and `word.delete_field`. The contract keeps field
+      enumeration, curated insertion, refresh/lock/unlock, and deletion in
+      Document & structure, uses `WordApi 1.4` for listing and `WordApi 1.5`
+      for mutations, treats field indices as current collection positions, and
+      exposes a safe table-of-contents insertion path while excluding
+      external-content field types.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.
