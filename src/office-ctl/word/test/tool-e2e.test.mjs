@@ -513,6 +513,23 @@ const WORD_E2E_CASES = Object.fromEntries([
     args: { change_index: '${trackChanges.changes.0.index}', action: 'accept', expected_fingerprint: '${trackChanges.changes.0.fingerprint}' },
     verify: wordReadback.trackChanges({ notContains: ['Tracked change E2E paragraph'] })
   }],
+  ['word.set_change_tracking', {
+    setup: {
+      actions: [
+        { tool: 'word.get_selection', arguments: {} }
+      ]
+    },
+    args: { mode: 'track_all' },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'mode', value: 'track_all' }] }
+    },
+    reset: {
+      actions: [
+        { tool: 'word.set_change_tracking', arguments: { mode: 'off' }, allowErrorCodes: ['HOST_CAPABILITY_UNAVAILABLE'] }
+      ]
+    }
+  }],
   ['word.save', {
     setup: {
       actions: [

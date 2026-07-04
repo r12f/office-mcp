@@ -90,6 +90,7 @@
     'word.apply_style',
     'word.add_comment',
     'word.resolve_comment',
+    'word.set_change_tracking',
     'word.update_tracked_change',
     'word.save'
   ]);
@@ -133,6 +134,7 @@
     'word.apply_style',
     'word.add_comment',
     'word.resolve_comment',
+    'word.set_change_tracking',
     'word.update_tracked_change',
     'word.save'
   ];
@@ -144,7 +146,7 @@
     { label: 'Media', tools: ['word.insert_image', 'word.resize_image'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
     { label: 'Notes', tools: ['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'] },
-    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_tracked_change'] }
+    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.set_change_tracking', 'word.update_tracked_change'] }
   ];
   const TOOL_METADATA = new Map([
     ['word.get_text', { category: 'Document & structure', sideEffect: 'read', description: 'Read document text by paragraph range.' }],
@@ -187,7 +189,8 @@
     ['word.apply_style', { category: 'Range & selection', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
     ['word.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a comment to an anchored range.' }],
     ['word.resolve_comment', { category: 'Review', sideEffect: 'mutating', description: 'Resolve an existing comment.' }],
-    ['word.update_tracked_change', { category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint.' }],
+    ['word.set_change_tracking', { category: 'Review', sideEffect: 'mutating', description: 'Set Track Changes mode.' }],
+    ['word.update_tracked_change', { category: 'Review', sideEffect: 'destructive', description: 'Accept, reject, or bulk-finalize tracked changes.' }],
     ['word.save', { category: 'Document & structure', sideEffect: 'mutating', description: 'Save the current document.' }]
   ]);
   let socket;
@@ -597,6 +600,9 @@
         case 'word.resolve_comment':
           data = await resolveComment(args);
           break;
+        case 'word.set_change_tracking':
+          data = await setChangeTracking(args);
+          break;
         case 'word.update_tracked_change':
           data = await updateTrackedChange(args);
           break;
@@ -739,10 +745,11 @@
       case 'word.resolve_comment':
         if (!args.comment_id) throw invalidArgument('word.resolve_comment requires comment_id.');
         break;
+      case 'word.set_change_tracking':
+        validateChangeTrackingMode(args.mode);
+        break;
       case 'word.update_tracked_change':
-        requireNonNegativeInteger(tool, 'change_index', args.change_index);
-        validateTrackedChangeAction(args.action);
-        if (!args.expected_fingerprint) throw invalidArgument('word.update_tracked_change requires expected_fingerprint.');
+        validateTrackedChangeArgs(args);
         break;
       default:
         break;
@@ -2072,11 +2079,22 @@
     });
   }
 
+  async function setChangeTracking(args) {
+    return Word.run(async (context) => {
+      const document = context.document;
+      document.load('changeTrackingMode');
+      await context.sync();
+      const previousMode = changeTrackingModeToResult(document.changeTrackingMode);
+      document.changeTrackingMode = changeTrackingModeFromArg(args.mode);
+      document.load('changeTrackingMode');
+      await context.sync();
+      return { previous_mode: previousMode, mode: changeTrackingModeToResult(document.changeTrackingMode) };
+    });
+  }
+
   async function updateTrackedChange(args) {
     const action = String(args.action || '').trim().toLowerCase();
-    if (action !== 'accept' && action !== 'reject') {
-      throw Object.assign(new Error(`Unsupported tracked-change action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
-    }
+    if (action === 'accept_all' || action === 'reject_all') return mutateAllTrackedChanges(args, action);
     return mutateTrackedChange(args, action);
   }
 
@@ -2095,6 +2113,22 @@
       else change.reject();
       await context.sync();
       return { change_index: args.change_index, fingerprint, action };
+    });
+  }
+
+  async function mutateAllTrackedChanges(args, action) {
+    return Word.run(async (context) => {
+      const changes = context.document.body.getTrackedChanges();
+      changes.load('items');
+      await context.sync();
+      const liveCount = changes.items.length;
+      if (liveCount !== args.expected_count) {
+        throw Object.assign(new Error('Tracked change count mismatch; re-read track_changes before bulk mutating.'), { officeMcpCode: 'STALE_INDEX' });
+      }
+      if (action === 'accept_all') changes.acceptAll();
+      else changes.rejectAll();
+      await context.sync();
+      return { action, expected_count: args.expected_count, affected_count: liveCount };
     });
   }
 
@@ -2818,11 +2852,46 @@
     }
   }
 
+  function validateChangeTrackingMode(mode) {
+    if (mode !== 'off' && mode !== 'track_all' && mode !== 'track_mine_only') {
+      throw invalidArgument('word.set_change_tracking mode must be off, track_all, or track_mine_only.');
+    }
+  }
+
+  function validateTrackedChangeArgs(args) {
+    const action = validateTrackedChangeAction(args.action);
+    if (action === 'accept' || action === 'reject') {
+      requireNonNegativeInteger('word.update_tracked_change', 'change_index', args.change_index);
+      if (!args.expected_fingerprint) throw invalidArgument('word.update_tracked_change requires expected_fingerprint.');
+      return;
+    }
+    if (args.expected_count === undefined) {
+      throw invalidArgument('word.update_tracked_change requires expected_count.');
+    }
+    requireNonNegativeInteger('word.update_tracked_change', 'expected_count', args.expected_count);
+  }
+
   function validateTrackedChangeAction(action) {
     const normalized = String(action || '').trim().toLowerCase();
-    if (normalized !== 'accept' && normalized !== 'reject') {
+    if (normalized !== 'accept' && normalized !== 'reject' && normalized !== 'accept_all' && normalized !== 'reject_all') {
       throw invalidArgument(`Unsupported tracked-change action ${action}.`);
     }
+    return normalized;
+  }
+
+  function changeTrackingModeFromArg(mode) {
+    validateChangeTrackingMode(mode);
+    if (mode === 'off') return Word.ChangeTrackingMode.off;
+    if (mode === 'track_all') return Word.ChangeTrackingMode.trackAll;
+    return Word.ChangeTrackingMode.trackMineOnly;
+  }
+
+  function changeTrackingModeToResult(mode) {
+    const normalized = String(mode || '').toLowerCase();
+    if (normalized === 'off') return 'off';
+    if (normalized === 'trackall' || normalized === 'track_all') return 'track_all';
+    if (normalized === 'trackmineonly' || normalized === 'track_mine_only') return 'track_mine_only';
+    return normalized || null;
   }
 
   function validateResizeImageArgs(args) {

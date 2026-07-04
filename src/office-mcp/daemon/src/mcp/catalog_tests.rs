@@ -75,6 +75,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word.resize_image"));
     assert!(names.contains(&"word.update_table"));
     assert!(names.contains(&"word_update_table"));
+    assert!(names.contains(&"word.set_change_tracking"));
     assert!(names.contains(&"word.update_tracked_change"));
     assert!(!names.contains(&"word.insert_heading"));
     assert!(!names.contains(&"word.set_heading_level"));
@@ -99,10 +100,49 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 41);
+    assert_eq!(WORD_V1_TOOLS.len(), 42);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 178);
+    assert_eq!(tools.len(), 180);
+}
+
+#[test]
+fn word_change_tracking_tools_expose_expected_contracts() {
+    let set_change_tracking = tool_for("word.set_change_tracking");
+    assert_eq!(
+        set_change_tracking["inputSchema"]["required"],
+        serde_json::json!(["session_id", "mode"])
+    );
+    assert_eq!(
+        set_change_tracking["inputSchema"]["properties"]["mode"]["enum"],
+        serde_json::json!(["off", "track_all", "track_mine_only"])
+    );
+    assert_eq!(
+        set_change_tracking["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
+
+    let update_tracked_change = tool_for("word.update_tracked_change");
+    assert_eq!(
+        update_tracked_change["inputSchema"]["required"],
+        serde_json::json!(["session_id", "action"])
+    );
+    assert_eq!(
+        update_tracked_change["inputSchema"]["properties"]["action"]["enum"],
+        serde_json::json!(["accept", "reject", "accept_all", "reject_all"])
+    );
+    assert_eq!(
+        update_tracked_change["inputSchema"]["properties"]["expected_count"]["minimum"],
+        0
+    );
+    assert_eq!(
+        update_tracked_change["inputSchema"]["allOf"][0]["then"]["required"],
+        serde_json::json!(["change_index", "expected_fingerprint"])
+    );
+    assert_eq!(
+        update_tracked_change["inputSchema"]["allOf"][1]["then"]["required"],
+        serde_json::json!(["expected_count"])
+    );
 }
 
 #[test]
@@ -319,8 +359,8 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 86);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 86);
+    assert_eq!(all_tools.len(), 87);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 87);
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));

@@ -35,6 +35,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.resolve_comment",
     "word.resize_image",
     "word.save",
+    "word.set_change_tracking",
     "word.update_header_footer",
     "word.update_content_control",
     "word.update_note",
@@ -1225,18 +1226,19 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "comment_id"]
     ),
     tool_spec!(
+        "word.set_change_tracking",
+        ["session_id", "mode"],
+        ["session_id", "mode"]
+    ),
+    tool_spec!(
         "word.update_tracked_change",
+        ["session_id", "action"],
         [
             "session_id",
             "action",
             "change_index",
-            "expected_fingerprint"
-        ],
-        [
-            "session_id",
-            "action",
-            "change_index",
-            "expected_fingerprint"
+            "expected_fingerprint",
+            "expected_count"
         ]
     ),
     tool_spec!("excel.get_workbook_info", ["session_id"], ["session_id"]),
@@ -1740,10 +1742,28 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             { "required": ["paragraph"] }
         ]);
     }
+    if tool == "word.update_tracked_change" {
+        schema["allOf"] = json!([
+            {
+                "if": { "properties": { "action": { "enum": ["accept", "reject"] } } },
+                "then": { "required": ["change_index", "expected_fingerprint"] }
+            },
+            {
+                "if": { "properties": { "action": { "enum": ["accept_all", "reject_all"] } } },
+                "then": { "required": ["expected_count"] }
+            }
+        ]);
+    }
     schema
 }
 
 fn property_schema(tool: &str, name: &str) -> Value {
+    if let Some(schema) = word_review_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_header_footer_property_schema(tool, name) {
+        return schema;
+    }
     if let Some(schema) = word_note_property_schema(tool, name) {
         return schema;
     }
@@ -1758,7 +1778,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
         | "table_index" | "change_index" | "content_control_id" | "position" | "slice_size"
         | "section_index" | "slide_index" | "target_index" | "row_index" | "column_index"
-        | "row_count" | "column_count" | "count" | "max_depth" => {
+        | "row_count" | "column_count" | "count" | "max_depth" | "expected_count" => {
             json!({ "type": "integer", "minimum": 0 })
         }
         "heading_level" | "level" | "columns" => json!({ "type": "integer", "minimum": 1 }),
@@ -1811,12 +1831,6 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
         "image" => image_schema(),
         "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
-        "location" if tool == "word.get_header_footer" || tool == "word.update_header_footer" => {
-            json!({ "enum": ["header", "footer"] })
-        }
-        "header_footer_type" => {
-            json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" })
-        }
         "break_type" => {
             json!({ "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" })
         }
@@ -1831,9 +1845,6 @@ fn property_schema(tool: &str, name: &str) -> Value {
             },
             "additionalProperties": false
         }),
-        "action" if tool == "word.update_header_footer" => {
-            json!({ "enum": ["set_text", "append_paragraph", "clear"] })
-        }
         "formatting" => formatting_schema(),
         "paragraph" if tool == "word.apply_formatting" => paragraph_formatting_schema(),
         "title_box" | "content_box" => shape_box_schema(),
@@ -1843,6 +1854,33 @@ fn property_schema(tool: &str, name: &str) -> Value {
             json!({ "type": "array" })
         }
         _ => json!({ "type": "string" }),
+    }
+}
+
+fn word_header_footer_property_schema(tool: &str, name: &str) -> Option<Value> {
+    match (tool, name) {
+        ("word.get_header_footer" | "word.update_header_footer", "location") => {
+            Some(json!({ "enum": ["header", "footer"] }))
+        }
+        (_, "header_footer_type") => {
+            Some(json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" }))
+        }
+        ("word.update_header_footer", "action") => {
+            Some(json!({ "enum": ["set_text", "append_paragraph", "clear"] }))
+        }
+        _ => None,
+    }
+}
+
+fn word_review_property_schema(tool: &str, name: &str) -> Option<Value> {
+    match (tool, name) {
+        ("word.update_tracked_change", "action") => {
+            Some(json!({ "enum": ["accept", "reject", "accept_all", "reject_all"] }))
+        }
+        ("word.set_change_tracking", "mode") => {
+            Some(json!({ "enum": ["off", "track_all", "track_mine_only"] }))
+        }
+        _ => None,
     }
 }
 
