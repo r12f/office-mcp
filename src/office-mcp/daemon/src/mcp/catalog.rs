@@ -1758,6 +1758,12 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
 }
 
 fn property_schema(tool: &str, name: &str) -> Value {
+    if let Some(schema) = word_review_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_header_footer_property_schema(tool, name) {
+        return schema;
+    }
     if let Some(schema) = word_note_property_schema(tool, name) {
         return schema;
     }
@@ -1825,12 +1831,6 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
         "image" => image_schema(),
         "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
-        "location" if tool == "word.get_header_footer" || tool == "word.update_header_footer" => {
-            json!({ "enum": ["header", "footer"] })
-        }
-        "header_footer_type" => {
-            json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" })
-        }
         "break_type" => {
             json!({ "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" })
         }
@@ -1845,15 +1845,6 @@ fn property_schema(tool: &str, name: &str) -> Value {
             },
             "additionalProperties": false
         }),
-        "action" if tool == "word.update_header_footer" => {
-            json!({ "enum": ["set_text", "append_paragraph", "clear"] })
-        }
-        "action" if tool == "word.update_tracked_change" => {
-            json!({ "enum": ["accept", "reject", "accept_all", "reject_all"] })
-        }
-        "mode" if tool == "word.set_change_tracking" => {
-            json!({ "enum": ["off", "track_all", "track_mine_only"] })
-        }
         "formatting" => formatting_schema(),
         "paragraph" if tool == "word.apply_formatting" => paragraph_formatting_schema(),
         "title_box" | "content_box" => shape_box_schema(),
@@ -1863,6 +1854,33 @@ fn property_schema(tool: &str, name: &str) -> Value {
             json!({ "type": "array" })
         }
         _ => json!({ "type": "string" }),
+    }
+}
+
+fn word_header_footer_property_schema(tool: &str, name: &str) -> Option<Value> {
+    match (tool, name) {
+        ("word.get_header_footer" | "word.update_header_footer", "location") => {
+            Some(json!({ "enum": ["header", "footer"] }))
+        }
+        (_, "header_footer_type") => {
+            Some(json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" }))
+        }
+        ("word.update_header_footer", "action") => {
+            Some(json!({ "enum": ["set_text", "append_paragraph", "clear"] }))
+        }
+        _ => None,
+    }
+}
+
+fn word_review_property_schema(tool: &str, name: &str) -> Option<Value> {
+    match (tool, name) {
+        ("word.update_tracked_change", "action") => {
+            Some(json!({ "enum": ["accept", "reject", "accept_all", "reject_all"] }))
+        }
+        ("word.set_change_tracking", "mode") => {
+            Some(json!({ "enum": ["off", "track_all", "track_mine_only"] }))
+        }
+        _ => None,
     }
 }
 
