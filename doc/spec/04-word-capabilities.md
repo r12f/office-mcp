@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 31 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 32 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -80,7 +80,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | **Media** | `word.insert_image`, `word.resize_image` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Notes** | `word.insert_note`, `word.list_notes`, `word.update_note`, `word.delete_note` |
-| **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_tracked_change` |
+| **Review** | `word.add_comment`, `word.resolve_comment`, `word.set_change_tracking`, `word.update_tracked_change` |
 
 ### 1.2 Target refined Word tool surface
 
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 41 tools. It deliberately consolidates specialized tools
+The target surface has 42 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -136,7 +136,8 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.delete_note` | implemented | Notes | destructive | `WordApi 1.5` | Delete one footnote or endnote reference and body by current note index. |
 | `word.add_comment` | implemented | Review | comment | `WordApi 1.4` | Add a comment to an anchored range as the signed-in Office user. |
 | `word.resolve_comment` | implemented | Review | comment | `WordApi 1.4` | Resolve an existing comment. |
-| `word.update_tracked_change` | implemented | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint. |
+| `word.set_change_tracking` | implemented | Review | edit | `WordApi 1.4` | Set Track Changes mode and report the previous mode. |
+| `word.update_tracked_change` | implemented | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint, or bulk accept/reject after an expected-count stale check. |
 | `word.save` | implemented | Document & structure | edit | `WordApi 1.1` | Save the current document with the host save behavior. |
 
 Superseded target-surface tools:
@@ -180,9 +181,12 @@ Tool ownership rules:
   the reference anchor, but note body creation, enumeration, body replacement,
   and deletion are owned by `word.insert_note`, `word.list_notes`,
   `word.update_note`, and `word.delete_note`.
-- `word.update_tracked_change` owns tracked-change accept/reject actions. The
-  tracked-change resource remains the read owner for current indices and
-  fingerprints.
+- `word.set_change_tracking` owns document Track Changes mode. The session
+  descriptor and tracked-change resource may expose the current mode as
+  read-only metadata, but mode mutation stays with this review tool.
+- `word.update_tracked_change` owns tracked-change accept/reject actions,
+  including bulk accept/reject. The tracked-change resource remains the read
+  owner for current indices, fingerprints, and counts.
 - `word.get_header_footer` and `word.update_header_footer` own header/footer
   body reads and writes. Body, range, and paragraph tools operate on the main
   document body and must not silently reach into headers or footers.
@@ -1471,7 +1475,27 @@ indistinguishable from the user doing it themselves.
 }
 ```
 
-### 8.3 `word.update_tracked_change`
+### 8.3 `word.set_change_tracking`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "mode"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "mode": { "enum": ["off", "track_all", "track_mine_only"] }
+  },
+  "additionalProperties": false
+}
+```
+
+The tool maps to `Document.changeTrackingMode` (`WordApi 1.4`) and returns
+`{ previous_mode, mode }`. The accepted modes map to Office.js values as
+follows: `off` -> `Word.ChangeTrackingMode.off`, `track_all` ->
+`trackAll`, and `track_mine_only` -> `trackMineOnly`. Unsupported host
+capabilities return `HOST_CAPABILITY_UNAVAILABLE` before mutation.
+
+### 8.4 `word.update_tracked_change`
 
 Stable Office.js tracked-change objects do not expose an ID. The tracked
 changes resource therefore returns each item as
@@ -1482,21 +1506,39 @@ loaded fields.
 ```json
 {
   "type": "object",
-  "required": ["session_id", "action", "change_index", "expected_fingerprint"],
+  "required": ["session_id", "action"],
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
-    "action": { "enum": ["accept", "reject"] },
+    "action": { "enum": ["accept", "reject", "accept_all", "reject_all"] },
     "change_index": { "type": "integer", "minimum": 0 },
-    "expected_fingerprint": { "type": "string", "minLength": 1 }
+    "expected_fingerprint": { "type": "string", "minLength": 1 },
+    "expected_count": { "type": "integer", "minimum": 0 }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "enum": ["accept", "reject"] } } },
+      "then": { "required": ["change_index", "expected_fingerprint"] }
+    },
+    {
+      "if": { "properties": { "action": { "enum": ["accept_all", "reject_all"] } } },
+      "then": { "required": ["expected_count"] }
+    }
+  ]
 }
 ```
 
 The add-in reloads the collection immediately before mutation. An index or
 fingerprint mismatch returns `STALE_INDEX`; clients must re-read the resource.
+For bulk actions, the add-in compares the live tracked-change count to
+`expected_count` before calling `TrackedChangeCollection.acceptAll()` or
+`rejectAll()`. A count mismatch returns `STALE_INDEX` with no mutation.
+Single-change `accept` and `reject` remain edit actions guarded by current
+index and fingerprint. Bulk `accept_all` and `reject_all` are destructive
+actions because they finalize every tracked revision in the document and are
+available only under the All permission ceiling.
 
-### 8.4 `word.accept_change` and `word.reject_change`
+### 8.5 `word.accept_change` and `word.reject_change`
 
 Compatibility tools retained until the target-surface migration removes them
 from the advertised catalog. New clients should call `word.update_tracked_change`.
