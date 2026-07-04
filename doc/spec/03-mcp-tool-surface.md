@@ -244,7 +244,7 @@ The complete Word anchor vocabulary is:
 ```
 
 Per-tool schemas intentionally narrow this vocabulary. For example,
-`word.insert_paragraph`, `word.insert_table`, `word.insert_page_break`,
+`word.insert_paragraph`, `word.insert_table`, `word.insert_break`,
 `word.insert_list`, `word.delete_range`, `word.apply_formatting`,
 `word.apply_style`, `word.insert_content_control`, and `word.add_comment`
 support the full anchor vocabulary. `word.insert_image` also supports the full
