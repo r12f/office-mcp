@@ -1273,8 +1273,11 @@ passes.
 ```
 
 Creates a document style via `Document.addStyle(name, type)`, then applies
-optional base-style, font, and paragraph-formatting properties. Duplicate style
-names fail before mutation with `INVALID_ARGUMENT` and `partial_effect: none`.
+optional font and paragraph-formatting properties. Duplicate style names fail
+before mutation with `INVALID_ARGUMENT` and `partial_effect: none`.
+`base_style` is accepted only when a `WordApi 1.6` probe succeeds because
+Office.js exposes `Style.baseStyle` in 1.5 but only supports setting it in 1.6;
+on 1.5-only hosts it fails with `HOST_CAPABILITY_UNAVAILABLE` before mutation.
 `validate_only: true` resolves existing styles and validates arguments without
 creating the style.
 
@@ -1298,11 +1301,13 @@ creating the style.
 
 Callers must provide at least one of `base_style`, `font`, or `paragraph`.
 Unknown style names and unknown `base_style` names fail before mutation with
-`INVALID_ARGUMENT` and `partial_effect: none`. Built-in styles may be updated
-when Word allows it; responses include `built_in` so clients can present an
-appropriate warning. Style deletion remains out of scope for this tool because
-deleting an in-use style changes document content fallback behavior and needs a
-separate destructive contract.
+`INVALID_ARGUMENT` and `partial_effect: none`. `base_style` writes require a
+successful `WordApi 1.6` probe; other style updates remain available at
+`WordApi 1.5`. Built-in styles may be updated when Word allows it; responses
+include `built_in` so clients can present an appropriate warning. Style
+deletion remains out of scope for this tool because deleting an in-use style
+changes document content fallback behavior and needs a separate destructive
+contract.
 
 ## 7. Content Controls
 

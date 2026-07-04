@@ -69,6 +69,21 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(delete_field.category, "Document & structure");
     assert_eq!(delete_field.side_effect, ToolSideEffect::Destructive);
 
+    let list_styles = tool_metadata("word.list_styles").expect("style list metadata");
+    assert_eq!(list_styles.app, "word");
+    assert_eq!(list_styles.category, "Document & structure");
+    assert_eq!(list_styles.side_effect, ToolSideEffect::Read);
+
+    let create_style = tool_metadata("word.create_style").expect("style create metadata");
+    assert_eq!(create_style.app, "word");
+    assert_eq!(create_style.category, "Document & structure");
+    assert_eq!(create_style.side_effect, ToolSideEffect::Mutating);
+
+    let update_style = tool_metadata("word.update_style").expect("style update metadata");
+    assert_eq!(update_style.app, "word");
+    assert_eq!(update_style.category, "Document & structure");
+    assert_eq!(update_style.side_effect, ToolSideEffect::Mutating);
+
     let sections = tool_metadata("word.list_sections").expect("sections metadata");
     assert_eq!(sections.app, "word");
     assert_eq!(sections.category, "Document & structure");

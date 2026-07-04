@@ -297,6 +297,48 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'count', value: 0 }] }
     }
   }],
+  ['word.list_styles', {
+    setup: {
+      actions: [
+        { tool: 'word.create_style', arguments: { name: 'E2E ListStyles Custom', type: 'paragraph', font: { bold: true } } }
+      ]
+    },
+    args: { type: 'paragraph' },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E ListStyles Custom'] }
+    }
+  }],
+  ['word.create_style', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Create style setup marker' } }
+      ]
+    },
+    args: { name: 'E2E Created Style', type: 'paragraph', font: { bold: true, color: '#1F4E79' }, paragraph: { alignment: 'center' } },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_styles',
+      readbackArguments: { type: 'paragraph' },
+      expect: { contains: ['E2E Created Style'] }
+    }
+  }],
+  ['word.update_style', {
+    setup: {
+      actions: [
+        { tool: 'word.create_style', arguments: { name: 'E2E Updated Style', type: 'paragraph', font: { italic: true } } },
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Updated style paragraph' } },
+        { tool: 'word.apply_style', arguments: { anchor: { kind: 'after_text', text: 'Updated style paragraph' }, style: 'E2E Updated Style' } }
+      ]
+    },
+    args: { name: 'E2E Updated Style', font: { bold: true }, paragraph: { alignment: 'center' } },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_styles',
+      readbackArguments: { type: 'paragraph' },
+      expect: { contains: ['E2E Updated Style'] }
+    }
+  }],
   ['word.update_header_footer', {
     setup: {
       actions: [

@@ -31,6 +31,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.list_hyperlinks",
     "word.list_notes",
     "word.list_sections",
+    "word.list_styles",
     "word.read_table",
     "word.remove_hyperlink",
     "word.replace_text",
@@ -45,6 +46,8 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.update_note",
     "word.update_page_setup",
     "word.update_paragraph",
+    "word.create_style",
+    "word.update_style",
     "word.update_table",
     "word.update_tracked_change",
     "word.delete_note",
@@ -691,6 +694,9 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
         "word.list_fields" | "word.insert_field" | "word.update_field" | "word.delete_field" => {
             field_examples_for_tool(tool)
         }
+        "word.list_styles" | "word.create_style" | "word.update_style" => {
+            style_examples_for_tool(tool)
+        }
         "word.update_table" => vec![json!({
             "description": "Replace one table cell by row and column index.",
             "arguments": {
@@ -721,6 +727,37 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
                 "row_index": 0,
                 "column_index": 1,
                 "text": "Q4"
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
+fn style_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.list_styles" => vec![json!({
+            "description": "List paragraph styles available in the document.",
+            "arguments": {
+                "session_id": "session-1",
+                "type": "paragraph"
+            }
+        })],
+        "word.create_style" => vec![json!({
+            "description": "Create a reusable paragraph style.",
+            "arguments": {
+                "session_id": "session-1",
+                "name": "Review Heading",
+                "type": "paragraph",
+                "font": { "bold": true, "color": "#1F4E79" },
+                "paragraph": { "alignment": "center" }
+            }
+        })],
+        "word.update_style" => vec![json!({
+            "description": "Update an existing style definition after listing styles.",
+            "arguments": {
+                "session_id": "session-1",
+                "name": "Review Heading",
+                "font": { "italic": true }
             }
         })],
         _ => Vec::new(),
@@ -913,6 +950,12 @@ fn common_errors_for_tool(tool: &str) -> Vec<Value> {
                 "cause": "Field type must be allowlisted, and field indices or expected counts must be refreshed after document edits."
             }));
         }
+        "word.create_style" | "word.update_style" => {
+            errors.push(json!({
+                "code": "INVALID_ARGUMENTS",
+                "cause": "Style names and base styles must resolve before mutation, and update_style requires at least one style property."
+            }));
+        }
         "word.update_table" | "excel.update_table" | "powerpoint.update_table" => {
             errors.push(json!({
                 "code": "INVALID_ARGUMENTS",
@@ -1012,6 +1055,11 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         "word.list_fields",
         ["session_id"],
         ["session_id", "type", "offset", "limit"]
+    ),
+    tool_spec!(
+        "word.list_styles",
+        ["session_id"],
+        ["session_id", "type", "built_in", "in_use_only"]
     ),
     tool_spec!(
         "word.insert_paragraph",
@@ -1226,6 +1274,31 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         "word.delete_field",
         ["session_id", "field_index"],
         ["session_id", "field_index", "validate_only"]
+    ),
+    tool_spec!(
+        "word.create_style",
+        ["session_id", "name", "type"],
+        [
+            "session_id",
+            "name",
+            "type",
+            "base_style",
+            "font",
+            "paragraph",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
+        "word.update_style",
+        ["session_id", "name"],
+        [
+            "session_id",
+            "name",
+            "base_style",
+            "font",
+            "paragraph",
+            "validate_only"
+        ]
     ),
     tool_spec!(
         "word.apply_formatting",
@@ -1824,6 +1897,13 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             { "required": ["paragraph"] }
         ]);
     }
+    if tool == "word.update_style" {
+        schema["anyOf"] = json!([
+            { "required": ["base_style"] },
+            { "required": ["font"] },
+            { "required": ["paragraph"] }
+        ]);
+    }
     if tool == "word.update_tracked_change" {
         schema["allOf"] = json!([
             {
@@ -1853,6 +1933,9 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
 
 fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = word_field_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_style_property_schema(tool, name) {
         return schema;
     }
     if let Some(schema) = word_review_property_schema(tool, name) {
@@ -1943,7 +2026,8 @@ fn property_schema(tool: &str, name: &str) -> Value {
             "additionalProperties": false
         }),
         "formatting" => formatting_schema(),
-        "paragraph" if tool == "word.apply_formatting" => paragraph_formatting_schema(),
+        "font" => formatting_schema(),
+        "paragraph" if tool == "word.apply_formatting" || tool == "word.create_style" || tool == "word.update_style" => paragraph_formatting_schema(),
         "title_box" | "content_box" => shape_box_schema(),
         "tools" | "values" | "data" | "formulas" | "number_formats" | "items" | "fields"
         | "borders" | "criteria" | "selected_items" | "shape_ids" | "row_indices"
@@ -1951,6 +2035,16 @@ fn property_schema(tool: &str, name: &str) -> Value {
             json!({ "type": "array" })
         }
         _ => json!({ "type": "string" }),
+    }
+}
+
+fn word_style_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_style_tool = matches!(tool, "word.list_styles" | "word.create_style" | "word.update_style");
+    match (is_style_tool, name) {
+        (true, "type") => Some(json!({ "enum": ["paragraph", "character", "table", "list"] })),
+        (true, "name" | "base_style") => Some(json!({ "type": "string", "minLength": 1 })),
+        (true, "built_in" | "in_use_only") => Some(json!({ "type": "boolean" })),
+        _ => None,
     }
 }
 
@@ -2163,9 +2257,11 @@ fn formatting_schema() -> Value {
             "bold": { "type": "boolean" },
             "italic": { "type": "boolean" },
             "underline": { "type": "boolean" },
-            "font_color": { "type": "string" },
-            "highlight_color": { "type": "string" },
-            "font_size": { "type": "number" }
+            "strikethrough": { "type": "boolean" },
+            "font_name": { "type": "string" },
+            "font_size_pt": { "type": "number", "exclusiveMinimum": 0 },
+            "color": { "type": "string" },
+            "highlight": { "type": "string" }
         },
         "additionalProperties": false
     })
