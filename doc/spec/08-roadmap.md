@@ -102,7 +102,8 @@ user intent.
 
 Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.find_text`, `word.resolve_anchor`, `word.get_selection`,
-`word.get_header_footer`, `word.update_header_footer`, `word.insert_paragraph`,
+`word.get_header_footer`, `word.update_header_footer`, `word.insert_bookmark`,
+`word.list_bookmarks`, `word.delete_bookmark`, `word.insert_paragraph`,
 `word.insert_table`, `word.insert_image`, `word.resize_image`,
 `word.insert_break`, `word.list_sections`, `word.update_page_setup`,
 `word.insert_list`, `word.insert_hyperlink`, `word.list_hyperlinks`,
@@ -174,6 +175,13 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       permission grouping, dispatch path, and E2E case table; it returns safe
       object metadata, operation hints, and bounded preview text without
       mutating the document or returning full document text.
+- [x] Add bookmark lifecycle tools: `word.insert_bookmark`,
+      `word.list_bookmarks`, and `word.delete_bookmark`. The contract keeps
+      bookmark creation, enumeration, and marker deletion in Range & selection,
+      uses `WordApi 1.4`, validates Word bookmark names before mutation,
+      handles duplicate names explicitly with `overwrite`, and preserves the
+      existing bookmark anchor as the stable target used by `word.resolve_anchor`
+      and anchored mutation tools.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.

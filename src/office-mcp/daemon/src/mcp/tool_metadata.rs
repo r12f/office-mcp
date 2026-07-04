@@ -198,6 +198,24 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
+        "word.insert_bookmark",
+        "word",
+        "Range & selection",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.list_bookmarks",
+        "word",
+        "Range & selection",
+        ToolSideEffect::Read,
+    ),
+    tool(
+        "word.delete_bookmark",
+        "word",
+        "Range & selection",
+        ToolSideEffect::Destructive,
+    ),
+    tool(
         "word.apply_formatting",
         "word",
         "Range & selection",

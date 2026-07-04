@@ -77,6 +77,8 @@
     'word.replace_text',
     'word.update_paragraph',
     'word.delete_range',
+    'word.insert_bookmark',
+    'word.delete_bookmark',
     'word.apply_formatting',
     'word.update_table',
     'word.insert_content_control',
@@ -94,6 +96,9 @@
     'word.get_paragraph',
     'word.find_text',
     'word.resolve_anchor',
+    'word.insert_bookmark',
+    'word.list_bookmarks',
+    'word.delete_bookmark',
     'word.get_selection',
     'word.get_header_footer',
     'word.insert_paragraph',
@@ -126,7 +131,7 @@
   ];
   const TOOL_GROUPS = [
     { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.save'] },
-    { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
+    { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
     { label: 'Media', tools: ['word.insert_image', 'word.resize_image'] },
@@ -140,6 +145,9 @@
     ['word.get_paragraph', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'Read a single paragraph by index.' }],
     ['word.find_text', { category: 'Range & selection', sideEffect: 'read', description: 'Find text matches in the document body.' }],
     ['word.resolve_anchor', { category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata.' }],
+    ['word.insert_bookmark', { category: 'Range & selection', sideEffect: 'mutating', description: 'Create a named bookmark around an anchored range.' }],
+    ['word.list_bookmarks', { category: 'Range & selection', sideEffect: 'read', description: 'List bookmark names and locations.' }],
+    ['word.delete_bookmark', { category: 'Range & selection', sideEffect: 'destructive', description: 'Delete a bookmark marker without deleting text.' }],
     ['word.get_selection', { category: 'Range & selection', sideEffect: 'read', description: 'Read the current selection.' }],
     ['word.insert_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
     ['word.insert_image', { category: 'Media', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
@@ -472,6 +480,15 @@
         case 'word.resolve_anchor':
           data = await resolveAnchorTool(args);
           break;
+        case 'word.insert_bookmark':
+          data = await insertBookmark(args);
+          break;
+        case 'word.list_bookmarks':
+          data = await listBookmarks(args || {});
+          break;
+        case 'word.delete_bookmark':
+          data = await deleteBookmark(args);
+          break;
         case 'word.get_selection':
           data = await getSelection(args);
           break;
@@ -649,6 +666,13 @@
         break;
       case 'word.delete_range':
         validateExtentToolArgs(tool, args);
+        break;
+      case 'word.insert_bookmark':
+        requireAnchor(tool, args.anchor);
+        validateBookmarkName(tool, args.name);
+        break;
+      case 'word.delete_bookmark':
+        validateBookmarkName(tool, args.name, { strictPattern: false });
         break;
       case 'word.apply_formatting':
         validateExtentToolArgs(tool, args);
@@ -1690,6 +1714,41 @@
     });
   }
 
+  async function insertBookmark(args) {
+    return Word.run(async (context) => {
+      const name = String(args.name);
+      await ensureBookmarkAvailable(context, name, Boolean(args.overwrite));
+      const target = await resolveAnchor(context, args.anchor);
+      const range = target.getRange ? target.getRange() : target;
+      range.insertBookmark(name);
+      await context.sync();
+      const bookmark = await bookmarkMetadata(context, name);
+      return { bookmark, overwritten: Boolean(args.overwrite) };
+    });
+  }
+
+  async function listBookmarks(args) {
+    return Word.run(async (context) => {
+      const bookmarks = await bookmarkNames(context, Boolean(args.include_hidden));
+      const items = [];
+      for (const name of bookmarks) {
+        const metadata = await bookmarkMetadata(context, name);
+        items.push(metadata);
+      }
+      return { bookmarks: items, count: items.length, untrusted_source: true };
+    });
+  }
+
+  async function deleteBookmark(args) {
+    return Word.run(async (context) => {
+      const name = await existingBookmarkName(context, String(args.name));
+      context.document.deleteBookmark(name);
+      await context.sync();
+      const remaining = await bookmarkNames(context, false);
+      return { deleted: true, name, count: remaining.length };
+    });
+  }
+
   async function setHeadingLevel(args) {
     return Word.run(async (context) => {
       const paragraph = await getParagraphByIndex(context, args.index);
@@ -1954,6 +2013,49 @@
     const text = String(value || '').replace(/\s+/g, ' ').trim();
     if (!text) return '';
     return text.length > 80 ? `${text.slice(0, 77)}...` : text;
+  }
+
+  async function bookmarkNames(context, includeHidden) {
+    const range = context.document.body.getRange();
+    const result = range.getBookmarks(Boolean(includeHidden), true);
+    await context.sync();
+    return Array.isArray(result.value) ? result.value : [];
+  }
+
+  async function existingBookmarkName(context, name) {
+    const requested = String(name || '');
+    const names = await bookmarkNames(context, true);
+    const match = names.find((item) => item.toLowerCase() === requested.toLowerCase());
+    if (!match) throw invalidArgument(`Bookmark not found: ${requested}.`);
+    return match;
+  }
+
+  async function ensureBookmarkAvailable(context, name, overwrite) {
+    const names = await bookmarkNames(context, true);
+    const exists = names.some((item) => item.toLowerCase() === String(name).toLowerCase());
+    if (exists && !overwrite) throw invalidArgument(`Bookmark ${name} already exists; pass overwrite=true to move it.`);
+  }
+
+  async function bookmarkMetadata(context, name) {
+    const range = context.document.getBookmarkRangeOrNullObject(name);
+    range.load('isNullObject,text');
+    await context.sync();
+    if (range.isNullObject) throw invalidArgument(`Bookmark not found: ${name}.`);
+    const metadata = { name, text_preview: safeTextPreview(range.text), untrusted_source: true };
+    const paragraphIndex = await paragraphIndexForRange(context, range);
+    if (paragraphIndex !== null) metadata.paragraph_index = paragraphIndex;
+    return metadata;
+  }
+
+  async function paragraphIndexForRange(context, range) {
+    range.load('text');
+    const paragraphs = context.document.body.paragraphs;
+    paragraphs.load('items/text');
+    await context.sync();
+    const preview = safeTextPreview(range.text);
+    if (!preview) return null;
+    const index = paragraphs.items.findIndex((paragraph) => safeTextPreview(paragraph.text).includes(preview));
+    return index >= 0 ? index : null;
   }
 
   function resolvedAnchorObjectType(anchor) {
@@ -2268,6 +2370,15 @@
   function requirePositiveInteger(tool, name, value) {
     if (!Number.isInteger(value) || value < 1) {
       throw invalidArgument(`${tool} ${name} must be a positive integer.`);
+    }
+  }
+
+  function validateBookmarkName(tool, name, { strictPattern = true } = {}) {
+    if (typeof name !== 'string' || name.length < 1) {
+      throw invalidArgument(`${tool} requires a non-empty bookmark name.`);
+    }
+    if (strictPattern && !/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(name)) {
+      throw invalidArgument(`${tool} bookmark name must start with a letter or underscore and contain only letters, digits, and underscores.`);
     }
   }
 

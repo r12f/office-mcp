@@ -5,6 +5,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.add_comment",
     "word.apply_formatting",
     "word.apply_style",
+    "word.delete_bookmark",
     "word.delete_content_control",
     "word.delete_range",
     "word.find_text",
@@ -13,6 +14,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.get_paragraph",
     "word.get_selection",
     "word.get_text",
+    "word.insert_bookmark",
     "word.insert_content_control",
     "word.insert_break",
     "word.insert_hyperlink",
@@ -20,6 +22,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.insert_list",
     "word.insert_paragraph",
     "word.insert_table",
+    "word.list_bookmarks",
     "word.list_content_controls",
     "word.list_hyperlinks",
     "word.list_sections",
@@ -670,6 +673,9 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
                 "delete_contents": false
             }
         })],
+        "word.insert_bookmark" | "word.list_bookmarks" | "word.delete_bookmark" => {
+            bookmark_examples_for_tool(tool)
+        }
         "word.update_table" => vec![json!({
             "description": "Replace one table cell by row and column index.",
             "arguments": {
@@ -737,6 +743,31 @@ fn word_hyperlink_examples(tool: &str) -> Vec<Value> {
     }
 }
 
+fn bookmark_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.insert_bookmark" => vec![json!({
+            "description": "Create a bookmark around a located section heading.",
+            "arguments": {
+                "session_id": "session-1",
+                "name": "ResultsSection",
+                "anchor": { "kind": "heading", "text": "Results", "level": 2 }
+            }
+        })],
+        "word.list_bookmarks" => vec![json!({
+            "description": "List visible bookmarks and bounded previews.",
+            "arguments": { "session_id": "session-1" }
+        })],
+        "word.delete_bookmark" => vec![json!({
+            "description": "Delete a bookmark marker while keeping its text.",
+            "arguments": {
+                "session_id": "session-1",
+                "name": "ResultsSection"
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
 fn common_errors_for_tool(tool: &str) -> Vec<Value> {
     let mut errors = vec![json!({
         "code": "INVALID_ARGUMENTS",
@@ -765,6 +796,12 @@ fn common_errors_for_tool(tool: &str) -> Vec<Value> {
             "code": "INVALID_ARGUMENTS",
             "cause": "The anchor must resolve to a range, and hyperlink URLs must use http, https, mailto, or an in-document bookmark target."
         })),
+        "word.insert_bookmark" | "word.delete_bookmark" => {
+            errors.push(json!({
+                "code": "INVALID_ARGUMENTS",
+                "cause": "Bookmark names must follow Word naming rules and duplicate names require overwrite=true."
+            }));
+        }
         "word.insert_content_control" | "word.update_content_control" | "word.delete_content_control" => {
             errors.push(json!({
                 "code": "INVALID_ARGUMENTS",
@@ -842,6 +879,11 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         "word.resolve_anchor",
         ["session_id", "anchor"],
         ["session_id", "anchor", "include_text_preview"]
+    ),
+    tool_spec!(
+        "word.list_bookmarks",
+        ["session_id"],
+        ["session_id", "include_hidden"]
     ),
     tool_spec!("word.get_selection", ["session_id"], ["session_id"]),
     tool_spec!(
@@ -983,6 +1025,11 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!(
+        "word.insert_bookmark",
+        ["session_id", "name", "anchor"],
+        ["session_id", "name", "anchor", "extent", "overwrite"]
+    ),
+    tool_spec!(
         "word.replace_text",
         ["session_id", "find", "replace"],
         [
@@ -1017,6 +1064,11 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         "word.delete_range",
         ["session_id", "anchor"],
         ["session_id", "anchor", "match_case", "validate_only"]
+    ),
+    tool_spec!(
+        "word.delete_bookmark",
+        ["session_id", "name"],
+        ["session_id", "name"]
     ),
     tool_spec!(
         "word.apply_formatting",
@@ -1652,6 +1704,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
         | "show_banded_columns"
         | "show_banded_rows"
         | "show_filter_button"
+        | "include_hidden"
         | "visible"
         | "overlay"
         | "title_visible"
@@ -1662,6 +1715,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
         | "lock_aspect_ratio"
         | "delete_contents"
         | "keep_text"
+        | "overwrite"
         | "validate_only" => json!({ "type": "boolean" }),
         "anchor" => anchor_schema_for_tool(tool),
         "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
@@ -1673,6 +1727,10 @@ fn property_schema(tool: &str, name: &str) -> Value {
         "header_footer_type" => {
             json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" })
         }
+        "name" if tool == "word.insert_bookmark" => {
+            json!({ "type": "string", "minLength": 1, "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,39}$" })
+        }
+        "name" if tool == "word.delete_bookmark" => json!({ "type": "string", "minLength": 1 }),
         "break_type" => {
             json!({ "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" })
         }
