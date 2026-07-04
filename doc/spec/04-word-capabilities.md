@@ -47,7 +47,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 29 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 31 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -57,7 +57,7 @@ The per-tool JSON Schemas follow in §2-§9.
 
 | Category | Tools |
 |---|---|
-| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_page_break`, `word.save` |
+| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.save` |
 | **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
@@ -73,7 +73,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 29 tools. It deliberately consolidates specialized tools
+The target surface has 31 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -92,7 +92,9 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.insert_table` | implemented | Tables | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
 | `word.insert_image` | implemented | Media | edit | `WordApi 1.3` | Insert a validated image from base64 or a daemon-fetched HTTPS URL. |
 | `word.resize_image` | implemented | Media | edit | `WordApi 1.3` | Resize an existing inline image in place by paragraph index and image index. |
-| `word.insert_page_break` | implemented | Document & structure | edit | `WordApi 1.3` | Insert a page break at an anchor. |
+| `word.insert_break` | implemented | Document & structure | edit | `WordApi 1.3` | Insert a page, line, or section break at an anchor. |
+| `word.list_sections` | implemented | Document & structure | read | `WordApi 1.3` | List document sections with paragraph range and header/footer metadata. |
+| `word.update_page_setup` | implemented | Document & structure | edit | `WordApiDesktop 1.3` | Update document or section page setup such as orientation, margins, and page size. |
 | `word.insert_list` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a numbered or bulleted list. |
 | `word.replace_text` | implemented | Range & selection | edit | `WordApi 1.3` | Find and replace text, with dry-run support. |
 | `word.update_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Replace one paragraph's text wholesale. |
@@ -121,6 +123,7 @@ Superseded target-surface tools:
 | `word.add_column` | `word.update_table` | Column insertion is a table-owned mutation. |
 | `word.format_cell` | `word.update_table` | Cell formatting is table-owned formatting, distinct from generic run formatting. |
 | `word.accept_change` / `word.reject_change` | `word.update_tracked_change` | Accept/reject are one tracked-change action with an explicit `action` argument. |
+| `word.insert_page_break` | `word.insert_break` | Page breaks are one break kind in the generalized break owner. |
 
 Tool ownership rules:
 
@@ -146,6 +149,16 @@ Tool ownership rules:
 - `word.get_header_footer` and `word.update_header_footer` own header/footer
   body reads and writes. Body, range, and paragraph tools operate on the main
   document body and must not silently reach into headers or footers.
+- `word.insert_break` owns all Word break insertion. The superseded
+  `word.insert_page_break` compatibility tool MAY remain callable for older
+  clients but MUST NOT be advertised in the daemon catalog or task pane
+  available-tools metadata.
+- `word.list_sections` owns section structure reads. Header/footer tools own
+  section header/footer body content; `word.list_sections` reports only bounded
+  structural metadata.
+- `word.update_page_setup` owns page layout mutations for the document or a
+  single section and is advertised only after a successful
+  `WordApiDesktop 1.3` probe.
 
 ### 1.3 Runtime capability tiers
 
@@ -157,11 +170,16 @@ runtime and advertises only tools whose complete implementation is supported:
 | Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection |
 | Review | `WordApi 1.4` | comments, bookmark anchors |
 | Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
-| Host-specific | explicit successful probe | active-window and protection metadata |
+| Host-specific | explicit successful probe | page setup, active-window, and protection metadata |
 
 Header/footer body access and `word.save` use production Word APIs available
 before the base manifest requirement and are available whenever the core tier is
 available. Preview APIs are excluded from v1.
+
+`word.update_page_setup` requires `WordApiDesktop 1.3` and is absent from the
+catalog when that probe fails. `word.insert_break` and `word.list_sections` are
+core-tier tools because their required Office.js APIs are available within the
+base Word API tier.
 
 ### 1.4 Word resources
 
@@ -456,7 +474,30 @@ add-in derives the other dimension from the current image dimensions. The tool
 returns old and new dimensions in points and preserves paragraph placement, alt
 text, relationship identity, and adjacent text.
 
-### 3.6 `word.insert_page_break`
+### 3.6 `word.insert_break`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "break_type": { "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" }
+  },
+  "additionalProperties": false
+}
+```
+
+`word.insert_break` resolves the anchor and calls Word's break insertion API
+with the requested break kind. `break_type: "page"` is the owner for page break
+insertion. Section breaks are inserted at the resolved range boundary and rely on
+Word's host layout semantics for the newly created section.
+
+### 3.7 `word.insert_page_break`
+
+Superseded compatibility contract. This tool is no longer advertised; use
+`word.insert_break` with `break_type: "page"`.
 
 ```json
 {
@@ -465,11 +506,90 @@ text, relationship identity, and adjacent text.
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
     "anchor": { "$ref": "#/$defs/anchor" }
-  }
+  },
+  "additionalProperties": false
 }
 ```
 
-### 3.7 `word.get_header_footer`
+### 3.8 `word.list_sections`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "include_page_setup": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns:
+
+```json
+{
+  "sections": [
+    {
+      "index": 0,
+      "first_paragraph_index": 0,
+      "paragraph_count": 12,
+      "has_header": true,
+      "has_footer": false,
+      "page_setup": {
+        "orientation": "portrait",
+        "paper_size": "letter",
+        "margins_pt": { "top": 72, "bottom": 72, "left": 72, "right": 72 },
+        "page_width_pt": 612,
+        "page_height_pt": 792
+      }
+    }
+  ],
+  "count": 1
+}
+```
+
+`page_setup` is included only when `include_page_setup: true` and the
+`WordApiDesktop 1.3` probe succeeds. Otherwise the tool still returns section
+structure without layout fields.
+
+### 3.9 `word.update_page_setup`
+
+Desktop-tier tool, advertised only after a successful `WordApiDesktop 1.3`
+probe.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "section_index": { "type": "integer", "minimum": 0 },
+    "orientation": { "enum": ["portrait", "landscape"] },
+    "paper_size": { "type": "string", "minLength": 1 },
+    "margins_pt": {
+      "type": "object",
+      "properties": {
+        "top": { "type": "number", "minimum": 0 },
+        "bottom": { "type": "number", "minimum": 0 },
+        "left": { "type": "number", "minimum": 0 },
+        "right": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "page_width_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "page_height_pt": { "type": "number", "exclusiveMinimum": 0 }
+  },
+  "additionalProperties": false
+}
+```
+
+Omitting `section_index` applies the requested page setup to the document-level
+page setup. Supplying `section_index` applies only to that section. Calls that
+provide no mutable page-setup fields fail with `INVALID_ARGUMENT` and
+`partial_effect: "none"` before any write is queued.
+
+### 3.10 `word.get_header_footer`
 
 ```json
 {

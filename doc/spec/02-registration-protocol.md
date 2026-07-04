@@ -201,7 +201,8 @@ its current document.
       "word.insert_table",
       "word.insert_image",
       "word.resize_image",
-      "word.insert_page_break",
+      "word.insert_break",
+      "word.list_sections",
       "word.insert_list",
       "word.replace_text",
       "word.update_paragraph",
@@ -217,6 +218,7 @@ its current document.
       "word.add_comment",
       "word.resolve_comment",
       "word.update_tracked_change",
+      "word.update_page_setup",
       "word.save"
     ],
     "is_active": null

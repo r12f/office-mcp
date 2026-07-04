@@ -104,7 +104,8 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.find_text`, `word.resolve_anchor`, `word.get_selection`,
 `word.get_header_footer`, `word.update_header_footer`, `word.insert_paragraph`,
 `word.insert_table`, `word.insert_image`, `word.resize_image`,
-`word.insert_page_break`, `word.insert_list`, `word.replace_text`,
+`word.insert_break`, `word.list_sections`, `word.update_page_setup`,
+`word.insert_list`, `word.replace_text`,
 `word.update_paragraph`, `word.delete_range`, `word.apply_formatting`,
 `word.apply_style`, `word.read_table`, `word.update_table`,
 `word.list_content_controls`, `word.insert_content_control`,
@@ -112,8 +113,8 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.resolve_comment`, `word.update_tracked_change`, and `word.save`.
 
 Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
-`word.update_cell`, `word.add_row`, `word.add_column`, `word.format_cell`,
-`word.accept_change`, and `word.reject_change`.
+`word.insert_page_break`, `word.update_cell`, `word.add_row`, `word.add_column`,
+`word.format_cell`, `word.accept_change`, and `word.reject_change`.
 
 - [x] Verify planned Word content-control and consolidated mutation APIs against
       `@types/office-js` and Microsoft API docs before implementation. Current

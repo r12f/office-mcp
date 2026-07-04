@@ -67,7 +67,9 @@
     'word.insert_table',
     'word.insert_image',
     'word.resize_image',
+    'word.insert_break',
     'word.insert_page_break',
+    'word.update_page_setup',
     'word.update_header_footer',
     'word.insert_list',
     'word.replace_text',
@@ -96,8 +98,10 @@
     'word.insert_image',
     'word.resize_image',
     'word.insert_table',
-    'word.insert_page_break',
     'word.update_header_footer',
+    'word.insert_break',
+    'word.list_sections',
+    'word.update_page_setup',
     'word.insert_list',
     'word.replace_text',
     'word.update_paragraph',
@@ -116,7 +120,7 @@
     'word.save'
   ];
   const TOOL_GROUPS = [
-    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_page_break', 'word.save'] },
+    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.save'] },
     { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
@@ -136,7 +140,10 @@
     ['word.insert_image', { category: 'Media', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
     ['word.resize_image', { category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image.' }],
     ['word.insert_table', { category: 'Tables', sideEffect: 'mutating', description: 'Insert a table with provided values.' }],
+    ['word.insert_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page, line, or section break.' }],
     ['word.insert_page_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page break.' }],
+    ['word.list_sections', { category: 'Document & structure', sideEffect: 'read', description: 'List document sections.' }],
+    ['word.update_page_setup', { category: 'Document & structure', sideEffect: 'mutating', description: 'Update document or section page setup.' }],
     ['word.update_header_footer', { category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer.' }],
     ['word.insert_list', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a list.' }],
     ['word.replace_text', { category: 'Range & selection', sideEffect: 'mutating', description: 'Replace matching document text.' }],
@@ -475,8 +482,17 @@
         case 'word.resize_image':
           data = await resizeImage(args);
           break;
+        case 'word.insert_break':
+          data = await insertBreak(args);
+          break;
         case 'word.insert_page_break':
           data = await insertPageBreak(args);
+          break;
+        case 'word.list_sections':
+          data = await listSections(args || {});
+          break;
+        case 'word.update_page_setup':
+          data = await updatePageSetup(args || {});
           break;
         case 'word.update_header_footer':
           data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateHeaderFooter(args);
@@ -584,8 +600,15 @@
       case 'word.resize_image':
         validateResizeImageArgs(args);
         break;
+      case 'word.insert_break':
+        requireAnchor(tool, args.anchor);
+        validateBreakType(args.break_type);
+        break;
       case 'word.insert_page_break':
         requireAnchor(tool, args.anchor);
+        break;
+      case 'word.update_page_setup':
+        validateUpdatePageSetupArgs(args);
         break;
       case 'word.update_header_footer':
         validateHeaderFooterArgs(tool, args, true);
@@ -1084,18 +1107,87 @@
   }
 
 
-  async function insertPageBreak(args) {
+  async function insertBreak(args) {
     return Word.run(async (context) => {
+      const breakType = normalizeBreakType(args.break_type);
+      const wordBreakType = wordBreakTypeFrom(breakType);
       if (args.anchor.kind === 'start_of_document') {
-        context.document.body.insertBreak(Word.BreakType.page, Word.InsertLocation.start);
+        context.document.body.insertBreak(wordBreakType, Word.InsertLocation.start);
       } else if (args.anchor.kind === 'end_of_document') {
-        context.document.body.insertBreak(Word.BreakType.page, Word.InsertLocation.end);
+        context.document.body.insertBreak(wordBreakType, Word.InsertLocation.end);
       } else {
         const target = await resolveAnchor(context, args.anchor);
-        target.insertBreak(Word.BreakType.page, isBeforeAnchor(args.anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
+        target.insertBreak(wordBreakType, isBeforeAnchor(args.anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
       }
       await context.sync();
-      return { inserted: true, break_type: 'page' };
+      return { inserted: true, break_type: breakType };
+    });
+  }
+
+  async function insertPageBreak(args) {
+    const result = await insertBreak({ ...args, break_type: 'page' });
+    return { ...result, superseded_by: 'word.insert_break' };
+  }
+
+  async function listSections(args = {}) {
+    return Word.run(async (context) => {
+      const sections = context.document.sections;
+      const bodyParagraphs = context.document.body.paragraphs;
+      sections.load('items');
+      bodyParagraphs.load('items/text');
+      await context.sync();
+
+      const includePageSetup = args.include_page_setup === true && supportsWordApiDesktop13();
+      const sectionViews = [];
+      for (let index = 0; index < sections.items.length; index += 1) {
+        const section = sections.items[index];
+        const body = section.body;
+        const paragraphs = body.paragraphs;
+        const header = section.getHeader(Word.HeaderFooterType.primary).body;
+        const footer = section.getFooter(Word.HeaderFooterType.primary).body;
+        body.load('text');
+        paragraphs.load('items/text');
+        header.load('text');
+        footer.load('text');
+        if (includePageSetup) section.pageSetup.load('orientation,paperSize,topMargin,bottomMargin,leftMargin,rightMargin,pageWidth,pageHeight');
+        sectionViews.push({ section, body, paragraphs, header, footer });
+      }
+      await context.sync();
+
+      const entries = [];
+      let nextParagraphIndex = 0;
+      for (let index = 0; index < sectionViews.length; index += 1) {
+        const { section, paragraphs, header, footer } = sectionViews[index];
+        const paragraphItems = paragraphs.items || [];
+        const entry = {
+          index,
+          first_paragraph_index: nextParagraphIndex,
+          paragraph_count: paragraphItems.length,
+          has_header: Boolean((header.text || '').trim()),
+          has_footer: Boolean((footer.text || '').trim())
+        };
+        if (includePageSetup) entry.page_setup = pageSetupMetadata(section.pageSetup);
+        entries.push(entry);
+        nextParagraphIndex += paragraphItems.length;
+      }
+
+      return { sections: entries, count: entries.length };
+    });
+  }
+
+  async function updatePageSetup(args) {
+    requireWordApiDesktop13('word.update_page_setup');
+    return Word.run(async (context) => {
+      const target = await pageSetupTarget(context, args.section_index);
+      applyPageSetup(target.pageSetup, args);
+      await context.sync();
+      target.pageSetup.load('orientation,paperSize,topMargin,bottomMargin,leftMargin,rightMargin,pageWidth,pageHeight');
+      await context.sync();
+      return {
+        updated: true,
+        section_index: target.sectionIndex,
+        page_setup: pageSetupMetadata(target.pageSetup)
+      };
     });
   }
 
@@ -1826,6 +1918,125 @@
     }
   }
 
+  function normalizeBreakType(value) {
+    const breakType = value || 'page';
+    validateBreakType(breakType);
+    return breakType;
+  }
+
+  function validateBreakType(value) {
+    if (value === undefined) return;
+    if (!['page', 'line', 'section_next', 'section_continuous', 'section_even', 'section_odd'].includes(value)) {
+      throw invalidArgument('word.insert_break break_type must be page, line, section_next, section_continuous, section_even, or section_odd.');
+    }
+  }
+
+  function wordBreakTypeFrom(value) {
+    switch (value) {
+      case 'page':
+        return Word.BreakType.page;
+      case 'line':
+        return Word.BreakType.line;
+      case 'section_next':
+        return Word.BreakType.sectionNext;
+      case 'section_continuous':
+        return Word.BreakType.sectionContinuous;
+      case 'section_even':
+        return Word.BreakType.sectionEven;
+      case 'section_odd':
+        return Word.BreakType.sectionOdd;
+      default:
+        throw invalidArgument(`Unsupported break_type ${value}.`);
+    }
+  }
+
+  async function pageSetupTarget(context, sectionIndex) {
+    if (sectionIndex === undefined || sectionIndex === null) {
+      return { pageSetup: context.document.pageSetup, sectionIndex: null };
+    }
+    const sections = context.document.sections;
+    sections.load('items');
+    await context.sync();
+    const section = sections.items[sectionIndex];
+    if (!section) throw Object.assign(new Error(`Section index ${sectionIndex} is out of range.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
+    return { pageSetup: section.pageSetup, sectionIndex };
+  }
+
+  function validateUpdatePageSetupArgs(args) {
+    if (args.section_index !== undefined) requireNonNegativeInteger('word.update_page_setup', 'section_index', args.section_index);
+    if (args.orientation !== undefined && !['portrait', 'landscape'].includes(args.orientation)) {
+      throw invalidArgument('word.update_page_setup orientation must be portrait or landscape.');
+    }
+    validateOptionalNonNegativeNumber('word.update_page_setup', 'page_width_pt', args.page_width_pt, true);
+    validateOptionalNonNegativeNumber('word.update_page_setup', 'page_height_pt', args.page_height_pt, true);
+    if (args.margins_pt !== undefined) {
+      if (!args.margins_pt || typeof args.margins_pt !== 'object' || Array.isArray(args.margins_pt)) {
+        throw invalidArgument('word.update_page_setup margins_pt must be an object.');
+      }
+      for (const side of ['top', 'bottom', 'left', 'right']) {
+        validateOptionalNonNegativeNumber('word.update_page_setup', `margins_pt.${side}`, args.margins_pt[side], false);
+      }
+    }
+    if (
+      args.orientation === undefined
+      && args.paper_size === undefined
+      && args.margins_pt === undefined
+      && args.page_width_pt === undefined
+      && args.page_height_pt === undefined
+    ) {
+      throw invalidArgument('word.update_page_setup requires at least one page setup field.');
+    }
+  }
+
+  function validateOptionalNonNegativeNumber(tool, name, value, exclusive) {
+    if (value === undefined) return;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || (exclusive && value <= 0)) {
+      throw invalidArgument(`${tool} ${name} must be a ${exclusive ? 'positive' : 'non-negative'} number.`);
+    }
+  }
+
+  function applyPageSetup(pageSetup, args) {
+    if (args.orientation !== undefined) pageSetup.orientation = args.orientation === 'landscape' ? Word.Orientation.landscape : Word.Orientation.portrait;
+    if (args.paper_size !== undefined) pageSetup.paperSize = String(args.paper_size);
+    if (args.margins_pt) {
+      if (args.margins_pt.top !== undefined) pageSetup.topMargin = args.margins_pt.top;
+      if (args.margins_pt.bottom !== undefined) pageSetup.bottomMargin = args.margins_pt.bottom;
+      if (args.margins_pt.left !== undefined) pageSetup.leftMargin = args.margins_pt.left;
+      if (args.margins_pt.right !== undefined) pageSetup.rightMargin = args.margins_pt.right;
+    }
+    if (args.page_width_pt !== undefined) pageSetup.pageWidth = args.page_width_pt;
+    if (args.page_height_pt !== undefined) pageSetup.pageHeight = args.page_height_pt;
+  }
+
+  function pageSetupMetadata(pageSetup) {
+    return {
+      orientation: normalizeOrientation(pageSetup.orientation),
+      paper_size: pageSetup.paperSize || null,
+      margins_pt: {
+        top: pageSetup.topMargin,
+        bottom: pageSetup.bottomMargin,
+        left: pageSetup.leftMargin,
+        right: pageSetup.rightMargin
+      },
+      page_width_pt: pageSetup.pageWidth,
+      page_height_pt: pageSetup.pageHeight
+    };
+  }
+
+  function normalizeOrientation(value) {
+    const text = String(value || '').toLowerCase();
+    return text.includes('landscape') ? 'landscape' : 'portrait';
+  }
+
+  function supportsWordApiDesktop13() {
+    return Office.context?.requirements?.isSetSupported?.('WordApiDesktop', '1.3') === true;
+  }
+
+  function requireWordApiDesktop13(tool) {
+    if (supportsWordApiDesktop13()) return;
+    throw Object.assign(new Error(`${tool} requires WordApiDesktop 1.3.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+  }
+
   async function targetContentControl(context, args) {
     const id = Number(args.content_control_id ?? args.id);
     if (!Number.isInteger(id)) {
@@ -2261,7 +2472,8 @@
       WordApi: requirements.isSetSupported('WordApi', '1.3') ? '1.3' : null,
       WordApi_1_4: requirements.isSetSupported('WordApi', '1.4') ? '1.4' : null,
       WordApi_1_5: requirements.isSetSupported('WordApi', '1.5') ? '1.5' : null,
-      WordApi_1_6: requirements.isSetSupported('WordApi', '1.6') ? '1.6' : null
+      WordApi_1_6: requirements.isSetSupported('WordApi', '1.6') ? '1.6' : null,
+      WordApiDesktop_1_3: requirements.isSetSupported('WordApiDesktop', '1.3') ? '1.3' : null
     };
   }
 
@@ -2503,7 +2715,12 @@
   }
 
   function effectiveTools() {
-    return AVAILABLE_TOOLS.filter((tool) => isToolEnabled(tool) && isToolAllowedByMode(tool));
+    return AVAILABLE_TOOLS.filter((tool) => isToolSupported(tool) && isToolEnabled(tool) && isToolAllowedByMode(tool));
+  }
+
+  function isToolSupported(tool) {
+    if (tool === 'word.update_page_setup') return supportsWordApiDesktop13();
+    return true;
   }
 
   function isToolAllowedByMode(tool) {
