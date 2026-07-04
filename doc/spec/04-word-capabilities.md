@@ -47,17 +47,17 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 27 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 29 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
 object model.
 
-The per-tool JSON Schemas follow in §2-§8.
+The per-tool JSON Schemas follow in §2-§9.
 
 | Category | Tools |
 |---|---|
-| **Document & structure** | `word.get_text`, `word.get_outline`, `word.insert_page_break`, `word.save` |
+| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_page_break`, `word.save` |
 | **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
@@ -73,7 +73,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 27 tools. It deliberately consolidates specialized tools
+The target surface has 29 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -82,6 +82,8 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 |---|---|---|---|---|---|
 | `word.get_text` | implemented | Document & structure | read | `WordApi 1.3` | Read paginated document body text; paragraph metadata is optional. |
 | `word.get_outline` | implemented | Document & structure | read | `WordApi 1.3` | Read headings and lightweight document structure without body text. |
+| `word.get_header_footer` | implemented | Document & structure | read | `WordApi 1.1` | Read section-scoped header or footer text and optional paragraph metadata; non-primary layout validation uses `WordApiDesktop 1.3` when required. |
+| `word.update_header_footer` | implemented | Document & structure | edit/destructive | `WordApi 1.1` | Replace, append to, or clear a section-scoped header or footer body; non-primary layout validation uses `WordApiDesktop 1.3` when required. |
 | `word.get_paragraph` | implemented | Paragraphs & lists | read | `WordApi 1.3` | Read one paragraph by index. |
 | `word.find_text` | implemented | Range & selection | read | `WordApi 1.3` | Search text with Word search options and return portable paragraph-relative matches. |
 | `word.resolve_anchor` | implemented | Range & selection | read | `WordApi 1.3` | Resolve an anchor to safe diagnostic metadata without returning full document text. |
@@ -141,6 +143,9 @@ Tool ownership rules:
 - `word.update_tracked_change` owns tracked-change accept/reject actions. The
   tracked-change resource remains the read owner for current indices and
   fingerprints.
+- `word.get_header_footer` and `word.update_header_footer` own header/footer
+  body reads and writes. Body, range, and paragraph tools operate on the main
+  document body and must not silently reach into headers or footers.
 
 ### 1.3 Runtime capability tiers
 
@@ -154,8 +159,9 @@ runtime and advertises only tools whose complete implementation is supported:
 | Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
 | Host-specific | explicit successful probe | active-window and protection metadata |
 
-`word.save` uses the production `WordApi 1.1` API and is available whenever
-the core tier is available. Preview APIs are excluded from v1.
+Header/footer body access and `word.save` use production Word APIs available
+before the base manifest requirement and are available whenever the core tier is
+available. Preview APIs are excluded from v1.
 
 ### 1.4 Word resources
 
@@ -463,7 +469,71 @@ text, relationship identity, and adjacent text.
 }
 ```
 
-### 3.7 `word.insert_list`
+### 3.7 `word.get_header_footer`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "location"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "location": { "enum": ["header", "footer"] },
+    "header_footer_type": { "enum": ["primary", "first_page", "even_pages"], "default": "primary" },
+    "section_index": { "type": "integer", "minimum": 0, "default": 0 },
+    "include_metadata": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns `{ text, is_empty, section_count }`. When `include_metadata` is true,
+the response also includes `paragraphs: [{ index, text, style }]` for the target
+header or footer body. `section_index` is zero-based and must be within the
+current document's section collection.
+
+`header_footer_type: "first_page"` requires the target section's different-first
+page layout to be enabled. `header_footer_type: "even_pages"` requires odd/even
+header-footer layout to be enabled. If the layout is disabled, the tool fails
+with `INVALID_ARGUMENT` rather than reading a header/footer slot that Word will
+not render for the user.
+
+### 3.8 `word.update_header_footer`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "location", "action"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "location": { "enum": ["header", "footer"] },
+    "header_footer_type": { "enum": ["primary", "first_page", "even_pages"], "default": "primary" },
+    "section_index": { "type": "integer", "minimum": 0, "default": 0 },
+    "action": { "enum": ["set_text", "append_paragraph", "clear"] },
+    "text": { "type": "string" },
+    "style": { "type": "string" },
+    "formatting": { "$ref": "#/$defs/run_formatting" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Action semantics:
+
+- `set_text` requires `text` and replaces the whole target header/footer body
+  with `Body.insertText(text, "Replace")`.
+- `append_paragraph` requires `text`, appends a paragraph to the target
+  header/footer body, and may apply `style` and run `formatting` to the inserted
+  paragraph.
+- `clear` removes all content from the target header/footer body with
+  `Body.clear()` and is classified destructive.
+
+`validate_only: true` performs argument, section, layout, and action validation
+without invoking a mutating Office.js API. Successful validation returns
+`{ valid: true, operation: "word.update_header_footer", partial_effect: "none", resolved_target: { section_index, location, header_footer_type } }`.
+Failures return `INVALID_ARGUMENT` with `partial_effect: "none"`.
+
+### 3.9 `word.insert_list`
 
 ```json
 {

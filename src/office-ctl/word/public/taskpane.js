@@ -68,6 +68,7 @@
     'word.insert_image',
     'word.resize_image',
     'word.insert_page_break',
+    'word.update_header_footer',
     'word.insert_list',
     'word.replace_text',
     'word.update_paragraph',
@@ -90,11 +91,13 @@
     'word.find_text',
     'word.resolve_anchor',
     'word.get_selection',
+    'word.get_header_footer',
     'word.insert_paragraph',
     'word.insert_image',
     'word.resize_image',
     'word.insert_table',
     'word.insert_page_break',
+    'word.update_header_footer',
     'word.insert_list',
     'word.replace_text',
     'word.update_paragraph',
@@ -113,7 +116,7 @@
     'word.save'
   ];
   const TOOL_GROUPS = [
-    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.insert_page_break', 'word.save'] },
+    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_page_break', 'word.save'] },
     { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
@@ -124,6 +127,7 @@
   const TOOL_METADATA = new Map([
     ['word.get_text', { category: 'Document & structure', sideEffect: 'read', description: 'Read document text by paragraph range.' }],
     ['word.get_outline', { category: 'Document & structure', sideEffect: 'read', description: 'Read heading outline and structure.' }],
+    ['word.get_header_footer', { category: 'Document & structure', sideEffect: 'read', description: 'Read section header or footer text.' }],
     ['word.get_paragraph', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'Read a single paragraph by index.' }],
     ['word.find_text', { category: 'Range & selection', sideEffect: 'read', description: 'Find text matches in the document body.' }],
     ['word.resolve_anchor', { category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata.' }],
@@ -133,6 +137,7 @@
     ['word.resize_image', { category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image.' }],
     ['word.insert_table', { category: 'Tables', sideEffect: 'mutating', description: 'Insert a table with provided values.' }],
     ['word.insert_page_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page break.' }],
+    ['word.update_header_footer', { category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer.' }],
     ['word.insert_list', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a list.' }],
     ['word.replace_text', { category: 'Range & selection', sideEffect: 'mutating', description: 'Replace matching document text.' }],
     ['word.update_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Update paragraph text and style.' }],
@@ -455,6 +460,9 @@
         case 'word.get_selection':
           data = await getSelection(args);
           break;
+        case 'word.get_header_footer':
+          data = await getHeaderFooter(args);
+          break;
         case 'word.insert_paragraph':
           data = await insertParagraph(args);
           break;
@@ -469,6 +477,9 @@
           break;
         case 'word.insert_page_break':
           data = await insertPageBreak(args);
+          break;
+        case 'word.update_header_footer':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateHeaderFooter(args);
           break;
         case 'word.insert_list':
           data = await insertList(args);
@@ -576,6 +587,9 @@
       case 'word.insert_page_break':
         requireAnchor(tool, args.anchor);
         break;
+      case 'word.update_header_footer':
+        validateHeaderFooterArgs(tool, args, true);
+        break;
       case 'word.insert_list':
         requireAnchor(tool, args.anchor);
         validateInsertListArgs(args);
@@ -649,6 +663,8 @@
         return validateUpdateParagraphOnly(args);
       case 'word.delete_range':
         return validateDeleteRangeOnly(args);
+      case 'word.update_header_footer':
+        return validateUpdateHeaderFooterOnly(args);
       default:
         throw invalidArgument(`${tool} does not support validate_only.`);
     }
@@ -871,6 +887,67 @@
         paragraph_count: paragraphs.items.length,
         is_empty: selection.text.length === 0,
         untrusted_source: true
+      };
+    });
+  }
+
+  async function getHeaderFooter(args) {
+    validateHeaderFooterArgs('word.get_header_footer', args, false);
+    return Word.run(async (context) => {
+      const target = await headerFooterTarget(context, args);
+      const body = target.body;
+      const paragraphs = body.paragraphs;
+      body.load('text');
+      paragraphs.load('items/text,items/style');
+      await context.sync();
+      const data = {
+        text: body.text || '',
+        is_empty: !(body.text || '').trim(),
+        section_count: target.sectionCount,
+        section_index: target.sectionIndex,
+        location: target.location,
+        header_footer_type: target.headerFooterType,
+        untrusted_source: true
+      };
+      if (args.include_metadata) {
+        data.paragraphs = paragraphs.items.map((paragraph, index) => ({
+          index,
+          text: paragraph.text,
+          style: paragraph.style || null
+        }));
+      }
+      return data;
+    });
+  }
+
+  async function validateUpdateHeaderFooterOnly(args) {
+    return Word.run(async (context) => {
+      const target = await headerFooterTarget(context, args);
+      return validationSuccess('word.update_header_footer', {
+        resolved_target: headerFooterResolvedTarget(target)
+      });
+    });
+  }
+
+  async function updateHeaderFooter(args) {
+    validateHeaderFooterArgs('word.update_header_footer', args, true);
+    return Word.run(async (context) => {
+      const target = await headerFooterTarget(context, args);
+      const action = normalizedHeaderFooterAction(args.action);
+      if (action === 'set_text') {
+        target.body.insertText(String(args.text), Word.InsertLocation.replace);
+      } else if (action === 'append_paragraph') {
+        const paragraph = target.body.insertParagraph(String(args.text), Word.InsertLocation.end);
+        if (args.style) paragraph.style = String(args.style);
+        if (args.formatting) applyRunFormatting(paragraph.font, args.formatting);
+      } else if (action === 'clear') {
+        target.body.clear();
+      }
+      await context.sync();
+      return {
+        updated: true,
+        action,
+        resolved_target: headerFooterResolvedTarget(target)
       };
     });
   }
@@ -1698,6 +1775,57 @@
     return table.getCell(row, col);
   }
 
+  async function headerFooterTarget(context, args) {
+    const sections = context.document.sections;
+    sections.load('items');
+    await context.sync();
+    const sectionIndex = args.section_index ?? 0;
+    const section = sections.items[sectionIndex];
+    if (!section) throw Object.assign(new Error(`Section index ${sectionIndex} is out of range.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
+    const headerFooterType = normalizedHeaderFooterType(args.header_footer_type);
+    const location = normalizedHeaderFooterLocation(args.location);
+    await validateHeaderFooterLayout(section, headerFooterType);
+    const body = location === 'header'
+      ? section.getHeader(wordHeaderFooterType(headerFooterType))
+      : section.getFooter(wordHeaderFooterType(headerFooterType));
+    return { body, section, sectionIndex, sectionCount: sections.items.length, location, headerFooterType };
+  }
+
+  async function validateHeaderFooterLayout(section, headerFooterType) {
+    if (headerFooterType === 'primary') return;
+    const pageSetup = section.pageSetup;
+    pageSetup.load('differentFirstPageHeaderFooter,oddAndEvenPagesHeaderFooter');
+    await section.context.sync();
+    if (headerFooterType === 'first_page' && !pageSetup.differentFirstPageHeaderFooter) {
+      throw invalidArgument('first_page header/footer requires different-first-page layout to be enabled for the section.');
+    }
+    if (headerFooterType === 'even_pages' && !pageSetup.oddAndEvenPagesHeaderFooter) {
+      throw invalidArgument('even_pages header/footer requires odd/even-pages layout to be enabled for the section.');
+    }
+  }
+
+  function headerFooterResolvedTarget(target) {
+    return {
+      section_index: target.sectionIndex,
+      section_count: target.sectionCount,
+      location: target.location,
+      header_footer_type: target.headerFooterType
+    };
+  }
+
+  function wordHeaderFooterType(headerFooterType) {
+    switch (headerFooterType) {
+      case 'primary':
+        return Word.HeaderFooterType.primary;
+      case 'first_page':
+        return Word.HeaderFooterType.firstPage;
+      case 'even_pages':
+        return Word.HeaderFooterType.evenPages;
+      default:
+        throw invalidArgument(`Unsupported header_footer_type ${headerFooterType}.`);
+    }
+  }
+
   async function targetContentControl(context, args) {
     const id = Number(args.content_control_id ?? args.id);
     if (!Number.isInteger(id)) {
@@ -1789,6 +1917,36 @@
     if (!Number.isInteger(level) || level < minimum || level > 9) {
       throw invalidArgument(`${tool} heading_level must be an integer from ${minimum} to 9.`);
     }
+  }
+
+  function validateHeaderFooterArgs(tool, args, mutating) {
+    normalizedHeaderFooterLocation(args.location);
+    normalizedHeaderFooterType(args.header_footer_type);
+    if (args.section_index !== undefined) requireNonNegativeInteger(tool, 'section_index', args.section_index);
+    if (!mutating) return;
+    const action = normalizedHeaderFooterAction(args.action);
+    if ((action === 'set_text' || action === 'append_paragraph') && args.text === undefined) {
+      throw invalidArgument(`${tool} ${action} requires text.`);
+    }
+    validateFormattingArg(tool, args.formatting);
+  }
+
+  function normalizedHeaderFooterLocation(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'header' || normalized === 'footer') return normalized;
+    throw invalidArgument('header/footer location must be header or footer.');
+  }
+
+  function normalizedHeaderFooterType(value) {
+    const normalized = String(value || 'primary').trim().toLowerCase();
+    if (normalized === 'primary' || normalized === 'first_page' || normalized === 'even_pages') return normalized;
+    throw invalidArgument('header_footer_type must be primary, first_page, or even_pages.');
+  }
+
+  function normalizedHeaderFooterAction(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'set_text' || normalized === 'append_paragraph' || normalized === 'clear') return normalized;
+    throw invalidArgument('word.update_header_footer action must be set_text, append_paragraph, or clear.');
   }
 
   function validateFormattingArg(tool, formatting, required = false) {

@@ -52,6 +52,8 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"office.describe_tool"));
     assert!(names.contains(&"word.get_text"));
     assert!(names.contains(&"word_get_text"));
+    assert!(names.contains(&"word.get_header_footer"));
+    assert!(names.contains(&"word.update_header_footer"));
     assert!(names.contains(&"word.resolve_anchor"));
     assert!(names.contains(&"word.list_content_controls"));
     assert!(names.contains(&"word.insert_content_control"));
@@ -83,10 +85,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 27);
+    assert_eq!(WORD_V1_TOOLS.len(), 29);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 150);
+    assert_eq!(tools.len(), 154);
 }
 
 #[test]
@@ -247,8 +249,8 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 72);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 72);
+    assert_eq!(all_tools.len(), 74);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 74);
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));
@@ -315,6 +317,32 @@ fn representative_word_schemas_are_specific() {
             .len(),
         6
     );
+
+    let get_header_footer = schema_for("word.get_header_footer");
+    assert_required(&get_header_footer, &["session_id", "location"]);
+    assert_eq!(
+        get_header_footer["properties"]["location"]["enum"][0],
+        "header"
+    );
+    assert_eq!(
+        get_header_footer["properties"]["header_footer_type"]["default"],
+        "primary"
+    );
+    assert_eq!(
+        get_header_footer["properties"]["section_index"]["minimum"],
+        0
+    );
+
+    let update_header_footer = schema_for("word.update_header_footer");
+    assert_required(&update_header_footer, &["session_id", "location", "action"]);
+    assert_eq!(
+        update_header_footer["properties"]["action"]["enum"][0],
+        "set_text"
+    );
+    assert_eq!(
+        update_header_footer["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 }
 
 #[test]
@@ -324,6 +352,7 @@ fn word_validation_only_schemas_accept_validate_only_flag() {
         "word.replace_text",
         "word.update_paragraph",
         "word.delete_range",
+        "word.update_header_footer",
     ] {
         let schema = schema_for(tool);
         assert_eq!(
