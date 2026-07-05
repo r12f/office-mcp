@@ -2191,7 +2191,7 @@ Initial catalog: `add_slide`, `replace_text`, `insert_image`, `apply_layout`,
       Current evidence: `artifacts/office-tool-e2e-powerpoint.json` records a
       passed `office_tool_e2e_report` against that self-contained live
       PowerPoint presentation, and the validator passes
-      `--require-office-tool-e2e` with the refined 25-tool catalog,
+      `--require-office-tool-e2e` with the refined 24-tool catalog,
       per-tool setup/readback proof, cleanup proof, and activation proof.
 
 #### M8.1 — PowerPoint Core Tool Surface Refinement
@@ -2201,13 +2201,12 @@ identifies the primary object model as `Presentation` -> `Slide` -> content
 objects such as `Shape`, `TextRange`, and `Table`, with `Layout` controlling how
 slide content is organized. It also calls out the Common API owners for runtime
 context, requirement-set probing, active view, and document file download. The
-refined PowerPoint catalog is fixed at 25 tools in
+refined PowerPoint catalog is fixed at 24 tools in
 [04-powerpoint-capabilities.md](04-powerpoint-capabilities.md). It applies
 Occam's razor: each tool must own one distinct user workflow; method-level or
 overlapping tools must be merged into the relevant object-owner update tool.
 
-Target catalog: `powerpoint.get_presentation_info`,
-`powerpoint.get_active_view`, `powerpoint.export_file`,
+Target catalog: `powerpoint.get_presentation_info`, `powerpoint.export_file`,
 `powerpoint.update_tags`, `powerpoint.list_slides`, `powerpoint.add_slide`,
 `powerpoint.update_slide`, `powerpoint.delete_slide`,
 `powerpoint.move_slide`, `powerpoint.export_slide`,
@@ -2220,7 +2219,7 @@ Target catalog: `powerpoint.get_presentation_info`,
 `powerpoint.add_table`, `powerpoint.read_table`, and
 `powerpoint.update_table`.
 
-The 25 tools are grouped as: Presentation 3, Metadata 1, Slides 6, Layout 2,
+The 24 tools are grouped as: Presentation 2, Metadata 1, Slides 6, Layout 2,
 Selection 2, Shapes 5, Text 3, and Tables 3. Rejected v1 expansions include a
 PowerPoint deck save tool, separate `powerpoint.export_pdf`, slide duplication
 without a proven stable host API, custom XML mutation, document-property writes,
@@ -2231,7 +2230,7 @@ PowerPoint Designer, and macros.
 
 - [x] Research the PowerPoint v1 tool surface from Microsoft Learn's
       PowerPoint core concepts page and `@types/office-js`, then record the
-      refined 25-tool target in
+      refined 24-tool target in
       [04-powerpoint-capabilities.md](04-powerpoint-capabilities.md). Current
       spec keeps export under `powerpoint.export_file`, rejects a PowerPoint
       deck save tool because stable typings do not expose one, keeps slide
@@ -2244,7 +2243,7 @@ PowerPoint Designer, and macros.
       paths explicitly, returning `HOST_CAPABILITY_UNAVAILABLE` where the live
       host lacks the required object model.
 - [x] Update daemon catalog and MCP `tools/list` from the current 5-tool
-      PowerPoint runtime surface to the refined 25-tool surface. Remove
+      PowerPoint runtime surface to the refined 24-tool surface. Remove
       `powerpoint.export_pdf` from the advertised catalog after
       `powerpoint.export_file` is implemented and covered.
 - [x] Update the PowerPoint task pane `AVAILABLE_TOOLS`, permission grouping,
@@ -2253,8 +2252,8 @@ PowerPoint Designer, and macros.
       Presentation, Metadata, Slides, Layout, Selection, Shapes, Text, and
       Tables categories as the spec.
 - [x] Implement Presentation and Metadata slice:
-      `powerpoint.get_presentation_info`, `powerpoint.get_active_view`,
-      `powerpoint.export_file`, and `powerpoint.update_tags`. Do not implement
+      `powerpoint.get_presentation_info`, `powerpoint.export_file`, and
+      `powerpoint.update_tags`. Do not implement
       a deck save tool unless stable PowerPoint save support is proven first.
 - [x] Implement Slide and Layout slice: `powerpoint.list_slides`, extend
       `powerpoint.add_slide` as needed, add `powerpoint.update_slide`,
@@ -2291,7 +2290,7 @@ PowerPoint Designer, and macros.
       `npm run check` in `src/office-mcp/daemon/evidence`,
       `cargo test -p office-mcp-daemon`, `cargo fmt --check`, and
       `git diff --check`; the generated PowerPoint runtime evidence records a
-      self-contained `office_tool_e2e_report` with all 25 tools advertised and per-tool
+      self-contained `office_tool_e2e_report` with all 24 tools advertised and per-tool
       proofs for Presentation, Slides, Layout, Shapes, Text, and Tables.
 
 ### M9 — Outlook (cautious)
