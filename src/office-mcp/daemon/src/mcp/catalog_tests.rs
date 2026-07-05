@@ -786,6 +786,42 @@ fn representative_word_schemas_are_specific() {
         6
     );
 
+    let get_html = schema_for("word.get_html");
+    assert_required(&get_html, &["session_id"]);
+    assert!(get_html["properties"].get("anchor").is_some());
+    assert!(get_html["properties"].get("extent").is_some());
+    assert_eq!(
+        get_html["properties"]["anchor"]["oneOf"]
+            .as_array()
+            .expect("anchor oneOf")
+            .len(),
+        6
+    );
+
+    let insert_html = schema_for("word.insert_html");
+    assert_required(&insert_html, &["session_id", "anchor", "html"]);
+    assert_eq!(insert_html["properties"]["html"]["minLength"], 1);
+    assert_eq!(insert_html["properties"]["html"]["maxLength"], 1_000_000);
+    assert_eq!(
+        insert_html["properties"]["insert_location"]["enum"]
+            .as_array()
+            .expect("insert location enum")
+            .len(),
+        5
+    );
+    assert_eq!(
+        insert_html["properties"]["insert_location"]["default"],
+        "after"
+    );
+    assert_eq!(insert_html["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        insert_html["properties"]["anchor"]["oneOf"]
+            .as_array()
+            .expect("anchor oneOf")
+            .len(),
+        6
+    );
+
     let get_header_footer = schema_for("word.get_header_footer");
     assert_required(&get_header_footer, &["session_id", "location"]);
     assert_eq!(

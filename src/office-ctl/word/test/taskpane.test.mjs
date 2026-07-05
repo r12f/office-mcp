@@ -693,6 +693,54 @@ test('word.set_selection is advertised, grouped, and dispatches through anchor s
   assert.match(functionBody(js, 'selectionModeForSetSelection'), /cursor_end[\s\S]*Word\.SelectionMode\.end/);
 });
 
+test('word HTML interchange tools are advertised, sanitized, and dispatched', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const preflightBody = functionBody(js, 'preflightWordMutatingTool');
+  const getHtmlBody = functionBody(js, 'getHtml');
+  const insertHtmlBody = functionBody(js, 'insertHtml');
+  const sanitizeBody = functionBody(js, 'validateSafeHtmlForWord');
+
+  assert.match(js, /'word\.get_html'/);
+  assert.match(js, /'word\.insert_html'/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \[[\s\S]*'word\.get_selection'[\s\S]*'word\.set_selection'[\s\S]*'word\.get_html'[\s\S]*'word\.insert_html'[\s\S]*'word\.resolve_anchor'[\s\S]*\] \}/);
+  assert.match(js, /\['word\.get_html', \{ category: 'Range & selection', sideEffect: 'read', description: 'Read document or anchored range HTML\.' \}\]/);
+  assert.match(js, /\['word\.insert_html', \{ category: 'Range & selection', sideEffect: 'mutating', description: 'Insert sanitized HTML at an anchored range\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.get_html':\s*data = await getHtml\(args \|\| \{\}\);/);
+  assert.match(invokeBody, /case 'word\.insert_html':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await insertHtml\(args\);/);
+  assert.match(preflightBody, /case 'word\.insert_html':[\s\S]*validateInsertHtmlArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'availableToolsForRequirements'), /WordApi_1_3[\s\S]*word\.get_html[\s\S]*word\.insert_html/);
+  assert.match(getHtmlBody, /args\.anchor \? await resolveRangeForExtent\(context, args\.anchor, args\.extent\) : context\.document\.body/);
+  assert.match(getHtmlBody, /getHtml\(\)/);
+  assert.match(getHtmlBody, /enforceResponseSizeLimit\(html/);
+  assert.match(insertHtmlBody, /validateSafeHtmlForWord\(args\.html\)/);
+  assert.match(insertHtmlBody, /const target = await resolveAnchor\(context, args\.anchor\);/);
+  assert.match(insertHtmlBody, /target\.insertHtml\(args\.html, insertLocationForHtml\(args\.insert_location\)\);/);
+  assert.match(js, /function validateInsertHtmlArgs\(tool, args\)/);
+  assert.match(js, /function validateSafeHtmlForWord\(html\)/);
+  assert.match(js, /function insertLocationForHtml\(location\)/);
+  assert.match(sanitizeBody, /<script\b/i);
+  assert.match(sanitizeBody, /\bon[a-z]+\s*=/i);
+  assert.match(sanitizeBody, /javascript:/i);
+  assert.match(sanitizeBody, /\b(?:src|srcset|poster|background)\s*=/i);
+  assert.match(sanitizeBody, /\burl\s*\(/i);
+});
+
+test('word HTML sanitizer rejects unsafe payload classes before mutation', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const validateBody = functionBody(js, 'validateSafeHtmlForWord');
+  const script = `function invalidArgument(message) { return Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' }); }\nfunction validateSafeHtmlForWord(html) {${validateBody}}\nconst unsafe = [\n  '<script>alert(1)</script>',\n  '<p onclick="alert(1)">x</p>',\n  '<a href="javascript:alert(1)">x</a>',\n  '<img src="https://example.com/x.png">',\n  '<p style="background:url(https://example.com/x.png)">x</p>'\n];\nfor (const html of unsafe) {\n  let rejected = false;\n  try { validateSafeHtmlForWord(html); } catch (error) {\n    rejected = error.officeMcpCode === 'INVALID_ARGUMENT' && error.partialEffect === 'none';\n  }\n  if (!rejected) throw new Error('Expected unsafe HTML rejection for ' + html);\n}\nvalidateSafeHtmlForWord('<h1>Title</h1><p><strong>Bold</strong> <a href="https://example.com">link</a></p><table><tr><td>A</td></tr></table>');`;
+  const tmpDir = mkdtempSync(join(tmpdir(), 'office-mcp-html-'));
+  const scriptPath = join(tmpDir, 'html-sanitizer-test.cjs');
+  try {
+    writeFileSync(scriptPath, script);
+    const result = spawnSync(process.execPath, [scriptPath], { encoding: 'utf8' });
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test('word.apply_formatting supports paragraph layout formatting and readback metadata', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const preflightBody = functionBody(js, 'preflightWordMutatingTool');

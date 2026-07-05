@@ -148,6 +148,35 @@ const WORD_E2E_CASES = Object.fromEntries([
       }
     }
   }],
+  ['word.get_html', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'HTML read E2E paragraph' } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['HTML read E2E paragraph'], pathEquals: [{ path: 'untrusted_source', value: true }] }
+    }
+  }],
+  ['word.insert_html', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'HTML insert anchor marker' } }
+      ]
+    },
+    args: {
+      anchor: { kind: 'after_text', text: 'HTML insert anchor marker' },
+      html: '<h2>HTML Interchange E2E</h2><p><strong>Bold HTML</strong> <a href="https://example.com">link</a></p><ul><li>List item</li></ul><table><tr><td>Cell A</td></tr></table>'
+    },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_html',
+      readbackArguments: {},
+      expect: { contains: ['HTML Interchange E2E', 'Bold HTML', 'List item', 'Cell A'] }
+    }
+  }],
   ['word.get_header_footer', {
     setup: {
       actions: [
