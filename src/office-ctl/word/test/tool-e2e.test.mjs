@@ -267,6 +267,33 @@ const WORD_E2E_CASES = Object.fromEntries([
     args: { anchor: { kind: 'after_text', text: 'list anchor marker' }, items: ['E2E One', 'E2E Two'] },
     verify: wordReadback.documentText({ contains: ['E2E One', 'E2E Two'] })
   }],
+  ['word.list_lists', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_list', arguments: { anchor: { kind: 'end_of_document' }, items: ['ListLists One', 'ListLists Two'] } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['ListLists One', 'ListLists Two'], pathEquals: [{ path: 'count', value: 1 }, { path: 'lists.0.item_count', value: 2 }] }
+    }
+  }],
+  ['word.update_list', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_list', arguments: { anchor: { kind: 'end_of_document' }, items: ['UpdateList One', 'UpdateList Two'] } },
+        { tool: 'word.list_lists', saveAs: 'lists', arguments: {} }
+      ]
+    },
+    args: { action: 'add_item', list_id: '${lists.lists.0.list_id}', text: 'UpdateList Three', level: 0 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_lists',
+      readbackArguments: {},
+      expect: { contains: ['UpdateList One', 'UpdateList Two', 'UpdateList Three'], pathEquals: [{ path: 'lists.0.item_count', value: 3 }] }
+    }
+  }],
   ['word.insert_hyperlink', {
     setup: {
       actions: [

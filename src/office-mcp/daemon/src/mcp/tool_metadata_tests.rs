@@ -59,6 +59,16 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(page_setup.category, "Document & structure");
     assert_eq!(page_setup.side_effect, ToolSideEffect::Mutating);
 
+    let list_lists = tool_metadata("word.list_lists").expect("list lists metadata");
+    assert_eq!(list_lists.app, "word");
+    assert_eq!(list_lists.category, "Paragraphs & lists");
+    assert_eq!(list_lists.side_effect, ToolSideEffect::Read);
+
+    let update_list = tool_metadata("word.update_list").expect("list update metadata");
+    assert_eq!(update_list.app, "word");
+    assert_eq!(update_list.category, "Paragraphs & lists");
+    assert_eq!(update_list.side_effect, ToolSideEffect::Destructive);
+
     let mutating = tool_metadata("excel.write_range").expect("excel metadata");
     assert_eq!(mutating.app, "excel");
     assert_eq!(mutating.category, "Range");

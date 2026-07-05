@@ -156,6 +156,18 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
+        "word.list_lists",
+        "word",
+        "Paragraphs & lists",
+        ToolSideEffect::Read,
+    ),
+    tool(
+        "word.update_list",
+        "word",
+        "Paragraphs & lists",
+        ToolSideEffect::Destructive,
+    ),
+    tool(
         "word.insert_hyperlink",
         "word",
         "Range & selection",

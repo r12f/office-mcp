@@ -99,10 +99,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 41);
+    assert_eq!(WORD_V1_TOOLS.len(), 43);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 178);
+    assert_eq!(tools.len(), 182);
 }
 
 #[test]
@@ -319,8 +319,8 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 86);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 86);
+    assert_eq!(all_tools.len(), 88);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 88);
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));

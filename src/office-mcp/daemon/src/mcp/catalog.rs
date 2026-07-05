@@ -26,6 +26,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.list_bookmarks",
     "word.list_content_controls",
     "word.list_hyperlinks",
+    "word.list_lists",
     "word.list_notes",
     "word.list_sections",
     "word.read_table",
@@ -37,6 +38,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.save",
     "word.update_header_footer",
     "word.update_content_control",
+    "word.update_list",
     "word.update_note",
     "word.update_page_setup",
     "word.update_paragraph",
@@ -1041,6 +1043,27 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!(
+        "word.list_lists",
+        ["session_id"],
+        ["session_id", "offset", "limit"]
+    ),
+    tool_spec!(
+        "word.update_list",
+        ["session_id", "action"],
+        [
+            "session_id",
+            "action",
+            "list_id",
+            "paragraph_index",
+            "text",
+            "position",
+            "level",
+            "numbering",
+            "bullet_char",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
         "word.insert_hyperlink",
         ["session_id", "anchor", "url"],
         [
@@ -1750,23 +1773,71 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = word_range_marker_property_schema(tool, name) {
         return schema;
     }
+    if let Some(schema) = word_list_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = common_property_schema(tool, name) {
+        return schema;
+    }
     match name {
         "session_id" => json!({ "type": "string", "description": "Office document session ID." }),
-        "limit" if tool == "word.list_notes" => {
+        "limit" if tool == "word.list_lists" => {
             json!({ "type": "integer", "minimum": 1, "maximum": 200 })
         }
+        "list_id" | "paragraph_index" => json!({ "type": "integer", "minimum": 0 }),
+        "anchor" => anchor_schema_for_tool(tool),
+        "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
+        "image" => image_schema(),
+        "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
+        "location" if tool == "word.get_header_footer" || tool == "word.update_header_footer" => {
+            json!({ "enum": ["header", "footer"] })
+        }
+        "header_footer_type" => {
+            json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" })
+        }
+        "break_type" => {
+            json!({ "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" })
+        }
+        "orientation" => json!({ "enum": ["portrait", "landscape"] }),
+        "margins_pt" => json!({
+            "type": "object",
+            "properties": {
+                "top": { "type": "number", "minimum": 0 },
+                "bottom": { "type": "number", "minimum": 0 },
+                "left": { "type": "number", "minimum": 0 },
+                "right": { "type": "number", "minimum": 0 }
+            },
+            "additionalProperties": false
+        }),
+        "action" if tool == "word.update_header_footer" => {
+            json!({ "enum": ["set_text", "append_paragraph", "clear"] })
+        }
+        "formatting" => formatting_schema(),
+        "paragraph" if tool == "word.apply_formatting" => paragraph_formatting_schema(),
+        "title_box" | "content_box" => shape_box_schema(),
+        "tools" | "values" | "data" | "formulas" | "number_formats" | "items" | "fields"
+        | "borders" | "criteria" | "selected_items" | "shape_ids" | "row_indices"
+        | "column_indices" => {
+            json!({ "type": "array" })
+        }
+        _ => json!({ "type": "string" }),
+    }
+}
+
+fn common_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let schema = match name {
         "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
         | "table_index" | "change_index" | "content_control_id" | "position" | "slice_size"
         | "section_index" | "slide_index" | "target_index" | "row_index" | "column_index"
-        | "row_count" | "column_count" | "count" | "max_depth" => {
+        | "row_count" | "column_count" | "count" | "max_depth"
+            if !(tool == "word.update_list" && name == "position") =>
+        {
             json!({ "type": "integer", "minimum": 0 })
         }
         "heading_level" | "level" | "columns" => json!({ "type": "integer", "minimum": 1 }),
         "width_pt" | "height_pt" | "scale_percent" | "width" | "height" | "left" | "top"
         | "page_width_pt" | "page_height_pt" | "rotation" | "fill_transparency" | "line_weight"
-        | "line_transparency" | "font_size" => {
-            json!({ "type": "number" })
-        }
+        | "line_transparency" | "font_size" => json!({ "type": "number" }),
         "match_case"
         | "whole_word"
         | "wildcards"
@@ -1807,42 +1878,29 @@ fn property_schema(tool: &str, name: &str) -> Value {
         | "keep_text"
         | "overwrite"
         | "validate_only" => json!({ "type": "boolean" }),
-        "anchor" => anchor_schema_for_tool(tool),
-        "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
-        "image" => image_schema(),
-        "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
-        "location" if tool == "word.get_header_footer" || tool == "word.update_header_footer" => {
-            json!({ "enum": ["header", "footer"] })
+        _ => return None,
+    };
+    Some(schema)
+}
+
+fn word_list_property_schema(tool: &str, name: &str) -> Option<Value> {
+    if tool != "word.update_list" {
+        return None;
+    }
+    match name {
+        "level" => Some(json!({ "type": "integer", "minimum": 0, "maximum": 8 })),
+        "action" => Some(json!({
+            "enum": ["add_item", "set_item_level", "attach_paragraph", "detach_paragraph", "set_level_format"]
+        })),
+        "position" => {
+            Some(json!({ "enum": ["start", "end", "after_paragraph"], "default": "end" }))
         }
-        "header_footer_type" => {
-            json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" })
-        }
-        "break_type" => {
-            json!({ "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" })
-        }
-        "orientation" => json!({ "enum": ["portrait", "landscape"] }),
-        "margins_pt" => json!({
-            "type": "object",
-            "properties": {
-                "top": { "type": "number", "minimum": 0 },
-                "bottom": { "type": "number", "minimum": 0 },
-                "left": { "type": "number", "minimum": 0 },
-                "right": { "type": "number", "minimum": 0 }
-            },
-            "additionalProperties": false
-        }),
-        "action" if tool == "word.update_header_footer" => {
-            json!({ "enum": ["set_text", "append_paragraph", "clear"] })
-        }
-        "formatting" => formatting_schema(),
-        "paragraph" if tool == "word.apply_formatting" => paragraph_formatting_schema(),
-        "title_box" | "content_box" => shape_box_schema(),
-        "tools" | "values" | "data" | "formulas" | "number_formats" | "items" | "fields"
-        | "borders" | "criteria" | "selected_items" | "shape_ids" | "row_indices"
-        | "column_indices" => {
-            json!({ "type": "array" })
-        }
-        _ => json!({ "type": "string" }),
+        "numbering" => Some(json!({
+            "enum": ["bullet", "arabic", "upper_roman", "lower_roman", "upper_letter", "lower_letter", "none"]
+        })),
+        "text" => Some(json!({ "type": "string", "minLength": 1 })),
+        "bullet_char" => Some(json!({ "type": "string", "maxLength": 1 })),
+        _ => None,
     }
 }
 
@@ -1871,6 +1929,9 @@ fn word_note_property_schema(tool: &str, name: &str) -> Option<Value> {
     );
     match (is_note_tool, name) {
         (true, "kind") => Some(json!({ "enum": ["footnote", "endnote"] })),
+        (true, "limit") if tool == "word.list_notes" => {
+            Some(json!({ "type": "integer", "minimum": 1, "maximum": 200 }))
+        }
         (true, "text") if tool == "word.insert_note" => {
             Some(json!({ "type": "string", "minLength": 1 }))
         }
