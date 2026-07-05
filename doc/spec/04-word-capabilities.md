@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 39 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 43 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -77,7 +77,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
-| **Media** | `word.insert_image`, `word.resize_image` |
+| **Media** | `word.insert_image`, `word.resize_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.delete_image` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Notes** | `word.insert_note`, `word.list_notes`, `word.update_note`, `word.delete_note` |
 | **Review** | `word.add_comment`, `word.resolve_comment`, `word.set_change_tracking`, `word.update_tracked_change` |
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 49 tools. It deliberately consolidates specialized tools
+The target surface has 53 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -115,6 +115,10 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.insert_table` | implemented | Tables | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
 | `word.insert_image` | implemented | Media | edit | `WordApi 1.3` | Insert a validated image from base64 or a daemon-fetched HTTPS URL. |
 | `word.resize_image` | implemented | Media | edit | `WordApi 1.3` | Resize an existing inline image in place by paragraph index and image index. |
+| `word.list_images` | implemented | Media | read | `WordApi 1.3` | List inline images with paragraph and image indexes, dimensions, alt text, and hyperlink presence. |
+| `word.get_image` | implemented | Media | read | `WordApi 1.3` | Export one inline image as base64 with dimensions and metadata, subject to large-result limits. |
+| `word.update_image` | implemented | Media | edit | `WordApi 1.3` | Update inline image alt text, hyperlink, or bytes in place. |
+| `word.delete_image` | implemented | Media | destructive | `WordApi 1.3` | Delete one inline image without deleting surrounding paragraph text. |
 | `word.insert_break` | implemented | Document & structure | edit | `WordApi 1.3` | Insert a page, line, or section break at an anchor. |
 | `word.list_sections` | implemented | Document & structure | read | `WordApi 1.3` | List document sections with paragraph range and header/footer metadata. |
 | `word.update_page_setup` | implemented | Document & structure | edit | `WordApiDesktop 1.3` | Update document or section page setup such as orientation, margins, and page size. |
@@ -181,9 +185,14 @@ Tool ownership rules:
 - `word.read_table` owns table content reads and merged-table diagnostics.
   `word.update_table` owns table structure, cell value, table/cell formatting,
   width, borders, header-row state, merge, and deletion mutations.
-- `word.insert_image` owns new image insertion. `word.resize_image` owns in-place
-  resizing of an existing inline image and must not require re-uploading image
-  bytes or alter surrounding paragraphs.
+- Media tools own inline image lifecycle. `word.insert_image` owns new image
+  insertion. `word.list_images` owns inline image discovery, and
+  `word.get_image` owns bounded image byte export. `word.resize_image` owns
+  geometry-only resizing without re-uploading bytes. `word.update_image` owns
+  alt text, hyperlink, and byte replacement for an existing image.
+  `word.delete_image` owns removing one inline image while preserving
+  surrounding paragraph text. Floating shapes remain out of scope for these
+  inline-picture tools.
 - Content-control tools own content-control lifecycle and metadata. Generic text
   edits inside a known range remain owned by range/paragraph tools unless the
   caller is explicitly targeting a content control.
@@ -567,7 +576,149 @@ add-in derives the other dimension from the current image dimensions. The tool
 returns old and new dimensions in points and preserves paragraph placement, alt
 text, relationship identity, and adjacent text.
 
-### 3.6 `word.insert_break`
+### 3.6 `word.list_images`
+
+List inline pictures in the main document body without exporting image bytes.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string" }
+  },
+  "additionalProperties": false
+}
+```
+
+The response shape is:
+
+```json
+{
+  "images": [
+    {
+      "paragraph_index": 0,
+      "image_index": 0,
+      "width_pt": 96,
+      "height_pt": 48,
+      "alt_text_title": "Logo",
+      "alt_text_description": "Company logo",
+      "has_hyperlink": true
+    }
+  ],
+  "count": 1
+}
+```
+
+`paragraph_index` is the current zero-based body paragraph index, and
+`image_index` is the zero-based inline-picture index within that paragraph.
+Callers must re-run `word.list_images` after insertion, replacement, or
+deletion before using previously observed indexes.
+
+### 3.7 `word.get_image`
+
+Export one inline picture by the same locator used by `word.resize_image`.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "image"],
+  "properties": {
+    "session_id": { "type": "string" },
+    "image": {
+      "type": "object",
+      "required": ["kind", "index"],
+      "properties": {
+        "kind": { "const": "paragraph_index" },
+        "index": { "type": "integer", "minimum": 0 },
+        "image_index": { "type": "integer", "minimum": 0, "default": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+The tool returns `base64`, `width_pt`, `height_pt`, `alt_text_title`,
+`alt_text_description`, and `has_hyperlink`. Because this exports document
+content, it requires the extract/read permission ceiling used for content reads.
+The add-in MUST reject responses that exceed the daemon's large-result limit
+with a structured result-size error instead of allowing an oversized transport
+payload.
+
+### 3.8 `word.update_image`
+
+Update non-geometry metadata or replace the bytes for an existing inline image.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "image"],
+  "properties": {
+    "session_id": { "type": "string" },
+    "image": {
+      "type": "object",
+      "required": ["kind", "index"],
+      "properties": {
+        "kind": { "const": "paragraph_index" },
+        "index": { "type": "integer", "minimum": 0 },
+        "image_index": { "type": "integer", "minimum": 0, "default": 0 }
+      },
+      "additionalProperties": false
+    },
+    "alt_text_title": { "type": "string" },
+    "alt_text_description": { "type": "string" },
+    "hyperlink": { "type": "string", "format": "uri" },
+    "replace_base64": { "type": "string" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+At least one of `alt_text_title`, `alt_text_description`, `hyperlink`, or
+`replace_base64` is required. Hyperlinks use the same URL scheme allowlist as
+the Word hyperlink tools. Replacement bytes use the same decoded-byte and image
+format validation as `word.insert_image`. `word.update_image` does not resize
+the image; callers use `word.resize_image` for geometry changes.
+
+With `validate_only: true`, the tool resolves the target image and validates
+arguments without changing image metadata or bytes. Invalid locators or action
+arguments fail with `INVALID_ARGUMENT` and `partial_effect: "none"`.
+
+### 3.9 `word.delete_image`
+
+Delete one inline picture by locator.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "image"],
+  "properties": {
+    "session_id": { "type": "string" },
+    "image": {
+      "type": "object",
+      "required": ["kind", "index"],
+      "properties": {
+        "kind": { "const": "paragraph_index" },
+        "index": { "type": "integer", "minimum": 0 },
+        "image_index": { "type": "integer", "minimum": 0, "default": 0 }
+      },
+      "additionalProperties": false
+    },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+The tool removes only the selected inline picture. It MUST preserve adjacent
+text and MUST NOT delete the containing paragraph as a substitute for image
+deletion. With `validate_only: true`, the tool resolves the target image and
+returns without deleting it.
+
+### 3.10 `word.insert_break`
 
 ```json
 {
