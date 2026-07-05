@@ -618,7 +618,6 @@ fn representative_word_schemas_are_specific() {
         update_header_footer["properties"]["validate_only"]["type"],
         "boolean"
     );
-
 }
 
 #[test]
