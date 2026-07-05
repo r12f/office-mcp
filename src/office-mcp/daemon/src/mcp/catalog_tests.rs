@@ -619,6 +619,10 @@ fn representative_word_schemas_are_specific() {
         "boolean"
     );
 
+}
+
+#[test]
+fn word_update_table_schema_covers_complete_table_mutations() {
     let update_table = schema_for("word.update_table");
     assert_required(&update_table, &["session_id", "table_index", "action"]);
     let actions = update_table["properties"]["action"]["enum"]
