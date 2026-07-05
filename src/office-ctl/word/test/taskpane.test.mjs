@@ -720,10 +720,10 @@ test('word HTML interchange tools are advertised, sanitized, and dispatched', ()
   assert.match(js, /function validateSafeHtmlForWord\(html\)/);
   assert.match(js, /function insertLocationForHtml\(location\)/);
   assert.match(sanitizeBody, /<script\b/i);
-  assert.match(sanitizeBody, /\bon[a-z]+\s*=/i);
+  assert.match(sanitizeBody, /\\bon\[a-z\]\+\\s\*=|\\bon\[a-z\]\+\\s\*=/i);
   assert.match(sanitizeBody, /javascript:/i);
-  assert.match(sanitizeBody, /\b(?:src|srcset|poster|background)\s*=/i);
-  assert.match(sanitizeBody, /\burl\s*\(/i);
+  assert.match(sanitizeBody, /\\b\(\?:src\|srcset\|poster\|background\)\\s\*=/i);
+  assert.match(sanitizeBody, /\\burl\\s\*\\\(/i);
 });
 
 test('word HTML sanitizer rejects unsafe payload classes before mutation', () => {
@@ -872,7 +872,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.list_sections'/);
   assert.match(js, /'word\.update_page_setup'/);
   assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.get_document_properties', 'word\.update_document_properties', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.list_fields', 'word\.insert_field', 'word\.update_field', 'word\.delete_field', 'word\.list_styles', 'word\.create_style', 'word\.update_style', 'word\.save'\] \}/);
-  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.set_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.set_selection', 'word\.get_html', 'word\.insert_html', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image', 'word\.list_images', 'word\.get_image', 'word\.update_image', 'word\.delete_image'\] \}/);
@@ -1163,7 +1163,8 @@ test('Word task pane announces session only after successful register response',
 });
 
 function functionBody(source, name) {
-  const start = source.indexOf(`function ${name}(`);
+  let start = source.indexOf(`function ${name}(`);
+  if (start === -1) start = source.indexOf(`async function ${name}(`);
   assert.notEqual(start, -1, `missing function ${name}`);
   const open = source.indexOf('{', start);
   let depth = 0;

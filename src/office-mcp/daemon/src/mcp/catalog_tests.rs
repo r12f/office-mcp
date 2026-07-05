@@ -114,10 +114,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 56);
+    assert_eq!(WORD_V1_TOOLS.len(), 58);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 208);
+    assert_eq!(tools.len(), 212);
 }
 
 #[test]
@@ -667,10 +667,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 101);
+    assert_eq!(all_tools.len(), 103);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        101
+        103
     );
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
@@ -813,7 +813,10 @@ fn representative_word_schemas_are_specific() {
         insert_html["properties"]["insert_location"]["default"],
         "after"
     );
-    assert_eq!(insert_html["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        insert_html["properties"]["validate_only"]["type"],
+        "boolean"
+    );
     assert_eq!(
         insert_html["properties"]["anchor"]["oneOf"]
             .as_array()

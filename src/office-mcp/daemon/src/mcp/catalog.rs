@@ -13,6 +13,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.find_text",
     "word.get_document_properties",
     "word.get_header_footer",
+    "word.get_html",
     "word.get_outline",
     "word.get_paragraph",
     "word.get_selection",
@@ -23,6 +24,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.insert_content_control",
     "word.insert_break",
     "word.insert_field",
+    "word.insert_html",
     "word.insert_hyperlink",
     "word.insert_image",
     "word.insert_list",
@@ -1079,6 +1081,22 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "anchor", "extent", "mode"]
     ),
     tool_spec!(
+        "word.get_html",
+        ["session_id"],
+        ["session_id", "anchor", "extent"]
+    ),
+    tool_spec!(
+        "word.insert_html",
+        ["session_id", "anchor", "html"],
+        [
+            "session_id",
+            "anchor",
+            "html",
+            "insert_location",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
         "word.get_header_footer",
         ["session_id", "location"],
         [
@@ -2078,6 +2096,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = word_range_marker_property_schema(tool, name) {
         return schema;
     }
+    if let Some(schema) = word_html_property_schema(tool, name) {
+        return schema;
+    }
     if (tool != "word.list_notes" || name != "limit")
         && let Some(schema) = generic_property_schema(name)
     {
@@ -2124,6 +2145,22 @@ fn property_schema(tool: &str, name: &str) -> Value {
             json!({ "type": "array" })
         }
         _ => json!({ "type": "string" }),
+    }
+}
+
+fn word_html_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_html_tool = matches!(tool, "word.get_html" | "word.insert_html");
+    if !is_html_tool {
+        return None;
+    }
+    match name {
+        "html" if tool == "word.insert_html" => {
+            Some(json!({ "type": "string", "minLength": 1, "maxLength": 1_000_000 }))
+        }
+        "insert_location" if tool == "word.insert_html" => Some(
+            json!({ "enum": ["replace", "before", "after", "start", "end"], "default": "after" }),
+        ),
+        _ => None,
     }
 }
 

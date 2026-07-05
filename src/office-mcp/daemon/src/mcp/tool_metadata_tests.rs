@@ -19,16 +19,6 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(set_selection.category, "Range & selection");
     assert_eq!(set_selection.side_effect, ToolSideEffect::Mutating);
 
-    let get_html = tool_metadata("word.get_html").expect("HTML read metadata");
-    assert_eq!(get_html.app, "word");
-    assert_eq!(get_html.category, "Range & selection");
-    assert_eq!(get_html.side_effect, ToolSideEffect::Read);
-
-    let insert_html = tool_metadata("word.insert_html").expect("HTML insert metadata");
-    assert_eq!(insert_html.app, "word");
-    assert_eq!(insert_html.category, "Range & selection");
-    assert_eq!(insert_html.side_effect, ToolSideEffect::Mutating);
-
     let list_bookmarks = tool_metadata("word.list_bookmarks").expect("bookmark list metadata");
     assert_eq!(list_bookmarks.app, "word");
     assert_eq!(list_bookmarks.category, "Range & selection");
@@ -130,6 +120,19 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(destructive.app, "powerpoint");
     assert_eq!(destructive.category, "Slides");
     assert_eq!(destructive.side_effect, ToolSideEffect::Destructive);
+}
+
+#[test]
+fn word_html_tool_metadata_classifies_range_side_effects() {
+    let get_html = tool_metadata("word.get_html").expect("HTML read metadata");
+    assert_eq!(get_html.app, "word");
+    assert_eq!(get_html.category, "Range & selection");
+    assert_eq!(get_html.side_effect, ToolSideEffect::Read);
+
+    let insert_html = tool_metadata("word.insert_html").expect("HTML insert metadata");
+    assert_eq!(insert_html.app, "word");
+    assert_eq!(insert_html.category, "Range & selection");
+    assert_eq!(insert_html.side_effect, ToolSideEffect::Mutating);
 }
 
 #[test]
