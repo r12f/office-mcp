@@ -114,6 +114,18 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
+        "word.get_html",
+        "word",
+        "Range & selection",
+        ToolSideEffect::Read,
+    ),
+    tool(
+        "word.insert_html",
+        "word",
+        "Range & selection",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
         "word.insert_paragraph",
         "word",
         "Paragraphs & lists",

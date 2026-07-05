@@ -693,6 +693,54 @@ test('word.set_selection is advertised, grouped, and dispatches through anchor s
   assert.match(functionBody(js, 'selectionModeForSetSelection'), /cursor_end[\s\S]*Word\.SelectionMode\.end/);
 });
 
+test('word HTML interchange tools are advertised, sanitized, and dispatched', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const preflightBody = functionBody(js, 'preflightWordMutatingTool');
+  const getHtmlBody = functionBody(js, 'getHtml');
+  const insertHtmlBody = functionBody(js, 'insertHtml');
+  const sanitizeBody = functionBody(js, 'validateSafeHtmlForWord');
+
+  assert.match(js, /'word\.get_html'/);
+  assert.match(js, /'word\.insert_html'/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \[[\s\S]*'word\.get_selection'[\s\S]*'word\.set_selection'[\s\S]*'word\.get_html'[\s\S]*'word\.insert_html'[\s\S]*'word\.resolve_anchor'[\s\S]*\] \}/);
+  assert.match(js, /\['word\.get_html', \{ category: 'Range & selection', sideEffect: 'read', description: 'Read document or anchored range HTML\.' \}\]/);
+  assert.match(js, /\['word\.insert_html', \{ category: 'Range & selection', sideEffect: 'mutating', description: 'Insert sanitized HTML at an anchored range\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.get_html':\s*data = await getHtml\(args \|\| \{\}\);/);
+  assert.match(invokeBody, /case 'word\.insert_html':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await insertHtml\(args\);/);
+  assert.match(preflightBody, /case 'word\.insert_html':[\s\S]*validateInsertHtmlArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'availableToolsForRequirements'), /WordApi_1_3[\s\S]*word\.get_html[\s\S]*word\.insert_html/);
+  assert.match(getHtmlBody, /args\.anchor \? await resolveRangeForExtent\(context, args\.anchor, args\.extent\) : context\.document\.body/);
+  assert.match(getHtmlBody, /getHtml\(\)/);
+  assert.match(getHtmlBody, /enforceResponseSizeLimit\(html/);
+  assert.match(insertHtmlBody, /validateSafeHtmlForWord\(args\.html\)/);
+  assert.match(insertHtmlBody, /const target = await resolveAnchor\(context, args\.anchor\);/);
+  assert.match(insertHtmlBody, /target\.insertHtml\(args\.html, insertLocationForHtml\(args\.insert_location\)\);/);
+  assert.match(js, /function validateInsertHtmlArgs\(tool, args\)/);
+  assert.match(js, /function validateSafeHtmlForWord\(html\)/);
+  assert.match(js, /function insertLocationForHtml\(location\)/);
+  assert.match(sanitizeBody, /<script\b/i);
+  assert.match(sanitizeBody, /\\bon\[a-z\]\+\\s\*=|\\bon\[a-z\]\+\\s\*=/i);
+  assert.match(sanitizeBody, /javascript:/i);
+  assert.match(sanitizeBody, /\\b\(\?:src\|srcset\|poster\|background\)\\s\*=/i);
+  assert.match(sanitizeBody, /\\burl\\s\*\\\(/i);
+});
+
+test('word HTML sanitizer rejects unsafe payload classes before mutation', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const validateBody = functionBody(js, 'validateSafeHtmlForWord');
+  const script = `function invalidArgument(message) { return Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' }); }\nfunction validateSafeHtmlForWord(html) {${validateBody}}\nconst unsafe = [\n  '<script>alert(1)</script>',\n  '<p onclick="alert(1)">x</p>',\n  '<a href="javascript:alert(1)">x</a>',\n  '<img src="https://example.com/x.png">',\n  '<p style="background:url(https://example.com/x.png)">x</p>'\n];\nfor (const html of unsafe) {\n  let rejected = false;\n  try { validateSafeHtmlForWord(html); } catch (error) {\n    rejected = error.officeMcpCode === 'INVALID_ARGUMENT' && error.partialEffect === 'none';\n  }\n  if (!rejected) throw new Error('Expected unsafe HTML rejection for ' + html);\n}\nvalidateSafeHtmlForWord('<h1>Title</h1><p><strong>Bold</strong> <a href="https://example.com">link</a></p><table><tr><td>A</td></tr></table>');`;
+  const tmpDir = mkdtempSync(join(tmpdir(), 'office-mcp-html-'));
+  const scriptPath = join(tmpDir, 'html-sanitizer-test.cjs');
+  try {
+    writeFileSync(scriptPath, script);
+    const result = spawnSync(process.execPath, [scriptPath], { encoding: 'utf8' });
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test('word.apply_formatting supports paragraph layout formatting and readback metadata', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const preflightBody = functionBody(js, 'preflightWordMutatingTool');
@@ -824,7 +872,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.list_sections'/);
   assert.match(js, /'word\.update_page_setup'/);
   assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.get_document_properties', 'word\.update_document_properties', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.list_fields', 'word\.insert_field', 'word\.update_field', 'word\.delete_field', 'word\.list_styles', 'word\.create_style', 'word\.update_style', 'word\.save'\] \}/);
-  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.set_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.set_selection', 'word\.get_html', 'word\.insert_html', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image', 'word\.list_images', 'word\.get_image', 'word\.update_image', 'word\.delete_image'\] \}/);
@@ -1115,7 +1163,8 @@ test('Word task pane announces session only after successful register response',
 });
 
 function functionBody(source, name) {
-  const start = source.indexOf(`function ${name}(`);
+  let start = source.indexOf(`function ${name}(`);
+  if (start === -1) start = source.indexOf(`async function ${name}(`);
   assert.notEqual(start, -1, `missing function ${name}`);
   const open = source.indexOf('{', start);
   let depth = 0;

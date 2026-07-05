@@ -114,10 +114,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 56);
+    assert_eq!(WORD_V1_TOOLS.len(), 58);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 208);
+    assert_eq!(tools.len(), 212);
 }
 
 #[test]
@@ -667,10 +667,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 101);
+    assert_eq!(all_tools.len(), 103);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        101
+        103
     );
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
@@ -780,6 +780,45 @@ fn representative_word_schemas_are_specific() {
     assert!(set_selection["properties"].get("extent").is_some());
     assert_eq!(
         set_selection["properties"]["anchor"]["oneOf"]
+            .as_array()
+            .expect("anchor oneOf")
+            .len(),
+        6
+    );
+
+    let get_html = schema_for("word.get_html");
+    assert_required(&get_html, &["session_id"]);
+    assert!(get_html["properties"].get("anchor").is_some());
+    assert!(get_html["properties"].get("extent").is_some());
+    assert_eq!(
+        get_html["properties"]["anchor"]["oneOf"]
+            .as_array()
+            .expect("anchor oneOf")
+            .len(),
+        6
+    );
+
+    let insert_html = schema_for("word.insert_html");
+    assert_required(&insert_html, &["session_id", "anchor", "html"]);
+    assert_eq!(insert_html["properties"]["html"]["minLength"], 1);
+    assert_eq!(insert_html["properties"]["html"]["maxLength"], 1_000_000);
+    assert_eq!(
+        insert_html["properties"]["insert_location"]["enum"]
+            .as_array()
+            .expect("insert location enum")
+            .len(),
+        5
+    );
+    assert_eq!(
+        insert_html["properties"]["insert_location"]["default"],
+        "after"
+    );
+    assert_eq!(
+        insert_html["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        insert_html["properties"]["anchor"]["oneOf"]
             .as_array()
             .expect("anchor oneOf")
             .len(),

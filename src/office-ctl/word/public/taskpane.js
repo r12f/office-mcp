@@ -53,6 +53,7 @@
     taskStatusLabel
   } = window.OfficeCtlMainUi;
   const CONNECT_TIMEOUT_MS = 8000;
+  const MAX_RESPONSE_BYTES = 1024 * 1024;
   const INSERT_IMAGE_PLACEMENTS = new Set([
     'inline',
     'before_paragraph',
@@ -87,6 +88,7 @@
     'word.update_paragraph',
     'word.delete_range',
     'word.set_selection',
+    'word.insert_html',
     'word.insert_bookmark',
     'word.delete_bookmark',
     'word.insert_note',
@@ -115,6 +117,8 @@
     'word.delete_bookmark',
     'word.get_selection',
     'word.set_selection',
+    'word.get_html',
+    'word.insert_html',
     'word.get_header_footer',
     'word.get_document_properties',
     'word.insert_paragraph',
@@ -164,7 +168,7 @@
   ];
   const TOOL_GROUPS = [
     { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.get_document_properties', 'word.update_document_properties', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.list_fields', 'word.insert_field', 'word.update_field', 'word.delete_field', 'word.list_styles', 'word.create_style', 'word.update_style', 'word.save'] },
-    { label: 'Range & selection', tools: ['word.get_selection', 'word.set_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
+    { label: 'Range & selection', tools: ['word.get_selection', 'word.set_selection', 'word.get_html', 'word.insert_html', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
     { label: 'Media', tools: ['word.insert_image', 'word.resize_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'] },
@@ -185,6 +189,8 @@
     ['word.delete_bookmark', { category: 'Range & selection', sideEffect: 'destructive', description: 'Delete a bookmark marker without deleting text.' }],
     ['word.get_selection', { category: 'Range & selection', sideEffect: 'read', description: 'Read the current selection.' }],
     ['word.set_selection', { category: 'Range & selection', sideEffect: 'mutating', description: 'Set the current selection or cursor position from an anchor.' }],
+    ['word.get_html', { category: 'Range & selection', sideEffect: 'read', description: 'Read document or anchored range HTML.' }],
+    ['word.insert_html', { category: 'Range & selection', sideEffect: 'mutating', description: 'Insert sanitized HTML at an anchored range.' }],
     ['word.insert_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
     ['word.insert_image', { category: 'Media', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
     ['word.resize_image', { category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image.' }],
@@ -560,6 +566,12 @@
         case 'word.set_selection':
           data = await setSelection(args);
           break;
+        case 'word.get_html':
+          data = await getHtml(args || {});
+          break;
+        case 'word.insert_html':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await insertHtml(args);
+          break;
         case 'word.get_header_footer':
           data = await getHeaderFooter(args);
           break;
@@ -811,6 +823,9 @@
       case 'word.set_selection':
         validateSetSelectionArgs(tool, args);
         break;
+      case 'word.insert_html':
+        validateInsertHtmlArgs(tool, args);
+        break;
       case 'word.insert_note':
         validateInsertNoteArgs(tool, args);
         break;
@@ -908,6 +923,8 @@
       case 'word.update_document_properties':
         validateUpdateDocumentPropertiesArgs(tool, args || {});
         return validationSuccess(tool, { partial_effect: 'none' });
+      case 'word.insert_html':
+        return validateInsertHtmlOnly(args);
       default:
         throw invalidArgument(`${tool} does not support validate_only.`);
     }
@@ -1319,6 +1336,106 @@
       default:
         throw invalidArgument(`word.set_selection mode must be select, cursor_start, or cursor_end.`);
     }
+  }
+
+  async function getHtml(args) {
+    args = args || {};
+    return Word.run(async (context) => {
+      const target = args.anchor ? await resolveRangeForExtent(context, args.anchor, args.extent) : context.document.body;
+      const result = target.getHtml();
+      await context.sync();
+      const html = result.value || '';
+      const byteLength = enforceResponseSizeLimit(html);
+      return {
+        html,
+        byte_length: byteLength,
+        truncated: false,
+        untrusted_source: true
+      };
+    });
+  }
+
+  async function insertHtml(args) {
+    validateInsertHtmlArgs('word.insert_html', args);
+    validateSafeHtmlForWord(args.html);
+    return Word.run(async (context) => {
+      const target = await resolveAnchor(context, args.anchor);
+      const inserted = target.insertHtml(args.html, insertLocationForHtml(args.insert_location));
+      inserted.load('text');
+      await context.sync();
+      return {
+        inserted: true,
+        insert_location: args.insert_location || 'after',
+        text_preview: safeTextPreview(inserted.text || ''),
+        untrusted_source: true
+      };
+    });
+  }
+
+  async function validateInsertHtmlOnly(args) {
+    validateInsertHtmlArgs('word.insert_html', args);
+    return Word.run(async (context) => {
+      const resolved = await resolveValidationAnchor(context, args.anchor);
+      return validationSuccess('word.insert_html', {
+        resolved_target: {
+          ...resolved,
+          insert_location: args.insert_location || 'after',
+          html_byte_length: utf8ByteLength(args.html)
+        }
+      });
+    });
+  }
+
+  function validateInsertHtmlArgs(tool, args) {
+    requireAnchor(tool, args?.anchor);
+    if (typeof args.html !== 'string' || args.html.length < 1) throw invalidArgument(`${tool} requires non-empty html.`);
+    if (args.html.length > 1_000_000) throw invalidArgument(`${tool} html exceeds 1000000 characters.`);
+    validateSafeHtmlForWord(args.html);
+    insertLocationForHtml(args.insert_location);
+  }
+
+  function validateSafeHtmlForWord(html) {
+    const source = String(html || '');
+    if (/<script\b/i.test(source)) throw invalidArgument('word.insert_html rejects script elements.');
+    if (/\bon[a-z]+\s*=/i.test(source)) throw invalidArgument('word.insert_html rejects inline event handlers.');
+    if (/javascript:/i.test(source)) throw invalidArgument('word.insert_html rejects javascript: URLs.');
+    if (/\b(?:src|srcset|poster|background)\s*=/i.test(source)) throw invalidArgument('word.insert_html rejects external resource attributes.');
+    if (/\burl\s*\(/i.test(source)) throw invalidArgument('word.insert_html rejects CSS url() resource references.');
+    return true;
+  }
+
+  function insertLocationForHtml(location) {
+    switch (location || 'after') {
+      case 'replace':
+        return Word.InsertLocation.replace;
+      case 'before':
+        return Word.InsertLocation.before;
+      case 'after':
+        return Word.InsertLocation.after;
+      case 'start':
+        return Word.InsertLocation.start;
+      case 'end':
+        return Word.InsertLocation.end;
+      default:
+        throw invalidArgument('word.insert_html insert_location must be replace, before, after, start, or end.');
+    }
+  }
+
+  function enforceResponseSizeLimit(value) {
+    const byteLength = utf8ByteLength(value);
+    if (byteLength > MAX_RESPONSE_BYTES) {
+      throw Object.assign(new Error(`Response exceeds MAX_RESPONSE_BYTES (${MAX_RESPONSE_BYTES}).`), {
+        officeMcpCode: 'MAX_RESPONSE_SIZE',
+        partialEffect: 'none',
+        max_response_bytes: MAX_RESPONSE_BYTES
+      });
+    }
+    return byteLength;
+  }
+
+  function utf8ByteLength(value) {
+    if (typeof TextEncoder === 'function') return new TextEncoder().encode(String(value)).length;
+    return unescape(encodeURIComponent(String(value))).length;
   }
 
   async function insertNote(args) {
@@ -4471,6 +4588,7 @@
     const supportsInlineImages = Boolean(requirements.WordApi_1_3);
     const supportsDocumentProperties = Boolean(requirements.WordApi_1_3);
     const supportsSetSelection = Boolean(requirements.WordApi_1_3);
+    const supportsHtmlInterchange = Boolean(requirements.WordApi_1_3);
     return AVAILABLE_TOOLS.filter((tool) => {
       if (tool === 'word.update_page_setup') return Boolean(requirements.WordApiDesktop_1_3);
       if (['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'].includes(tool)) {
@@ -4482,6 +4600,7 @@
       if (['word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'].includes(tool)) return supportsInlineImages;
       if (['word.get_document_properties', 'word.update_document_properties'].includes(tool)) return supportsDocumentProperties;
       if (tool === 'word.set_selection') return supportsSetSelection;
+      if (['word.get_html', 'word.insert_html'].includes(tool)) return supportsHtmlInterchange;
       return true;
     });
   }
