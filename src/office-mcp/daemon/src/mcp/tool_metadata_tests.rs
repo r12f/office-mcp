@@ -174,6 +174,26 @@ fn word_image_tool_metadata_classifies_media_side_effects() {
     assert_eq!(delete_image.app, "word");
     assert_eq!(delete_image.category, "Media");
     assert_eq!(delete_image.side_effect, ToolSideEffect::Destructive);
+
+    let list_shapes = tool_metadata("word.list_shapes").expect("shape list metadata");
+    assert_eq!(list_shapes.app, "word");
+    assert_eq!(list_shapes.category, "Media");
+    assert_eq!(list_shapes.side_effect, ToolSideEffect::Read);
+
+    let insert_shape = tool_metadata("word.insert_shape").expect("shape insert metadata");
+    assert_eq!(insert_shape.app, "word");
+    assert_eq!(insert_shape.category, "Media");
+    assert_eq!(insert_shape.side_effect, ToolSideEffect::Mutating);
+
+    let update_shape = tool_metadata("word.update_shape").expect("shape update metadata");
+    assert_eq!(update_shape.app, "word");
+    assert_eq!(update_shape.category, "Media");
+    assert_eq!(update_shape.side_effect, ToolSideEffect::Mutating);
+
+    let delete_shape = tool_metadata("word.delete_shape").expect("shape delete metadata");
+    assert_eq!(delete_shape.app, "word");
+    assert_eq!(delete_shape.category, "Media");
+    assert_eq!(delete_shape.side_effect, ToolSideEffect::Destructive);
 }
 
 #[test]

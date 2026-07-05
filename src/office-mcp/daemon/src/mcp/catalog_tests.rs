@@ -284,6 +284,79 @@ fn word_image_tools_expose_expected_contracts() {
         delete_image_schema["properties"]["validate_only"]["type"],
         "boolean"
     );
+
+    let list_shapes = tool_for("word.list_shapes");
+    assert_eq!(
+        list_shapes["inputSchema"]["required"],
+        serde_json::json!(["session_id"])
+    );
+    assert_eq!(list_shapes["_meta"]["com.office-mcp/side_effects"], "read");
+
+    let insert_shape = tool_for("word.insert_shape");
+    assert_eq!(
+        insert_shape["inputSchema"]["required"],
+        serde_json::json!(["session_id", "shape_type"])
+    );
+    assert_eq!(
+        insert_shape["inputSchema"]["properties"]["shape_type"]["enum"],
+        serde_json::json!(["text_box", "rectangle", "ellipse", "rounded_rectangle", "line", "picture"])
+    );
+    assert_eq!(
+        insert_shape["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
+
+    let update_shape = tool_for("word.update_shape");
+    assert_eq!(
+        update_shape["inputSchema"]["required"],
+        serde_json::json!(["session_id", "shape_id", "action"])
+    );
+    assert_eq!(
+        update_shape["inputSchema"]["properties"]["action"]["enum"],
+        serde_json::json!(["move", "resize", "set_text", "set_alt_text", "set_fill", "set_line", "set_wrap", "set_visibility"])
+    );
+    assert_eq!(
+        update_shape["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
+
+    let delete_shape = tool_for("word.delete_shape");
+    assert_eq!(
+        delete_shape["inputSchema"]["required"],
+        serde_json::json!(["session_id", "shape_id"])
+    );
+    assert_eq!(
+        delete_shape["_meta"]["com.office-mcp/side_effects"],
+        "destructive"
+    );
+
+    let list_shapes_schema = schema_for("word.list_shapes");
+    assert_required(&list_shapes_schema, &["session_id"]);
+    assert_eq!(
+        list_shapes_schema["properties"]["scope"]["enum"],
+        serde_json::json!(["body", "paragraph", "anchor"])
+    );
+
+    let insert_shape_schema = schema_for("word.insert_shape");
+    assert_required(&insert_shape_schema, &["session_id", "shape_type"]);
+    assert_eq!(
+        insert_shape_schema["properties"]["image"]["oneOf"][0]["required"],
+        serde_json::json!(["base64"])
+    );
+
+    let update_shape_schema = schema_for("word.update_shape");
+    assert_required(&update_shape_schema, &["session_id", "shape_id", "action"]);
+    assert_eq!(
+        update_shape_schema["properties"]["wrap_type"]["enum"],
+        serde_json::json!(["inline", "square", "tight", "behind", "front", "top_bottom"])
+    );
+
+    let delete_shape_schema = schema_for("word.delete_shape");
+    assert_required(&delete_shape_schema, &["session_id", "shape_id"]);
+    assert_eq!(
+        delete_shape_schema["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 }
 
 #[test]
