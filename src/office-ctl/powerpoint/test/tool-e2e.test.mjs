@@ -22,18 +22,17 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
     },
     verify: {
       kind: 'direct-result',
-      expect: { pathEquals: [{ path: 'host.app', value: 'powerpoint' }, { path: 'is_read_only', value: false }, { path: 'protection.kind', value: 'none' }] }
-    }
-  }],
-  ['powerpoint.get_active_view', {
-    setup: {
-      actions: [
-        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank', title: 'Active view baseline' } }
-      ]
-    },
-    verify: {
-      kind: 'direct-result',
-      expect: { pathEquals: [{ path: 'editable', value: true }] }
+      expect: {
+        pathEquals: [
+          { path: 'host.app', value: 'powerpoint' },
+          { path: 'is_read_only', value: false },
+          { path: 'protection.kind', value: 'none' },
+          { path: 'active_view_source', value: 'host' }
+        ],
+        pathMatches: [
+          { path: 'active_view', pattern: '^(edit|read)$' }
+        ]
+      }
     }
   }],
   ['powerpoint.export_file', {
