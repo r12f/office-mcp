@@ -231,6 +231,20 @@ Tool ownership rules:
   configuration operations for their object type, but must not absorb generic
   range, formula, or cell-format operations.
 
+Action side-effect maps:
+
+| Tool | Read actions | Edit actions | Destructive actions |
+|---|---|---|---|
+| `excel.find_replace_cells` | omitted `replace` / find-only mode | replace mode | - |
+| `excel.update_table` | `metadata`, `read` | `add_rows`, `add_columns`, `resize`, `rename`, `options`, `style` | `delete` |
+| `excel.update_chart` | `metadata`, `read`, `export_image` | `title`, `legend`, `axis`, `data`, `series_source`, `position`, `size` | `delete` |
+| `excel.update_pivot_table` | `metadata`, `read` | `refresh`, `add_hierarchy`, `remove_hierarchy`, `layout`, `filter`, `clear_filters` | `delete` |
+
+These maps are part of the public contract described in
+[03-mcp-tool-surface.md](03-mcp-tool-surface.md) §9. The daemon MUST expose the
+same maps in MCP metadata and enforce Global Tool Access at action granularity
+before dispatching to the Excel add-in.
+
 API shape rules:
 
 - Prefer explicit `action` fields for object-owner update tools when one tool

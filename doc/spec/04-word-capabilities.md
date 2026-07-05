@@ -257,6 +257,23 @@ Tool ownership rules:
   style, and header/footer tools may create text that fields reference, but they
   must not create, refresh, or delete fields implicitly.
 
+Action side-effect maps:
+
+| Tool | Read actions | Edit actions | Destructive actions |
+|---|---|---|---|
+| `word.update_image` | - | `resize`, `set_alt_text`, `set_hyperlink`, `replace` | `delete` |
+| `word.update_list` | - | `add_item`, `set_item_level`, `attach_paragraph`, `detach_paragraph`, `set_level_format` | - |
+| `word.update_header_footer` | - | `set_text`, `append_paragraph` | `clear` |
+| `word.update_field` | - | `refresh`, `refresh_all`, `lock`, `unlock` | - |
+| `word.update_table` | - | `update_cell`, `add_row`, `add_column`, `format_cell`, `merge_cells`, `set_column_width`, `distribute_columns`, `set_borders`, `set_header_row` | `delete`, `delete_row`, `delete_column` |
+| `word.update_comment` | - | `reply`, `edit`, `reopen` | `delete` |
+| `word.update_tracked_change` | - | `accept`, `reject` | `accept_all`, `reject_all` |
+
+These maps are part of the public contract described in
+[03-mcp-tool-surface.md](03-mcp-tool-surface.md) §9. The daemon MUST expose the
+same maps in MCP metadata and enforce Global Tool Access at action granularity
+before dispatching to the Word add-in.
+
 ### 1.3 Runtime capability tiers
 
 The base manifest requires `WordApi 1.3`. The add-in probes higher sets at

@@ -226,6 +226,19 @@ evidence where the host API cannot be fully proven statically.
 - `powerpoint.update_tags` owns presentation tags only; it must not become a
   generic metadata bag for custom XML or arbitrary document properties.
 
+Action side-effect maps:
+
+| Tool | Read actions | Edit actions | Destructive actions |
+|---|---|---|---|
+| `powerpoint.update_tags` | omitted `action` / list tags | `set` | `delete` |
+| `powerpoint.update_shape` | - | `move`, `resize`, `rotate`, `rename`, `set_alt_text`, `set_fill`, `set_line`, `set_z_order`, `group`, `ungroup` | `delete` |
+| `powerpoint.update_table` | - | `set_values`, `set_cell`, `add_rows`, `add_columns`, `merge_cells`, `split_cell`, `clear`, `style` | `delete`, `delete_rows`, `delete_columns` |
+
+These maps are part of the public contract described in
+[03-mcp-tool-surface.md](03-mcp-tool-surface.md) §9. The daemon MUST expose the
+same maps in MCP metadata and enforce Global Tool Access at action granularity
+before dispatching to the PowerPoint add-in.
+
 ## 4. API Shape Rules
 
 - Prefer explicit `action` fields for object-owner update tools when one tool
