@@ -217,7 +217,13 @@ fn word_image_tools_expose_expected_contracts() {
     );
     assert_eq!(
         update_image["inputSchema"]["properties"]["action"]["enum"],
-        serde_json::json!(["resize", "set_alt_text", "set_hyperlink", "replace", "delete"])
+        serde_json::json!([
+            "resize",
+            "set_alt_text",
+            "set_hyperlink",
+            "replace",
+            "delete"
+        ])
     );
     assert_eq!(
         update_image["inputSchema"]["properties"]["base64"]["type"],
@@ -258,13 +264,22 @@ fn word_image_tools_expose_expected_contracts() {
     assert_required(&update_image_schema, &["session_id", "image", "action"]);
     assert_eq!(
         update_image_schema["properties"]["action"]["enum"],
-        serde_json::json!(["resize", "set_alt_text", "set_hyperlink", "replace", "delete"])
+        serde_json::json!([
+            "resize",
+            "set_alt_text",
+            "set_hyperlink",
+            "replace",
+            "delete"
+        ])
     );
     assert_eq!(
         update_image_schema["properties"]["hyperlink"]["format"],
         "uri"
     );
-    assert_eq!(update_image_schema["properties"]["base64"]["type"], "string");
+    assert_eq!(
+        update_image_schema["properties"]["base64"]["type"],
+        "string"
+    );
     assert_eq!(
         update_image_schema["properties"]["validate_only"]["type"],
         "boolean"
@@ -744,10 +759,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 110);
+    assert_eq!(all_tools.len(), 108);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        110
+        108
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1246,7 +1261,6 @@ fn word_validation_only_schemas_accept_validate_only_flag() {
         "word.create_style",
         "word.update_style",
         "word.delete_range",
-        "word.delete_image",
         "word.delete_note",
         "word.delete_field",
         "word.update_header_footer",

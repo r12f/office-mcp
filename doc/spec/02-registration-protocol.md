@@ -200,7 +200,7 @@ its current document.
       "word.insert_paragraph",
       "word.insert_table",
       "word.insert_image",
-      "word.resize_image",
+      "word.update_image",
       "word.insert_break",
       "word.list_sections",
       "word.insert_list",
