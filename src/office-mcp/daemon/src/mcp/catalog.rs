@@ -698,14 +698,13 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
             style_examples_for_tool(tool)
         }
         "word.update_table" => vec![json!({
-            "description": "Replace one table cell by row and column index.",
+            "description": "Merge the first row across two columns after validating table bounds.",
             "arguments": {
                 "session_id": "session-1",
                 "table_index": 0,
-                "action": "set_cell_text",
-                "row": 1,
-                "col": 2,
-                "text": "Approved"
+                "action": "merge_cells",
+                "row_range": [0, 0],
+                "col_range": [0, 1]
             }
         })],
         "excel.update_table" => vec![json!({
@@ -1337,6 +1336,13 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "row",
             "col",
             "text",
+            "index",
+            "values",
+            "row_range",
+            "col_range",
+            "width_pt",
+            "header_row",
+            "borders",
             "data",
             "rows",
             "cols"
@@ -1941,6 +1947,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = word_review_property_schema(tool, name) {
         return schema;
     }
+    if let Some(schema) = word_table_property_schema(tool, name) {
+        return schema;
+    }
     if let Some(schema) = word_header_footer_property_schema(tool, name) {
         return schema;
     }
@@ -2048,6 +2057,52 @@ fn generic_property_schema(name: &str) -> Option<Value> {
         | "keep_text"
         | "overwrite"
         | "validate_only" => Some(json!({ "type": "boolean" })),
+        _ => None,
+    }
+}
+
+fn word_table_property_schema(tool: &str, name: &str) -> Option<Value> {
+    if tool != "word.update_table" {
+        return None;
+    }
+    match name {
+        "action" => Some(json!({
+            "enum": [
+                "update_cell",
+                "add_row",
+                "add_column",
+                "format_cell",
+                "delete",
+                "delete_row",
+                "delete_column",
+                "merge_cells",
+                "set_column_width",
+                "distribute_columns",
+                "set_borders",
+                "set_header_row"
+            ]
+        })),
+        "row_range" | "col_range" => Some(json!({
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "minItems": 2,
+            "maxItems": 2
+        })),
+        "width_pt" => Some(json!({ "type": "number", "exclusiveMinimum": 0 })),
+        "header_row" => Some(json!({ "type": "boolean" })),
+        "borders" => Some(json!({
+            "type": "object",
+            "properties": {
+                "edges": {
+                    "type": "array",
+                    "items": { "enum": ["top", "bottom", "left", "right", "inside_horizontal", "inside_vertical", "all"] }
+                },
+                "style": { "enum": ["single", "double", "dotted", "dashed", "none"] },
+                "width_pt": { "type": "number", "minimum": 0 },
+                "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+            },
+            "additionalProperties": false
+        })),
         _ => None,
     }
 }
