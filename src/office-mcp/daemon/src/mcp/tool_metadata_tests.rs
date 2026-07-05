@@ -84,6 +84,26 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(update_style.category, "Document & structure");
     assert_eq!(update_style.side_effect, ToolSideEffect::Mutating);
 
+    let list_images = tool_metadata("word.list_images").expect("image list metadata");
+    assert_eq!(list_images.app, "word");
+    assert_eq!(list_images.category, "Media");
+    assert_eq!(list_images.side_effect, ToolSideEffect::Read);
+
+    let get_image = tool_metadata("word.get_image").expect("image get metadata");
+    assert_eq!(get_image.app, "word");
+    assert_eq!(get_image.category, "Media");
+    assert_eq!(get_image.side_effect, ToolSideEffect::Read);
+
+    let update_image = tool_metadata("word.update_image").expect("image update metadata");
+    assert_eq!(update_image.app, "word");
+    assert_eq!(update_image.category, "Media");
+    assert_eq!(update_image.side_effect, ToolSideEffect::Mutating);
+
+    let delete_image = tool_metadata("word.delete_image").expect("image delete metadata");
+    assert_eq!(delete_image.app, "word");
+    assert_eq!(delete_image.category, "Media");
+    assert_eq!(delete_image.side_effect, ToolSideEffect::Destructive);
+
     let sections = tool_metadata("word.list_sections").expect("sections metadata");
     assert_eq!(sections.app, "word");
     assert_eq!(sections.category, "Document & structure");
