@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 45 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 46 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -74,7 +74,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | Category | Tools |
 |---|---|
 | **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.get_document_properties`, `word.update_document_properties`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.list_fields`, `word.insert_field`, `word.update_field`, `word.delete_field`, `word.list_styles`, `word.create_style`, `word.update_style`, `word.save` |
-| **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
+| **Range & selection** | `word.get_selection`, `word.set_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
 | **Media** | `word.insert_image`, `word.resize_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.delete_image` |
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 55 tools. It deliberately consolidates specialized tools
+The target surface has 56 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -110,6 +110,7 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.list_bookmarks` | implemented | Range & selection | read | `WordApi 1.4` | List bookmark names and bounded location previews without returning full document text. |
 | `word.delete_bookmark` | implemented | Range & selection | destructive | `WordApi 1.4` | Delete a bookmark marker without deleting the bookmarked text. |
 | `word.get_selection` | implemented | Range & selection | read | `WordApi 1.3` | Read current selection text and simple selection metadata. |
+| `word.set_selection` | implemented | Range & selection | edit | `WordApi 1.3` | Resolve an anchor and set the current selection or cursor position. |
 | `word.insert_hyperlink` | implemented | Range & selection | edit | `WordApi 1.3` | Create a hyperlink on an anchored range or inserted text with URL scheme validation. |
 | `word.list_hyperlinks` | implemented | Range & selection | read | `WordApi 1.3` | List hyperlink text and URLs with paragraph-relative locations. |
 | `word.remove_hyperlink` | implemented | Range & selection | edit | `WordApi 1.3` | Remove hyperlink targets from an anchored range while preserving text by default. |
@@ -381,6 +382,34 @@ promised because Word does not expose portable document offsets.
 
 Returns `{ text, paragraph_count, is_empty }`. A selection may span multiple
 paragraphs; portable character offsets are intentionally not exposed.
+
+### 2.5A `word.set_selection`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "extent": { "$ref": "#/$defs/extent" },
+    "mode": { "enum": ["select", "cursor_start", "cursor_end"], "default": "select" }
+  },
+  "additionalProperties": false
+}
+```
+
+Resolves the shared Word anchor vocabulary, optionally applies the same extent
+rules as other anchored range tools, and calls Word's selection API on the
+resolved range. `mode: "select"` highlights and scrolls to the range;
+`cursor_start` and `cursor_end` collapse the selection to the range boundary.
+The response returns `{ selected_text_preview, paragraph_index, is_empty }`,
+where the preview is bounded to avoid turning selection control into a bulk
+document-read path.
+
+Although `word.set_selection` does not edit document contents, it changes UI
+state and affects later `selection`-anchored mutating calls. It is therefore
+classified as `edit` and is not exposed under the Read permission ceiling.
 
 ### 2.6 `word.list_bookmarks`
 
@@ -1723,6 +1752,12 @@ existence checks described in §3.11 and §4.4. A bookmark anchor remains part o
 the shared anchor vocabulary whether or not the lifecycle tools are enabled;
 however, the lifecycle tools themselves are advertised only when the `WordApi
 1.4` review tier is available.
+
+Selection-setting stays in Range & selection because it targets the same shared
+anchor vocabulary as `word.resolve_anchor` and anchored mutation tools. It is
+implemented with `Range.select("Select" | "Start" | "End")`; the tool itself
+uses the existing Word core anchor-resolution tier (`WordApi 1.3`) rather than
+introducing a separate selection capability gate.
 
 ## 7B. Note Lifecycle
 
