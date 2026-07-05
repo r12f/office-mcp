@@ -64,10 +64,51 @@ The resource fallback is additive. When a host session reports tools in
 `available_tools`, those public tools must still be exposed as callable MCP
 tools through `tools/list` whenever the daemon Global Tool Access policy allows
 them. In particular, PowerPoint action tools such as `powerpoint.add_slide`,
-`powerpoint.add_text_box`, `powerpoint.update_shape`,
+`powerpoint.add_shape`, `powerpoint.update_shape`,
 `powerpoint.replace_text`, and `powerpoint.format_text` are not resource-only
 capabilities; clients invoke them with `tools/call` and the daemon then checks
 the target session's `available_tools` before forwarding to the add-in.
+
+## 1.1 Naming and split conventions
+
+Tool names follow user intents and stable object owners. New public Office tools
+MUST use the conventions below unless an app capability spec documents a more
+specific reason for an exception:
+
+- `get_*` reads metadata, orientation, or current state without returning bulk
+  document content.
+- `read_*` reads user-authored content such as text, table values, or range
+  values.
+- `list_*` enumerates a collection and returns ids, indexes, names, and bounded
+  metadata needed for follow-up calls.
+- `insert_*` is preferred for Word body/anchor operations where the caller is
+  choosing a document position.
+- `add_*` is preferred for slide- or sheet-like containers and objects appended
+  to an app-owned collection.
+- `create_*` is preferred for promoted Excel objects such as tables, charts, and
+  PivotTables where creation establishes a named workbook object.
+- `update_*` owns lifecycle/configuration actions for an existing object when
+  those actions share one object owner. If an update owner mixes read, edit, and
+  destructive actions, the tool must document the action-level side effects and
+  enforce policy at action granularity.
+
+Search and replace are allowed to share a tool only when the read-only search
+mode is explicit and documented. Word exposes `word.find_text` for search and
+`word.replace_text` for mutation. Excel uses `excel.find_replace_cells` with no
+replacement argument as the find idiom. PowerPoint text search uses
+`powerpoint.replace_text` dry-run/validation mode until `powerpoint.read_text`
+gains an explicit query argument.
+
+Content-bearing objects should split reads from mutations when the read result
+is independently useful: `read_*` owns content inspection, and `update_*` owns
+mutation. Combined owners are allowed for compact catalogs only when they expose
+and enforce action-level side-effect metadata.
+
+Text boxes are shape-owned creation. Word uses `word.insert_shape` with
+`shape_type: "text_box"` because Word shape insertion is anchor-relative.
+PowerPoint uses `powerpoint.add_shape` with `shape_type: "text_box"` and
+`text`, because the text box is a slide shape and should not be a separate
+public tool beside geometric shape creation.
 
 | URI pattern | Returns | Notes |
 |---|---|---|

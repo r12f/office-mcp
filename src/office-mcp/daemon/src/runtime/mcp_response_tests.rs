@@ -100,7 +100,8 @@ fn forwarded_response_invokes_mcp_runtime() {
     assert!(text.contains("office.list_sessions"));
     assert!(text.contains("word.get_text"));
     assert!(text.contains("powerpoint.add_slide"));
-    assert!(text.contains("powerpoint.add_text_box"));
+    assert!(!text.contains("powerpoint.add_text_box"));
+    assert!(text.contains("powerpoint.add_shape"));
     assert!(text.contains("powerpoint.update_shape"));
     assert!(text.contains("powerpoint.replace_text"));
     assert!(text.contains("powerpoint.format_text"));

@@ -612,12 +612,6 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Read,
     ),
     tool(
-        "powerpoint.add_text_box",
-        "powerpoint",
-        "Shapes",
-        ToolSideEffect::Mutating,
-    ),
-    tool(
         "powerpoint.add_shape",
         "powerpoint",
         "Shapes",

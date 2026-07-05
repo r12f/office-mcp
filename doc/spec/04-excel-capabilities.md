@@ -197,6 +197,11 @@ fully proven statically.
 
 Tool ownership rules:
 
+- Excel follows the cross-app naming and split conventions in
+  [03-mcp-tool-surface.md](03-mcp-tool-surface.md) §1.1. Workbook and worksheet
+  state reads use `get_*` / `list_*`, range content reads use `read_*`, sheet
+  collection operations use `add_*`, promoted workbook objects use `create_*`,
+  and lifecycle/configuration changes use object-owner `update_*` tools.
 - One tool owns each common user intent. Do not add a second tool unless it has a
   different object owner, permission profile, or user-visible result.
 - `excel.get_workbook_info` is workbook state only. It may include the active
@@ -205,6 +210,9 @@ Tool ownership rules:
 - `excel.get_used_range` locates the occupied sheet area. It does not return
   cell contents; callers use `excel.read_range` for values, text, formulas, and
   number formats.
+- `excel.find_replace_cells` is the Excel search owner. Omitting replacement
+  arguments is the read-only find idiom; supplying replacement arguments makes
+  it the range replacement owner.
 - `excel.write_range` writes literal values. `excel.set_formula` writes formulas
   and formula matrices. Formula strings passed to `excel.write_range` remain
   literal input unless explicitly documented otherwise during implementation.

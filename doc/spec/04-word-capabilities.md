@@ -178,6 +178,11 @@ Superseded target-surface tools:
 
 Tool ownership rules:
 
+- Word follows the cross-app naming and split conventions in
+  [03-mcp-tool-surface.md](03-mcp-tool-surface.md) §1.1. In particular,
+  anchor-relative creation uses `insert_*`, content reads use `get_*` for
+  document metadata/text windows and `read_*` for object content, and text-box
+  creation belongs to `word.insert_shape` with `shape_type: "text_box"`.
 - One common user intent has one tool owner. Add a new tool only when it has a
   different object owner, permission profile, or user-visible result.
 - Read resources and read tools may expose the same underlying document data,

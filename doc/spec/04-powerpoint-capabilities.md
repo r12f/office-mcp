@@ -31,11 +31,11 @@ That page identifies two API layers and the primary object path:
 
 `office-mcp` exposes workflow-oriented tools for those objects. It must not
 mirror every PowerPoint.js class, property, or method. The target v1 catalog is
-24 tools: large enough to cover presentation orientation, slide CRUD, layout,
+23 tools: large enough to cover presentation orientation, slide CRUD, layout,
 selection, shape/text/table authoring, visual formatting, metadata, and export,
 but small enough to keep each tool's owner and permission profile clear.
 
-Selection rules for the 24-tool budget:
+Selection rules for the 23-tool budget:
 
 - Start from the Microsoft Learn object path: `Presentation` -> `Slide` ->
   `Shape` / `TextRange` / `Table`, with `Layout` as the slide organization
@@ -59,7 +59,7 @@ Selection rules for the 24-tool budget:
   method-level tool.
 - Defer charts, SmartArt, media, animations, transitions, comments, speaker
   notes, slide show control, external data, and preview-only APIs until a later
-  user workflow proves that the 24-tool surface cannot express the need safely.
+  user workflow proves that the 23-tool surface cannot express the need safely.
 
 Candidate selection matrix before final pruning:
 
@@ -70,7 +70,7 @@ Candidate selection matrix before final pruning:
 | Read and mutate slides | `SlideCollection` / `Slide` | `powerpoint.list_slides`, `powerpoint.add_slide`, `powerpoint.update_slide`, `powerpoint.delete_slide`, `powerpoint.duplicate_slide`, `powerpoint.move_slide`, `powerpoint.export_slide` | Covers slide inventory, CRUD, ordering, duplication, and single-slide image/PPTX export without adding separate slide selection/export variants. |
 | Use layouts and masters | `SlideMaster` / `SlideLayout` | `powerpoint.list_layouts`, `powerpoint.apply_layout`, `powerpoint.set_slide_background` | Layout and background are the slide organization/visual base owners; shape content remains separate. |
 | Work from the user's selection | `Presentation` selection APIs | `powerpoint.get_selection`, `powerpoint.set_selection` | One read and one write owner for selected slides/shapes/text ranges. |
-| Author and manage shapes | `ShapeCollection` / `Shape` | `powerpoint.list_shapes`, `powerpoint.add_text_box`, `powerpoint.add_shape`, `powerpoint.insert_image`, `powerpoint.update_shape` | Shape creation is split by common user intent; lifecycle/configuration is consolidated under `update_shape`. |
+| Author and manage shapes | `ShapeCollection` / `Shape` | `powerpoint.list_shapes`, `powerpoint.add_text_box`, `powerpoint.add_shape`, `powerpoint.insert_image`, `powerpoint.update_shape` | Candidate text-box creation is pruned into `add_shape`; lifecycle/configuration is consolidated under `update_shape`. |
 | Edit and format text | `TextRange` / `ShapeFont` / `ParagraphFormat` | `powerpoint.read_text`, `powerpoint.replace_text`, `powerpoint.format_text` | Text reads, replacement, and formatting have distinct validation and permission profiles. |
 | Author tables | `Table` | `powerpoint.add_table`, `powerpoint.read_table`, `powerpoint.update_table` | Table creation, reading, and table-owned mutation cover row/column/cell/style/merge/clear without method-level sprawl. |
 
@@ -88,7 +88,7 @@ Candidate tool pressure before Occam reduction:
 | Tables | `powerpoint.add_table`, `powerpoint.read_table`, `powerpoint.update_table` | 3 | Create, inspect, and mutate slide tables. |
 
 Total: 28. The table above intentionally shows candidate group pressure.
-The accepted v1 budget is 24 tools, so the final accepted set removes four
+The accepted v1 budget is 23 tools, so the final accepted set removes five
 candidate tools that overlap with stronger owners:
 
 - Remove `powerpoint.update_properties`; fold safe title/subject/author metadata
@@ -100,6 +100,8 @@ candidate tools that overlap with stronger owners:
   later host-supported path is proven.
 - Remove `powerpoint.set_slide_background`; background changes belong to
   `powerpoint.update_slide` because the slide owns its background.
+- Remove `powerpoint.add_text_box`; text boxes are slide shapes and belong to
+  `powerpoint.add_shape` with `shape_type: "text_box"` and `text`.
 
 Accepted v1 tool set:
 
@@ -110,11 +112,11 @@ Accepted v1 tool set:
 | Slides | `powerpoint.list_slides`, `powerpoint.add_slide`, `powerpoint.update_slide`, `powerpoint.delete_slide`, `powerpoint.move_slide`, `powerpoint.export_slide` | 6 |
 | Layout | `powerpoint.list_layouts`, `powerpoint.apply_layout` | 2 |
 | Selection | `powerpoint.get_selection`, `powerpoint.set_selection` | 2 |
-| Shapes | `powerpoint.list_shapes`, `powerpoint.add_text_box`, `powerpoint.add_shape`, `powerpoint.insert_image`, `powerpoint.update_shape` | 5 |
+| Shapes | `powerpoint.list_shapes`, `powerpoint.add_shape`, `powerpoint.insert_image`, `powerpoint.update_shape` | 4 |
 | Text | `powerpoint.read_text`, `powerpoint.replace_text`, `powerpoint.format_text` | 3 |
 | Tables | `powerpoint.add_table`, `powerpoint.read_table`, `powerpoint.update_table` | 3 |
 
-Total: 24 tools.
+Total: 23 tools.
 
 Rejected v1 expansions:
 
@@ -124,6 +126,9 @@ Rejected v1 expansions:
 - No separate `powerpoint.get_active_view` after refinement. It is superseded by
   `powerpoint.get_presentation_info`; active view is presentation orientation
   metadata and must be returned as a guaranteed field on that owner.
+- No separate `powerpoint.add_text_box` after refinement. It is superseded by
+  `powerpoint.add_shape` with `shape_type: "text_box"`; text boxes are shapes,
+  and shape creation must have one public owner.
 - No separate `powerpoint.apply_shape_fill`, `powerpoint.move_shape`,
   `powerpoint.resize_shape`, `powerpoint.delete_shape`, or
   `powerpoint.group_shapes`; those belong to `powerpoint.update_shape`.
@@ -160,8 +165,7 @@ Rejected v1 expansions:
 | `powerpoint.get_selection` | implemented | Selection | read | `PowerPointApi 1.5` | Return selected slides, shapes, and text range metadata. |
 | `powerpoint.set_selection` | implemented | Selection | edit | `PowerPointApi 1.5` | Select slides or a text range; shape selection support is host-gated and must be verified before advertisement. |
 | `powerpoint.list_shapes` | implemented | Shapes | read | `PowerPointApi 1.3`; richer shape metadata requires `PowerPointApi 1.4+` | List shapes on a slide with id, type, position, size, text/table presence, and accessibility metadata. |
-| `powerpoint.add_text_box` | implemented | Shapes | edit | `PowerPointApi 1.4` | Add a text box to a slide. This supersedes title/body-specific text insertion tools. |
-| `powerpoint.add_shape` | implemented | Shapes | edit | `PowerPointApi 1.4` | Add a geometric shape or line to a slide with explicit type and geometry. |
+| `powerpoint.add_shape` | implemented | Shapes | edit | `PowerPointApi 1.4` | Add a text box, geometric shape, or line to a slide with explicit type, optional text, and geometry. |
 | `powerpoint.insert_image` | implemented | Shapes | edit | Current implementation uses Common API image insertion; shape-owned implementation requires PowerPoint image API verification | Insert an image on a slide or current selection from validated base64 or daemon-fetched HTTPS URL. |
 | `powerpoint.update_shape` | implemented | Shapes | edit/destructive | `PowerPointApi 1.4`; grouping and advanced fields require higher sets | Read/update shape position, size, rotation, name, alt text, fill, line, z-order, grouping, and delete through one shape owner. |
 | `powerpoint.read_text` | implemented | Text | read | `PowerPointApi 1.4` | Read text from selected text, a shape, one slide, or all slides. |
@@ -174,7 +178,7 @@ Rejected v1 expansions:
 The tools above are the target PowerPoint v1 contract. Implementation work must
 keep the daemon catalog, MCP `tools/list`, PowerPoint task pane
 `available_tools`, task pane permission grouping, documentation, and tests
-aligned with this 24-tool surface. Before implementing or changing a tool,
+aligned with this 23-tool surface. Before implementing or changing a tool,
 verify its minimum requirement set against `@types/office-js` and Microsoft API
 docs, then land the change as a test-first implementation slice with daemon
 catalog coverage, task pane contract coverage, and live PowerPoint smoke
@@ -184,6 +188,10 @@ evidence where the host API cannot be fully proven statically.
 
 - One common user intent has one tool owner. Add a new tool only when it has a
   different object owner, permission profile, or user-visible result.
+- PowerPoint follows the cross-app naming and split conventions in
+  [03-mcp-tool-surface.md](03-mcp-tool-surface.md) §1.1. Slide and shape
+  collection creation uses `add_*`, content reads use `read_*`, and text-box
+  creation belongs to `powerpoint.add_shape` with `shape_type: "text_box"`.
 - `powerpoint.get_presentation_info` owns presentation orientation and summary
   metadata. It must always include `active_view` as `edit`, `read`, or
   `unknown`, plus `active_view_source` as `host` when the Common API returns a
@@ -206,6 +214,10 @@ evidence where the host API cannot be fully proven statically.
 - `powerpoint.update_shape` owns shape lifecycle and visual geometry. It must
   not edit text contents or table contents except when deleting the owning
   shape explicitly.
+- `powerpoint.add_shape` owns all slide shape creation except images and tables:
+  text boxes use `shape_type: "text_box"` plus `text`, and geometric shapes or
+  lines use the same owner with shape geometry. Do not advertise a separate
+  `powerpoint.add_text_box` public tool.
 - `powerpoint.read_text`, `powerpoint.replace_text`, and
   `powerpoint.format_text` own text inside shapes. Do not add separate title,
   subtitle, body, placeholder, or selected-text mutation tools.
@@ -225,6 +237,9 @@ evidence where the host API cannot be fully proven statically.
 - Read operations must return metadata, ids, indices, dimensions, and object
   owners where useful, but must not return large deck text unless the tool is
   explicitly `powerpoint.read_text`.
+- PowerPoint text search uses `powerpoint.replace_text` dry-run mode as the
+  documented find idiom until `powerpoint.read_text` grows an explicit query
+  argument.
 - Destructive actions must be explicit in the tool arguments and must set
   destructive metadata in the daemon catalog.
 - Host-gated operations must fail with `HOST_CAPABILITY_UNAVAILABLE` when the
