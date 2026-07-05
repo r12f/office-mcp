@@ -20,7 +20,6 @@ const POWERPOINT_V1_TOOLS = [
   'powerpoint.get_selection',
   'powerpoint.set_selection',
   'powerpoint.list_shapes',
-  'powerpoint.add_text_box',
   'powerpoint.add_shape',
   'powerpoint.insert_image',
   'powerpoint.update_shape',
@@ -297,11 +296,12 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   const listShapesBody = functionBody(js, 'listShapes');
   assert.match(listShapesBody, /slide\.shapes\.load\('items'\)/);
   assert.match(listShapesBody, /shape\.load\('id,name,type,left,top,width,height,rotation,textFrame\/hasText,textFrame\/textRange\/text'\)/);
-  assert.match(js, /async function addTextBox\(args\)/);
-  const addTextBoxBody = functionBody(js, 'addTextBox');
-  assert.match(addTextBoxBody, /shape\.load\('id,name,type,left,top,width,height,rotation,textFrame\/hasText,textFrame\/textRange\/text'\)/);
+  assert.doesNotMatch(js, /case 'powerpoint\.add_text_box':/);
   assert.match(js, /async function addShape\(args\)/);
   const addShapeBody = functionBody(js, 'addShape');
+  assert.match(addShapeBody, /shapeTypeFrom\(args\.shape_type/);
+  assert.match(addShapeBody, /slide\.shapes\.addTextBox\(text/);
+  assert.match(addShapeBody, /slide\.shapes\.addGeometricShape\(type/);
   assert.match(addShapeBody, /shape\.load\('id,name,type,left,top,width,height,rotation,textFrame\/hasText,textFrame\/textRange\/text'\)/);
   const shapeMetadataBody = functionBody(js, 'shapeMetadata');
   assert.match(shapeMetadataBody, /safeLoaded\(shape, 'altTextTitle'/);

@@ -22,7 +22,6 @@ const POWERPOINT_V1_TOOL_NAMES: &[&str] = &[
     "powerpoint.get_selection",
     "powerpoint.set_selection",
     "powerpoint.list_shapes",
-    "powerpoint.add_text_box",
     "powerpoint.add_shape",
     "powerpoint.insert_image",
     "powerpoint.update_shape",
@@ -114,13 +113,15 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     for name in POWERPOINT_V1_TOOL_NAMES {
         assert!(names.contains(name), "missing PowerPoint tool {name}");
     }
+    assert!(!names.contains(&"powerpoint.add_text_box"));
+    assert!(!names.contains(&"powerpoint_add_text_box"));
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
     assert_eq!(WORD_V1_TOOLS.len(), 62);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
-    assert_eq!(PowerPointToolCatalog::tools().len(), 24);
-    assert_eq!(tools.len(), 218);
+    assert_eq!(PowerPointToolCatalog::tools().len(), 23);
+    assert_eq!(tools.len(), 216);
 }
 
 #[test]
@@ -760,10 +761,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 106);
+    assert_eq!(all_tools.len(), 105);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        106
+        105
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1323,6 +1324,19 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
         slide["properties"]["title_box"]["additionalProperties"],
         false
     );
+
+    let shape = schema_for("powerpoint.add_shape");
+    assert_required(&shape, &["session_id", "shape_type"]);
+    assert_eq!(
+        shape["properties"]["shape_type"]["enum"],
+        serde_json::json!(["text_box", "rectangle", "ellipse", "rounded_rectangle", "line"])
+    );
+    assert_eq!(shape["properties"]["text"]["type"], "string");
+
+    let retired_text_box = tool_catalog_json()
+        .into_iter()
+        .find(|tool| tool["name"] == "powerpoint.add_text_box");
+    assert!(retired_text_box.is_none());
 }
 
 #[test]
@@ -1353,6 +1367,7 @@ fn powerpoint_tool_catalog_checks_supported_names() {
     assert!(!PowerPointToolCatalog::contains(
         "powerpoint.get_active_view"
     ));
+    assert!(!PowerPointToolCatalog::contains("powerpoint.add_text_box"));
     assert!(PowerPointToolCatalog::contains("powerpoint.list_slides"));
     assert!(PowerPointToolCatalog::contains("powerpoint.apply_layout"));
     assert!(PowerPointToolCatalog::contains("powerpoint.update_table"));

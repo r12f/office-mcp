@@ -203,30 +203,18 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
       expect: { contains: ['E2E Listed Shape'], pathEquals: [{ path: 'slide_index', value: 0 }] }
     }
   }],
-  ['powerpoint.add_text_box', {
-    setup: {
-      actions: [
-        { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank' } }
-      ]
-    },
-    args: { slide_index: 0, text: 'E2E text box' },
-    verify: {
-      kind: 'readback',
-      readbackTool: 'powerpoint.read_text',
-      readbackArguments: { slide_index: 0 },
-      expect: { contains: ['E2E text box'] }
-    }
-  }],
   ['powerpoint.add_shape', {
     setup: {
       actions: [
         { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank' } }
       ]
     },
-    args: { slide_index: 0, type: 'rectangle' },
+    args: { slide_index: 0, shape_type: 'text_box', text: 'E2E text box' },
     verify: {
-      kind: 'direct-result',
-      expect: { contains: ['shape_id'] }
+      kind: 'readback',
+      readbackTool: 'powerpoint.read_text',
+      readbackArguments: { slide_index: 0 },
+      expect: { contains: ['E2E text box'] }
     }
   }],
   ['powerpoint.insert_image', {
@@ -264,7 +252,7 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
   ['powerpoint.read_text', {
     setup: {
       actions: [
-        { tool: 'powerpoint.add_text_box', arguments: { slide_index: 0, text: 'E2E read text baseline' } }
+        { tool: 'powerpoint.add_shape', arguments: { slide_index: 0, shape_type: 'text_box', text: 'E2E read text baseline' } }
       ]
     },
     args: { slide_index: 0 },
@@ -276,7 +264,7 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
   ['powerpoint.replace_text', {
     setup: {
       actions: [
-        { tool: 'powerpoint.add_text_box', arguments: { slide_index: 0, text: 'baseline marker' } }
+        { tool: 'powerpoint.add_shape', arguments: { slide_index: 0, shape_type: 'text_box', text: 'baseline marker' } }
       ]
     },
     args: { search: 'baseline marker', replacement: 'updated marker' },
@@ -291,7 +279,7 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
   ['powerpoint.format_text', {
     setup: {
       actions: [
-        { tool: 'powerpoint.add_text_box', saveAs: 'textBoxResult', arguments: { slide_index: 0, text: 'Format me E2E' } }
+        { tool: 'powerpoint.add_shape', saveAs: 'textBoxResult', arguments: { slide_index: 0, shape_type: 'text_box', text: 'Format me E2E' } }
       ]
     },
     args: { slide_index: 0, shape_id: '${textBoxResult.shape.shape_id}', bold: true, color: '#1F4E79' },
