@@ -1,6 +1,6 @@
 use super::{ToolSideEffect, tool_metadata, tool_metadata_catalog};
 use crate::mcp::all_office_tool_names;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -238,4 +238,140 @@ fn tool_metadata_covers_every_forwarded_office_tool() {
         .collect::<BTreeSet<_>>();
 
     assert_eq!(metadata_tools, forwarded_tools);
+}
+
+#[test]
+fn mixed_action_owner_metadata_declares_complete_action_side_effects() {
+    let expected = BTreeMap::from([
+        (
+            "word.update_table",
+            BTreeMap::from([
+                ("update_cell", ToolSideEffect::Mutating),
+                ("add_row", ToolSideEffect::Mutating),
+                ("add_column", ToolSideEffect::Mutating),
+                ("format_cell", ToolSideEffect::Mutating),
+                ("delete", ToolSideEffect::Destructive),
+                ("delete_row", ToolSideEffect::Destructive),
+                ("delete_column", ToolSideEffect::Destructive),
+                ("merge_cells", ToolSideEffect::Mutating),
+                ("set_column_width", ToolSideEffect::Mutating),
+                ("distribute_columns", ToolSideEffect::Mutating),
+                ("set_borders", ToolSideEffect::Mutating),
+                ("set_header_row", ToolSideEffect::Mutating),
+            ]),
+        ),
+        (
+            "word.update_comment",
+            BTreeMap::from([
+                ("reply", ToolSideEffect::Mutating),
+                ("edit", ToolSideEffect::Mutating),
+                ("delete", ToolSideEffect::Destructive),
+                ("reopen", ToolSideEffect::Mutating),
+            ]),
+        ),
+        (
+            "word.update_tracked_change",
+            BTreeMap::from([
+                ("accept", ToolSideEffect::Mutating),
+                ("reject", ToolSideEffect::Mutating),
+                ("accept_all", ToolSideEffect::Destructive),
+                ("reject_all", ToolSideEffect::Destructive),
+            ]),
+        ),
+        (
+            "excel.update_table",
+            BTreeMap::from([
+                ("metadata", ToolSideEffect::Read),
+                ("read", ToolSideEffect::Read),
+                ("add_rows", ToolSideEffect::Mutating),
+                ("add_columns", ToolSideEffect::Mutating),
+                ("resize", ToolSideEffect::Mutating),
+                ("rename", ToolSideEffect::Mutating),
+                ("options", ToolSideEffect::Mutating),
+                ("style", ToolSideEffect::Mutating),
+                ("delete", ToolSideEffect::Destructive),
+            ]),
+        ),
+        (
+            "excel.update_chart",
+            BTreeMap::from([
+                ("metadata", ToolSideEffect::Read),
+                ("read", ToolSideEffect::Read),
+                ("title", ToolSideEffect::Mutating),
+                ("legend", ToolSideEffect::Mutating),
+                ("axis", ToolSideEffect::Mutating),
+                ("data", ToolSideEffect::Mutating),
+                ("series_source", ToolSideEffect::Mutating),
+                ("position", ToolSideEffect::Mutating),
+                ("size", ToolSideEffect::Mutating),
+                ("export_image", ToolSideEffect::Read),
+                ("delete", ToolSideEffect::Destructive),
+            ]),
+        ),
+        (
+            "excel.update_pivot_table",
+            BTreeMap::from([
+                ("metadata", ToolSideEffect::Read),
+                ("read", ToolSideEffect::Read),
+                ("refresh", ToolSideEffect::Mutating),
+                ("add_hierarchy", ToolSideEffect::Mutating),
+                ("remove_hierarchy", ToolSideEffect::Mutating),
+                ("layout", ToolSideEffect::Mutating),
+                ("filter", ToolSideEffect::Mutating),
+                ("clear_filters", ToolSideEffect::Mutating),
+                ("delete", ToolSideEffect::Destructive),
+            ]),
+        ),
+        (
+            "powerpoint.update_tags",
+            BTreeMap::from([
+                ("list", ToolSideEffect::Read),
+                ("set", ToolSideEffect::Mutating),
+                ("delete", ToolSideEffect::Destructive),
+            ]),
+        ),
+        (
+            "powerpoint.update_shape",
+            BTreeMap::from([
+                ("move", ToolSideEffect::Mutating),
+                ("resize", ToolSideEffect::Mutating),
+                ("rotate", ToolSideEffect::Mutating),
+                ("rename", ToolSideEffect::Mutating),
+                ("set_alt_text", ToolSideEffect::Mutating),
+                ("set_fill", ToolSideEffect::Mutating),
+                ("set_line", ToolSideEffect::Mutating),
+                ("set_z_order", ToolSideEffect::Mutating),
+                ("group", ToolSideEffect::Mutating),
+                ("ungroup", ToolSideEffect::Mutating),
+                ("delete", ToolSideEffect::Destructive),
+            ]),
+        ),
+        (
+            "powerpoint.update_table",
+            BTreeMap::from([
+                ("set_values", ToolSideEffect::Mutating),
+                ("set_cell", ToolSideEffect::Mutating),
+                ("add_rows", ToolSideEffect::Mutating),
+                ("delete_rows", ToolSideEffect::Destructive),
+                ("add_columns", ToolSideEffect::Mutating),
+                ("delete_columns", ToolSideEffect::Destructive),
+                ("merge_cells", ToolSideEffect::Mutating),
+                ("split_cell", ToolSideEffect::Mutating),
+                ("clear", ToolSideEffect::Mutating),
+                ("style", ToolSideEffect::Mutating),
+                ("delete", ToolSideEffect::Destructive),
+            ]),
+        ),
+    ]);
+
+    for (tool, expected_actions) in expected {
+        let metadata = tool_metadata(tool).expect("tool metadata");
+        let actual = metadata
+            .action_side_effects
+            .expect("mixed owner action map")
+            .iter()
+            .copied()
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(actual, expected_actions, "{tool} action side effects");
+    }
 }

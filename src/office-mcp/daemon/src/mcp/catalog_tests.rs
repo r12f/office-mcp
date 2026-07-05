@@ -125,6 +125,49 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
 }
 
 #[test]
+fn tools_list_exposes_action_side_effects_for_mixed_owner_tools() {
+    let tools = tool_catalog_json();
+    let word_update_table = tools
+        .iter()
+        .find(|tool| tool["name"] == "word.update_table")
+        .expect("word.update_table tool");
+    assert_eq!(
+        word_update_table["_meta"]["com.office-mcp/action_side_effects"]["update_cell"],
+        "mutating"
+    );
+    assert_eq!(
+        word_update_table["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
+    );
+
+    let excel_update_table = tools
+        .iter()
+        .find(|tool| tool["name"] == "excel.update_table")
+        .expect("excel.update_table tool");
+    assert_eq!(
+        excel_update_table["_meta"]["com.office-mcp/action_side_effects"]["read"],
+        "read"
+    );
+    assert_eq!(
+        excel_update_table["_meta"]["com.office-mcp/action_side_effects"]["add_rows"],
+        "mutating"
+    );
+
+    let powerpoint_update_tags = tools
+        .iter()
+        .find(|tool| tool["name"] == "powerpoint.update_tags")
+        .expect("powerpoint.update_tags tool");
+    assert_eq!(
+        powerpoint_update_tags["_meta"]["com.office-mcp/action_side_effects"]["list"],
+        "read"
+    );
+    assert_eq!(
+        powerpoint_update_tags["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
+    );
+}
+
+#[test]
 fn word_document_property_tools_expose_expected_contracts() {
     let get_properties = tool_for("word.get_document_properties");
     assert_eq!(
