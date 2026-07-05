@@ -85,6 +85,7 @@
     'word.create_style',
     'word.update_style',
     'word.insert_list',
+    'word.update_list',
     'word.insert_hyperlink',
     'word.remove_hyperlink',
     'word.replace_text',
@@ -149,6 +150,8 @@
     'word.create_style',
     'word.update_style',
     'word.insert_list',
+    'word.list_lists',
+    'word.update_list',
     'word.insert_hyperlink',
     'word.list_hyperlinks',
     'word.remove_hyperlink',
@@ -176,7 +179,7 @@
   const TOOL_GROUPS = [
     { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.get_document_properties', 'word.update_document_properties', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.list_fields', 'word.insert_field', 'word.update_field', 'word.delete_field', 'word.list_styles', 'word.create_style', 'word.update_style', 'word.save'] },
     { label: 'Range & selection', tools: ['word.get_selection', 'word.set_selection', 'word.get_html', 'word.insert_html', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
-    { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
+    { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list', 'word.list_lists', 'word.update_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
     { label: 'Media', tools: ['word.insert_image', 'word.resize_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image', 'word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
@@ -224,6 +227,8 @@
     ['word.update_header_footer', { category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer.' }],
     ['word.update_document_properties', { category: 'Document & structure', sideEffect: 'mutating', description: 'Update document metadata and custom properties.' }],
     ['word.insert_list', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a list.' }],
+    ['word.list_lists', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'List existing Word lists and their paragraph items.' }],
+    ['word.update_list', { category: 'Paragraphs & lists', sideEffect: 'destructive', description: 'Mutate existing Word list membership, levels, or formatting.' }],
     ['word.insert_hyperlink', { category: 'Range & selection', sideEffect: 'mutating', description: 'Insert or apply a hyperlink at an anchored range.' }],
     ['word.list_hyperlinks', { category: 'Range & selection', sideEffect: 'read', description: 'List document hyperlinks with paragraph-relative locations.' }],
     ['word.remove_hyperlink', { category: 'Range & selection', sideEffect: 'mutating', description: 'Remove a hyperlink while preserving text by default.' }],
@@ -667,6 +672,12 @@
         case 'word.insert_list':
           data = await insertList(args);
           break;
+        case 'word.list_lists':
+          data = await listLists(args || {});
+          break;
+        case 'word.update_list':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateList(args);
+          break;
         case 'word.insert_hyperlink':
           data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await insertHyperlink(args);
           break;
@@ -829,6 +840,9 @@
         requireAnchor(tool, args.anchor);
         validateInsertListArgs(args);
         break;
+      case 'word.update_list':
+        validateUpdateListArgs(args);
+        break;
       case 'word.insert_hyperlink':
         requireAnchor(tool, args.anchor);
         validateHyperlinkArgs(tool, args);
@@ -952,6 +966,8 @@
         return validateUpdateStyleOnly(args);
       case 'word.update_header_footer':
         return validateUpdateHeaderFooterOnly(args);
+      case 'word.update_list':
+        return validateUpdateListOnly(args);
       case 'word.update_document_properties':
         validateUpdateDocumentPropertiesArgs(tool, args || {});
         return validationSuccess(tool, { partial_effect: 'none' });
@@ -1187,6 +1203,18 @@
           extent: args.extent ?? 'paragraph',
           current_text_length: (target.text || '').length
         }
+      });
+    });
+  }
+
+  async function validateUpdateListOnly(args) {
+    return Word.run(async (context) => {
+      const action = normalizedListAction(args.action);
+      const lists = await collectListMetadata(context);
+      const resolved = resolveListMutationTarget(context, args, action, lists);
+      return validationSuccess('word.update_list', {
+        action,
+        resolved_target: resolved
       });
     });
   }
@@ -2040,6 +2068,174 @@
       await context.sync();
       return { inserted_items: args.items.length, kind: args.kind ?? 'bulleted', level: args.level ?? 0 };
     });
+  }
+
+  async function listLists(args = {}) {
+    const offset = args.offset ?? 0;
+    const limit = args.limit ?? 50;
+    if (!Number.isInteger(offset) || offset < 0) throw invalidArgument('word.list_lists offset must be a non-negative integer.');
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw invalidArgument('word.list_lists limit must be an integer from 1 to 200.');
+
+    return Word.run(async (context) => {
+      const lists = await collectListMetadata(context);
+      const page = lists.slice(offset, offset + limit).map(publicListMetadata);
+      return {
+        lists: page,
+        count: lists.length,
+        truncated: offset + page.length < lists.length,
+        untrusted_source: true
+      };
+    });
+  }
+
+  async function updateList(args) {
+    validateUpdateListArgs(args);
+    return Word.run(async (context) => {
+      const action = normalizedListAction(args.action);
+      const lists = await collectListMetadata(context);
+      const target = resolveListMutationTarget(context, args, action, lists);
+      if (action === 'add_item') {
+        return updateListAddItem(context, args, target.list);
+      }
+      if (action === 'set_item_level') {
+        target.paragraph.listItem.level = args.level;
+      } else if (action === 'attach_paragraph') {
+        target.paragraph.style = 'List Paragraph';
+        if (target.list) target.paragraph.attachToList(target.list.list_id, args.level ?? 0);
+        else {
+          const created = target.paragraph.startNewList();
+          applyListLevelFormat(created, args.level ?? 0, args.numbering || 'bullet', args.bullet_char);
+        }
+      } else if (action === 'detach_paragraph') {
+        target.paragraph.detachFromList();
+      } else if (action === 'set_level_format') {
+        applyListLevelFormat(target.list.listObject, args.level, args.numbering, args.bullet_char);
+      }
+      await context.sync();
+      return { updated: true, action, list_id: target.list?.list_id ?? null, paragraph_index: args.paragraph_index ?? null };
+    });
+  }
+
+  async function updateListAddItem(context, args, list) {
+    const level = args.level ?? 0;
+    const position = args.position || 'end';
+    const anchor = position === 'start'
+      ? list.firstParagraph
+      : (position === 'after_paragraph' ? list.itemParagraphs.get(args.paragraph_index) : list.lastParagraph);
+    const location = position === 'start' ? Word.InsertLocation.before : Word.InsertLocation.after;
+    const paragraph = anchor.insertParagraph(String(args.text), location);
+    paragraph.style = 'List Paragraph';
+    paragraph.attachToList(list.list_id, level);
+    if (level > 0) paragraph.leftIndent = 18 * level;
+    await context.sync();
+    return { updated: true, action: 'add_item', list_id: list.list_id, text: String(args.text), level, position };
+  }
+
+  async function collectListMetadata(context) {
+    const paragraphs = context.document.body.paragraphs;
+    paragraphs.load('items/text,items/isListItem');
+    await context.sync();
+
+    const entries = [];
+    paragraphs.items.forEach((paragraph, paragraphIndex) => {
+      if (!paragraph.isListItem) return;
+      const listItem = paragraph.listItemOrNullObject;
+      const list = paragraph.listOrNullObject;
+      listItem.load('isNullObject,level,listString');
+      list.load('isNullObject,id,levelTypes');
+      entries.push({ paragraph, paragraphIndex, listItem, list });
+    });
+    if (entries.length > 0) await context.sync();
+
+    const byId = new Map();
+    for (const entry of entries) {
+      if (entry.list.isNullObject || entry.listItem.isNullObject) continue;
+      const listId = entry.list.id;
+      if (!byId.has(listId)) {
+        const levelTypes = entry.list.levelTypes ?? [];
+        byId.set(listId, {
+          list_id: listId,
+          kind: listKindFromLevelType(levelTypes[entry.listItem.level ?? 0]),
+          item_count: 0,
+          first_paragraph_index: entry.paragraphIndex,
+          firstParagraph: entry.paragraph,
+          lastParagraph: entry.paragraph,
+          listObject: entry.list,
+          itemParagraphs: new Map(),
+          items: []
+        });
+      }
+      const list = byId.get(listId);
+      list.item_count += 1;
+      list.lastParagraph = entry.paragraph;
+      list.itemParagraphs.set(entry.paragraphIndex, entry.paragraph);
+      list.items.push({
+        paragraph_index: entry.paragraphIndex,
+        text: entry.paragraph.text || '',
+        level: entry.listItem.level,
+        list_string: entry.listItem.listString || null
+      });
+    }
+    const lists = Array.from(byId.values()).sort((left, right) => left.first_paragraph_index - right.first_paragraph_index);
+    lists.paragraphs = paragraphs.items;
+    return lists;
+  }
+
+  function publicListMetadata(list) {
+    return {
+      list_id: list.list_id,
+      kind: list.kind,
+      item_count: list.item_count,
+      first_paragraph_index: list.first_paragraph_index,
+      items: list.items,
+      untrusted_source: true
+    };
+  }
+
+  function resolveListMutationTarget(context, args, action, lists) {
+    const result = { action };
+    if (args.list_id !== undefined) {
+      const list = lists.find((item) => item.list_id === args.list_id);
+      if (!list) throw invalidArgument(`word.update_list list_id ${args.list_id} was not found.`);
+      result.list = list;
+      result.list_id = list.list_id;
+    }
+    if (args.paragraph_index !== undefined) {
+      const paragraph = lists.paragraphs?.[args.paragraph_index];
+      if (!paragraph) throw invalidArgument(`word.update_list paragraph_index ${args.paragraph_index} is out of range.`);
+      result.paragraph = paragraph;
+      result.paragraph_index = args.paragraph_index;
+      const owningList = lists.find((list) => list.items.some((item) => item.paragraph_index === args.paragraph_index));
+      if (owningList) result.list = result.list || owningList;
+      if ((action === 'set_item_level' || action === 'detach_paragraph') && !owningList) {
+        throw invalidArgument(`word.update_list ${action} requires paragraph_index to target a list item.`);
+      }
+    }
+    if ((action === 'add_item' || action === 'set_level_format') && !result.list) {
+      throw invalidArgument(`word.update_list ${action} requires list_id.`);
+    }
+    return result;
+  }
+
+  function applyListLevelFormat(list, level, numbering, bulletChar) {
+    if (numbering === 'bullet') {
+      if (bulletChar) list.setLevelBullet(level, Word.ListBullet.custom, String(bulletChar).codePointAt(0), 'Arial');
+      else list.setLevelBullet(level, Word.ListBullet.solid);
+      return;
+    }
+    if (numbering === 'none') return;
+    list.setLevelNumbering(level, listNumberingValue(numbering));
+  }
+
+  function listNumberingValue(numbering) {
+    const values = {
+      arabic: Word.ListNumbering.arabic,
+      upper_roman: Word.ListNumbering.upperRoman,
+      lower_roman: Word.ListNumbering.lowerRoman,
+      upper_letter: Word.ListNumbering.upperLetter,
+      lower_letter: Word.ListNumbering.lowerLetter
+    };
+    return values[numbering] || Word.ListNumbering.arabic;
   }
 
   async function insertHyperlink(args) {
@@ -3773,6 +3969,63 @@
     if (kind !== 'bulleted' && kind !== 'numbered') {
       throw invalidArgument('word.insert_list kind must be bulleted or numbered.');
     }
+  }
+
+  function validateUpdateListArgs(args) {
+    const action = String(args.action || '').trim().toLowerCase();
+    if (!['add_item', 'set_item_level', 'attach_paragraph', 'detach_paragraph', 'set_level_format'].includes(action)) {
+      throw invalidArgument('Unsupported list action. Use add_item, set_item_level, attach_paragraph, detach_paragraph, or set_level_format.');
+    }
+    if (args.list_id !== undefined && (!Number.isInteger(args.list_id) || args.list_id < 0)) {
+      throw invalidArgument('word.update_list list_id must be a non-negative integer.');
+    }
+    if (args.paragraph_index !== undefined && (!Number.isInteger(args.paragraph_index) || args.paragraph_index < 0)) {
+      throw invalidArgument('word.update_list paragraph_index must be a non-negative integer.');
+    }
+    if (args.level !== undefined && (!Number.isInteger(args.level) || args.level < 0 || args.level > 8)) {
+      throw invalidArgument('word.update_list level must be an integer from 0 to 8.');
+    }
+    if (args.text !== undefined && typeof args.text !== 'string') {
+      throw invalidArgument('word.update_list text must be a string.');
+    }
+    if (args.bullet_char !== undefined && (typeof args.bullet_char !== 'string' || args.bullet_char.length > 1)) {
+      throw invalidArgument('word.update_list bullet_char must be a single character.');
+    }
+    if (args.position !== undefined && !['start', 'end', 'after_paragraph'].includes(args.position)) {
+      throw invalidArgument('word.update_list position must be start, end, or after_paragraph.');
+    }
+    if (args.position === 'after_paragraph' && (!Number.isInteger(args.paragraph_index) || args.paragraph_index < 0)) {
+      throw invalidArgument('word.update_list position after_paragraph requires paragraph_index.');
+    }
+    if (args.numbering !== undefined) validateListNumbering(args.numbering);
+
+    if (action === 'add_item') {
+      if (!Number.isInteger(args.list_id) || args.list_id < 0) throw invalidArgument('word.update_list add_item requires list_id.');
+      if (typeof args.text !== 'string' || args.text.length < 1) throw invalidArgument('word.update_list add_item requires non-empty text.');
+    } else if (action === 'set_item_level') {
+      if (!Number.isInteger(args.paragraph_index) || args.paragraph_index < 0) throw invalidArgument('word.update_list set_item_level requires paragraph_index.');
+      if (!Number.isInteger(args.level) || args.level < 0 || args.level > 8) throw invalidArgument('word.update_list set_item_level requires level from 0 to 8.');
+    } else if (action === 'attach_paragraph') {
+      if (!Number.isInteger(args.paragraph_index) || args.paragraph_index < 0) throw invalidArgument('word.update_list attach_paragraph requires paragraph_index.');
+    } else if (action === 'detach_paragraph') {
+      if (!Number.isInteger(args.paragraph_index) || args.paragraph_index < 0) throw invalidArgument('word.update_list detach_paragraph requires paragraph_index.');
+    } else if (action === 'set_level_format') {
+      if (!Number.isInteger(args.list_id) || args.list_id < 0) throw invalidArgument('word.update_list set_level_format requires list_id.');
+      if (!Number.isInteger(args.level) || args.level < 0 || args.level > 8) throw invalidArgument('word.update_list set_level_format requires level from 0 to 8.');
+      if (!args.numbering) throw invalidArgument('word.update_list set_level_format requires numbering.');
+    }
+  }
+
+  function normalizedListAction(action) {
+    const value = String(action || '').trim().toLowerCase();
+    if (['add_item', 'set_item_level', 'attach_paragraph', 'detach_paragraph', 'set_level_format'].includes(value)) return value;
+    throw invalidArgument('Unsupported list action. Use add_item, set_item_level, attach_paragraph, detach_paragraph, or set_level_format.');
+  }
+
+  function validateListNumbering(numbering) {
+    const value = String(numbering || '').trim().toLowerCase();
+    if (['bullet', 'arabic', 'upper_roman', 'lower_roman', 'upper_letter', 'lower_letter', 'none'].includes(value)) return value;
+    throw invalidArgument('word.update_list numbering must be bullet, arabic, upper_roman, lower_roman, upper_letter, lower_letter, or none.');
   }
 
   function validateHyperlinkArgs(tool, args) {

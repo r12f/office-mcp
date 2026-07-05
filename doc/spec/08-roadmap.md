@@ -91,6 +91,7 @@ review the result like a normal collaborator's edits.
 - [x] `word.insert_image` (base64 + URL)
 - [x] `word.resize_image` (in-place inline image resizing by paragraph index)
 - [x] `word.insert_list` (numbered, bulleted)
+- [x] `word.list_lists`, `word.update_list` (discover and mutate existing lists)
 
 ### M4.1 — Word Core Tool Surface Refinement
 
@@ -112,7 +113,8 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.delete_image`, `word.list_shapes`, `word.insert_shape`,
 `word.update_shape`, `word.delete_shape`, `word.insert_break`,
 `word.list_sections`, `word.update_page_setup`,
-`word.insert_list`, `word.insert_hyperlink`, `word.list_hyperlinks`,
+`word.insert_list`, `word.list_lists`, `word.update_list`,
+`word.insert_hyperlink`, `word.list_hyperlinks`,
 `word.remove_hyperlink`, `word.replace_text`,
 `word.update_paragraph`, `word.delete_range`, `word.apply_formatting`,
 `word.apply_style`, `word.read_table`, `word.update_table`,
@@ -145,6 +147,9 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       `tools/list`, Word task pane available-tools metadata, permission grouping,
       dispatch path, and spec contract. It reuses the existing tested cell,
       row, column, and format behavior and adds explicit whole-table deletion.
+- [x] Implement `word.list_lists` and `word.update_list` as the discovery and
+      mutation owners for existing Word lists. `word.insert_list` remains the
+      creation owner, while paragraph deletion remains with `word.delete_range`.
       The compatibility tools were removed from the advertised catalog in the
       target-surface retirement slice; historical handlers remain only as local
       implementation helpers where needed.

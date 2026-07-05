@@ -379,6 +379,8 @@ test('Word mutating tools run preflight validation before Office mutation dispat
   assert.match(preflightBody, /requirePositiveInteger\(tool, 'rows', args\.rows\)/);
   assert.match(preflightBody, /case 'word\.insert_list':/);
   assert.match(preflightBody, /validateInsertListArgs\(args\)/);
+  assert.match(preflightBody, /case 'word\.update_list':/);
+  assert.match(preflightBody, /validateUpdateListArgs\(args\)/);
   assert.match(preflightBody, /case 'word\.update_header_footer':/);
   assert.match(preflightBody, /validateHeaderFooterArgs\(tool, args, true\)/);
   assert.match(preflightBody, /case 'word\.insert_hyperlink':/);
@@ -418,6 +420,9 @@ test('Word mutating preflight helpers return specific no-effect validation error
   assert.match(functionBody(js, 'mapError'), /mapped\.suggestion = error\.suggestion/);
   assert.match(functionBody(js, 'validateInsertListArgs'), /word\.insert_list requires a non-empty items array/);
   assert.match(functionBody(js, 'validateInsertListArgs'), /word\.insert_list kind must be bulleted or numbered/);
+  assert.match(functionBody(js, 'validateUpdateListArgs'), /Unsupported list action/);
+  assert.match(functionBody(js, 'validateUpdateListArgs'), /word\.update_list add_item requires list_id/);
+  assert.match(functionBody(js, 'validateUpdateListArgs'), /word\.update_list detach_paragraph requires paragraph_index/);
   assert.match(functionBody(js, 'validateHeaderFooterArgs'), /set_text[\s\S]*requires text/);
   assert.match(functionBody(js, 'normalizedHeaderFooterLocation'), /header\/footer location must be header or footer/);
   assert.match(functionBody(js, 'normalizedHeaderFooterAction'), /set_text, append_paragraph, or clear/);
@@ -902,9 +907,11 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.insert_break'/);
   assert.match(js, /'word\.list_sections'/);
   assert.match(js, /'word\.update_page_setup'/);
+  assert.match(js, /'word\.list_lists'/);
+  assert.match(js, /'word\.update_list'/);
   assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.get_document_properties', 'word\.update_document_properties', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.list_fields', 'word\.insert_field', 'word\.update_field', 'word\.delete_field', 'word\.list_styles', 'word\.create_style', 'word\.update_style', 'word\.save'\] \}/);
   assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.set_selection', 'word\.get_html', 'word\.insert_html', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
-  assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
+  assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list', 'word\.list_lists', 'word\.update_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image', 'word\.list_images', 'word\.get_image', 'word\.update_image', 'word\.delete_image', 'word\.list_shapes', 'word\.insert_shape', 'word\.update_shape', 'word\.delete_shape'\] \}/);
   assert.match(js, /\{ label: 'Content controls', tools: \['word\.list_content_controls', 'word\.insert_content_control', 'word\.update_content_control', 'word\.delete_content_control'\] \}/);
@@ -944,6 +951,9 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.insert_break', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page, line, or section break\.' \}\]/);
   assert.match(js, /\['word\.list_sections', \{ category: 'Document & structure', sideEffect: 'read', description: 'List document sections\.' \}\]/);
   assert.match(js, /\['word\.update_page_setup', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Update document or section page setup\.' \}\]/);
+  assert.match(js, /\['word\.list_lists', \{ category: 'Paragraphs & lists', sideEffect: 'read', description: 'List existing Word lists and their paragraph items\.' \}\]/);
+  assert.match(js, /\['word\.update_list', \{ category: 'Paragraphs & lists', sideEffect: 'destructive', description: 'Mutate existing Word list membership, levels, or formatting\.' \}\]/);
+
   assert.match(js, /\['word\.list_fields', \{ category: 'Document & structure', sideEffect: 'read', description: 'List document fields with bounded previews\.' \}\]/);
   assert.match(js, /\['word\.insert_field', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a curated Word field at an anchored range\.' \}\]/);
   assert.match(js, /\['word\.update_field', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Refresh, lock, or unlock Word fields\.' \}\]/);
@@ -965,6 +975,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /case 'word\.insert_page_break':\s*data = await insertPageBreak\(args\);/);
   assert.match(js, /case 'word\.list_sections':\s*data = await listSections\(args \|\| \{\}\);/);
   assert.match(js, /case 'word\.update_page_setup':\s*data = await updatePageSetup\(args \|\| \{\}\);/);
+  assert.match(js, /case 'word\.list_lists':\s*data = await listLists\(args \|\| \{\}\);/);
+  assert.match(js, /case 'word\.update_list':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateList\(args\);/);
   assert.match(js, /superseded_by: 'word\.insert_break'/);
   assert.match(js, /case 'word\.update_table':\s*data = await updateTable\(args\);/);
   assert.match(functionBody(js, 'updateTable'), /case 'delete_row':\s*return deleteTableRows\(args\);/);
@@ -1019,6 +1031,9 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /async function listNotes\(args\)/);
   assert.match(js, /async function updateNote\(args\)/);
   assert.match(js, /async function deleteNote\(args\)/);
+  assert.match(js, /async function listLists\(args/);
+  assert.match(js, /async function updateList\(args\)/);
+
   assert.match(js, /async function listFields\(args\)/);
   assert.match(js, /async function insertField\(args\)/);
   assert.match(js, /async function updateField\(args\)/);

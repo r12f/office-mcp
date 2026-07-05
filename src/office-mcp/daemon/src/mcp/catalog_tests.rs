@@ -114,10 +114,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 62);
+    assert_eq!(WORD_V1_TOOLS.len(), 64);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 220);
+    assert_eq!(tools.len(), 224);
 }
 
 #[test]
@@ -759,10 +759,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 107);
+    assert_eq!(all_tools.len(), 109);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        107
+        109
     );
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
@@ -778,7 +778,6 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
         }
     }
 }
-
 #[test]
 #[allow(clippy::too_many_lines)]
 fn representative_word_schemas_are_specific() {

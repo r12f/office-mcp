@@ -3,6 +3,7 @@ use crate::mcp::all_office_tool_names;
 use std::collections::BTreeSet;
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn tool_metadata_classifies_app_category_and_side_effect() {
     let read = tool_metadata("word.get_text").expect("word metadata");
     assert_eq!(read.app, "word");
@@ -98,6 +99,16 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(page_setup.app, "word");
     assert_eq!(page_setup.category, "Document & structure");
     assert_eq!(page_setup.side_effect, ToolSideEffect::Mutating);
+
+    let list_lists = tool_metadata("word.list_lists").expect("list lists metadata");
+    assert_eq!(list_lists.app, "word");
+    assert_eq!(list_lists.category, "Paragraphs & lists");
+    assert_eq!(list_lists.side_effect, ToolSideEffect::Read);
+
+    let update_list = tool_metadata("word.update_list").expect("list update metadata");
+    assert_eq!(update_list.app, "word");
+    assert_eq!(update_list.category, "Paragraphs & lists");
+    assert_eq!(update_list.side_effect, ToolSideEffect::Destructive);
 
     let set_change_tracking =
         tool_metadata("word.set_change_tracking").expect("change tracking metadata");
