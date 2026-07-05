@@ -196,6 +196,80 @@ const WORD_E2E_CASES = Object.fromEntries([
       }
     }
   }],
+  ['word.list_images', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'List image E2E', width_pt: 24, height_pt: 24 } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        contains: ['List image E2E'],
+        pathEquals: [
+          { path: 'count', value: 1 },
+          { path: 'images.0.paragraph_index', value: 0 },
+          { path: 'images.0.image_index', value: 0 }
+        ]
+      }
+    }
+  }],
+  ['word.get_image', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Get image E2E', width_pt: 24, height_pt: 24 } }
+      ]
+    },
+    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 } },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        contains: ['Get image E2E'],
+        pathEquals: [
+          { path: 'paragraph_index', value: 0 },
+          { path: 'image_index', value: 0 }
+        ]
+      }
+    }
+  }],
+  ['word.update_image', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Old image E2E', width_pt: 24, height_pt: 24 } }
+      ]
+    },
+    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 }, alt_text_description: 'Updated image E2E' },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        pathEquals: [
+          { path: 'updated', value: true },
+          { path: 'replaced', value: false },
+          { path: 'image.paragraph_index', value: 0 },
+          { path: 'image.image_index', value: 0 }
+        ]
+      }
+    }
+  }],
+  ['word.delete_image', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Delete image E2E', width_pt: 24, height_pt: 24 } }
+      ]
+    },
+    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 } },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        pathEquals: [
+          { path: 'deleted', value: true },
+          { path: 'image.paragraph_index', value: 0 },
+          { path: 'image.image_index', value: 0 }
+        ]
+      }
+    }
+  }],
   ['word.insert_table', {
     setup: {
       actions: [

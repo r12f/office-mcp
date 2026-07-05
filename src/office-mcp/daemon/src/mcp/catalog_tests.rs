@@ -177,6 +177,46 @@ fn word_image_tools_expose_expected_contracts() {
         delete_image["_meta"]["com.office-mcp/side_effects"],
         "destructive"
     );
+
+    let list_images_schema = schema_for("word.list_images");
+    assert_required(&list_images_schema, &["session_id"]);
+
+    let get_image_schema = schema_for("word.get_image");
+    assert_required(&get_image_schema, &["session_id", "image"]);
+    assert_eq!(
+        get_image_schema["properties"]["image"]["properties"]["kind"]["const"],
+        "paragraph_index"
+    );
+    assert_eq!(
+        get_image_schema["properties"]["image"]["properties"]["index"]["minimum"],
+        0
+    );
+    assert_eq!(
+        get_image_schema["properties"]["image"]["properties"]["image_index"]["default"],
+        0
+    );
+
+    let update_image_schema = schema_for("word.update_image");
+    assert_required(&update_image_schema, &["session_id", "image"]);
+    assert_eq!(
+        update_image_schema["properties"]["hyperlink"]["format"],
+        "uri"
+    );
+    assert_eq!(
+        update_image_schema["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        update_image_schema["anyOf"][3]["required"],
+        serde_json::json!(["replace_base64"])
+    );
+
+    let delete_image_schema = schema_for("word.delete_image");
+    assert_required(&delete_image_schema, &["session_id", "image"]);
+    assert_eq!(
+        delete_image_schema["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 }
 
 #[test]
@@ -560,8 +600,8 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 94);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 94);
+    assert_eq!(all_tools.len(), 98);
+    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 98);
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));
@@ -643,43 +683,6 @@ fn representative_word_schemas_are_specific() {
             .expect("image oneOf")
             .len(),
         2
-    );
-
-    let list_images = schema_for("word.list_images");
-    assert_required(&list_images, &["session_id"]);
-
-    let get_image = schema_for("word.get_image");
-    assert_required(&get_image, &["session_id", "image"]);
-    assert_eq!(
-        get_image["properties"]["image"]["properties"]["kind"]["const"],
-        "paragraph_index"
-    );
-    assert_eq!(
-        get_image["properties"]["image"]["properties"]["index"]["minimum"],
-        0
-    );
-    assert_eq!(
-        get_image["properties"]["image"]["properties"]["image_index"]["default"],
-        0
-    );
-
-    let update_image = schema_for("word.update_image");
-    assert_required(&update_image, &["session_id", "image"]);
-    assert_eq!(update_image["properties"]["hyperlink"]["format"], "uri");
-    assert_eq!(
-        update_image["properties"]["validate_only"]["type"],
-        "boolean"
-    );
-    assert_eq!(
-        update_image["anyOf"][3]["required"],
-        serde_json::json!(["replace_base64"])
-    );
-
-    let delete_image = schema_for("word.delete_image");
-    assert_required(&delete_image, &["session_id", "image"]);
-    assert_eq!(
-        delete_image["properties"]["validate_only"]["type"],
-        "boolean"
     );
 
     let resolve_anchor = schema_for("word.resolve_anchor");

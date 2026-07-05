@@ -785,7 +785,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
-  assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image'\] \}/);
+  assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image', 'word\.list_images', 'word\.get_image', 'word\.update_image', 'word\.delete_image'\] \}/);
   assert.match(js, /\{ label: 'Content controls', tools: \['word\.list_content_controls', 'word\.insert_content_control', 'word\.update_content_control', 'word\.delete_content_control'\] \}/);
   assert.match(js, /\{ label: 'Notes', tools: \['word\.insert_note', 'word\.list_notes', 'word\.update_note', 'word\.delete_note'\] \}/);
   assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.set_change_tracking', 'word\.update_tracked_change'\] \}/);
@@ -804,6 +804,10 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.update_content_control', \{ category: 'Content controls', sideEffect: 'mutating', description: 'Update content-control metadata, locks, or text\.' \}\]/);
   assert.match(js, /\['word\.delete_content_control', \{ category: 'Content controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling\.' \}\]/);
   assert.match(js, /\['word\.resize_image', \{ category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image\.' \}\]/);
+  assert.match(js, /\['word\.list_images', \{ category: 'Media', sideEffect: 'read', description: 'List inline images\.' \}\]/);
+  assert.match(js, /\['word\.get_image', \{ category: 'Media', sideEffect: 'read', description: 'Export an inline image with metadata\.' \}\]/);
+  assert.match(js, /\['word\.update_image', \{ category: 'Media', sideEffect: 'mutating', description: 'Update inline image metadata or bytes\.' \}\]/);
+  assert.match(js, /\['word\.delete_image', \{ category: 'Media', sideEffect: 'destructive', description: 'Delete an inline image without deleting paragraph text\.' \}\]/);
   assert.match(js, /\['word\.resolve_anchor', \{ category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata\.' \}\]/);
   assert.match(js, /\['word\.insert_bookmark', \{ category: 'Range & selection', sideEffect: 'mutating', description: 'Create a named bookmark around an anchored range\.' \}\]/);
   assert.match(js, /\['word\.list_bookmarks', \{ category: 'Range & selection', sideEffect: 'read', description: 'List bookmark names and locations\.' \}\]/);

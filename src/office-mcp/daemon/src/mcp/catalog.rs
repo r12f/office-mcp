@@ -8,6 +8,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.delete_bookmark",
     "word.delete_content_control",
     "word.delete_field",
+    "word.delete_image",
     "word.delete_range",
     "word.find_text",
     "word.get_header_footer",
@@ -15,6 +16,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.get_paragraph",
     "word.get_selection",
     "word.get_text",
+    "word.get_image",
     "word.insert_bookmark",
     "word.insert_content_control",
     "word.insert_break",
@@ -29,6 +31,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.list_content_controls",
     "word.list_fields",
     "word.list_hyperlinks",
+    "word.list_images",
     "word.list_notes",
     "word.list_sections",
     "word.list_styles",
@@ -43,6 +46,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.update_header_footer",
     "word.update_content_control",
     "word.update_field",
+    "word.update_image",
     "word.update_note",
     "word.update_page_setup",
     "word.update_paragraph",
@@ -1113,6 +1117,30 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "lock_aspect_ratio"
         ]
     ),
+    tool_spec!("word.list_images", ["session_id"], ["session_id"]),
+    tool_spec!(
+        "word.get_image",
+        ["session_id", "image"],
+        ["session_id", "image"]
+    ),
+    tool_spec!(
+        "word.update_image",
+        ["session_id", "image"],
+        [
+            "session_id",
+            "image",
+            "alt_text_title",
+            "alt_text_description",
+            "hyperlink",
+            "replace_base64",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
+        "word.delete_image",
+        ["session_id", "image"],
+        ["session_id", "image", "validate_only"]
+    ),
     tool_spec!(
         "word.insert_break",
         ["session_id", "anchor"],
@@ -1910,6 +1938,14 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             { "required": ["paragraph"] }
         ]);
     }
+    if tool == "word.update_image" {
+        schema["anyOf"] = json!([
+            { "required": ["alt_text_title"] },
+            { "required": ["alt_text_description"] },
+            { "required": ["hyperlink"] },
+            { "required": ["replace_base64"] }
+        ]);
+    }
     if tool == "word.update_tracked_change" {
         schema["allOf"] = json!([
             {
@@ -1948,6 +1984,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
         return schema;
     }
     if let Some(schema) = word_table_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_image_property_schema(tool, name) {
         return schema;
     }
     if let Some(schema) = word_header_footer_property_schema(tool, name) {
@@ -2002,6 +2041,25 @@ fn property_schema(tool: &str, name: &str) -> Value {
             json!({ "type": "array" })
         }
         _ => json!({ "type": "string" }),
+    }
+}
+
+fn word_image_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_image_tool = matches!(
+        tool,
+        "word.resize_image"
+            | "word.list_images"
+            | "word.get_image"
+            | "word.update_image"
+            | "word.delete_image"
+    );
+    match (is_image_tool, name) {
+        (true, "image") => Some(inline_image_locator_schema()),
+        (true, "alt_text_title" | "alt_text_description" | "replace_base64") => {
+            Some(json!({ "type": "string" }))
+        }
+        (true, "hyperlink") => Some(json!({ "type": "string", "format": "uri" })),
+        _ => None,
     }
 }
 
@@ -2288,6 +2346,19 @@ fn image_schema() -> Value {
             { "type": "object", "required": ["base64"], "properties": { "base64": { "type": "string" }, "mime_type": { "type": "string" }, "byte_length": { "type": "integer", "minimum": 0 } }, "additionalProperties": false },
             { "type": "object", "required": ["url"], "properties": { "url": { "type": "string", "format": "uri" }, "mime_type": { "type": "string" }, "byte_length": { "type": "integer", "minimum": 0 } }, "additionalProperties": false }
         ]
+    })
+}
+
+fn inline_image_locator_schema() -> Value {
+    json!({
+        "type": "object",
+        "required": ["kind", "index"],
+        "properties": {
+            "kind": { "const": "paragraph_index" },
+            "index": { "type": "integer", "minimum": 0 },
+            "image_index": { "type": "integer", "minimum": 0, "default": 0 }
+        },
+        "additionalProperties": false
     })
 }
 
