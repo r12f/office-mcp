@@ -137,12 +137,6 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Media",
         ToolSideEffect::Mutating,
     ),
-    tool(
-        "word.resize_image",
-        "word",
-        "Media",
-        ToolSideEffect::Mutating,
-    ),
     tool("word.list_images", "word", "Media", ToolSideEffect::Read),
     tool("word.get_image", "word", "Media", ToolSideEffect::Read),
     tool("word.list_shapes", "word", "Media", ToolSideEffect::Read),
@@ -166,12 +160,6 @@ const TOOL_METADATA: &[ToolMetadata] = &[
     ),
     tool(
         "word.update_image",
-        "word",
-        "Media",
-        ToolSideEffect::Mutating,
-    ),
-    tool(
-        "word.delete_image",
         "word",
         "Media",
         ToolSideEffect::Destructive,

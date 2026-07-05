@@ -68,9 +68,7 @@
     'word.insert_paragraph',
     'word.insert_table',
     'word.insert_image',
-    'word.resize_image',
     'word.update_image',
-    'word.delete_image',
     'word.insert_shape',
     'word.update_shape',
     'word.delete_shape',
@@ -128,11 +126,9 @@
     'word.get_document_properties',
     'word.insert_paragraph',
     'word.insert_image',
-    'word.resize_image',
     'word.list_images',
     'word.get_image',
     'word.update_image',
-    'word.delete_image',
     'word.list_shapes',
     'word.insert_shape',
     'word.update_shape',
@@ -183,7 +179,7 @@
     { label: 'Range & selection', tools: ['word.get_selection', 'word.set_selection', 'word.get_html', 'word.insert_html', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list', 'word.list_lists', 'word.update_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
-    { label: 'Media', tools: ['word.insert_image', 'word.resize_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image', 'word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'] },
+    { label: 'Media', tools: ['word.insert_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
     { label: 'Notes', tools: ['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'] },
     { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_comment', 'word.set_change_tracking', 'word.update_tracked_change'] }
@@ -205,11 +201,9 @@
     ['word.insert_html', { category: 'Range & selection', sideEffect: 'mutating', description: 'Insert sanitized HTML at an anchored range.' }],
     ['word.insert_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
     ['word.insert_image', { category: 'Media', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
-    ['word.resize_image', { category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image.' }],
     ['word.list_images', { category: 'Media', sideEffect: 'read', description: 'List inline images.' }],
     ['word.get_image', { category: 'Media', sideEffect: 'read', description: 'Export an inline image with metadata.' }],
-    ['word.update_image', { category: 'Media', sideEffect: 'mutating', description: 'Update inline image metadata or bytes.' }],
-    ['word.delete_image', { category: 'Media', sideEffect: 'destructive', description: 'Delete an inline image without deleting paragraph text.' }],
+    ['word.update_image', { category: 'Media', sideEffect: 'destructive', description: 'Resize, update, replace, or delete an inline image.' }],
     ['word.list_shapes', { category: 'Media', sideEffect: 'read', description: 'List desktop Word shapes and text boxes.' }],
     ['word.insert_shape', { category: 'Media', sideEffect: 'mutating', description: 'Insert a desktop Word shape or text box.' }],
     ['word.update_shape', { category: 'Media', sideEffect: 'mutating', description: 'Update desktop Word shape text, geometry, or visual settings.' }],
@@ -606,9 +600,6 @@
         case 'word.insert_image':
           data = await insertImage(args);
           break;
-        case 'word.resize_image':
-          data = await resizeImage(args);
-          break;
         case 'word.list_images':
           data = await listImages(args || {});
           break;
@@ -617,9 +608,6 @@
           break;
         case 'word.update_image':
           data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateImage(args);
-          break;
-        case 'word.delete_image':
-          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await deleteImage(args);
           break;
         case 'word.list_shapes':
           data = await listShapes(args || {});
@@ -793,14 +781,8 @@
         requireAnchor(tool, args.anchor);
         validateInsertImagePreflight(args);
         break;
-      case 'word.resize_image':
-        validateResizeImageArgs(args);
-        break;
       case 'word.update_image':
         validateUpdateImageArgs(args);
-        break;
-      case 'word.delete_image':
-        validateImageLocator('word.delete_image', args?.image);
         break;
       case 'word.insert_shape':
         validateInsertShapeArgs(tool, args);
@@ -947,8 +929,6 @@
         return validateInsertImageOnly(args);
       case 'word.update_image':
         return validateUpdateImageOnly(args);
-      case 'word.delete_image':
-        return validateDeleteImageOnly(args);
       case 'word.insert_hyperlink':
         return validateInsertHyperlinkOnly(args);
       case 'word.insert_note':
@@ -1010,16 +990,6 @@
     return Word.run(async (context) => {
       const target = await resolveInlineImage(context, args.image, 'word.update_image');
       return validationSuccess('word.update_image', {
-        resolved_target: imageTargetSummary(target)
-      });
-    });
-  }
-
-  async function validateDeleteImageOnly(args) {
-    validateImageLocator('word.delete_image', args.image);
-    return Word.run(async (context) => {
-      const target = await resolveInlineImage(context, args.image, 'word.delete_image');
-      return validationSuccess('word.delete_image', {
         resolved_target: imageTargetSummary(target)
       });
     });
@@ -1775,34 +1745,6 @@
     });
   }
 
-  async function resizeImage(args) {
-    validateResizeImageArgs(args);
-    return Word.run(async (context) => {
-      const target = await resolveInlineImage(context, args.image, 'word.resize_image');
-      const { selector, imageIndex, picture } = target;
-
-      const oldWidth = picture.width;
-      const oldHeight = picture.height;
-      const size = resizedImageSize(args, oldWidth, oldHeight);
-      picture.width = size.width;
-      picture.height = size.height;
-      await context.sync();
-
-      return {
-        resized: true,
-        image: {
-          paragraph_index: selector.index,
-          image_index: imageIndex,
-          old_width_pt: oldWidth,
-          old_height_pt: oldHeight,
-          new_width_pt: size.width,
-          new_height_pt: size.height,
-          preserve_aspect_ratio: args.preserve_aspect_ratio !== false
-        }
-      };
-    });
-  }
-
   async function listImages(args) {
     return Word.run(async (context) => {
       const paragraphs = context.document.body.paragraphs;
@@ -1843,31 +1785,48 @@
     validateUpdateImageArgs(args);
     return Word.run(async (context) => {
       const target = await resolveInlineImage(context, args.image, 'word.update_image');
-      const { picture } = target;
-      if (args.alt_text_title !== undefined) picture.altTextTitle = args.alt_text_title;
-      if (args.alt_text_description !== undefined) picture.altTextDescription = args.alt_text_description;
-      if (args.hyperlink !== undefined) picture.hyperlink = args.hyperlink;
-      let replaced = false;
-      if (args.replace_base64 !== undefined) {
-        picture.insertInlinePictureFromBase64(args.replace_base64, Word.InsertLocation.replace);
-        replaced = true;
+      const { selector, imageIndex, picture } = target;
+      switch (args.action) {
+        case 'resize': {
+          const oldWidth = picture.width;
+          const oldHeight = picture.height;
+          const size = resizedImageSize(args, oldWidth, oldHeight);
+          picture.width = size.width;
+          picture.height = size.height;
+          await context.sync();
+          return {
+            resized: true,
+            image: {
+              paragraph_index: selector.index,
+              image_index: imageIndex,
+              old_width_pt: oldWidth,
+              old_height_pt: oldHeight,
+              new_width_pt: size.width,
+              new_height_pt: size.height,
+              preserve_aspect_ratio: args.preserve_aspect_ratio !== false
+            }
+          };
+        }
+        case 'set_alt_text':
+          if (args.alt_text_title !== undefined) picture.altTextTitle = args.alt_text_title;
+          if (args.alt_text_description !== undefined) picture.altTextDescription = args.alt_text_description;
+          await context.sync();
+          return { updated: true, replaced: false, image: imageTargetSummary(target) };
+        case 'set_hyperlink':
+          picture.hyperlink = args.hyperlink;
+          await context.sync();
+          return { updated: true, replaced: false, image: imageTargetSummary(target) };
+        case 'replace':
+          picture.insertInlinePictureFromBase64(args.base64, Word.InsertLocation.replace);
+          await context.sync();
+          return { updated: true, replaced: true, image: imageTargetSummary(target) };
+        case 'delete':
+          picture.delete();
+          await context.sync();
+          return { deleted: true, image: imageTargetSummary(target) };
+        default:
+          throw invalidArgument(`Unsupported image action ${args.action}.`);
       }
-      await context.sync();
-      return {
-        updated: true,
-        replaced,
-        image: imageTargetSummary(target)
-      };
-    });
-  }
-
-  async function deleteImage(args) {
-    validateImageLocator('word.delete_image', args.image);
-    return Word.run(async (context) => {
-      const target = await resolveInlineImage(context, args.image, 'word.delete_image');
-      target.picture.delete();
-      await context.sync();
-      return { deleted: true, image: imageTargetSummary(target) };
     });
   }
 
@@ -4524,18 +4483,17 @@
   }
 
   function validateResizeImageArgs(args) {
-    validateImageLocator('word.resize_image', args.image);
     if (args.width_pt === undefined && args.height_pt === undefined) {
-      throw Object.assign(new Error('word.resize_image requires width_pt or height_pt.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      throw invalidArgument('word.update_image resize requires width_pt or height_pt.');
     }
     if (args.width_pt !== undefined && !isPositiveNumber(args.width_pt)) {
-      throw Object.assign(new Error('word.resize_image width_pt must be a positive number.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      throw invalidArgument('word.update_image width_pt must be a positive number.');
     }
     if (args.height_pt !== undefined && !isPositiveNumber(args.height_pt)) {
-      throw Object.assign(new Error('word.resize_image height_pt must be a positive number.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      throw invalidArgument('word.update_image height_pt must be a positive number.');
     }
     if (args.preserve_aspect_ratio === false && (args.width_pt === undefined || args.height_pt === undefined)) {
-      throw Object.assign(new Error('word.resize_image requires both width_pt and height_pt when preserve_aspect_ratio is false.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      throw invalidArgument('word.update_image resize requires both width_pt and height_pt when preserve_aspect_ratio is false.');
     }
   }
 
@@ -4553,12 +4511,33 @@
 
   function validateUpdateImageArgs(args) {
     validateImageLocator('word.update_image', args?.image);
-    const hasUpdate = args.alt_text_title !== undefined || args.alt_text_description !== undefined || args.hyperlink !== undefined || args.replace_base64 !== undefined;
-    if (!hasUpdate) throw invalidArgument('word.update_image requires alt_text_title, alt_text_description, hyperlink, or replace_base64.');
-    if (args.alt_text_title !== undefined && typeof args.alt_text_title !== 'string') throw invalidArgument('word.update_image alt_text_title must be a string.');
-    if (args.alt_text_description !== undefined && typeof args.alt_text_description !== 'string') throw invalidArgument('word.update_image alt_text_description must be a string.');
-    if (args.hyperlink !== undefined) validateHyperlinkUrl(args.hyperlink);
-    if (args.replace_base64 !== undefined && typeof args.replace_base64 !== 'string') throw invalidArgument('word.update_image replace_base64 must be a string.');
+    if (!args || typeof args.action !== 'string') throw invalidArgument('word.update_image requires action.');
+    if (!['resize', 'set_alt_text', 'set_hyperlink', 'replace', 'delete'].includes(args.action)) {
+      throw invalidArgument('word.update_image action must be resize, set_alt_text, set_hyperlink, replace, or delete.');
+    }
+    switch (args.action) {
+      case 'resize':
+        validateResizeImageArgs(args);
+        break;
+      case 'set_alt_text':
+        if (args.alt_text_title === undefined && args.alt_text_description === undefined) {
+          throw invalidArgument('word.update_image set_alt_text requires alt_text_title or alt_text_description.');
+        }
+        if (args.alt_text_title !== undefined && typeof args.alt_text_title !== 'string') throw invalidArgument('word.update_image alt_text_title must be a string.');
+        if (args.alt_text_description !== undefined && typeof args.alt_text_description !== 'string') throw invalidArgument('word.update_image alt_text_description must be a string.');
+        break;
+      case 'set_hyperlink':
+        if (args.hyperlink === undefined) throw invalidArgument('word.update_image set_hyperlink requires hyperlink.');
+        validateHyperlinkUrl(args.hyperlink);
+        break;
+      case 'replace':
+        if (typeof args.base64 !== 'string' || args.base64.length === 0) throw invalidArgument('word.update_image replace requires base64.');
+        break;
+      case 'delete':
+        break;
+      default:
+        throw invalidArgument(`Unsupported image action ${args.action}.`);
+    }
   }
 
   async function resolveInlineImage(context, selector, tool) {
@@ -5350,7 +5329,7 @@
       if (tool === 'word.list_fields') return supportsFieldListing;
       if (['word.insert_field', 'word.update_field', 'word.delete_field'].includes(tool)) return supportsFieldMutation;
       if (['word.list_styles', 'word.create_style', 'word.update_style'].includes(tool)) return supportsStyles;
-      if (['word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'].includes(tool)) return supportsInlineImages;
+      if (['word.list_images', 'word.get_image', 'word.update_image'].includes(tool)) return supportsInlineImages;
       if (['word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'].includes(tool)) return supportsShapes;
       if (['word.get_document_properties', 'word.update_document_properties'].includes(tool)) return supportsDocumentProperties;
       if (tool === 'word.set_selection') return supportsSetSelection;

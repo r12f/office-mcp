@@ -184,12 +184,9 @@ fn word_image_tool_metadata_classifies_media_side_effects() {
     let update_image = tool_metadata("word.update_image").expect("image update metadata");
     assert_eq!(update_image.app, "word");
     assert_eq!(update_image.category, "Media");
-    assert_eq!(update_image.side_effect, ToolSideEffect::Mutating);
-
-    let delete_image = tool_metadata("word.delete_image").expect("image delete metadata");
-    assert_eq!(delete_image.app, "word");
-    assert_eq!(delete_image.category, "Media");
-    assert_eq!(delete_image.side_effect, ToolSideEffect::Destructive);
+    assert_eq!(update_image.side_effect, ToolSideEffect::Destructive);
+    assert_eq!(tool_metadata("word.resize_image"), None);
+    assert_eq!(tool_metadata("word.delete_image"), None);
 
     let list_shapes = tool_metadata("word.list_shapes").expect("shape list metadata");
     assert_eq!(list_shapes.app, "word");

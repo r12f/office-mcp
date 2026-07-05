@@ -8,7 +8,6 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.delete_bookmark",
     "word.delete_content_control",
     "word.delete_field",
-    "word.delete_image",
     "word.delete_shape",
     "word.delete_range",
     "word.find_text",
@@ -49,7 +48,6 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.resolve_anchor",
     "word.resolve_comment",
     "word.update_comment",
-    "word.resize_image",
     "word.save",
     "word.set_change_tracking",
     "word.update_header_footer",
@@ -1193,18 +1191,6 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "validate_only"
         ]
     ),
-    tool_spec!(
-        "word.resize_image",
-        ["session_id", "image"],
-        [
-            "session_id",
-            "image",
-            "width_pt",
-            "height_pt",
-            "scale_percent",
-            "lock_aspect_ratio"
-        ]
-    ),
     tool_spec!("word.list_images", ["session_id"], ["session_id"]),
     tool_spec!(
         "word.list_shapes",
@@ -1236,14 +1222,18 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     ),
     tool_spec!(
         "word.update_image",
-        ["session_id", "image"],
+        ["session_id", "image", "action"],
         [
             "session_id",
             "image",
+            "action",
+            "width_pt",
+            "height_pt",
+            "preserve_aspect_ratio",
             "alt_text_title",
             "alt_text_description",
             "hyperlink",
-            "replace_base64",
+            "base64",
             "validate_only"
         ]
     ),
@@ -1267,11 +1257,6 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "visible",
             "validate_only"
         ]
-    ),
-    tool_spec!(
-        "word.delete_image",
-        ["session_id", "image"],
-        ["session_id", "image", "validate_only"]
     ),
     tool_spec!(
         "word.delete_shape",
@@ -2135,14 +2120,6 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             { "required": ["custom_delete"] }
         ]);
     }
-    if tool == "word.update_image" {
-        schema["anyOf"] = json!([
-            { "required": ["alt_text_title"] },
-            { "required": ["alt_text_description"] },
-            { "required": ["hyperlink"] },
-            { "required": ["replace_base64"] }
-        ]);
-    }
     if tool == "word.update_tracked_change" {
         schema["allOf"] = json!([
             {
@@ -2352,15 +2329,18 @@ fn word_html_property_schema(tool: &str, name: &str) -> Option<Value> {
 fn word_image_property_schema(tool: &str, name: &str) -> Option<Value> {
     let is_image_tool = matches!(
         tool,
-        "word.resize_image"
-            | "word.list_images"
-            | "word.get_image"
-            | "word.update_image"
-            | "word.delete_image"
+        "word.list_images" | "word.get_image" | "word.update_image"
     );
     match (is_image_tool, name) {
         (true, "image") => Some(inline_image_locator_schema()),
-        (true, "alt_text_title" | "alt_text_description" | "replace_base64") => {
+        (true, "action") => Some(
+            json!({ "enum": ["resize", "set_alt_text", "set_hyperlink", "replace", "delete"] }),
+        ),
+        (true, "width_pt" | "height_pt") => {
+            Some(json!({ "type": "number", "exclusiveMinimum": 0 }))
+        }
+        (true, "preserve_aspect_ratio") => Some(json!({ "type": "boolean", "default": true })),
+        (true, "alt_text_title" | "alt_text_description" | "base64") => {
             Some(json!({ "type": "string" }))
         }
         (true, "hyperlink") => Some(json!({ "type": "string", "format": "uri" })),

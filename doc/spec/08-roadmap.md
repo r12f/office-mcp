@@ -89,7 +89,7 @@ review the result like a normal collaborator's edits.
 - [x] `word.read_table`, `word.update_cell`, `word.add_row`, `word.add_column`,
       `word.format_cell`
 - [x] `word.insert_image` (base64 + URL)
-- [x] `word.resize_image` (in-place inline image resizing by paragraph index)
+- [x] inline image resizing through `word.update_image { action: "resize" }`
 - [x] `word.insert_list` (numbered, bulleted)
 - [x] `word.list_lists`, `word.update_list` (discover and mutate existing lists)
 
@@ -108,9 +108,8 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.get_html`, `word.insert_html`,
 `word.get_header_footer`, `word.update_header_footer`, `word.insert_bookmark`,
 `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_paragraph`,
-`word.insert_table`, `word.insert_image`, `word.resize_image`,
-`word.list_images`, `word.get_image`, `word.update_image`,
-`word.delete_image`, `word.list_shapes`, `word.insert_shape`,
+`word.insert_table`, `word.insert_image`, `word.list_images`,
+`word.get_image`, `word.update_image`, `word.list_shapes`, `word.insert_shape`,
 `word.update_shape`, `word.delete_shape`, `word.insert_break`,
 `word.list_sections`, `word.update_page_setup`,
 `word.insert_list`, `word.list_lists`, `word.update_list`,
@@ -237,12 +236,13 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       `word.apply_style` as the range-level style application owner, and keeps
       style deletion out of scope until a separate destructive contract is
       specified.
-- [x] Add inline image CRUD tools: `word.list_images`, `word.get_image`,
-      `word.update_image`, and `word.delete_image`. The contract keeps image
+- [x] Add inline image read/mutation tools: `word.list_images`,
+      `word.get_image`, and `word.update_image`. The contract keeps image
       discovery and byte export in Media, preserves `word.insert_image` as the
-      creation owner and `word.resize_image` as the geometry owner, validates
-      replacement bytes with the existing image safety limits, and gates image
-      deletion as destructive while preserving adjacent paragraph text.
+      creation owner, validates replacement bytes with the existing image safety
+      limits, and makes `word.update_image` the single owner for resize, alt
+      text, hyperlink, replace, and delete actions while preserving adjacent
+      paragraph text during delete.
 - [x] Add desktop-tier shape tools: `word.list_shapes`, `word.insert_shape`,
       `word.update_shape`, and `word.delete_shape`. The contract gates the
       tools on `WordApiDesktop 1.2`, keeps text boxes, geometric shapes,

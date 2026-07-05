@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolve } from 'node:path';
 import {
@@ -222,13 +223,13 @@ const WORD_E2E_CASES = Object.fromEntries([
       }
     }
   }],
-  ['word.resize_image', {
+  ['word.update_image', {
     setup: {
       actions: [
         { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Resize image E2E', width_pt: 24, height_pt: 24 } }
       ]
     },
-    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 }, width_pt: 48, preserve_aspect_ratio: true },
+    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 }, action: 'resize', width_pt: 48, preserve_aspect_ratio: true },
     verify: {
       kind: 'direct-result',
       expect: {
@@ -240,7 +241,46 @@ const WORD_E2E_CASES = Object.fromEntries([
           { path: 'image.old_height_pt', value: 24 }
         ]
       }
-    }
+    },
+    scenarios: [
+      {
+        setup: {
+          actions: [
+            { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Old image E2E', width_pt: 24, height_pt: 24 } }
+          ]
+        },
+        args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 }, action: 'set_alt_text', alt_text_description: 'Updated image E2E' },
+        verify: {
+          kind: 'direct-result',
+          expect: {
+            pathEquals: [
+              { path: 'updated', value: true },
+              { path: 'replaced', value: false },
+              { path: 'image.paragraph_index', value: 0 },
+              { path: 'image.image_index', value: 0 }
+            ]
+          }
+        }
+      },
+      {
+        setup: {
+          actions: [
+            { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Delete image E2E', width_pt: 24, height_pt: 24 } }
+          ]
+        },
+        args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 }, action: 'delete' },
+        verify: {
+          kind: 'direct-result',
+          expect: {
+            pathEquals: [
+              { path: 'deleted', value: true },
+              { path: 'image.paragraph_index', value: 0 },
+              { path: 'image.image_index', value: 0 }
+            ]
+          }
+        }
+      }
+    ]
   }],
   ['word.list_images', {
     setup: {
@@ -275,43 +315,6 @@ const WORD_E2E_CASES = Object.fromEntries([
         pathEquals: [
           { path: 'paragraph_index', value: 0 },
           { path: 'image_index', value: 0 }
-        ]
-      }
-    }
-  }],
-  ['word.update_image', {
-    setup: {
-      actions: [
-        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Old image E2E', width_pt: 24, height_pt: 24 } }
-      ]
-    },
-    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 }, alt_text_description: 'Updated image E2E' },
-    verify: {
-      kind: 'direct-result',
-      expect: {
-        pathEquals: [
-          { path: 'updated', value: true },
-          { path: 'replaced', value: false },
-          { path: 'image.paragraph_index', value: 0 },
-          { path: 'image.image_index', value: 0 }
-        ]
-      }
-    }
-  }],
-  ['word.delete_image', {
-    setup: {
-      actions: [
-        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Delete image E2E', width_pt: 24, height_pt: 24 } }
-      ]
-    },
-    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 } },
-    verify: {
-      kind: 'direct-result',
-      expect: {
-        pathEquals: [
-          { path: 'deleted', value: true },
-          { path: 'image.paragraph_index', value: 0 },
-          { path: 'image.image_index', value: 0 }
         ]
       }
     }
@@ -886,6 +889,19 @@ const WORD_E2E_CASES = Object.fromEntries([
 
 test('Word E2E case table covers every advertised tool', () => {
   assertE2eCaseCoverage({ addinRoot: ADDIN_ROOT, host: 'Word', cases: WORD_E2E_CASES });
+});
+
+test('Word image E2E coverage exercises consolidated update_image actions', () => {
+  const updateImage = WORD_E2E_CASES['word.update_image'];
+  assert.equal(updateImage.call.arguments.action, 'resize');
+  assert.equal(updateImage.call.arguments.width_pt, 48);
+
+  const source = JSON.stringify(WORD_E2E_CASES);
+  assert.match(source, /"action":"resize"/);
+  assert.match(source, /"action":"set_alt_text"/);
+  assert.match(source, /"action":"delete"/);
+  assert.doesNotMatch(source, /word\.resize_image/);
+  assert.doesNotMatch(source, /word\.delete_image/);
 });
 
 test('Word mutating E2E cases define concrete setup and readback checks', () => {
