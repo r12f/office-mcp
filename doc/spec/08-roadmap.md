@@ -54,7 +54,7 @@ End-to-end "agent reads paragraph 0 of an open Word doc":
 
 ### M2 — Read & insert
 
-- [x] `word.get_text`, `word.get_outline`, `word.get_paragraph`, `word.find_text`,
+- [x] `word.get_text`, `word.get_outline`, `word.find_text`,
       `word.get_selection`
 - [x] `word.insert_paragraph`, `word.insert_heading`, `word.insert_table`,
       `word.insert_page_break`
@@ -102,7 +102,7 @@ The refined catalog should stay compact and must apply Occam's razor: do
 not keep a separate tool when it only repeats another tool's object owner and
 user intent.
 
-Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
+Target catalog: `word.get_text`, `word.get_outline`,
 `word.find_text`, `word.resolve_anchor`, `word.get_selection`,
 `word.set_selection`,
 `word.get_html`, `word.insert_html`,
@@ -128,7 +128,8 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 
 Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 `word.insert_page_break`, `word.update_cell`, `word.add_row`, `word.add_column`,
-`word.format_cell`, `word.accept_change`, and `word.reject_change`.
+`word.format_cell`, `word.accept_change`, `word.reject_change`, and
+`word.get_paragraph`.
 
 - [x] Verify planned Word content-control and consolidated mutation APIs against
       `@types/office-js` and Microsoft API docs before implementation. Current

@@ -84,12 +84,6 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Read,
     ),
     tool(
-        "word.get_paragraph",
-        "word",
-        "Paragraphs & lists",
-        ToolSideEffect::Read,
-    ),
-    tool(
         "word.find_text",
         "word",
         "Range & selection",

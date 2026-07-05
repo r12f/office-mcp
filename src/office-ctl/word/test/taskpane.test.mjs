@@ -507,6 +507,7 @@ test('Word image CRUD tools are advertised, grouped, gated, and dispatched throu
   assert.match(js, /'word\.get_image'/);
   assert.match(js, /'word\.update_image'/);
   const availableToolsSource = js.match(/const AVAILABLE_TOOLS = \[([\s\S]*?)\];/)?.[1] || '';
+  assert.doesNotMatch(availableToolsSource, /'word\.get_paragraph'/);
   assert.doesNotMatch(availableToolsSource, /'word\.resize_image'/);
   assert.doesNotMatch(availableToolsSource, /'word\.delete_image'/);
   assert.match(js, /'word\.list_shapes'/);
@@ -788,7 +789,7 @@ test('word.apply_formatting supports paragraph layout formatting and readback me
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const preflightBody = functionBody(js, 'preflightWordMutatingTool');
   const applyBody = functionBody(js, 'applyFormatting');
-  const getParagraphBody = functionBody(js, 'getParagraph');
+  const getTextBody = functionBody(js, 'getText');
 
   assert.match(js, /function validateParagraphFormattingArg\(tool, paragraph/);
   assert.match(js, /function hasFormattingFields\(formatting\)/);
@@ -802,7 +803,7 @@ test('word.apply_formatting supports paragraph layout formatting and readback me
   assert.match(js, /function applyParagraphFormattingToParagraph\(paragraph, formatting\)/);
   assert.match(functionBody(js, 'applyParagraphFormattingToParagraph'), /paragraph\.alignment = Word\.Alignment\.centered/);
   assert.match(functionBody(js, 'applyParagraphFormattingToParagraph'), /paragraph\.firstLineIndent = formatting\.first_line_indent_pt/);
-  assert.match(getParagraphBody, /args\.include_formatting/);
+  assert.match(getTextBody, /args\.include_formatting/);
   assert.match(js, /function paragraphFormattingMetadata\(paragraph\)/);
   assert.match(functionBody(js, 'paragraphFormattingMetadata'), /alignment: normalizedParagraphAlignment\(paragraph\.alignment\)/);
   assert.match(functionBody(js, 'paragraphFormattingMetadata'), /space_after_pt: paragraph\.spaceAfter/);
@@ -920,7 +921,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.update_list'/);
   assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.get_document_properties', 'word\.update_document_properties', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.list_fields', 'word\.insert_field', 'word\.update_field', 'word\.delete_field', 'word\.list_styles', 'word\.create_style', 'word\.update_style', 'word\.save'\] \}/);
   assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.set_selection', 'word\.get_html', 'word\.insert_html', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
-  assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list', 'word\.list_lists', 'word\.update_list'\] \}/);
+  assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list', 'word\.list_lists', 'word\.update_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.list_images', 'word\.get_image', 'word\.update_image', 'word\.list_shapes', 'word\.insert_shape', 'word\.update_shape', 'word\.delete_shape'\] \}/);
   assert.match(js, /\{ label: 'Content controls', tools: \['word\.list_content_controls', 'word\.insert_content_control', 'word\.update_content_control', 'word\.delete_content_control'\] \}/);
@@ -934,6 +935,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.doesNotMatch(js, /'word\.format_cell'/);
   assert.doesNotMatch(js, /'word\.accept_change'/);
   assert.doesNotMatch(js, /'word\.reject_change'/);
+  assert.doesNotMatch(availableToolsSource, /'word\.get_paragraph'/);
   assert.doesNotMatch(availableToolsSource, /'word\.insert_page_break'/);
   assert.match(js, /\['word\.update_table', \{ category: 'Tables', sideEffect: 'destructive', description: 'Update table cells, rows, columns, formatting, or lifecycle\.' \}\]/);
   assert.match(js, /\['word\.list_content_controls', \{ category: 'Content controls', sideEffect: 'read', description: 'List content-control metadata\.' \}\]/);

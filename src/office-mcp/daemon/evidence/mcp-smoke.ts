@@ -93,8 +93,8 @@ if (mode === 'sessions') {
   const styled = await client.callTool({ name: 'word.apply_style', arguments: { session_id: sessionId, anchor: { kind: 'paragraph_index', index: paragraph.index }, style: 'Normal' } });
   const pageBreak = await client.callTool({ name: 'word.insert_page_break', arguments: { session_id: sessionId, anchor: { kind: 'end_of_document' } } });
   const saved = await client.callTool({ name: 'word.save', arguments: { session_id: sessionId } });
-  const after = await client.callTool({ name: 'word.get_paragraph', arguments: { session_id: sessionId, index: paragraph.index } });
-  assertToolData('update paragraph smoke', after, (data) => String(data.text).replace(/\f/g, '') === updatedText && data.style === 'Normal');
+  const after = await client.callTool({ name: 'word.get_text', arguments: { session_id: sessionId, offset: paragraph.index, limit: 1, include_metadata: true } });
+  assertToolData('update paragraph smoke', after, (data) => String(data.paragraphs?.[0]?.text || '').replace(/\f/g, '') === updatedText && data.paragraphs?.[0]?.style === 'Normal');
   console.log(JSON.stringify({ suffix, inserted, paragraph, updated, appliedFormatting, heading, styled, pageBreak, saved, after }, null, 2));
 } else if (mode === 'word-spec-args') {
   const sessionId = process.argv[4];

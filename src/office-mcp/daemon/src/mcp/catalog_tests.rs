@@ -52,6 +52,8 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"office.describe_tool"));
     assert!(names.contains(&"word.get_text"));
     assert!(names.contains(&"word_get_text"));
+    assert!(!names.contains(&"word.get_paragraph"));
+    assert!(!names.contains(&"word_get_paragraph"));
     assert!(names.contains(&"word.get_header_footer"));
     assert!(names.contains(&"word.update_header_footer"));
     assert!(names.contains(&"word.insert_break"));
@@ -116,10 +118,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 63);
+    assert_eq!(WORD_V1_TOOLS.len(), 62);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 222);
+    assert_eq!(tools.len(), 220);
 }
 
 #[test]
@@ -759,10 +761,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 108);
+    assert_eq!(all_tools.len(), 107);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        108
+        107
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -786,15 +788,13 @@ fn representative_word_schemas_are_specific() {
     assert_required(&describe, &["tools"]);
     assert_eq!(describe["properties"]["tools"]["type"], "array");
 
-    let paragraph = schema_for("word.get_paragraph");
-    assert_required(&paragraph, &["session_id", "index"]);
-    assert_eq!(paragraph["properties"]["index"]["type"], "integer");
-    assert_eq!(paragraph["properties"]["index"]["minimum"], 0);
-    assert_eq!(
-        paragraph["properties"]["include_formatting"]["type"],
-        "boolean"
-    );
-    assert!(paragraph["properties"].get("paragraph_index").is_none());
+    let text = schema_for("word.get_text");
+    assert_required(&text, &["session_id"]);
+    assert_eq!(text["properties"]["offset"]["type"], "integer");
+    assert_eq!(text["properties"]["limit"]["maximum"], 1000);
+    assert_eq!(text["properties"]["include_metadata"]["type"], "boolean");
+    assert_eq!(text["properties"]["include_formatting"]["type"], "boolean");
+    assert!(text["properties"].get("paragraph_index").is_none());
 
     let apply_formatting = schema_for("word.apply_formatting");
     assert_required(&apply_formatting, &["session_id", "anchor"]);

@@ -525,7 +525,7 @@ test('E2E readback helpers create standard direct, tool, and resource verifiers'
 
 test('E2E readback helpers cover current Word, Excel, and PowerPoint object owners', () => {
   assert.deepEqual(wordReadback.documentText({ contains: ['paragraph'] }), readbackByTool('word.get_text', { arguments: { limit: 20 }, expect: { contains: ['paragraph'] } }));
-  assert.deepEqual(wordReadback.paragraph(0, { contains: ['paragraph'] }), readbackByTool('word.get_paragraph', { arguments: { index: 0 }, expect: { contains: ['paragraph'] } }));
+  assert.deepEqual(wordReadback.paragraph(0, { contains: ['paragraph'] }), readbackByTool('word.get_text', { arguments: { offset: 0, limit: 1, include_metadata: true }, expect: { contains: ['paragraph'] } }));
   assert.deepEqual(wordReadback.table(0, { contains: ['cell'] }), readbackByTool('word.read_table', { arguments: { table_index: 0 }, expect: { contains: ['cell'] } }));
   assert.deepEqual(wordReadback.contentControls('tag', { contains: ['title'] }), readbackByTool('word.list_content_controls', { arguments: { tag: 'tag' }, expect: { contains: ['title'] } }));
   assert.deepEqual(wordReadback.comments({ contains: ['comment'] }), readbackByResource('office://word/${session_id}/comments', { expect: { contains: ['comment'] } }));

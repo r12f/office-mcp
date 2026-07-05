@@ -761,16 +761,16 @@ fn mcp_json_rpc_rejects_unknown_tool_arguments_before_dispatch() {
 
     let reply = mcp_handle_body(
         &registry,
-        br#"{"jsonrpc":"2.0","id":"bad-args","method":"tools/call","params":{"name":"word.get_paragraph","arguments":{"session_id":"session-1","paragraph_index":2}}}"#,
+        br#"{"jsonrpc":"2.0","id":"bad-args","method":"tools/call","params":{"name":"word.get_text","arguments":{"session_id":"session-1","paragraph_index":2}}}"#,
     );
 
     let reply: serde_json::Value = serde_json::from_str(&reply).expect("reply json");
     let error = &reply["result"]["structuredContent"]["error"];
     assert_eq!(error["office_mcp_code"], "INVALID_ARGUMENTS");
-    assert_eq!(error["tool"], "word.get_paragraph");
+    assert_eq!(error["tool"], "word.get_text");
     assert_eq!(
         error["message"],
-        "word.get_paragraph does not accept argument paragraph_index."
+        "word.get_text does not accept argument paragraph_index."
     );
 }
 
@@ -1243,7 +1243,6 @@ fn registry_with_word_session() -> SessionRegistry {
     registry_with_word_session_with_tools(vec![
         "word.get_text",
         "word.get_outline",
-        "word.get_paragraph",
         "word.get_selection",
         "word.save",
     ])

@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 54 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 53 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -75,7 +75,7 @@ The per-tool JSON Schemas follow in §2-§9.
 |---|---|
 | **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.get_document_properties`, `word.update_document_properties`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.list_fields`, `word.insert_field`, `word.update_field`, `word.delete_field`, `word.list_styles`, `word.create_style`, `word.update_style`, `word.save` |
 | **Range & selection** | `word.get_selection`, `word.set_selection`, `word.get_html`, `word.insert_html`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
-| **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list`, `word.list_lists`, `word.update_list` |
+| **Paragraphs & lists** | `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list`, `word.list_lists`, `word.update_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
 | **Media** | `word.insert_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.list_shapes`, `word.insert_shape`, `word.update_shape`, `word.delete_shape` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 59 tools. It deliberately consolidates specialized tools
+The target surface has 58 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -103,7 +103,6 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.update_header_footer` | implemented | Document & structure | edit/destructive | `WordApi 1.1` | Replace, append to, or clear a section-scoped header or footer body; non-primary layout validation uses `WordApiDesktop 1.3` when required. |
 | `word.get_document_properties` | implemented | Document & structure | read | `WordApi 1.3` | Read writable core document properties, read-only metadata, and optionally custom properties. |
 | `word.update_document_properties` | implemented | Document & structure | edit | `WordApi 1.3` | Update writable core document properties and upsert or delete custom properties. |
-| `word.get_paragraph` | implemented | Paragraphs & lists | read | `WordApi 1.3` | Read one paragraph by index, optionally including direct paragraph formatting metadata. |
 | `word.find_text` | implemented | Range & selection | read | `WordApi 1.3` | Search text with Word search options and return portable paragraph-relative matches. |
 | `word.resolve_anchor` | implemented | Range & selection | read | `WordApi 1.3` | Resolve an anchor to safe diagnostic metadata without returning full document text. |
 | `word.insert_bookmark` | implemented | Range & selection | edit | `WordApi 1.4` | Create or move a named bookmark at an anchored range with explicit duplicate handling. |
@@ -175,6 +174,7 @@ Superseded target-surface tools:
 | `word.insert_page_break` | `word.insert_break` | Page breaks are one break kind in the generalized break owner. |
 | `word.resize_image` | `word.update_image` | Resize is an inline-image mutation action, not a distinct media owner. |
 | `word.delete_image` | `word.update_image` | Delete is an inline-image mutation action with destructive side effect. |
+| `word.get_paragraph` | `word.get_text` | A paragraph read is a one-paragraph document text window. |
 
 Tool ownership rules:
 
@@ -316,7 +316,8 @@ Return the document's plain text.
     "session_id": { "type": "string", "format": "uuid" },
     "offset": { "type": "integer", "minimum": 0, "default": 0 },
     "limit":  { "type": "integer", "minimum": 1, "maximum": 1000, "default": 200 },
-    "include_metadata": { "type": "boolean", "default": false }
+    "include_metadata": { "type": "boolean", "default": false },
+    "include_formatting": { "type": "boolean", "default": false }
   }
 }
 ```
@@ -343,6 +344,16 @@ When `include_metadata: true`, each paragraph is wrapped:
 }
 ```
 
+When `include_formatting: true`, each returned paragraph also includes a
+`formatting` object with the same direct paragraph-layout fields accepted by
+`word.apply_formatting.paragraph`, plus `style` when available. This closes the
+field-parity gap with the superseded `word.get_paragraph` contract. The
+single-paragraph replacement pattern is:
+
+```json
+{ "offset": 41, "limit": 1, "include_metadata": true, "include_formatting": true }
+```
+
 IRM: requires `extract` right.
 
 ### 2.2 `word.get_outline`
@@ -362,27 +373,7 @@ Return headings + structure, no body text.
 
 Returns nested tree of `{ text, level, paragraph_index, children: [...] }`.
 
-### 2.3 `word.get_paragraph`
-
-```json
-{
-  "type": "object",
-  "required": ["session_id", "index"],
-  "properties": {
-    "session_id": { "type": "string" },
-    "index": { "type": "integer", "minimum": 0 },
-    "include_formatting": { "type": "boolean", "default": false }
-  }
-}
-```
-
-When `include_formatting` is true, the response includes a `formatting` object
-with the same direct paragraph-layout fields accepted by
-`word.apply_formatting.paragraph`, plus `style` when available. This read-back
-shape is intended for round-trip verification; it is not a substitute for
-semantic style inspection.
-
-### 2.4 `word.find_text`
+### 2.3 `word.find_text`
 
 ```json
 {
