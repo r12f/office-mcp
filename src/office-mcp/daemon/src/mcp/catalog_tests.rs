@@ -1350,7 +1350,9 @@ fn powerpoint_tool_catalog_checks_supported_names() {
         "powerpoint.get_presentation_info"
     ));
     assert!(PowerPointToolCatalog::contains("powerpoint.export_file"));
-    assert!(!PowerPointToolCatalog::contains("powerpoint.get_active_view"));
+    assert!(!PowerPointToolCatalog::contains(
+        "powerpoint.get_active_view"
+    ));
     assert!(PowerPointToolCatalog::contains("powerpoint.list_slides"));
     assert!(PowerPointToolCatalog::contains("powerpoint.apply_layout"));
     assert!(PowerPointToolCatalog::contains("powerpoint.update_table"));

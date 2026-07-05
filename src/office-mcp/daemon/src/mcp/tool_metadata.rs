@@ -534,12 +534,6 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Read,
     ),
     tool(
-        "powerpoint.get_active_view",
-        "powerpoint",
-        "Presentation",
-        ToolSideEffect::Read,
-    ),
-    tool(
         "powerpoint.export_file",
         "powerpoint",
         "Presentation",

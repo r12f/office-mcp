@@ -91,7 +91,6 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
 
 const POWERPOINT_V1_TOOLS: &[OfficeToolDefinition] = &[
     "powerpoint.get_presentation_info",
-    "powerpoint.get_active_view",
     "powerpoint.export_file",
     "powerpoint.update_tags",
     "powerpoint.list_slides",
@@ -1824,7 +1823,6 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id"],
         ["session_id", "include_selection"]
     ),
-    tool_spec!("powerpoint.get_active_view", ["session_id"], ["session_id"]),
     tool_spec!(
         "powerpoint.export_file",
         ["session_id"],

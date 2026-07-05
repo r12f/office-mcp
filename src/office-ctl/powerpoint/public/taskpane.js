@@ -32,7 +32,6 @@
 
   const AVAILABLE_TOOLS = [
     'powerpoint.get_presentation_info',
-    'powerpoint.get_active_view',
     'powerpoint.export_file',
     'powerpoint.update_tags',
     'powerpoint.list_slides',
@@ -58,7 +57,7 @@
     'powerpoint.update_table'
   ];
   const TOOL_GROUPS = [
-    { label: 'Presentation', tools: ['powerpoint.get_presentation_info', 'powerpoint.get_active_view', 'powerpoint.export_file'] },
+    { label: 'Presentation', tools: ['powerpoint.get_presentation_info', 'powerpoint.export_file'] },
     { label: 'Metadata', tools: ['powerpoint.update_tags'] },
     { label: 'Slides', tools: ['powerpoint.list_slides', 'powerpoint.add_slide', 'powerpoint.update_slide', 'powerpoint.delete_slide', 'powerpoint.move_slide', 'powerpoint.export_slide'] },
     { label: 'Layout', tools: ['powerpoint.list_layouts', 'powerpoint.apply_layout'] },
@@ -68,8 +67,7 @@
     { label: 'Tables', tools: ['powerpoint.add_table', 'powerpoint.read_table', 'powerpoint.update_table'] }
   ];
   const TOOL_METADATA = new Map([
-    ['powerpoint.get_presentation_info', { category: 'Presentation', sideEffect: 'read', description: 'Return presentation metadata, counts, selection summary, and capability gates.' }],
-    ['powerpoint.get_active_view', { category: 'Presentation', sideEffect: 'read', description: 'Return the current PowerPoint view mode.' }],
+    ['powerpoint.get_presentation_info', { category: 'Presentation', sideEffect: 'read', description: 'Return presentation metadata, counts, active view, selection summary, and capability gates.' }],
     ['powerpoint.export_file', { category: 'Presentation', sideEffect: 'read', description: 'Export the presentation as PDF or PPTX when supported by the host.' }],
     ['powerpoint.update_tags', { category: 'Metadata', sideEffect: 'destructive', description: 'Read, set, or delete presentation tags.' }],
     ['powerpoint.list_slides', { category: 'Slides', sideEffect: 'read', description: 'List slides with ids, indices, layout, tags, and shape counts.' }],
@@ -329,9 +327,6 @@
         case 'powerpoint.get_presentation_info':
           data = await getPresentationInfoTool(args);
           break;
-        case 'powerpoint.get_active_view':
-          data = await getActiveView(args);
-          break;
         case 'powerpoint.export_file':
           data = await exportFile(args);
           break;
@@ -458,8 +453,10 @@
       const slides = context.presentation.slides;
       slides.load('items/id');
       await context.sync();
+      const activeView = await getActiveView();
       return {
         ...info,
+        ...activeView,
         slide_count: (slides.items || []).length,
         requirement_sets: probeRequirementSets(),
         capabilities: Object.fromEntries(AVAILABLE_TOOLS.map((tool) => [tool, isToolEnabled(tool)])),
@@ -468,9 +465,21 @@
     });
   }
 
-  async function getActiveView(_args) {
-    const view = await officeAsync((callback) => Office.context.document.getActiveViewAsync(callback));
-    return { active_view: String(view || 'unknown'), editable: String(view || '').toLowerCase() !== 'read' };
+  async function getActiveView() {
+    try {
+      const view = await officeAsync((callback) => Office.context.document.getActiveViewAsync(callback));
+      const activeView = normalizeActiveView(view);
+      return { active_view: activeView, active_view_source: 'host' };
+    } catch (_error) {
+      return { active_view: 'unknown', active_view_source: 'unavailable' };
+    }
+  }
+
+  function normalizeActiveView(view) {
+    const normalized = String(view || '').toLowerCase();
+    if (normalized === 'read') return 'read';
+    if (normalized === 'edit') return 'edit';
+    return 'unknown';
   }
 
   async function exportFile(args) {

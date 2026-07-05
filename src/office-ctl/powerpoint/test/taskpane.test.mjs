@@ -262,7 +262,13 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   }
   assert.doesNotMatch(js, /case 'powerpoint\.export_pdf':/);
   assert.match(js, /async function getPresentationInfoTool\(args\)/);
-  assert.match(js, /async function getActiveView\(_?args\)/);
+  const presentationInfoBody = functionBody(js, 'getPresentationInfoTool');
+  assert.match(presentationInfoBody, /const activeView = await getActiveView\(\)/);
+  assert.match(presentationInfoBody, /\.\.\.activeView/);
+  assert.match(js, /async function getActiveView\(\)/);
+  assert.match(functionBody(js, 'getActiveView'), /active_view_source: 'host'/);
+  assert.match(functionBody(js, 'getActiveView'), /active_view_source: 'unavailable'/);
+  assert.match(js, /function normalizeActiveView\(view\)/);
   assert.match(js, /async function exportFile\(args\)/);
   assert.match(js, /async function updateTags\(args\)/);
   const updateTagsBody = functionBody(js, 'updateTags');
