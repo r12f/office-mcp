@@ -164,11 +164,13 @@ fn word_document_property_tools_expose_expected_contracts() {
         serde_json::json!(["key", "value"])
     );
     assert_eq!(
-        update_properties["inputSchema"]["properties"]["custom_set"]["items"]["properties"]["key"]["minLength"],
+        update_properties["inputSchema"]["properties"]["custom_set"]["items"]["properties"]["key"]
+            ["minLength"],
         1
     );
     assert_eq!(
-        update_properties["inputSchema"]["properties"]["custom_set"]["items"]["properties"]["value"]["oneOf"][2]["type"],
+        update_properties["inputSchema"]["properties"]["custom_set"]["items"]["properties"]["value"]
+            ["oneOf"][2]["type"],
         "boolean"
     );
     assert_eq!(
@@ -665,7 +667,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
     assert_eq!(all_tools.len(), 100);
-    assert_eq!(all_tools.iter().copied().collect::<BTreeSet<_>>().len(), 100);
+    assert_eq!(
+        all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
+        100
+    );
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));
@@ -998,15 +1003,25 @@ fn word_style_schemas_are_specific() {
 fn word_document_property_schemas_are_specific() {
     let get_properties = schema_for("word.get_document_properties");
     assert_required(&get_properties, &["session_id"]);
-    assert_eq!(get_properties["properties"]["include_custom"]["type"], "boolean");
-    assert_eq!(get_properties["properties"]["include_custom"]["default"], true);
+    assert_eq!(
+        get_properties["properties"]["include_custom"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        get_properties["properties"]["include_custom"]["default"],
+        true
+    );
 
     let update_properties = schema_for("word.update_document_properties");
     assert_required(&update_properties, &["session_id"]);
     assert_eq!(update_properties["properties"]["title"]["type"], "string");
     assert_eq!(update_properties["properties"]["manager"]["type"], "string");
     assert!(update_properties["properties"].get("last_author").is_none());
-    assert!(update_properties["properties"].get("revision_number").is_none());
+    assert!(
+        update_properties["properties"]
+            .get("revision_number")
+            .is_none()
+    );
     assert_eq!(
         update_properties["properties"]["custom_set"]["items"]["additionalProperties"],
         false

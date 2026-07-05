@@ -664,33 +664,9 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
         "word.insert_hyperlink" | "word.list_hyperlinks" | "word.remove_hyperlink" => {
             word_hyperlink_examples(tool)
         }
-        "word.insert_content_control" => vec![json!({
-            "description": "Wrap inserted review text in a tagged content control.",
-            "arguments": {
-                "session_id": "session-1",
-                "anchor": { "kind": "end_of_document" },
-                "text": "Approved by legal.",
-                "tag": "approval-note",
-                "title": "Approval note"
-            }
-        })],
-        "word.update_content_control" => vec![json!({
-            "description": "Replace text and metadata for an existing content control.",
-            "arguments": {
-                "session_id": "session-1",
-                "content_control_id": 42,
-                "text": "Final approval received.",
-                "tag": "approval-note-final"
-            }
-        })],
-        "word.delete_content_control" => vec![json!({
-            "description": "Remove a content control while keeping its contents in the document.",
-            "arguments": {
-                "session_id": "session-1",
-                "content_control_id": 42,
-                "delete_contents": false
-            }
-        })],
+        "word.insert_content_control"
+        | "word.update_content_control"
+        | "word.delete_content_control" => content_control_examples_for_tool(tool),
         "word.insert_bookmark" | "word.list_bookmarks" | "word.delete_bookmark" => {
             bookmark_examples_for_tool(tool)
         }
@@ -735,6 +711,39 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
                 "row_index": 0,
                 "column_index": 1,
                 "text": "Q4"
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
+fn content_control_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.insert_content_control" => vec![json!({
+            "description": "Wrap inserted review text in a tagged content control.",
+            "arguments": {
+                "session_id": "session-1",
+                "anchor": { "kind": "end_of_document" },
+                "text": "Approved by legal.",
+                "tag": "approval-note",
+                "title": "Approval note"
+            }
+        })],
+        "word.update_content_control" => vec![json!({
+            "description": "Replace text and metadata for an existing content control.",
+            "arguments": {
+                "session_id": "session-1",
+                "content_control_id": 42,
+                "text": "Final approval received.",
+                "tag": "approval-note-final"
+            }
+        })],
+        "word.delete_content_control" => vec![json!({
+            "description": "Remove a content control while keeping its contents in the document.",
+            "arguments": {
+                "session_id": "session-1",
+                "content_control_id": 42,
+                "delete_contents": false
             }
         })],
         _ => Vec::new(),
@@ -2138,8 +2147,8 @@ fn word_document_property_schema(tool: &str, name: &str) -> Option<Value> {
     }
     match name {
         "include_custom" => Some(json!({ "type": "boolean", "default": true })),
-        "title" | "subject" | "author" | "keywords" | "category" | "comments"
-        | "company" | "manager" => Some(json!({ "type": "string" })),
+        "title" | "subject" | "author" | "keywords" | "category" | "comments" | "company"
+        | "manager" => Some(json!({ "type": "string" })),
         "custom_set" => Some(json!({
             "type": "array",
             "items": {

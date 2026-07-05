@@ -84,18 +84,6 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(update_style.category, "Document & structure");
     assert_eq!(update_style.side_effect, ToolSideEffect::Mutating);
 
-    let get_document_properties =
-        tool_metadata("word.get_document_properties").expect("document properties metadata");
-    assert_eq!(get_document_properties.app, "word");
-    assert_eq!(get_document_properties.category, "Document & structure");
-    assert_eq!(get_document_properties.side_effect, ToolSideEffect::Read);
-
-    let update_document_properties = tool_metadata("word.update_document_properties")
-        .expect("document properties update metadata");
-    assert_eq!(update_document_properties.app, "word");
-    assert_eq!(update_document_properties.category, "Document & structure");
-    assert_eq!(update_document_properties.side_effect, ToolSideEffect::Mutating);
-
     let sections = tool_metadata("word.list_sections").expect("sections metadata");
     assert_eq!(sections.app, "word");
     assert_eq!(sections.category, "Document & structure");
@@ -127,6 +115,24 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(destructive.app, "powerpoint");
     assert_eq!(destructive.category, "Slides");
     assert_eq!(destructive.side_effect, ToolSideEffect::Destructive);
+}
+
+#[test]
+fn word_document_property_tool_metadata_classifies_document_side_effects() {
+    let get_document_properties =
+        tool_metadata("word.get_document_properties").expect("document properties metadata");
+    assert_eq!(get_document_properties.app, "word");
+    assert_eq!(get_document_properties.category, "Document & structure");
+    assert_eq!(get_document_properties.side_effect, ToolSideEffect::Read);
+
+    let update_document_properties = tool_metadata("word.update_document_properties")
+        .expect("document properties update metadata");
+    assert_eq!(update_document_properties.app, "word");
+    assert_eq!(update_document_properties.category, "Document & structure");
+    assert_eq!(
+        update_document_properties.side_effect,
+        ToolSideEffect::Mutating
+    );
 }
 
 #[test]
