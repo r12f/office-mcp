@@ -173,7 +173,7 @@ export const wordReadback = Object.freeze({
     return readbackByTool('word.get_outline', { arguments: args, expect });
   },
   paragraph(index, expect, args = {}) {
-    return readbackByTool('word.get_paragraph', { arguments: { index, ...args }, expect });
+    return readbackByTool('word.get_text', { arguments: { offset: index, limit: 1, include_metadata: true, ...args }, expect });
   },
   table(tableIndex, expect, args = {}) {
     return readbackByTool('word.read_table', { arguments: { table_index: tableIndex, ...args }, expect });

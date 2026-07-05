@@ -22,10 +22,19 @@ const WORD_E2E_CASES = Object.fromEntries([
         { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Read text E2E paragraph' } }
       ]
     },
-    args: { limit: 20 },
+    args: { offset: 0, limit: 1, include_metadata: true, include_formatting: true },
     verify: {
       kind: 'direct-result',
-      expect: { contains: ['Read text E2E paragraph'], pathEquals: [{ path: 'untrusted_source', value: true }] }
+      expect: {
+        contains: ['Read text E2E paragraph'],
+        pathEquals: [
+          { path: 'untrusted_source', value: true },
+          { path: 'returned_paragraphs.offset', value: 0 },
+          { path: 'returned_paragraphs.limit', value: 1 },
+          { path: 'paragraphs.0.index', value: 0 },
+          { path: 'paragraphs.0.text', value: 'Read text E2E paragraph' }
+        ]
+      }
     }
   }],
   ['word.get_outline', {
@@ -38,18 +47,6 @@ const WORD_E2E_CASES = Object.fromEntries([
     verify: {
       kind: 'direct-result',
       expect: { contains: ['E2E Outline Heading'], pathEquals: [{ path: 'headings.0.level', value: 1 }] }
-    }
-  }],
-  ['word.get_paragraph', {
-    setup: {
-      actions: [
-        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'start_of_document' }, text: 'Paragraph read target' } }
-      ]
-    },
-    args: { index: 0 },
-    verify: {
-      kind: 'direct-result',
-      expect: { pathEquals: [{ path: 'index', value: 0 }, { path: 'text', value: 'Paragraph read target' }] }
     }
   }],
   ['word.find_text', {
@@ -676,9 +673,9 @@ const WORD_E2E_CASES = Object.fromEntries([
     args: { anchor: { kind: 'after_text', text: 'Format this E2E paragraph' }, paragraph: { alignment: 'center', left_indent_pt: 18, space_after_pt: 6 } },
     verify: {
       kind: 'readback',
-      readbackTool: 'word.get_paragraph',
-      readbackArguments: { index: 0, include_formatting: true },
-      expect: { contains: ['Format this E2E paragraph'], pathEquals: [{ path: 'formatting.alignment', value: 'center' }, { path: 'formatting.left_indent_pt', value: 18 }, { path: 'formatting.space_after_pt', value: 6 }] }
+      readbackTool: 'word.get_text',
+      readbackArguments: { offset: 0, limit: 1, include_metadata: true, include_formatting: true },
+      expect: { contains: ['Format this E2E paragraph'], pathEquals: [{ path: 'paragraphs.0.formatting.alignment', value: 'center' }, { path: 'paragraphs.0.formatting.left_indent_pt', value: 18 }, { path: 'paragraphs.0.formatting.space_after_pt', value: 6 }] }
     }
   }],
   ['word.read_table', {

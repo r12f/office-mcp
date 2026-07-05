@@ -352,7 +352,7 @@ fn registry_with_all_resource_sessions() -> SessionRegistry {
         "word",
         "session-1",
         "Draft.docx",
-        &["word.get_text", "word.get_paragraph", "word.get_selection"],
+        &["word.get_text", "word.get_selection"],
     );
     register_runtime_and_session(
         &mut registry,

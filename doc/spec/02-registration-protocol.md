@@ -193,7 +193,6 @@ its current document.
     "available_tools": [
       "word.get_text",
       "word.get_outline",
-      "word.get_paragraph",
       "word.find_text",
       "word.resolve_anchor",
       "word.get_selection",

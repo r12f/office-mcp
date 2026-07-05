@@ -66,8 +66,14 @@ fn parses_structure_and_paragraph_resources() {
             .expect("paragraph request"),
         ResourceReadRequest::Forwarded {
             uri: "office://word/session-1/paragraph/3".to_string(),
-            tool: "word.get_paragraph",
-            arguments: json!({ "session_id": "session-1", "index": 3 }),
+            tool: "word.get_text",
+            arguments: json!({
+                "session_id": "session-1",
+                "offset": 3,
+                "limit": 1,
+                "include_metadata": true,
+                "include_formatting": true,
+            }),
             check_capability: true,
         }
     );
