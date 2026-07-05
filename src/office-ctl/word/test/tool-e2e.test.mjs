@@ -628,13 +628,13 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.list_content_controls', {
     setup: {
       actions: [
-        { tool: 'word.insert_content_control', arguments: { anchor: { kind: 'end_of_document' }, text: 'List control payload', tag: 'e2e-list-control', title: 'E2E List Control' } }
+        { tool: 'word.insert_content_control', arguments: { anchor: { kind: 'end_of_document' }, type: 'checkbox', checked: false, tag: 'e2e-list-control', title: 'E2E List Control' } }
       ]
     },
     args: { tag: 'e2e-list-control' },
     verify: {
       kind: 'direct-result',
-      expect: { contains: ['e2e-list-control', 'E2E List Control'] }
+      expect: { contains: ['e2e-list-control', 'E2E List Control'], pathEquals: [{ path: 'content_controls.0.checked', value: false }] }
     }
   }],
   ['word.insert_content_control', {
@@ -643,26 +643,26 @@ const WORD_E2E_CASES = Object.fromEntries([
         { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'content control anchor marker' } }
       ]
     },
-    args: { anchor: { kind: 'after_text', text: 'content control anchor marker' }, text: 'E2E controlled text', tag: 'e2e-insert-control', title: 'E2E Insert Control' },
+    args: { anchor: { kind: 'after_text', text: 'content control anchor marker' }, type: 'checkbox', checked: false, tag: 'e2e-insert-control', title: 'E2E Insert Control' },
     verify: {
       kind: 'readback',
       readbackTool: 'word.list_content_controls',
       readbackArguments: { tag: 'e2e-insert-control' },
-      expect: { contains: ['e2e-insert-control', 'E2E Insert Control'] }
+      expect: { contains: ['e2e-insert-control', 'E2E Insert Control'], pathEquals: [{ path: 'content_controls.0.checked', value: false }] }
     }
   }],
   ['word.update_content_control', {
     setup: {
       actions: [
-        { tool: 'word.insert_content_control', saveAs: 'controlResult', arguments: { anchor: { kind: 'end_of_document' }, text: 'Before control update', tag: 'e2e-update-control', title: 'Before Control Update' } }
+        { tool: 'word.insert_content_control', saveAs: 'controlResult', arguments: { anchor: { kind: 'end_of_document' }, type: 'dropdown_list', list_items: [{ display_text: 'Draft', value: 'draft' }, { display_text: 'Approved', value: 'approved' }, { display_text: 'Rejected', value: 'rejected' }], tag: 'e2e-update-control', title: 'Before Control Update' } }
       ]
     },
-    args: { content_control_id: '${controlResult.content_control.content_control_id}', text: 'Updated control', tag: 'e2e-updated-control', title: 'Updated Control' },
+    args: { content_control_id: '${controlResult.content_control.content_control_id}', selected_value: 'approved', list_items_add: [{ display_text: 'Archived', value: 'archived' }], list_items_delete: ['rejected'], tag: 'e2e-updated-control', title: 'Updated Control' },
     verify: {
       kind: 'readback',
       readbackTool: 'word.list_content_controls',
       readbackArguments: { tag: 'e2e-updated-control' },
-      expect: { contains: ['e2e-updated-control', 'Updated Control'], notContains: ['Before Control Update'] }
+      expect: { contains: ['e2e-updated-control', 'Updated Control', 'Approved', 'Archived'], notContains: ['Before Control Update', 'Rejected'] }
     }
   }],
   ['word.delete_content_control', {
