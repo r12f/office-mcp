@@ -118,6 +118,24 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
 }
 
 #[test]
+fn word_document_property_tool_metadata_classifies_document_side_effects() {
+    let get_document_properties =
+        tool_metadata("word.get_document_properties").expect("document properties metadata");
+    assert_eq!(get_document_properties.app, "word");
+    assert_eq!(get_document_properties.category, "Document & structure");
+    assert_eq!(get_document_properties.side_effect, ToolSideEffect::Read);
+
+    let update_document_properties = tool_metadata("word.update_document_properties")
+        .expect("document properties update metadata");
+    assert_eq!(update_document_properties.app, "word");
+    assert_eq!(update_document_properties.category, "Document & structure");
+    assert_eq!(
+        update_document_properties.side_effect,
+        ToolSideEffect::Mutating
+    );
+}
+
+#[test]
 fn word_image_tool_metadata_classifies_media_side_effects() {
     let list_images = tool_metadata("word.list_images").expect("image list metadata");
     assert_eq!(list_images.app, "word");

@@ -224,6 +224,11 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       creation owner and `word.resize_image` as the geometry owner, validates
       replacement bytes with the existing image safety limits, and gates image
       deletion as destructive while preserving adjacent paragraph text.
+- [x] Add document-property tools: `word.get_document_properties` and
+      `word.update_document_properties`. The contract keeps document metadata
+      in Document & structure, uses `WordApi 1.3`, reads writable core fields,
+      read-only timestamps/revision metadata, and custom properties, and limits
+      mutation to writable core fields plus custom property upsert/delete.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.

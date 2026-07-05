@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 43 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 45 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -73,7 +73,7 @@ The per-tool JSON Schemas follow in §2-§9.
 
 | Category | Tools |
 |---|---|
-| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.list_fields`, `word.insert_field`, `word.update_field`, `word.delete_field`, `word.list_styles`, `word.create_style`, `word.update_style`, `word.save` |
+| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.get_document_properties`, `word.update_document_properties`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.list_fields`, `word.insert_field`, `word.update_field`, `word.delete_field`, `word.list_styles`, `word.create_style`, `word.update_style`, `word.save` |
 | **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 53 tools. It deliberately consolidates specialized tools
+The target surface has 55 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -101,6 +101,8 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.get_outline` | implemented | Document & structure | read | `WordApi 1.3` | Read headings and lightweight document structure without body text. |
 | `word.get_header_footer` | implemented | Document & structure | read | `WordApi 1.1` | Read section-scoped header or footer text and optional paragraph metadata; non-primary layout validation uses `WordApiDesktop 1.3` when required. |
 | `word.update_header_footer` | implemented | Document & structure | edit/destructive | `WordApi 1.1` | Replace, append to, or clear a section-scoped header or footer body; non-primary layout validation uses `WordApiDesktop 1.3` when required. |
+| `word.get_document_properties` | implemented | Document & structure | read | `WordApi 1.3` | Read writable core document properties, read-only metadata, and optionally custom properties. |
+| `word.update_document_properties` | implemented | Document & structure | edit | `WordApi 1.3` | Update writable core document properties and upsert or delete custom properties. |
 | `word.get_paragraph` | implemented | Paragraphs & lists | read | `WordApi 1.3` | Read one paragraph by index, optionally including direct paragraph formatting metadata. |
 | `word.find_text` | implemented | Range & selection | read | `WordApi 1.3` | Search text with Word search options and return portable paragraph-relative matches. |
 | `word.resolve_anchor` | implemented | Range & selection | read | `WordApi 1.3` | Resolve an anchor to safe diagnostic metadata without returning full document text. |
@@ -209,6 +211,11 @@ Tool ownership rules:
 - `word.get_header_footer` and `word.update_header_footer` own header/footer
   body reads and writes. Body, range, and paragraph tools operate on the main
   document body and must not silently reach into headers or footers.
+- `word.get_document_properties` and `word.update_document_properties` own
+  document metadata. The read tool may return writable core fields, read-only
+  metadata such as creation and save timestamps, and custom properties. The
+  update tool owns writable core fields plus custom property upsert/delete; it
+  must not expose read-only fields as writable arguments.
 - `word.insert_break` owns all Word break insertion. The superseded
   `word.insert_page_break` compatibility tool MAY remain callable for older
   clients but MUST NOT be advertised in the daemon catalog or task pane
@@ -233,7 +240,7 @@ runtime and advertises only tools whose complete implementation is supported:
 
 | Tier | Requirement | Additional tools/features |
 |---|---|---|
-| Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection |
+| Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection, document properties |
 | Review | `WordApi 1.4` | comments, bookmark anchors, bookmark lifecycle tools, and field listing |
 | Notes, content controls, fields, and styles | `WordApi 1.5` | footnote/endnote lifecycle, content-control lifecycle, field insertion/update/deletion tools, and style-catalog tools |
 | Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
@@ -1505,6 +1512,105 @@ include `built_in` so clients can present an appropriate warning. Style
 deletion remains out of scope for this tool because deleting an in-use style
 changes document content fallback behavior and needs a separate destructive
 contract.
+
+## 6A. Document Properties
+
+Document-property tools own Word document metadata. Core properties map to
+`Document.properties`; custom properties map to
+`Document.properties.customProperties`. The tool surface keeps read-only Office
+metadata observable but not writable.
+
+### 6A.1 `word.get_document_properties`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "include_custom": { "type": "boolean", "default": true }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns writable core fields (`title`, `subject`, `author`, `keywords`,
+`category`, `comments`, `company`, and `manager`), read-only metadata
+(`last_author`, `revision_number`, `creation_date`, `last_save_time`, and
+`security` when Office returns it), and, when `include_custom` is not false,
+`custom: [{ key, type, value }]`.
+
+The response normalizes Office camelCase names to snake_case. Date values are
+returned as ISO-8601 strings when Word returns a `Date`; missing host values are
+omitted rather than filled with synthetic defaults.
+
+### 6A.2 `word.update_document_properties`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "title": { "type": "string" },
+    "subject": { "type": "string" },
+    "author": { "type": "string" },
+    "keywords": { "type": "string" },
+    "category": { "type": "string" },
+    "comments": { "type": "string" },
+    "company": { "type": "string" },
+    "manager": { "type": "string" },
+    "custom_set": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "value"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "value": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" }
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "custom_delete": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+Callers must provide at least one writable core property, one `custom_set`
+entry, or one `custom_delete` key. Requests that contain no writable operation
+fail with `INVALID_ARGUMENT` and `partial_effect: "none"`. Read-only fields
+such as `last_author`, `revision_number`, `creation_date`, and
+`last_save_time` are intentionally absent from the schema, so attempts to write
+them fail schema validation.
+
+`custom_set` upserts by deleting any existing custom property with the same key
+before adding the new value through `CustomPropertyCollection.add(key, value)`.
+`custom_delete` deletes matching keys and reports unknown keys in the response;
+unknown-key deletes are successful no-ops. `deleteAll` is not exposed because it
+is too broad for the normal metadata-edit workflow.
+
+| Operation | API | Requirement set |
+|---|---|---|
+| Read/write core properties | `Document.properties` / `DocumentProperties` | `WordApi 1.3` |
+| Read read-only metadata | `DocumentProperties.lastAuthor`, `creationDate`, `lastSaveTime`, `revisionNumber`, `security` | `WordApi 1.3` |
+| Enumerate custom properties | `DocumentProperties.customProperties` / `CustomPropertyCollection` | `WordApi 1.3` |
+| Upsert/delete custom properties | `CustomPropertyCollection.add(key, value)` / `CustomProperty.delete()` | `WordApi 1.3` |
+
+Document-property tools are core-tier tools. `word.get_document_properties`
+requires the same read ceiling as document text extraction because metadata can
+contain sensitive author, keyword, and comment values. `word.update_document_properties`
+requires edit permission and has no destructive variant.
 
 ## 7. Content Controls
 
