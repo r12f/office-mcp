@@ -118,6 +118,29 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
 }
 
 #[test]
+fn word_image_tool_metadata_classifies_media_side_effects() {
+    let list_images = tool_metadata("word.list_images").expect("image list metadata");
+    assert_eq!(list_images.app, "word");
+    assert_eq!(list_images.category, "Media");
+    assert_eq!(list_images.side_effect, ToolSideEffect::Read);
+
+    let get_image = tool_metadata("word.get_image").expect("image get metadata");
+    assert_eq!(get_image.app, "word");
+    assert_eq!(get_image.category, "Media");
+    assert_eq!(get_image.side_effect, ToolSideEffect::Read);
+
+    let update_image = tool_metadata("word.update_image").expect("image update metadata");
+    assert_eq!(update_image.app, "word");
+    assert_eq!(update_image.category, "Media");
+    assert_eq!(update_image.side_effect, ToolSideEffect::Mutating);
+
+    let delete_image = tool_metadata("word.delete_image").expect("image delete metadata");
+    assert_eq!(delete_image.app, "word");
+    assert_eq!(delete_image.category, "Media");
+    assert_eq!(delete_image.side_effect, ToolSideEffect::Destructive);
+}
+
+#[test]
 fn unknown_tool_has_no_metadata() {
     assert_eq!(tool_metadata("office.list_sessions"), None);
     assert_eq!(tool_metadata("word.future_tool"), None);

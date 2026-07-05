@@ -106,7 +106,8 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.get_header_footer`, `word.update_header_footer`, `word.insert_bookmark`,
 `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_paragraph`,
 `word.insert_table`, `word.insert_image`, `word.resize_image`,
-`word.insert_break`, `word.list_sections`, `word.update_page_setup`,
+`word.list_images`, `word.get_image`, `word.update_image`,
+`word.delete_image`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`,
 `word.insert_list`, `word.insert_hyperlink`, `word.list_hyperlinks`,
 `word.remove_hyperlink`, `word.replace_text`,
 `word.update_paragraph`, `word.delete_range`, `word.apply_formatting`,
@@ -217,6 +218,12 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       `word.apply_style` as the range-level style application owner, and keeps
       style deletion out of scope until a separate destructive contract is
       specified.
+- [x] Add inline image CRUD tools: `word.list_images`, `word.get_image`,
+      `word.update_image`, and `word.delete_image`. The contract keeps image
+      discovery and byte export in Media, preserves `word.insert_image` as the
+      creation owner and `word.resize_image` as the geometry owner, validates
+      replacement bytes with the existing image safety limits, and gates image
+      deletion as destructive while preserving adjacent paragraph text.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.

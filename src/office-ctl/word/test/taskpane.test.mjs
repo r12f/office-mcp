@@ -479,7 +479,7 @@ test('Word validation-only mode validates required mutating tools without writes
   const validateOnlyBody = functionBody(js, 'validateWordMutationOnly');
 
   assert.match(invokeBody, /if \(args\?\.validate_only\) data = await validateWordMutationOnly\(tool, args \|\| \{\}\)/);
-  for (const tool of ['word.insert_image', 'word.insert_hyperlink', 'word.insert_note', 'word.insert_field', 'word.replace_text', 'word.update_paragraph', 'word.update_note', 'word.update_field', 'word.delete_range', 'word.delete_note', 'word.delete_field']) {
+  for (const tool of ['word.insert_image', 'word.update_image', 'word.delete_image', 'word.insert_hyperlink', 'word.insert_note', 'word.insert_field', 'word.replace_text', 'word.update_paragraph', 'word.update_note', 'word.update_field', 'word.delete_range', 'word.delete_note', 'word.delete_field']) {
     assert.match(validateOnlyBody, new RegExp(`case '${tool.replace('.', '\\.')}'`));
   }
   assert.match(validateOnlyBody, /partial_effect: 'none'/);
@@ -491,6 +491,37 @@ test('Word validation-only mode validates required mutating tools without writes
   assert.doesNotMatch(validateOnlyBody, /insertFootnote\(/);
   assert.doesNotMatch(validateOnlyBody, /insertEndnote\(/);
   assert.doesNotMatch(validateOnlyBody, /insertField\(/);
+});
+
+test('Word image CRUD tools are advertised, grouped, gated, and dispatched through media owners', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const preflightBody = functionBody(js, 'preflightWordMutatingTool');
+
+  assert.match(js, /'word\.list_images'/);
+  assert.match(js, /'word\.get_image'/);
+  assert.match(js, /'word\.update_image'/);
+  assert.match(js, /'word\.delete_image'/);
+  assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image', 'word\.list_images', 'word\.get_image', 'word\.update_image', 'word\.delete_image'\] \}/);
+  assert.match(js, /\['word\.list_images', \{ category: 'Media', sideEffect: 'read', description: 'List inline images\.' \}\]/);
+  assert.match(js, /\['word\.get_image', \{ category: 'Media', sideEffect: 'read', description: 'Export an inline image with metadata\.' \}\]/);
+  assert.match(js, /\['word\.update_image', \{ category: 'Media', sideEffect: 'mutating', description: 'Update inline image metadata or bytes\.' \}\]/);
+  assert.match(js, /\['word\.delete_image', \{ category: 'Media', sideEffect: 'destructive', description: 'Delete an inline image without deleting paragraph text\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.list_images':\s*data = await listImages\(args \|\| \{\}\);/);
+  assert.match(invokeBody, /case 'word\.get_image':\s*data = await getImage\(args\);/);
+  assert.match(invokeBody, /case 'word\.update_image':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateImage\(args\);/);
+  assert.match(invokeBody, /case 'word\.delete_image':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await deleteImage\(args\);/);
+  assert.match(preflightBody, /case 'word\.update_image':\s*validateUpdateImageArgs\(args\);/);
+  assert.match(preflightBody, /case 'word\.delete_image':\s*validateImageLocator\('word\.delete_image', args\?\.image\);/);
+  assert.match(functionBody(js, 'availableToolsForRequirements'), /WordApi_1_3[\s\S]*word\.list_images[\s\S]*word\.delete_image/);
+  assert.match(js, /async function listImages\(args/);
+  assert.match(js, /async function getImage\(args/);
+  assert.match(js, /async function updateImage\(args/);
+  assert.match(js, /async function deleteImage\(args/);
+  assert.match(js, /function validateImageLocator\(tool, image\)/);
+  assert.match(functionBody(js, 'validateUpdateImageArgs'), /requires alt_text_title, alt_text_description, hyperlink, or replace_base64/);
+  assert.match(functionBody(js, 'updateImage'), /insertInlinePictureFromBase64\(args\.replace_base64, Word\.InsertLocation\.replace\)/);
+  assert.match(functionBody(js, 'deleteImage'), /picture\.delete\(\)/);
 });
 
 test('Word style tools are advertised, grouped, gated, and dispatched through document owners', () => {
@@ -754,7 +785,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
-  assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image'\] \}/);
+  assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image', 'word\.list_images', 'word\.get_image', 'word\.update_image', 'word\.delete_image'\] \}/);
   assert.match(js, /\{ label: 'Content controls', tools: \['word\.list_content_controls', 'word\.insert_content_control', 'word\.update_content_control', 'word\.delete_content_control'\] \}/);
   assert.match(js, /\{ label: 'Notes', tools: \['word\.insert_note', 'word\.list_notes', 'word\.update_note', 'word\.delete_note'\] \}/);
   assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.set_change_tracking', 'word\.update_tracked_change'\] \}/);
@@ -773,6 +804,10 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.update_content_control', \{ category: 'Content controls', sideEffect: 'mutating', description: 'Update content-control metadata, locks, or text\.' \}\]/);
   assert.match(js, /\['word\.delete_content_control', \{ category: 'Content controls', sideEffect: 'destructive', description: 'Delete a content control with explicit content handling\.' \}\]/);
   assert.match(js, /\['word\.resize_image', \{ category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image\.' \}\]/);
+  assert.match(js, /\['word\.list_images', \{ category: 'Media', sideEffect: 'read', description: 'List inline images\.' \}\]/);
+  assert.match(js, /\['word\.get_image', \{ category: 'Media', sideEffect: 'read', description: 'Export an inline image with metadata\.' \}\]/);
+  assert.match(js, /\['word\.update_image', \{ category: 'Media', sideEffect: 'mutating', description: 'Update inline image metadata or bytes\.' \}\]/);
+  assert.match(js, /\['word\.delete_image', \{ category: 'Media', sideEffect: 'destructive', description: 'Delete an inline image without deleting paragraph text\.' \}\]/);
   assert.match(js, /\['word\.resolve_anchor', \{ category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata\.' \}\]/);
   assert.match(js, /\['word\.insert_bookmark', \{ category: 'Range & selection', sideEffect: 'mutating', description: 'Create a named bookmark around an anchored range\.' \}\]/);
   assert.match(js, /\['word\.list_bookmarks', \{ category: 'Range & selection', sideEffect: 'read', description: 'List bookmark names and locations\.' \}\]/);

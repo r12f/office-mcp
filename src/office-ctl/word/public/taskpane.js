@@ -67,6 +67,8 @@
     'word.insert_table',
     'word.insert_image',
     'word.resize_image',
+    'word.update_image',
+    'word.delete_image',
     'word.insert_break',
     'word.insert_page_break',
     'word.update_page_setup',
@@ -113,6 +115,10 @@
     'word.insert_paragraph',
     'word.insert_image',
     'word.resize_image',
+    'word.list_images',
+    'word.get_image',
+    'word.update_image',
+    'word.delete_image',
     'word.insert_table',
     'word.update_header_footer',
     'word.insert_break',
@@ -155,7 +161,7 @@
     { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
-    { label: 'Media', tools: ['word.insert_image', 'word.resize_image'] },
+    { label: 'Media', tools: ['word.insert_image', 'word.resize_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
     { label: 'Notes', tools: ['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'] },
     { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.set_change_tracking', 'word.update_tracked_change'] }
@@ -174,6 +180,10 @@
     ['word.insert_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
     ['word.insert_image', { category: 'Media', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
     ['word.resize_image', { category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image.' }],
+    ['word.list_images', { category: 'Media', sideEffect: 'read', description: 'List inline images.' }],
+    ['word.get_image', { category: 'Media', sideEffect: 'read', description: 'Export an inline image with metadata.' }],
+    ['word.update_image', { category: 'Media', sideEffect: 'mutating', description: 'Update inline image metadata or bytes.' }],
+    ['word.delete_image', { category: 'Media', sideEffect: 'destructive', description: 'Delete an inline image without deleting paragraph text.' }],
     ['word.insert_table', { category: 'Tables', sideEffect: 'mutating', description: 'Insert a table with provided values.' }],
     ['word.insert_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page, line, or section break.' }],
     ['word.insert_page_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page break.' }],
@@ -553,6 +563,18 @@
         case 'word.resize_image':
           data = await resizeImage(args);
           break;
+        case 'word.list_images':
+          data = await listImages(args || {});
+          break;
+        case 'word.get_image':
+          data = await getImage(args);
+          break;
+        case 'word.update_image':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateImage(args);
+          break;
+        case 'word.delete_image':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await deleteImage(args);
+          break;
         case 'word.insert_break':
           data = await insertBreak(args);
           break;
@@ -704,6 +726,12 @@
       case 'word.resize_image':
         validateResizeImageArgs(args);
         break;
+      case 'word.update_image':
+        validateUpdateImageArgs(args);
+        break;
+      case 'word.delete_image':
+        validateImageLocator('word.delete_image', args?.image);
+        break;
       case 'word.insert_break':
         requireAnchor(tool, args.anchor);
         validateBreakType(args.break_type);
@@ -823,6 +851,10 @@
     switch (tool) {
       case 'word.insert_image':
         return validateInsertImageOnly(args);
+      case 'word.update_image':
+        return validateUpdateImageOnly(args);
+      case 'word.delete_image':
+        return validateDeleteImageOnly(args);
       case 'word.insert_hyperlink':
         return validateInsertHyperlinkOnly(args);
       case 'word.insert_note':
@@ -866,6 +898,26 @@
           image_mime_type: args.image?.mime_type ?? null,
           image_byte_length: args.image?.byte_length ?? null
         }
+      });
+    });
+  }
+
+  async function validateUpdateImageOnly(args) {
+    validateUpdateImageArgs(args);
+    return Word.run(async (context) => {
+      const target = await resolveInlineImage(context, args.image, 'word.update_image');
+      return validationSuccess('word.update_image', {
+        resolved_target: imageTargetSummary(target)
+      });
+    });
+  }
+
+  async function validateDeleteImageOnly(args) {
+    validateImageLocator('word.delete_image', args.image);
+    return Word.run(async (context) => {
+      const target = await resolveInlineImage(context, args.image, 'word.delete_image');
+      return validationSuccess('word.delete_image', {
+        resolved_target: imageTargetSummary(target)
       });
     });
   }
@@ -1481,17 +1533,8 @@
   async function resizeImage(args) {
     validateResizeImageArgs(args);
     return Word.run(async (context) => {
-      const selector = args.image;
-      const paragraph = await getParagraphByIndex(context, selector.index);
-      const pictures = paragraph.inlinePictures;
-      pictures.load('items/width,items/height');
-      await context.sync();
-
-      const imageIndex = selector.image_index ?? 0;
-      const picture = pictures.items[imageIndex];
-      if (!picture) {
-        throw Object.assign(new Error(`Inline image index ${imageIndex} is out of range for paragraph ${selector.index}.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
-      }
+      const target = await resolveInlineImage(context, args.image, 'word.resize_image');
+      const { selector, imageIndex, picture } = target;
 
       const oldWidth = picture.width;
       const oldHeight = picture.height;
@@ -1512,6 +1555,74 @@
           preserve_aspect_ratio: args.preserve_aspect_ratio !== false
         }
       };
+    });
+  }
+
+  async function listImages(args) {
+    return Word.run(async (context) => {
+      const paragraphs = context.document.body.paragraphs;
+      paragraphs.load('items');
+      await context.sync();
+
+      const paragraphItems = paragraphs.items || [];
+      for (const paragraph of paragraphItems) {
+        paragraph.inlinePictures.load('items/width,items/height,items/altTextTitle,items/altTextDescription,items/hyperlink');
+      }
+      await context.sync();
+
+      const images = [];
+      paragraphItems.forEach((paragraph, paragraphIndex) => {
+        const pictures = paragraph.inlinePictures.items || [];
+        pictures.forEach((picture, imageIndex) => {
+          images.push(imageResult(picture, paragraphIndex, imageIndex));
+        });
+      });
+      return { images, count: images.length };
+    });
+  }
+
+  async function getImage(args) {
+    validateImageLocator('word.get_image', args.image);
+    return Word.run(async (context) => {
+      const target = await resolveInlineImage(context, args.image, 'word.get_image');
+      const base64Result = target.picture.getBase64ImageSrc();
+      await context.sync();
+      return {
+        ...imageResult(target.picture, target.selector.index, target.imageIndex),
+        base64: base64Result.value
+      };
+    });
+  }
+
+  async function updateImage(args) {
+    validateUpdateImageArgs(args);
+    return Word.run(async (context) => {
+      const target = await resolveInlineImage(context, args.image, 'word.update_image');
+      const { picture } = target;
+      if (args.alt_text_title !== undefined) picture.altTextTitle = args.alt_text_title;
+      if (args.alt_text_description !== undefined) picture.altTextDescription = args.alt_text_description;
+      if (args.hyperlink !== undefined) picture.hyperlink = args.hyperlink;
+      let replaced = false;
+      if (args.replace_base64 !== undefined) {
+        picture.insertInlinePictureFromBase64(args.replace_base64, Word.InsertLocation.replace);
+        replaced = true;
+      }
+      await context.sync();
+      return {
+        updated: true,
+        replaced,
+        image: imageTargetSummary(target)
+      };
+    });
+  }
+
+  async function deleteImage(args) {
+    validateImageLocator('word.delete_image', args.image);
+    return Word.run(async (context) => {
+      const target = await resolveInlineImage(context, args.image, 'word.delete_image');
+      target.picture.delete();
+      await context.sync();
+      return { deleted: true, image: imageTargetSummary(target) };
     });
   }
 
@@ -3479,15 +3590,7 @@
   }
 
   function validateResizeImageArgs(args) {
-    if (!args.image || args.image.kind !== 'paragraph_index') {
-      throw Object.assign(new Error('word.resize_image requires image.kind="paragraph_index".'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
-    }
-    if (!Number.isInteger(args.image.index) || args.image.index < 0) {
-      throw Object.assign(new Error('word.resize_image image.index must be a non-negative integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
-    }
-    if (args.image.image_index !== undefined && (!Number.isInteger(args.image.image_index) || args.image.image_index < 0)) {
-      throw Object.assign(new Error('word.resize_image image.image_index must be a non-negative integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
-    }
+    validateImageLocator('word.resize_image', args.image);
     if (args.width_pt === undefined && args.height_pt === undefined) {
       throw Object.assign(new Error('word.resize_image requires width_pt or height_pt.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
@@ -3500,6 +3603,64 @@
     if (args.preserve_aspect_ratio === false && (args.width_pt === undefined || args.height_pt === undefined)) {
       throw Object.assign(new Error('word.resize_image requires both width_pt and height_pt when preserve_aspect_ratio is false.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
+  }
+
+  function validateImageLocator(tool, image) {
+    if (!image || image.kind !== 'paragraph_index') {
+      throw Object.assign(new Error(`${tool} requires image.kind="paragraph_index".`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (!Number.isInteger(image.index) || image.index < 0) {
+      throw Object.assign(new Error(`${tool} image.index must be a non-negative integer.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (image.image_index !== undefined && (!Number.isInteger(image.image_index) || image.image_index < 0)) {
+      throw Object.assign(new Error(`${tool} image.image_index must be a non-negative integer.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
+  function validateUpdateImageArgs(args) {
+    validateImageLocator('word.update_image', args?.image);
+    const hasUpdate = args.alt_text_title !== undefined || args.alt_text_description !== undefined || args.hyperlink !== undefined || args.replace_base64 !== undefined;
+    if (!hasUpdate) throw invalidArgument('word.update_image requires alt_text_title, alt_text_description, hyperlink, or replace_base64.');
+    if (args.alt_text_title !== undefined && typeof args.alt_text_title !== 'string') throw invalidArgument('word.update_image alt_text_title must be a string.');
+    if (args.alt_text_description !== undefined && typeof args.alt_text_description !== 'string') throw invalidArgument('word.update_image alt_text_description must be a string.');
+    if (args.hyperlink !== undefined) validateHyperlinkUrl(args.hyperlink);
+    if (args.replace_base64 !== undefined && typeof args.replace_base64 !== 'string') throw invalidArgument('word.update_image replace_base64 must be a string.');
+  }
+
+  async function resolveInlineImage(context, selector, tool) {
+    validateImageLocator(tool, selector);
+    const paragraph = await getParagraphByIndex(context, selector.index);
+    const pictures = paragraph.inlinePictures;
+    pictures.load('items/width,items/height,items/altTextTitle,items/altTextDescription,items/hyperlink');
+    await context.sync();
+
+    const imageIndex = selector.image_index ?? 0;
+    const picture = pictures.items[imageIndex];
+    if (!picture) {
+      throw Object.assign(new Error(`Inline image index ${imageIndex} is out of range for paragraph ${selector.index}.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
+    }
+    return { selector, imageIndex, picture };
+  }
+
+  function imageResult(picture, paragraphIndex, imageIndex) {
+    return {
+      paragraph_index: paragraphIndex,
+      image_index: imageIndex,
+      width_pt: picture.width,
+      height_pt: picture.height,
+      alt_text_title: picture.altTextTitle || '',
+      alt_text_description: picture.altTextDescription || '',
+      has_hyperlink: Boolean(picture.hyperlink)
+    };
+  }
+
+  function imageTargetSummary(target) {
+    return {
+      paragraph_index: target.selector.index,
+      image_index: target.imageIndex,
+      width_pt: target.picture.width,
+      height_pt: target.picture.height
+    };
   }
 
   function resizedImageSize(args, oldWidth, oldHeight) {
@@ -4085,6 +4246,7 @@
     const supportsFieldListing = Boolean(requirements.WordApi_1_4);
     const supportsFieldMutation = Boolean(requirements.WordApi_1_5);
     const supportsStyles = Boolean(requirements.WordApi_1_5);
+    const supportsInlineImages = Boolean(requirements.WordApi_1_3);
     return AVAILABLE_TOOLS.filter((tool) => {
       if (tool === 'word.update_page_setup') return Boolean(requirements.WordApiDesktop_1_3);
       if (['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'].includes(tool)) {
@@ -4093,6 +4255,7 @@
       if (tool === 'word.list_fields') return supportsFieldListing;
       if (['word.insert_field', 'word.update_field', 'word.delete_field'].includes(tool)) return supportsFieldMutation;
       if (['word.list_styles', 'word.create_style', 'word.update_style'].includes(tool)) return supportsStyles;
+      if (['word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'].includes(tool)) return supportsInlineImages;
       return true;
     });
   }

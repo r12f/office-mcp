@@ -125,6 +125,20 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Media",
         ToolSideEffect::Mutating,
     ),
+    tool("word.list_images", "word", "Media", ToolSideEffect::Read),
+    tool("word.get_image", "word", "Media", ToolSideEffect::Read),
+    tool(
+        "word.update_image",
+        "word",
+        "Media",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.delete_image",
+        "word",
+        "Media",
+        ToolSideEffect::Destructive,
+    ),
     tool(
         "word.insert_table",
         "word",
