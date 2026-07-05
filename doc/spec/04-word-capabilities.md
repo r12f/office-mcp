@@ -77,7 +77,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | **Range & selection** | `word.get_selection`, `word.set_selection`, `word.get_html`, `word.insert_html`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list`, `word.list_lists`, `word.update_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
-| **Media** | `word.insert_image`, `word.resize_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.delete_image`, `word.list_shapes`, `word.insert_shape`, `word.update_shape`, `word.delete_shape` |
+| **Media** | `word.insert_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.list_shapes`, `word.insert_shape`, `word.update_shape`, `word.delete_shape` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Notes** | `word.insert_note`, `word.list_notes`, `word.update_note`, `word.delete_note` |
 | **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_comment`, `word.set_change_tracking`, `word.update_tracked_change` |
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 61 tools. It deliberately consolidates specialized tools
+The target surface has 59 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -119,11 +119,9 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.insert_paragraph` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a paragraph at an anchor; also owns heading insertion through style or heading-level arguments after migration. |
 | `word.insert_table` | implemented | Tables | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
 | `word.insert_image` | implemented | Media | edit | `WordApi 1.3` | Insert a validated image from base64 or a daemon-fetched HTTPS URL. |
-| `word.resize_image` | implemented | Media | edit | `WordApi 1.3` | Resize an existing inline image in place by paragraph index and image index. |
 | `word.list_images` | implemented | Media | read | `WordApi 1.3` | List inline images with paragraph and image indexes, dimensions, alt text, and hyperlink presence. |
 | `word.get_image` | implemented | Media | read | `WordApi 1.3` | Export one inline image as base64 with dimensions and metadata, subject to large-result limits. |
-| `word.update_image` | implemented | Media | edit | `WordApi 1.3` | Update inline image alt text, hyperlink, or bytes in place. |
-| `word.delete_image` | implemented | Media | destructive | `WordApi 1.3` | Delete one inline image without deleting surrounding paragraph text. |
+| `word.update_image` | implemented | Media | edit/destructive | `WordApi 1.3` | Resize, update metadata, replace bytes, or delete one inline image through a single owner. |
 | `word.list_shapes` | implemented | Media | read | `WordApiDesktop 1.2` | List inline and floating body shapes, including text boxes, geometric shapes, pictures, groups, and canvases, with bounded text previews. |
 | `word.insert_shape` | implemented | Media | edit | `WordApiDesktop 1.2` | Insert a text box, geometric shape, or floating picture at an anchored paragraph or range. |
 | `word.update_shape` | implemented | Media | edit | `WordApiDesktop 1.2` | Update shape text, geometry, alt text, fill, line, wrapping, or visibility through one shape owner. |
@@ -175,6 +173,8 @@ Superseded target-surface tools:
 | `word.format_cell` | `word.update_table` | Cell formatting is table-owned formatting, distinct from generic run formatting. |
 | `word.accept_change` / `word.reject_change` | `word.update_tracked_change` | Accept/reject are one tracked-change action with an explicit `action` argument. |
 | `word.insert_page_break` | `word.insert_break` | Page breaks are one break kind in the generalized break owner. |
+| `word.resize_image` | `word.update_image` | Resize is an inline-image mutation action, not a distinct media owner. |
+| `word.delete_image` | `word.update_image` | Delete is an inline-image mutation action with destructive side effect. |
 
 Tool ownership rules:
 
@@ -203,15 +203,13 @@ Tool ownership rules:
   deletion and is owned by `word.delete_range`.
 - Media tools own inline image lifecycle. `word.insert_image` owns new image
   insertion. `word.list_images` owns inline image discovery, and
-  `word.get_image` owns bounded image byte export. `word.resize_image` owns
-  geometry-only resizing without re-uploading bytes. `word.update_image` owns
-  alt text, hyperlink, and byte replacement for an existing image.
-  `word.delete_image` owns removing one inline image while preserving
-  surrounding paragraph text. `word.list_shapes`, `word.insert_shape`,
-  `word.update_shape`, and `word.delete_shape` own desktop-tier floating and
-  shape-backed media, including text boxes, geometric shapes, floating
-  pictures, groups, and canvases. Inline image tools must not silently mutate
-  floating pictures; shape tools must not duplicate inline-picture byte export.
+  `word.get_image` owns bounded image byte export. `word.update_image` owns
+  inline-image resize, alt text, hyperlink, byte replacement, and deletion for
+  existing images. `word.list_shapes`, `word.insert_shape`, `word.update_shape`,
+  and `word.delete_shape` own desktop-tier floating and shape-backed media,
+  including text boxes, geometric shapes, floating pictures, groups, and
+  canvases. Inline image tools must not silently mutate floating pictures; shape
+  tools must not duplicate inline-picture byte export.
 - Content-control tools own content-control lifecycle and metadata. Generic text
   edits inside a known range remain owned by range/paragraph tools unless the
   caller is explicitly targeting a content control.
@@ -669,42 +667,7 @@ anchor/placement combination is unsupported, the error SHOULD include a
 `suggestion.placement` value such as `new_paragraph_after` when that correction
 is deterministic.
 
-### 3.5 `word.resize_image`
-
-Resize an existing inline image in place without deleting and reinserting its
-binary data.
-
-```json
-{
-  "type": "object",
-  "required": ["session_id", "image"],
-  "properties": {
-    "session_id": { "type": "string" },
-    "image": {
-      "type": "object",
-      "required": ["kind", "index"],
-      "properties": {
-        "kind": { "const": "paragraph_index" },
-        "index": { "type": "integer", "minimum": 0 },
-        "image_index": { "type": "integer", "minimum": 0, "default": 0 }
-      },
-      "additionalProperties": false
-    },
-    "width_pt": { "type": "number", "exclusiveMinimum": 0 },
-    "height_pt": { "type": "number", "exclusiveMinimum": 0 },
-    "preserve_aspect_ratio": { "type": "boolean", "default": true }
-  },
-  "additionalProperties": false
-}
-```
-
-Callers must provide at least one of `width_pt` or `height_pt`. When
-`preserve_aspect_ratio` is true and exactly one dimension is provided, the
-add-in derives the other dimension from the current image dimensions. The tool
-returns old and new dimensions in points and preserves paragraph placement, alt
-text, relationship identity, and adjacent text.
-
-### 3.6 `word.list_images`
+### 3.5 `word.list_images`
 
 List inline pictures in the main document body without exporting image bytes.
 
@@ -743,9 +706,9 @@ The response shape is:
 Callers must re-run `word.list_images` after insertion, replacement, or
 deletion before using previously observed indexes.
 
-### 3.7 `word.get_image`
+### 3.6 `word.get_image`
 
-Export one inline picture by the same locator used by `word.resize_image`.
+Export one inline picture by the same locator used by `word.update_image`.
 
 ```json
 {
@@ -775,14 +738,14 @@ The add-in MUST reject responses that exceed the daemon's large-result limit
 with a structured result-size error instead of allowing an oversized transport
 payload.
 
-### 3.8 `word.update_image`
+### 3.7 `word.update_image`
 
-Update non-geometry metadata or replace the bytes for an existing inline image.
+Mutate one existing inline image by current paragraph/image index.
 
 ```json
 {
   "type": "object",
-  "required": ["session_id", "image"],
+  "required": ["session_id", "image", "action"],
   "properties": {
     "session_id": { "type": "string" },
     "image": {
@@ -795,58 +758,40 @@ Update non-geometry metadata or replace the bytes for an existing inline image.
       },
       "additionalProperties": false
     },
+    "action": { "enum": ["resize", "set_alt_text", "set_hyperlink", "replace", "delete"] },
+    "width_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "height_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "preserve_aspect_ratio": { "type": "boolean", "default": true },
     "alt_text_title": { "type": "string" },
     "alt_text_description": { "type": "string" },
     "hyperlink": { "type": "string", "format": "uri" },
-    "replace_base64": { "type": "string" },
+    "base64": { "type": "string" },
     "validate_only": { "type": "boolean", "default": false }
   },
   "additionalProperties": false
 }
 ```
 
-At least one of `alt_text_title`, `alt_text_description`, `hyperlink`, or
-`replace_base64` is required. Hyperlinks use the same URL scheme allowlist as
-the Word hyperlink tools. Replacement bytes use the same decoded-byte and image
-format validation as `word.insert_image`. `word.update_image` does not resize
-the image; callers use `word.resize_image` for geometry changes.
+Per-action requirements:
+
+- `resize`: requires `width_pt` and/or `height_pt`; when
+  `preserve_aspect_ratio` is true and exactly one dimension is provided, the
+  add-in derives the other dimension from current image dimensions. The action
+  preserves paragraph placement, alt text, relationship identity, and adjacent
+  text.
+- `set_alt_text`: requires `alt_text_title` and/or `alt_text_description`.
+- `set_hyperlink`: requires `hyperlink`, using the same URL scheme allowlist as
+  the Word hyperlink tools.
+- `replace`: requires `base64`; replacement bytes use the same decoded-byte and
+  image-format validation as `word.insert_image`.
+- `delete`: deletes the inline picture only and preserves surrounding paragraph
+  text; this action is destructive.
 
 With `validate_only: true`, the tool resolves the target image and validates
 arguments without changing image metadata or bytes. Invalid locators or action
 arguments fail with `INVALID_ARGUMENT` and `partial_effect: "none"`.
 
-### 3.9 `word.delete_image`
-
-Delete one inline picture by locator.
-
-```json
-{
-  "type": "object",
-  "required": ["session_id", "image"],
-  "properties": {
-    "session_id": { "type": "string" },
-    "image": {
-      "type": "object",
-      "required": ["kind", "index"],
-      "properties": {
-        "kind": { "const": "paragraph_index" },
-        "index": { "type": "integer", "minimum": 0 },
-        "image_index": { "type": "integer", "minimum": 0, "default": 0 }
-      },
-      "additionalProperties": false
-    },
-    "validate_only": { "type": "boolean", "default": false }
-  },
-  "additionalProperties": false
-}
-```
-
-The tool removes only the selected inline picture. It MUST preserve adjacent
-text and MUST NOT delete the containing paragraph as a substitute for image
-deletion. With `validate_only: true`, the tool resolves the target image and
-returns without deleting it.
-
-### 3.10 `word.list_shapes`
+### 3.8 `word.list_shapes`
 
 List desktop-tier Word shapes from the main body by default. Shapes include
 text boxes, geometric shapes, groups, pictures, and canvases exposed by
@@ -899,7 +844,7 @@ document text reads. `word.get_text` continues to read the main document body;
 text inside text boxes is reachable through `word.list_shapes` and
 `word.update_shape` rather than silently mixed into body text.
 
-### 3.11 `word.insert_shape`
+### 3.9 `word.insert_shape`
 
 Insert a desktop-tier text box, geometric shape, or floating picture anchored
 at an existing paragraph or range. The implementation uses
@@ -938,7 +883,7 @@ fetch, byte-size, MIME, and decoded-image validation policy as
 `word.insert_image`. The response returns the new `shape` metadata from
 `word.list_shapes` plus `created: true`.
 
-### 3.12 `word.update_shape`
+### 3.10 `word.update_shape`
 
 Mutate one existing desktop-tier shape by current `shape_id`.
 
@@ -975,7 +920,7 @@ enough metadata to decide. `move` changes `left` and/or `top`; `resize` changes
 arguments without changing it. The response returns `{ action, shape, updated:
 true }`.
 
-### 3.13 `word.delete_shape`
+### 3.11 `word.delete_shape`
 
 Delete one existing desktop-tier shape by current `shape_id`.
 
@@ -996,7 +941,7 @@ The tool deletes only the target shape and does not delete surrounding body
 paragraphs or inline-picture indexes. With `validate_only: true`, the tool
 resolves the shape and returns without deleting it.
 
-### 3.14 `word.insert_break`
+### 3.12 `word.insert_break`
 
 ```json
 {
