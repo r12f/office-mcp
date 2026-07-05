@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 46 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 48 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -74,7 +74,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | Category | Tools |
 |---|---|
 | **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.get_document_properties`, `word.update_document_properties`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.list_fields`, `word.insert_field`, `word.update_field`, `word.delete_field`, `word.list_styles`, `word.create_style`, `word.update_style`, `word.save` |
-| **Range & selection** | `word.get_selection`, `word.set_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
+| **Range & selection** | `word.get_selection`, `word.set_selection`, `word.get_html`, `word.insert_html`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
 | **Media** | `word.insert_image`, `word.resize_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.delete_image` |
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 56 tools. It deliberately consolidates specialized tools
+The target surface has 58 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -111,6 +111,8 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.delete_bookmark` | implemented | Range & selection | destructive | `WordApi 1.4` | Delete a bookmark marker without deleting the bookmarked text. |
 | `word.get_selection` | implemented | Range & selection | read | `WordApi 1.3` | Read current selection text and simple selection metadata. |
 | `word.set_selection` | implemented | Range & selection | edit | `WordApi 1.3` | Resolve an anchor and set the current selection or cursor position. |
+| `word.get_html` | implemented | Range & selection | read | `WordApi 1.3`; underlying HTML read APIs are `WordApi 1.1` | Read body or anchored range HTML, subject to the large-result cap. |
+| `word.insert_html` | implemented | Range & selection | edit | `WordApi 1.3`; underlying HTML insert APIs are `WordApi 1.1` | Insert sanitized HTML at an anchored range with explicit insert-location semantics. |
 | `word.insert_hyperlink` | implemented | Range & selection | edit | `WordApi 1.3` | Create a hyperlink on an anchored range or inserted text with URL scheme validation. |
 | `word.list_hyperlinks` | implemented | Range & selection | read | `WordApi 1.3` | List hyperlink text and URLs with paragraph-relative locations. |
 | `word.remove_hyperlink` | implemented | Range & selection | edit | `WordApi 1.3` | Remove hyperlink targets from an anchored range while preserving text by default. |
@@ -410,6 +412,65 @@ document-read path.
 Although `word.set_selection` does not edit document contents, it changes UI
 state and affects later `selection`-anchored mutating calls. It is therefore
 classified as `edit` and is not exposed under the Read permission ceiling.
+
+### 2.5B `word.get_html`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "extent": { "$ref": "#/$defs/extent" }
+  },
+  "additionalProperties": false
+}
+```
+
+Omitting `anchor` reads the whole document body with Word's HTML interchange
+API. Supplying `anchor` resolves the shared Word anchor vocabulary and applies
+the same optional `extent` rules used by other range-scoped tools before
+calling the range HTML API. The response returns `{ html, byte_length,
+truncated: false }` and is marked as untrusted document content.
+
+`word.get_html` is a rich-content interchange read, not a high-fidelity export
+format. Word's HTML conversion is host-defined and may normalize styles,
+attributes, whitespace, lists, and tables. Responses are subject to the daemon's
+`MAX_RESPONSE_BYTES` cap; oversized results fail with `MAX_RESPONSE_SIZE` and
+`max_response_bytes` rather than returning a partial HTML document.
+
+### 2.5C `word.insert_html`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor", "html"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "html": { "type": "string", "minLength": 1, "maxLength": 1000000 },
+    "insert_location": { "enum": ["replace", "before", "after", "start", "end"], "default": "after" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+`word.insert_html` resolves the target anchor and calls Word's HTML insertion
+API. `replace` replaces the resolved range; `before` and `after` insert adjacent
+to the resolved range; `start` and `end` insert inside the resolved range when
+the host supports those locations. `validate_only: true` performs anchor and
+HTML-policy validation and returns a no-write verdict.
+
+The daemon and task pane MUST reject unsafe HTML before mutation with
+`INVALID_ARGUMENT` and `partial_effect: none`. The policy rejects script blocks,
+inline event-handler attributes, `javascript:` URLs, CSS `url(...)` references,
+and external resource-bearing attributes that Word would fetch such as `src`,
+`srcset`, `poster`, and similar media or stylesheet references. Plain links such
+as `https://` anchors are allowed because they are hyperlink targets rather than
+resources fetched during insertion. OOXML interchange is out of scope for this
+tool pair because it has a larger injection and compatibility surface.
 
 ### 2.6 `word.list_bookmarks`
 

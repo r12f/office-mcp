@@ -104,6 +104,7 @@ user intent.
 Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.find_text`, `word.resolve_anchor`, `word.get_selection`,
 `word.set_selection`,
+`word.get_html`, `word.insert_html`,
 `word.get_header_footer`, `word.update_header_footer`, `word.insert_bookmark`,
 `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_paragraph`,
 `word.insert_table`, `word.insert_image`, `word.resize_image`,
@@ -235,6 +236,13 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       anchor vocabulary and extent handling, maps `select`, `cursor_start`, and
       `cursor_end` to Word range selection modes, and classifies the tool as
       edit because selection state affects later selection-anchored mutations.
+- [x] Add rich-content HTML interchange tools: `word.get_html` and
+      `word.insert_html`. The contract keeps body/range HTML reads and anchored
+      HTML insertion in Range & selection, uses the shared anchor vocabulary,
+      documents Word's host-defined HTML fidelity, rejects unsafe scripts,
+      event handlers, and external resource fetches before mutation, applies
+      the large-result cap to HTML reads, and keeps OOXML interchange out of
+      scope for this slice.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.
