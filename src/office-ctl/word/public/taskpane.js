@@ -2388,9 +2388,10 @@
   }
 
   async function listContentControls(args) {
+    validateContentControlArgs('word.list_content_controls', args || {});
     return Word.run(async (context) => {
       const controls = context.document.body.getContentControls(contentControlFilterOptions(args));
-      controls.load('items/id,items/tag,items/title,items/type,items/subtype,items/cannotDelete,items/cannotEdit');
+      controls.load('items/id,items/tag,items/title,items/type,items/subtype,items/cannotDelete,items/cannotEdit,items/text,items/checkboxContentControl/isChecked,items/dropDownListContentControl/listItems/items/displayText,items/dropDownListContentControl/listItems/items/value,items/comboBoxContentControl/listItems/items/displayText,items/comboBoxContentControl/listItems/items/value');
       await context.sync();
       const filtered = controls.items.filter((control) => {
         if (args.tag !== undefined && control.tag !== String(args.tag)) return false;
@@ -2406,23 +2407,28 @@
   }
 
   async function insertContentControl(args) {
+    validateContentControlArgs('word.insert_content_control', args);
     return Word.run(async (context) => {
       const target = args.anchor ? await resolveAnchor(context, args.anchor) : context.document.getSelection();
       const range = args.text !== undefined ? target.insertText(String(args.text), Word.InsertLocation.replace) : target;
       const control = range.insertContentControl(contentControlTypeFrom(args.type));
       applyContentControlProperties(control, args);
-      control.load('id,tag,title,type,subtype,cannotDelete,cannotEdit');
+      await applyTypedContentControlState(context, control, args);
+      control.load('id,tag,title,type,subtype,cannotDelete,cannotEdit,text,checkboxContentControl/isChecked,dropDownListContentControl/listItems/items/displayText,dropDownListContentControl/listItems/items/value,comboBoxContentControl/listItems/items/displayText,comboBoxContentControl/listItems/items/value');
       await context.sync();
       return { content_control: contentControlMetadata(control, 0), created: true };
     });
   }
 
   async function updateContentControl(args) {
+    validateContentControlTargetArgs('word.update_content_control', args);
+    validateContentControlArgs('word.update_content_control', args);
     return Word.run(async (context) => {
       const control = await targetContentControl(context, args);
       applyContentControlProperties(control, args);
       if (args.text !== undefined) control.insertText(String(args.text), Word.InsertLocation.replace);
-      control.load('id,tag,title,type,subtype,cannotDelete,cannotEdit');
+      await applyTypedContentControlUpdate(context, control, args);
+      control.load('id,tag,title,type,subtype,cannotDelete,cannotEdit,text,checkboxContentControl/isChecked,dropDownListContentControl/listItems/items/displayText,dropDownListContentControl/listItems/items/value,comboBoxContentControl/listItems/items/displayText,comboBoxContentControl/listItems/items/value');
       await context.sync();
       return { content_control: contentControlMetadata(control, 0), updated: true };
     });
@@ -3360,6 +3366,9 @@
       subtype: control.subtype || null,
       cannot_delete: Boolean(control.cannotDelete),
       cannot_edit: Boolean(control.cannotEdit),
+      checked: checkboxContentControlChecked(control),
+      list_items: contentControlListItems(control),
+      selected_text: contentControlSelectedText(control),
       untrusted_source: true
     };
   }
@@ -3384,10 +3393,97 @@
       rich: 'RichText',
       plain_text: 'PlainText',
       plaintext: 'PlainText',
-      plain: 'PlainText'
+      plain: 'PlainText',
+      checkbox: 'CheckBox',
+      check_box: 'CheckBox',
+      dropdown_list: 'DropDownList',
+      dropdown: 'DropDownList',
+      drop_down_list: 'DropDownList',
+      combo_box: 'ComboBox',
+      combobox: 'ComboBox'
     };
     if (values[normalized]) return values[normalized];
     throw Object.assign(new Error(`Unsupported content control type ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  function normalizedContentControlType(value) {
+    const type = String(value || '').trim().toLowerCase();
+    if (type.includes('checkbox')) return 'checkbox';
+    if (type.includes('dropdown')) return 'dropdown_list';
+    if (type.includes('combo')) return 'combo_box';
+    if (type.includes('plain')) return 'plain_text';
+    return 'rich_text';
+  }
+
+  function checkboxContentControlChecked(control) {
+    if (normalizedContentControlType(control.type) !== 'checkbox') return null;
+    return Boolean(control.checkboxContentControl?.isChecked);
+  }
+
+  function contentControlListItems(control) {
+    const listControl = listContentControlObject(control);
+    if (!listControl) return null;
+    return (listControl.listItems?.items || []).map((item) => ({
+      display_text: item.displayText || '',
+      value: item.value || ''
+    }));
+  }
+
+  function contentControlSelectedText(control) {
+    const kind = normalizedContentControlType(control.type);
+    return kind === 'dropdown_list' || kind === 'combo_box' ? (control.text || '') : null;
+  }
+
+  function listContentControlObject(control, type) {
+    const kind = normalizedContentControlType(type || control.type);
+    if (kind === 'dropdown_list') return control.dropDownListContentControl;
+    if (kind === 'combo_box') return control.comboBoxContentControl;
+    return null;
+  }
+
+  async function applyTypedContentControlState(context, control, args) {
+    if (args.checked !== undefined) control.checkboxContentControl.isChecked = Boolean(args.checked);
+    if (args.list_items !== undefined) addContentControlListItems(control, args.list_items, args.type);
+    if (args.selected_value !== undefined) await selectContentControlListItem(context, control, args.selected_value);
+  }
+
+  async function applyTypedContentControlUpdate(context, control, args) {
+    control.load('type,text,dropDownListContentControl/listItems/items/displayText,dropDownListContentControl/listItems/items/value,comboBoxContentControl/listItems/items/displayText,comboBoxContentControl/listItems/items/value');
+    await context.sync();
+    if (args.checked !== undefined) control.checkboxContentControl.isChecked = Boolean(args.checked);
+    if (args.list_items_clear === true) listContentControlObject(control).deleteAllListItems();
+    if (args.list_items_delete !== undefined) deleteContentControlListItems(control, args.list_items_delete);
+    if (args.list_items_add !== undefined) addContentControlListItems(control, args.list_items_add);
+    if (args.selected_value !== undefined) await selectContentControlListItem(context, control, args.selected_value);
+  }
+
+  function addContentControlListItems(control, items, type) {
+    const listControl = listContentControlObject(control, type);
+    for (const item of items || []) {
+      const index = Number.isInteger(item.index) ? item.index : undefined;
+      listControl.addListItem(String(item.display_text), item.value === undefined ? undefined : String(item.value), index);
+    }
+  }
+
+  function deleteContentControlListItems(control, values) {
+    const listControl = listContentControlObject(control);
+    const items = listControl.listItems?.items || [];
+    for (const value of values || []) {
+      const wanted = String(value);
+      const match = items.find((item) => item.value === wanted || item.displayText === wanted);
+      if (!match) throw invalidArgument(`Content control list item ${wanted} was not found.`);
+      match.delete();
+    }
+  }
+
+  async function selectContentControlListItem(context, control, value) {
+    const listControl = listContentControlObject(control);
+    const wanted = String(value);
+    const items = listControl.listItems?.items || [];
+    const matches = items.filter((item) => item.value === wanted || item.displayText === wanted);
+    if (matches.length !== 1) throw invalidArgument(`Content control list item ${wanted} must match exactly one item.`);
+    matches[0].select();
+    await context.sync();
   }
 
   function contentControlAppearanceFrom(value) {
@@ -3832,6 +3928,45 @@
     if (args.appearance !== undefined) contentControlAppearanceFrom(args.appearance);
     if (args.color !== undefined && !/^#[0-9a-f]{6}$/i.test(String(args.color))) {
       throw invalidArgument(`${tool} color must be a #RRGGBB value.`);
+    }
+    validateContentControlTypeSpecificArgs(tool, args);
+  }
+
+  function validateContentControlTypeSpecificArgs(tool, args) {
+    const type = normalizedContentControlType(args.type || 'rich_text');
+    requireContentControlTypeCapability(tool, type);
+    if (args.checked !== undefined) {
+      requireContentControlTypeCapability(tool, 'checkbox');
+      if (tool === 'word.insert_content_control' && type !== 'checkbox') throw invalidArgument(`${tool} checked is valid only for checkbox controls.`);
+    }
+    if (args.list_items !== undefined && type !== 'dropdown_list' && type !== 'combo_box') throw invalidArgument(`${tool} list_items is valid only for dropdown_list or combo_box controls.`);
+    validateContentControlListItems(tool, 'list_items', args.list_items, false);
+    const hasListUpdate = args.selected_value !== undefined || args.list_items_add !== undefined || args.list_items_delete !== undefined || args.list_items_clear !== undefined;
+    if (hasListUpdate) requireContentControlTypeCapability(tool, 'dropdown_list');
+    validateContentControlListItems(tool, 'list_items_add', args.list_items_add, true);
+    if (args.list_items_delete !== undefined && (!Array.isArray(args.list_items_delete) || args.list_items_delete.some((item) => typeof item !== 'string' || item.length < 1))) {
+      throw invalidArgument(`${tool} list_items_delete must contain non-empty strings.`);
+    }
+  }
+
+  function validateContentControlListItems(tool, name, items, allowIndex) {
+    if (items === undefined) return;
+    if (!Array.isArray(items) || items.length < 1) throw invalidArgument(`${tool} ${name} must be a non-empty array.`);
+    for (const item of items) {
+      if (!item || typeof item !== 'object' || typeof item.display_text !== 'string' || item.display_text.length < 1) {
+        throw invalidArgument(`${tool} ${name} items require display_text.`);
+      }
+      if (item.value !== undefined && typeof item.value !== 'string') throw invalidArgument(`${tool} ${name} item value must be a string.`);
+      if (allowIndex && item.index !== undefined && (!Number.isInteger(item.index) || item.index < 0)) throw invalidArgument(`${tool} ${name} item index must be a non-negative integer.`);
+    }
+  }
+
+  function requireContentControlTypeCapability(tool, type) {
+    if (type === 'checkbox' && !supportsWordApi('1.7')) {
+      throw Object.assign(new Error(`${tool} checkbox content controls require WordApi 1.7.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+    }
+    if ((type === 'dropdown_list' || type === 'combo_box') && !supportsWordApi('1.9')) {
+      throw Object.assign(new Error(`${tool} dropdown and combo box content controls require WordApi 1.9.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
     }
   }
 
@@ -4335,6 +4470,8 @@
       WordApi_1_4: requirements.isSetSupported('WordApi', '1.4') ? '1.4' : null,
       WordApi_1_5: requirements.isSetSupported('WordApi', '1.5') ? '1.5' : null,
       WordApi_1_6: requirements.isSetSupported('WordApi', '1.6') ? '1.6' : null,
+      WordApi_1_7: requirements.isSetSupported('WordApi', '1.7') ? '1.7' : null,
+      WordApi_1_9: requirements.isSetSupported('WordApi', '1.9') ? '1.9' : null,
       WordApiDesktop_1_3: requirements.isSetSupported('WordApiDesktop', '1.3') ? '1.3' : null
     };
   }

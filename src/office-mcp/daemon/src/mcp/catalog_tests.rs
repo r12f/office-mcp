@@ -952,7 +952,10 @@ fn word_content_control_schemas_cover_typed_form_controls() {
     let list_controls = schema_for("word.list_content_controls");
     assert_required(&list_controls, &["session_id"]);
     assert_eq!(list_controls["properties"]["type"]["enum"][2], "checkbox");
-    assert_eq!(list_controls["properties"]["type"]["enum"][3], "dropdown_list");
+    assert_eq!(
+        list_controls["properties"]["type"]["enum"][3],
+        "dropdown_list"
+    );
     assert_eq!(list_controls["properties"]["type"]["enum"][4], "combo_box");
 
     let insert_control = schema_for("word.insert_content_control");
@@ -965,18 +968,19 @@ fn word_content_control_schemas_cover_typed_form_controls() {
         serde_json::json!(["display_text"])
     );
     assert_eq!(
-        insert_control["properties"]["list_items"]["items"]["properties"]["display_text"]
-            ["minLength"],
+        insert_control["properties"]["list_items"]["items"]["properties"]["display_text"]["minLength"],
         1
     );
 
     let update_control = schema_for("word.update_content_control");
     assert_required(&update_control, &["session_id", "content_control_id"]);
     assert_eq!(update_control["properties"]["checked"]["type"], "boolean");
-    assert_eq!(update_control["properties"]["selected_value"]["type"], "string");
     assert_eq!(
-        update_control["properties"]["list_items_add"]["items"]["properties"]["index"]
-            ["minimum"],
+        update_control["properties"]["selected_value"]["type"],
+        "string"
+    );
+    assert_eq!(
+        update_control["properties"]["list_items_add"]["items"]["properties"]["index"]["minimum"],
         0
     );
     assert_eq!(

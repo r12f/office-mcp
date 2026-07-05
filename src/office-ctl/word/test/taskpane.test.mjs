@@ -1015,10 +1015,10 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(functionBody(js, 'requireContentControlTypeCapability'), /WordApi 1\.7/);
   assert.match(functionBody(js, 'requireContentControlTypeCapability'), /WordApi 1\.9/);
   assert.match(functionBody(js, 'validateContentControlArgs'), /validateContentControlTypeSpecificArgs\(tool, args\)/);
-  assert.match(js, /function applyTypedContentControlState\(control, args\)/);
+  assert.match(js, /function applyTypedContentControlState\(context, control, args\)/);
   assert.match(functionBody(js, 'applyTypedContentControlState'), /checkboxContentControl\.isChecked = Boolean\(args\.checked\)/);
-  assert.match(functionBody(js, 'applyTypedContentControlState'), /addContentControlListItems\(control, args\.list_items\)/);
-  assert.match(functionBody(js, 'applyTypedContentControlUpdate'), /selectContentControlListItem\(control, args\.selected_value\)/);
+  assert.match(functionBody(js, 'applyTypedContentControlState'), /addContentControlListItems\(control, args\.list_items, args\.type\)/);
+  assert.match(functionBody(js, 'applyTypedContentControlUpdate'), /selectContentControlListItem\(context, control, args\.selected_value\)/);
   assert.match(functionBody(js, 'applyTypedContentControlUpdate'), /deleteContentControlListItems\(control, args\.list_items_delete\)/);
   assert.match(js, /case 'update_cell':/);
   assert.match(js, /case 'add_row':/);

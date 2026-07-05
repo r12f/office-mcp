@@ -1460,7 +1460,7 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     tool_spec!(
         "word.list_content_controls",
         ["session_id"],
-        ["session_id", "tag", "title"]
+        ["session_id", "type", "tag", "title"]
     ),
     tool_spec!(
         "word.insert_content_control",
@@ -1472,13 +1472,26 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "tag",
             "title",
             "type",
+            "checked",
+            "list_items",
             "match_case"
         ]
     ),
     tool_spec!(
         "word.update_content_control",
         ["session_id", "content_control_id"],
-        ["session_id", "content_control_id", "text", "tag", "title"]
+        [
+            "session_id",
+            "content_control_id",
+            "text",
+            "checked",
+            "selected_value",
+            "list_items_add",
+            "list_items_delete",
+            "list_items_clear",
+            "tag",
+            "title"
+        ]
     ),
     tool_spec!(
         "word.delete_content_control",
@@ -2099,6 +2112,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = word_html_property_schema(tool, name) {
         return schema;
     }
+    if let Some(schema) = word_content_control_property_schema(tool, name) {
+        return schema;
+    }
     if (tool != "word.list_notes" || name != "limit")
         && let Some(schema) = generic_property_schema(name)
     {
@@ -2146,6 +2162,60 @@ fn property_schema(tool: &str, name: &str) -> Value {
         }
         _ => json!({ "type": "string" }),
     }
+}
+
+fn word_content_control_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_content_control_tool = matches!(
+        tool,
+        "word.list_content_controls"
+            | "word.insert_content_control"
+            | "word.update_content_control"
+    );
+    if !is_content_control_tool {
+        return None;
+    }
+    match name {
+        "type" => Some(
+            json!({ "enum": ["rich_text", "plain_text", "checkbox", "dropdown_list", "combo_box"] }),
+        ),
+        "checked" => Some(json!({ "type": "boolean" })),
+        "list_items" if tool == "word.insert_content_control" => {
+            Some(content_control_list_items_schema(false))
+        }
+        "list_items_add" if tool == "word.update_content_control" => {
+            Some(content_control_list_items_schema(true))
+        }
+        "list_items_delete" if tool == "word.update_content_control" => {
+            Some(json!({ "type": "array", "items": { "type": "string" } }))
+        }
+        "list_items_clear" if tool == "word.update_content_control" => {
+            Some(json!({ "type": "boolean", "default": false }))
+        }
+        "selected_value" if tool == "word.update_content_control" => {
+            Some(json!({ "type": "string" }))
+        }
+        _ => None,
+    }
+}
+
+fn content_control_list_items_schema(with_index: bool) -> Value {
+    let mut properties = json!({
+        "display_text": { "type": "string", "minLength": 1 },
+        "value": { "type": "string" }
+    });
+    if with_index {
+        properties["index"] = json!({ "type": "integer", "minimum": 0 });
+    }
+    json!({
+        "type": "array",
+        "minItems": 1,
+        "items": {
+            "type": "object",
+            "required": ["display_text"],
+            "properties": properties,
+            "additionalProperties": false
+        }
+    })
 }
 
 fn word_html_property_schema(tool: &str, name: &str) -> Option<Value> {
