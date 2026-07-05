@@ -71,6 +71,9 @@
     'word.resize_image',
     'word.update_image',
     'word.delete_image',
+    'word.insert_shape',
+    'word.update_shape',
+    'word.delete_shape',
     'word.insert_break',
     'word.insert_page_break',
     'word.update_page_setup',
@@ -128,6 +131,10 @@
     'word.get_image',
     'word.update_image',
     'word.delete_image',
+    'word.list_shapes',
+    'word.insert_shape',
+    'word.update_shape',
+    'word.delete_shape',
     'word.insert_table',
     'word.update_header_footer',
     'word.update_document_properties',
@@ -171,7 +178,7 @@
     { label: 'Range & selection', tools: ['word.get_selection', 'word.set_selection', 'word.get_html', 'word.insert_html', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
-    { label: 'Media', tools: ['word.insert_image', 'word.resize_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'] },
+    { label: 'Media', tools: ['word.insert_image', 'word.resize_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image', 'word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
     { label: 'Notes', tools: ['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'] },
     { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.set_change_tracking', 'word.update_tracked_change'] }
@@ -198,6 +205,10 @@
     ['word.get_image', { category: 'Media', sideEffect: 'read', description: 'Export an inline image with metadata.' }],
     ['word.update_image', { category: 'Media', sideEffect: 'mutating', description: 'Update inline image metadata or bytes.' }],
     ['word.delete_image', { category: 'Media', sideEffect: 'destructive', description: 'Delete an inline image without deleting paragraph text.' }],
+    ['word.list_shapes', { category: 'Media', sideEffect: 'read', description: 'List desktop Word shapes and text boxes.' }],
+    ['word.insert_shape', { category: 'Media', sideEffect: 'mutating', description: 'Insert a desktop Word shape or text box.' }],
+    ['word.update_shape', { category: 'Media', sideEffect: 'mutating', description: 'Update desktop Word shape text, geometry, or visual settings.' }],
+    ['word.delete_shape', { category: 'Media', sideEffect: 'destructive', description: 'Delete a desktop Word shape.' }],
     ['word.insert_table', { category: 'Tables', sideEffect: 'mutating', description: 'Insert a table with provided values.' }],
     ['word.insert_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page, line, or section break.' }],
     ['word.insert_page_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page break.' }],
@@ -602,6 +613,18 @@
         case 'word.delete_image':
           data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await deleteImage(args);
           break;
+        case 'word.list_shapes':
+          data = await listShapes(args || {});
+          break;
+        case 'word.insert_shape':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await insertShape(args);
+          break;
+        case 'word.update_shape':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateShape(args);
+          break;
+        case 'word.delete_shape':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await deleteShape(args);
+          break;
         case 'word.insert_break':
           data = await insertBreak(args);
           break;
@@ -761,6 +784,15 @@
         break;
       case 'word.delete_image':
         validateImageLocator('word.delete_image', args?.image);
+        break;
+      case 'word.insert_shape':
+        validateInsertShapeArgs(tool, args);
+        break;
+      case 'word.update_shape':
+        validateUpdateShapeArgs(tool, args);
+        break;
+      case 'word.delete_shape':
+        validateShapeId(tool, args?.shape_id);
         break;
       case 'word.insert_break':
         requireAnchor(tool, args.anchor);
@@ -1797,6 +1829,92 @@
       target.picture.delete();
       await context.sync();
       return { deleted: true, image: imageTargetSummary(target) };
+    });
+  }
+
+  async function listShapes(args = {}) {
+    requireWordApiDesktop12('word.list_shapes');
+    return Word.run(async (context) => {
+      const shapes = context.document.body.shapes;
+      shapes.load('items/id,items/name,items/type,items/geometricShapeType,items/width,items/height,items/left,items/top,items/altTextDescription,items/visible');
+      await context.sync();
+
+      const limit = Number.isInteger(args.limit) && args.limit > 0 ? args.limit : 200;
+      const items = (shapes.items || []).slice(0, limit);
+      for (const shape of items) {
+        try {
+          shape.body.load('text');
+        } catch (_error) {
+          // Some shape types do not expose a text body.
+        }
+      }
+      await context.sync();
+      const results = items.map((shape) => shapeMetadata(shape));
+      return { shapes: results, count: results.length, scope: args.scope || 'body' };
+    });
+  }
+
+  async function insertShape(args) {
+    validateInsertShapeArgs('word.insert_shape', args);
+    requireWordApiDesktop12('word.insert_shape');
+    return Word.run(async (context) => {
+      const owner = await shapeInsertOwner(context, args.anchor);
+      let shape;
+      if (args.shape_type === 'text_box') {
+        shape = owner.insertTextBox(String(args.text ?? ''), shapeInsertOptions(args));
+      } else if (args.shape_type === 'picture') {
+        shape = owner.insertPictureFromBase64(args.image.base64, shapeInsertOptions(args));
+      } else {
+        shape = owner.insertGeometricShape(wordGeometricShapeType(args.shape_type), shapeInsertOptions(args));
+      }
+      if (args.name !== undefined) shape.name = String(args.name);
+      if (args.alt_text_description !== undefined) shape.altTextDescription = String(args.alt_text_description);
+      shape.load('id,name,type,geometricShapeType,width,height,left,top,altTextDescription,visible');
+      try {
+        shape.body.load('text');
+      } catch (_error) {
+        // Pictures and other non-text shapes may not expose text.
+      }
+      await context.sync();
+      return { inserted: true, shape: shapeMetadata(shape) };
+    });
+  }
+
+  async function updateShape(args) {
+    validateUpdateShapeArgs('word.update_shape', args);
+    requireWordApiDesktop12('word.update_shape');
+    return Word.run(async (context) => {
+      const shape = await resolveShapeById(context, args.shape_id, 'word.update_shape');
+      if (args.action === 'set_text') shape.body.insertText(String(args.text), Word.InsertLocation.replace);
+      if (args.name !== undefined) shape.name = String(args.name);
+      if (args.alt_text_description !== undefined) shape.altTextDescription = String(args.alt_text_description);
+      if (args.width_pt !== undefined) shape.width = args.width_pt;
+      if (args.height_pt !== undefined) shape.height = args.height_pt;
+      if (args.left_pt !== undefined) shape.left = args.left_pt;
+      if (args.top_pt !== undefined) shape.top = args.top_pt;
+      if (args.visible !== undefined) shape.visible = Boolean(args.visible);
+      shape.load('id,name,type,geometricShapeType,width,height,left,top,altTextDescription,visible');
+      try {
+        shape.body.load('text');
+      } catch (_error) {
+        // Non-text shapes may not expose text.
+      }
+      await context.sync();
+      return { updated: true, shape: shapeMetadata(shape) };
+    });
+  }
+
+  async function deleteShape(args) {
+    validateShapeId('word.delete_shape', args?.shape_id);
+    requireWordApiDesktop12('word.delete_shape');
+    return Word.run(async (context) => {
+      const shape = await resolveShapeById(context, args.shape_id, 'word.delete_shape');
+      shape.load('id,name,type,width,height');
+      await context.sync();
+      const summary = shapeMetadata(shape);
+      shape.delete();
+      await context.sync();
+      return { deleted: true, shape: summary };
     });
   }
 
@@ -3338,6 +3456,15 @@
     return Office.context?.requirements?.isSetSupported?.('WordApiDesktop', '1.3') === true;
   }
 
+  function supportsWordApiDesktop12() {
+    return Office.context?.requirements?.isSetSupported?.('WordApiDesktop', '1.2') === true;
+  }
+
+  function requireWordApiDesktop12(tool) {
+    if (supportsWordApiDesktop12()) return;
+    throw Object.assign(new Error(`${tool} requires WordApiDesktop 1.2.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+  }
+
   function requireWordApiDesktop13(tool) {
     if (supportsWordApiDesktop13()) return;
     throw Object.assign(new Error(`${tool} requires WordApiDesktop 1.3.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
@@ -4092,6 +4219,115 @@
     };
   }
 
+  function validateInsertShapeArgs(tool, args) {
+    if (!args || typeof args !== 'object') throw invalidArgument(`${tool} requires arguments.`);
+    const type = String(args.shape_type || '').trim();
+    if (!['text_box', 'rectangle', 'ellipse', 'rounded_rectangle', 'line', 'picture'].includes(type)) {
+      throw invalidArgument(`${tool} shape_type must be text_box, rectangle, ellipse, rounded_rectangle, line, or picture.`);
+    }
+    if (args.anchor !== undefined) requireAnchor(tool, args.anchor);
+    if (type === 'picture' && (!args.image || typeof args.image.base64 !== 'string' || args.image.base64.length === 0)) {
+      throw invalidArgument(`${tool} picture shapes require image.base64.`);
+    }
+    validateOptionalShapeNumber(tool, 'width_pt', args.width_pt, true);
+    validateOptionalShapeNumber(tool, 'height_pt', args.height_pt, true);
+    validateOptionalShapeNumber(tool, 'left_pt', args.left_pt, false);
+    validateOptionalShapeNumber(tool, 'top_pt', args.top_pt, false);
+  }
+
+  function validateUpdateShapeArgs(tool, args) {
+    validateShapeId(tool, args?.shape_id);
+    const action = String(args?.action || '').trim();
+    if (!['move', 'resize', 'set_text', 'set_alt_text', 'set_fill', 'set_line', 'set_wrap', 'set_visibility'].includes(action)) {
+      throw invalidArgument(`${tool} action is required.`);
+    }
+    if (action === 'set_text' && args.text === undefined) throw invalidArgument(`${tool} set_text requires text.`);
+    if (action === 'set_alt_text' && args.alt_text_description === undefined) throw invalidArgument(`${tool} set_alt_text requires alt_text_description.`);
+    if (action === 'set_visibility' && typeof args.visible !== 'boolean') throw invalidArgument(`${tool} set_visibility requires visible.`);
+    validateOptionalShapeNumber(tool, 'width_pt', args.width_pt, true);
+    validateOptionalShapeNumber(tool, 'height_pt', args.height_pt, true);
+    validateOptionalShapeNumber(tool, 'left_pt', args.left_pt, false);
+    validateOptionalShapeNumber(tool, 'top_pt', args.top_pt, false);
+  }
+
+  function validateShapeId(tool, shapeId) {
+    if (!Number.isInteger(shapeId) || shapeId < 0) throw invalidArgument(`${tool} shape_id must be a non-negative integer.`);
+  }
+
+  function validateOptionalShapeNumber(tool, name, value, positive) {
+    if (value === undefined) return;
+    if (typeof value !== 'number' || !Number.isFinite(value) || (positive && value <= 0)) {
+      throw invalidArgument(`${tool} ${name} must be a ${positive ? 'positive ' : ''}number.`);
+    }
+  }
+
+  async function resolveShapeById(context, shapeId, tool) {
+    validateShapeId(tool, shapeId);
+    const shape = context.document.body.shapes.getByIdOrNullObject(shapeId);
+    shape.load('isNullObject');
+    await context.sync();
+    if (shape.isNullObject) throw Object.assign(new Error(`${tool} could not find shape ${shapeId}.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
+    return shape;
+  }
+
+  async function shapeInsertOwner(context, anchor) {
+    if (!anchor || anchor.kind === 'end_of_document') {
+      const paragraphs = context.document.body.paragraphs;
+      paragraphs.load('items');
+      await context.sync();
+      return paragraphs.items[paragraphs.items.length - 1] || context.document.body.insertParagraph('', Word.InsertLocation.end);
+    }
+    if (anchor.kind === 'start_of_document') {
+      const paragraphs = context.document.body.paragraphs;
+      paragraphs.load('items');
+      await context.sync();
+      return paragraphs.items[0] || context.document.body.insertParagraph('', Word.InsertLocation.start);
+    }
+    const target = await resolveAnchor(context, anchor);
+    if (typeof target.insertTextBox === 'function') return target;
+    return target.getRange();
+  }
+
+  function shapeInsertOptions(args) {
+    return compactObject({
+      width: args.width_pt,
+      height: args.height_pt,
+      left: args.left_pt,
+      top: args.top_pt
+    });
+  }
+
+  function wordGeometricShapeType(shapeType) {
+    const normalized = String(shapeType || '').trim().toLowerCase();
+    if (normalized === 'rectangle') return Word.GeometricShapeType.rectangle;
+    if (normalized === 'ellipse') return Word.GeometricShapeType.ellipse;
+    if (normalized === 'rounded_rectangle') return Word.GeometricShapeType.roundRectangle;
+    if (normalized === 'line') return Word.GeometricShapeType.lineInverse;
+    throw invalidArgument(`Unsupported geometric shape_type ${shapeType}.`);
+  }
+
+  function shapeMetadata(shape) {
+    return {
+      shape_id: shape.id,
+      name: shape.name || '',
+      type: shape.type || null,
+      geometric_shape_type: shape.geometricShapeType || null,
+      width_pt: typeof shape.width === 'number' ? shape.width : null,
+      height_pt: typeof shape.height === 'number' ? shape.height : null,
+      left_pt: typeof shape.left === 'number' ? shape.left : null,
+      top_pt: typeof shape.top === 'number' ? shape.top : null,
+      alt_text_description: shape.altTextDescription || '',
+      visible: typeof shape.visible === 'boolean' ? shape.visible : null,
+      text_preview: safeTextPreview(shape.body?.text)
+    };
+  }
+
+  function safeTextPreview(text, limit = 200) {
+    if (typeof text !== 'string') return '';
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    return normalized.length > limit ? `${normalized.slice(0, limit)}...` : normalized;
+  }
+
   function resizedImageSize(args, oldWidth, oldHeight) {
     const preserve = args.preserve_aspect_ratio !== false;
     let width = args.width_pt;
@@ -4472,6 +4708,7 @@
       WordApi_1_6: requirements.isSetSupported('WordApi', '1.6') ? '1.6' : null,
       WordApi_1_7: requirements.isSetSupported('WordApi', '1.7') ? '1.7' : null,
       WordApi_1_9: requirements.isSetSupported('WordApi', '1.9') ? '1.9' : null,
+      WordApiDesktop_1_2: requirements.isSetSupported('WordApiDesktop', '1.2') ? '1.2' : null,
       WordApiDesktop_1_3: requirements.isSetSupported('WordApiDesktop', '1.3') ? '1.3' : null
     };
   }
@@ -4723,6 +4960,7 @@
     const supportsFieldMutation = Boolean(requirements.WordApi_1_5);
     const supportsStyles = Boolean(requirements.WordApi_1_5);
     const supportsInlineImages = Boolean(requirements.WordApi_1_3);
+    const supportsShapes = Boolean(requirements.WordApiDesktop_1_2);
     const supportsDocumentProperties = Boolean(requirements.WordApi_1_3);
     const supportsSetSelection = Boolean(requirements.WordApi_1_3);
     const supportsHtmlInterchange = Boolean(requirements.WordApi_1_3);
@@ -4735,6 +4973,7 @@
       if (['word.insert_field', 'word.update_field', 'word.delete_field'].includes(tool)) return supportsFieldMutation;
       if (['word.list_styles', 'word.create_style', 'word.update_style'].includes(tool)) return supportsStyles;
       if (['word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'].includes(tool)) return supportsInlineImages;
+      if (['word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'].includes(tool)) return supportsShapes;
       if (['word.get_document_properties', 'word.update_document_properties'].includes(tool)) return supportsDocumentProperties;
       if (tool === 'word.set_selection') return supportsSetSelection;
       if (['word.get_html', 'word.insert_html'].includes(tool)) return supportsHtmlInterchange;

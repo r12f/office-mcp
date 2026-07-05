@@ -9,6 +9,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.delete_content_control",
     "word.delete_field",
     "word.delete_image",
+    "word.delete_shape",
     "word.delete_range",
     "word.find_text",
     "word.get_document_properties",
@@ -30,6 +31,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.insert_list",
     "word.insert_note",
     "word.insert_paragraph",
+    "word.insert_shape",
     "word.insert_table",
     "word.list_bookmarks",
     "word.list_content_controls",
@@ -38,6 +40,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.list_images",
     "word.list_notes",
     "word.list_sections",
+    "word.list_shapes",
     "word.list_styles",
     "word.read_table",
     "word.remove_hyperlink",
@@ -55,6 +58,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.update_note",
     "word.update_page_setup",
     "word.update_paragraph",
+    "word.update_shape",
     "word.create_style",
     "word.update_style",
     "word.update_table",
@@ -1200,9 +1204,32 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     ),
     tool_spec!("word.list_images", ["session_id"], ["session_id"]),
     tool_spec!(
+        "word.list_shapes",
+        ["session_id"],
+        ["session_id", "scope", "anchor", "limit"]
+    ),
+    tool_spec!(
         "word.get_image",
         ["session_id", "image"],
         ["session_id", "image"]
+    ),
+    tool_spec!(
+        "word.insert_shape",
+        ["session_id", "shape_type"],
+        [
+            "session_id",
+            "shape_type",
+            "anchor",
+            "text",
+            "image",
+            "name",
+            "width_pt",
+            "height_pt",
+            "left_pt",
+            "top_pt",
+            "alt_text_description",
+            "validate_only"
+        ]
     ),
     tool_spec!(
         "word.update_image",
@@ -1218,9 +1245,35 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!(
+        "word.update_shape",
+        ["session_id", "shape_id", "action"],
+        [
+            "session_id",
+            "shape_id",
+            "action",
+            "text",
+            "name",
+            "width_pt",
+            "height_pt",
+            "left_pt",
+            "top_pt",
+            "alt_text_description",
+            "fill_color",
+            "line_color",
+            "wrap_type",
+            "visible",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
         "word.delete_image",
         ["session_id", "image"],
         ["session_id", "image", "validate_only"]
+    ),
+    tool_spec!(
+        "word.delete_shape",
+        ["session_id", "shape_id"],
+        ["session_id", "shape_id", "validate_only"]
     ),
     tool_spec!(
         "word.insert_break",
@@ -2100,6 +2153,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = word_image_property_schema(tool, name) {
         return schema;
     }
+    if let Some(schema) = word_shape_property_schema(tool, name) {
+        return schema;
+    }
     if let Some(schema) = word_header_footer_property_schema(tool, name) {
         return schema;
     }
@@ -2253,6 +2309,50 @@ fn word_image_property_schema(tool: &str, name: &str) -> Option<Value> {
     }
 }
 
+fn word_shape_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_shape_tool = matches!(
+        tool,
+        "word.list_shapes" | "word.insert_shape" | "word.update_shape" | "word.delete_shape"
+    );
+    if !is_shape_tool {
+        return None;
+    }
+    match name {
+        "scope" if tool == "word.list_shapes" => {
+            Some(json!({ "enum": ["body", "paragraph", "anchor"], "default": "body" }))
+        }
+        "shape_type" if tool == "word.insert_shape" => Some(
+            json!({ "enum": ["text_box", "rectangle", "ellipse", "rounded_rectangle", "line", "picture"] }),
+        ),
+        "shape_id" => Some(json!({ "type": "integer", "minimum": 0 })),
+        "image" if tool == "word.insert_shape" => Some(json!({
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["base64"],
+                    "properties": {
+                        "base64": { "type": "string", "minLength": 1 },
+                        "mime_type": { "type": "string" },
+                        "byte_length": { "type": "integer", "minimum": 0 }
+                    },
+                    "additionalProperties": false
+                }
+            ]
+        })),
+        "action" if tool == "word.update_shape" => Some(json!({
+            "enum": ["move", "resize", "set_text", "set_alt_text", "set_fill", "set_line", "set_wrap", "set_visibility"]
+        })),
+        "wrap_type" if tool == "word.update_shape" => {
+            Some(json!({ "enum": ["inline", "square", "tight", "behind", "front", "top_bottom"] }))
+        }
+        "name" | "text" | "alt_text_description" | "fill_color" | "line_color" => {
+            Some(json!({ "type": "string" }))
+        }
+        "visible" => Some(json!({ "type": "boolean" })),
+        _ => None,
+    }
+}
+
 fn word_document_property_schema(tool: &str, name: &str) -> Option<Value> {
     let is_document_property_tool = matches!(
         tool,
@@ -2300,9 +2400,11 @@ fn generic_property_schema(name: &str) -> Option<Value> {
             Some(json!({ "type": "integer", "minimum": 0 }))
         }
         "heading_level" | "level" | "columns" => Some(json!({ "type": "integer", "minimum": 1 })),
-        "width_pt" | "height_pt" | "scale_percent" | "width" | "height" | "left" | "top"
-        | "page_width_pt" | "page_height_pt" | "rotation" | "fill_transparency" | "line_weight"
-        | "line_transparency" | "font_size" => Some(json!({ "type": "number" })),
+        "width_pt" | "height_pt" | "left_pt" | "top_pt" | "scale_percent" | "width" | "height"
+        | "left" | "top" | "page_width_pt" | "page_height_pt" | "rotation"
+        | "fill_transparency" | "line_weight" | "line_transparency" | "font_size" => {
+            Some(json!({ "type": "number" }))
+        }
         "match_case"
         | "whole_word"
         | "wildcards"
