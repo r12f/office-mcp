@@ -131,6 +131,52 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'untrusted_source', value: true }] }
     }
   }],
+  ['word.set_selection', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Selection navigation E2E target' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'Selection navigation E2E target' }, mode: 'select' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_selection',
+      readbackArguments: {},
+      expect: {
+        contains: ['Selection navigation E2E target'],
+        pathEquals: [{ path: 'is_empty', value: false }]
+      }
+    }
+  }],
+  ['word.get_html', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'HTML read E2E paragraph' } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['HTML read E2E paragraph'], pathEquals: [{ path: 'untrusted_source', value: true }] }
+    }
+  }],
+  ['word.insert_html', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'HTML insert anchor marker' } }
+      ]
+    },
+    args: {
+      anchor: { kind: 'after_text', text: 'HTML insert anchor marker' },
+      html: '<h2>HTML Interchange E2E</h2><p><strong>Bold HTML</strong> <a href="https://example.com">link</a></p><ul><li>List item</li></ul><table><tr><td>Cell A</td></tr></table>'
+    },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_html',
+      readbackArguments: {},
+      expect: { contains: ['HTML Interchange E2E', 'Bold HTML', 'List item', 'Cell A'] }
+    }
+  }],
   ['word.get_header_footer', {
     setup: {
       actions: [
@@ -196,6 +242,137 @@ const WORD_E2E_CASES = Object.fromEntries([
       }
     }
   }],
+  ['word.list_images', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'List image E2E', width_pt: 24, height_pt: 24 } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        contains: ['List image E2E'],
+        pathEquals: [
+          { path: 'count', value: 1 },
+          { path: 'images.0.paragraph_index', value: 0 },
+          { path: 'images.0.image_index', value: 0 }
+        ]
+      }
+    }
+  }],
+  ['word.get_image', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Get image E2E', width_pt: 24, height_pt: 24 } }
+      ]
+    },
+    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 } },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        contains: ['Get image E2E'],
+        pathEquals: [
+          { path: 'paragraph_index', value: 0 },
+          { path: 'image_index', value: 0 }
+        ]
+      }
+    }
+  }],
+  ['word.update_image', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Old image E2E', width_pt: 24, height_pt: 24 } }
+      ]
+    },
+    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 }, alt_text_description: 'Updated image E2E' },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        pathEquals: [
+          { path: 'updated', value: true },
+          { path: 'replaced', value: false },
+          { path: 'image.paragraph_index', value: 0 },
+          { path: 'image.image_index', value: 0 }
+        ]
+      }
+    }
+  }],
+  ['word.delete_image', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_image', arguments: { anchor: { kind: 'start_of_document' }, image: { base64: PNG_1X1_BASE64 }, alt_text: 'Delete image E2E', width_pt: 24, height_pt: 24 } }
+      ]
+    },
+    args: { image: { kind: 'paragraph_index', index: 0, image_index: 0 } },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        pathEquals: [
+          { path: 'deleted', value: true },
+          { path: 'image.paragraph_index', value: 0 },
+          { path: 'image.image_index', value: 0 }
+        ]
+      }
+    }
+  }],
+  ['word.list_shapes', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_shape', arguments: { shape_type: 'text_box', text: 'List shape E2E text', name: 'E2E List Shape', width_pt: 144, height_pt: 36 } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        contains: ['E2E List Shape', 'List shape E2E text'],
+        pathEquals: [{ path: 'count', value: 1 }]
+      }
+    }
+  }],
+  ['word.insert_shape', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'shape insert anchor marker' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'shape insert anchor marker' }, shape_type: 'text_box', text: 'Inserted shape E2E text', name: 'E2E Insert Shape', width_pt: 144, height_pt: 36, alt_text_description: 'Inserted text box shape' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_shapes',
+      readbackArguments: {},
+      expect: { contains: ['E2E Insert Shape', 'Inserted shape E2E text'] }
+    }
+  }],
+  ['word.update_shape', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_shape', saveAs: 'shapeResult', arguments: { shape_type: 'text_box', text: 'Before shape update', name: 'E2E Update Shape', width_pt: 144, height_pt: 36 } }
+      ]
+    },
+    args: { shape_id: '${shapeResult.shape.shape_id}', action: 'set_text', text: 'Updated shape E2E text', width_pt: 180, height_pt: 48 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_shapes',
+      readbackArguments: {},
+      expect: { contains: ['E2E Update Shape', 'Updated shape E2E text'] }
+    }
+  }],
+  ['word.delete_shape', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_shape', saveAs: 'shapeResult', arguments: { shape_type: 'text_box', text: 'Delete shape E2E text', name: 'E2E Delete Shape', width_pt: 144, height_pt: 36 } }
+      ]
+    },
+    args: { shape_id: '${shapeResult.shape.shape_id}' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_shapes',
+      readbackArguments: {},
+      expect: { notContains: ['E2E Delete Shape', 'Delete shape E2E text'] }
+    }
+  }],
   ['word.insert_table', {
     setup: {
       actions: [
@@ -244,6 +421,127 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'sections.0.page_setup.orientation', value: 'landscape' }, { path: 'sections.0.page_setup.margins_pt.left', value: 54 }] }
     }
   }],
+  ['word.insert_field', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'start_of_document' }, text: 'E2E Field Heading', heading_level: 1 } }
+      ]
+    },
+    args: { anchor: { kind: 'start_of_document' }, field_type: 'toc' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_fields',
+      readbackArguments: { limit: 10 },
+      expect: { contains: ['toc'], pathEquals: [{ path: 'count', value: 1 }, { path: 'fields.0.index', value: 0 }] }
+    }
+  }],
+  ['word.list_fields', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_field', arguments: { anchor: { kind: 'start_of_document' }, field_type: 'date' } }
+      ]
+    },
+    args: { offset: 0, limit: 10 },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['date'], pathEquals: [{ path: 'count', value: 1 }, { path: 'fields.0.index', value: 0 }] }
+    }
+  }],
+  ['word.update_field', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_field', arguments: { anchor: { kind: 'start_of_document' }, field_type: 'date' } },
+        { tool: 'word.list_fields', saveAs: 'fieldList', arguments: { limit: 10 } }
+      ]
+    },
+    args: { action: 'refresh_all', expected_count: '${fieldList.count}' },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'updated', value: true }, { path: 'action', value: 'refresh_all' }] }
+    }
+  }],
+  ['word.delete_field', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_field', arguments: { anchor: { kind: 'start_of_document' }, field_type: 'date' } }
+      ]
+    },
+    args: { field_index: 0 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_fields',
+      readbackArguments: { limit: 10 },
+      expect: { pathEquals: [{ path: 'count', value: 0 }] }
+    }
+  }],
+  ['word.list_styles', {
+    setup: {
+      actions: [
+        { tool: 'word.create_style', arguments: { name: 'E2E ListStyles Custom', type: 'paragraph', font: { bold: true } } }
+      ]
+    },
+    args: { type: 'paragraph' },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E ListStyles Custom'] }
+    }
+  }],
+  ['word.create_style', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Create style setup marker' } }
+      ]
+    },
+    args: { name: 'E2E Created Style', type: 'paragraph', font: { bold: true, color: '#1F4E79' }, paragraph: { alignment: 'center' } },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_styles',
+      readbackArguments: { type: 'paragraph' },
+      expect: { contains: ['E2E Created Style'] }
+    }
+  }],
+  ['word.update_style', {
+    setup: {
+      actions: [
+        { tool: 'word.create_style', arguments: { name: 'E2E Updated Style', type: 'paragraph', font: { italic: true } } },
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Updated style paragraph' } },
+        { tool: 'word.apply_style', arguments: { anchor: { kind: 'after_text', text: 'Updated style paragraph' }, style: 'E2E Updated Style' } }
+      ]
+    },
+    args: { name: 'E2E Updated Style', font: { bold: true }, paragraph: { alignment: 'center' } },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_styles',
+      readbackArguments: { type: 'paragraph' },
+      expect: { contains: ['E2E Updated Style'] }
+    }
+  }],
+  ['word.update_document_properties', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Document properties setup marker' } }
+      ]
+    },
+    args: { title: 'E2E Document Properties Title', author: 'Office MCP E2E', custom_set: [{ key: 'OfficeMcpE2E', value: 'properties' }] },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_document_properties',
+      readbackArguments: { include_custom: true },
+      expect: { contains: ['E2E Document Properties Title', 'OfficeMcpE2E'], pathEquals: [{ path: 'title', value: 'E2E Document Properties Title' }, { path: 'author', value: 'Office MCP E2E' }] }
+    }
+  }],
+  ['word.get_document_properties', {
+    setup: {
+      actions: [
+        { tool: 'word.update_document_properties', arguments: { subject: 'E2E Properties Subject', custom_set: [{ key: 'OfficeMcpReadback', value: true }] } }
+      ]
+    },
+    args: { include_custom: true },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E Properties Subject', 'OfficeMcpReadback'], pathEquals: [{ path: 'subject', value: 'E2E Properties Subject' }] }
+    }
+  }],
   ['word.update_header_footer', {
     setup: {
       actions: [
@@ -266,6 +564,33 @@ const WORD_E2E_CASES = Object.fromEntries([
     },
     args: { anchor: { kind: 'after_text', text: 'list anchor marker' }, items: ['E2E One', 'E2E Two'] },
     verify: wordReadback.documentText({ contains: ['E2E One', 'E2E Two'] })
+  }],
+  ['word.list_lists', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_list', arguments: { anchor: { kind: 'end_of_document' }, items: ['ListLists One', 'ListLists Two'] } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['ListLists One', 'ListLists Two'], pathEquals: [{ path: 'count', value: 1 }, { path: 'lists.0.item_count', value: 2 }] }
+    }
+  }],
+  ['word.update_list', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_list', arguments: { anchor: { kind: 'end_of_document' }, items: ['UpdateList One', 'UpdateList Two'] } },
+        { tool: 'word.list_lists', saveAs: 'lists', arguments: {} }
+      ]
+    },
+    args: { action: 'add_item', list_id: '${lists.lists.0.list_id}', text: 'UpdateList Three', level: 0 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_lists',
+      readbackArguments: {},
+      expect: { contains: ['UpdateList One', 'UpdateList Two', 'UpdateList Three'], pathEquals: [{ path: 'lists.0.item_count', value: 3 }] }
+    }
   }],
   ['word.insert_hyperlink', {
     setup: {
@@ -368,27 +693,32 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.update_table', {
     setup: {
       actions: [
-        { tool: 'word.insert_table', saveAs: 'table', arguments: { anchor: { kind: 'end_of_document' }, rows: 1, cols: 2, data: [['Old', 'Value']] } }
+        { tool: 'word.insert_table', saveAs: 'table', arguments: { anchor: { kind: 'end_of_document' }, rows: 3, cols: 3, data: [['Old', 'Value', 'Delete Col'], ['Delete Row', 'Delete Row B', 'Delete Row C'], ['Keep Row', 'Keep Cell', 'Keep Delete Col']] } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'update_cell', row: 0, col: 0, text: 'Updated table cell' } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'delete_row', row: 1 } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'delete_column', col: 2 } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'set_header_row', header_row: true } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'set_column_width', col: 0, width_pt: 72 } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'set_borders', borders: { edges: ['all'], style: 'single', width_pt: 1, color: '#336699' } } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'distribute_columns' } }
       ]
     },
-    args: { table_index: '${table.table_index}', action: 'update_cell', row: 0, col: 0, text: 'Updated table cell' },
+    args: { table_index: '${table.table_index}', action: 'merge_cells', row_range: [0, 0], col_range: [0, 1] },
     verify: {
-      kind: 'readback',
-      readbackTool: 'word.read_table',
-      readbackArguments: { table_index: '${table.table_index}' },
-      expect: { contains: ['Updated table cell'], notContains: ['Old'] }
+      kind: 'direct-result',
+      expect: { contains: ['merge_cells'], pathEquals: [{ path: 'merged', value: true }] }
     }
   }],
   ['word.list_content_controls', {
     setup: {
       actions: [
-        { tool: 'word.insert_content_control', arguments: { anchor: { kind: 'end_of_document' }, text: 'List control payload', tag: 'e2e-list-control', title: 'E2E List Control' } }
+        { tool: 'word.insert_content_control', arguments: { anchor: { kind: 'end_of_document' }, type: 'checkbox', checked: false, tag: 'e2e-list-control', title: 'E2E List Control' } }
       ]
     },
     args: { tag: 'e2e-list-control' },
     verify: {
       kind: 'direct-result',
-      expect: { contains: ['e2e-list-control', 'E2E List Control'] }
+      expect: { contains: ['e2e-list-control', 'E2E List Control'], pathEquals: [{ path: 'content_controls.0.checked', value: false }] }
     }
   }],
   ['word.insert_content_control', {
@@ -397,26 +727,26 @@ const WORD_E2E_CASES = Object.fromEntries([
         { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'content control anchor marker' } }
       ]
     },
-    args: { anchor: { kind: 'after_text', text: 'content control anchor marker' }, text: 'E2E controlled text', tag: 'e2e-insert-control', title: 'E2E Insert Control' },
+    args: { anchor: { kind: 'after_text', text: 'content control anchor marker' }, type: 'checkbox', checked: false, tag: 'e2e-insert-control', title: 'E2E Insert Control' },
     verify: {
       kind: 'readback',
       readbackTool: 'word.list_content_controls',
       readbackArguments: { tag: 'e2e-insert-control' },
-      expect: { contains: ['e2e-insert-control', 'E2E Insert Control'] }
+      expect: { contains: ['e2e-insert-control', 'E2E Insert Control'], pathEquals: [{ path: 'content_controls.0.checked', value: false }] }
     }
   }],
   ['word.update_content_control', {
     setup: {
       actions: [
-        { tool: 'word.insert_content_control', saveAs: 'controlResult', arguments: { anchor: { kind: 'end_of_document' }, text: 'Before control update', tag: 'e2e-update-control', title: 'Before Control Update' } }
+        { tool: 'word.insert_content_control', saveAs: 'controlResult', arguments: { anchor: { kind: 'end_of_document' }, type: 'dropdown_list', list_items: [{ display_text: 'Draft', value: 'draft' }, { display_text: 'Approved', value: 'approved' }, { display_text: 'Rejected', value: 'rejected' }], tag: 'e2e-update-control', title: 'Before Control Update' } }
       ]
     },
-    args: { content_control_id: '${controlResult.content_control.content_control_id}', text: 'Updated control', tag: 'e2e-updated-control', title: 'Updated Control' },
+    args: { content_control_id: '${controlResult.content_control.content_control_id}', selected_value: 'approved', list_items_add: [{ display_text: 'Archived', value: 'archived' }], list_items_delete: ['rejected'], tag: 'e2e-updated-control', title: 'Updated Control' },
     verify: {
       kind: 'readback',
       readbackTool: 'word.list_content_controls',
       readbackArguments: { tag: 'e2e-updated-control' },
-      expect: { contains: ['e2e-updated-control', 'Updated Control'], notContains: ['Before Control Update'] }
+      expect: { contains: ['e2e-updated-control', 'Updated Control', 'Approved', 'Archived'], notContains: ['Before Control Update', 'Rejected'] }
     }
   }],
   ['word.delete_content_control', {
@@ -522,6 +852,23 @@ const WORD_E2E_CASES = Object.fromEntries([
     },
     args: { change_index: '${trackChanges.changes.0.index}', action: 'accept', expected_fingerprint: '${trackChanges.changes.0.fingerprint}' },
     verify: wordReadback.trackChanges({ notContains: ['Tracked change E2E paragraph'] })
+  }],
+  ['word.set_change_tracking', {
+    setup: {
+      actions: [
+        { tool: 'word.get_selection', arguments: {} }
+      ]
+    },
+    args: { mode: 'track_all' },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'mode', value: 'track_all' }] }
+    },
+    reset: {
+      actions: [
+        { tool: 'word.set_change_tracking', arguments: { mode: 'off' }, allowErrorCodes: ['HOST_CAPABILITY_UNAVAILABLE'] }
+      ]
+    }
   }],
   ['word.save', {
     setup: {

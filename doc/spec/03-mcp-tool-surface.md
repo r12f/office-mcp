@@ -311,7 +311,7 @@ edits.
 
 ## 8. Pagination
 
-Read operations that may return large bodies (`word.get_text`,
+Read operations that may return large bodies (`word.get_text`, `word.get_html`,
 `office://.../document`) MUST support:
 
 - `offset` (paragraph offset, 0-based)

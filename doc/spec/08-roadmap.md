@@ -91,6 +91,7 @@ review the result like a normal collaborator's edits.
 - [x] `word.insert_image` (base64 + URL)
 - [x] `word.resize_image` (in-place inline image resizing by paragraph index)
 - [x] `word.insert_list` (numbered, bulleted)
+- [x] `word.list_lists`, `word.update_list` (discover and mutate existing lists)
 
 ### M4.1 — Word Core Tool Surface Refinement
 
@@ -103,11 +104,17 @@ user intent.
 
 Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.find_text`, `word.resolve_anchor`, `word.get_selection`,
+`word.set_selection`,
+`word.get_html`, `word.insert_html`,
 `word.get_header_footer`, `word.update_header_footer`, `word.insert_bookmark`,
 `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_paragraph`,
 `word.insert_table`, `word.insert_image`, `word.resize_image`,
-`word.insert_break`, `word.list_sections`, `word.update_page_setup`,
-`word.insert_list`, `word.insert_hyperlink`, `word.list_hyperlinks`,
+`word.list_images`, `word.get_image`, `word.update_image`,
+`word.delete_image`, `word.list_shapes`, `word.insert_shape`,
+`word.update_shape`, `word.delete_shape`, `word.insert_break`,
+`word.list_sections`, `word.update_page_setup`,
+`word.insert_list`, `word.list_lists`, `word.update_list`,
+`word.insert_hyperlink`, `word.list_hyperlinks`,
 `word.remove_hyperlink`, `word.replace_text`,
 `word.update_paragraph`, `word.delete_range`, `word.apply_formatting`,
 `word.apply_style`, `word.read_table`, `word.update_table`,
@@ -115,7 +122,10 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.update_content_control`, `word.delete_content_control`,
 `word.insert_note`, `word.list_notes`, `word.update_note`,
 `word.delete_note`, `word.add_comment`, `word.resolve_comment`,
-`word.update_comment`, `word.update_tracked_change`, and `word.save`.
+`word.update_comment`, `word.list_fields`, `word.insert_field`,
+`word.update_field`, `word.delete_field`, `word.add_comment`,
+`word.resolve_comment`, `word.set_change_tracking`,
+`word.update_tracked_change`, and `word.save`.
 
 Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 `word.insert_page_break`, `word.update_cell`, `word.add_row`, `word.add_column`,
@@ -138,9 +148,18 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       `tools/list`, Word task pane available-tools metadata, permission grouping,
       dispatch path, and spec contract. It reuses the existing tested cell,
       row, column, and format behavior and adds explicit whole-table deletion.
+- [x] Implement `word.list_lists` and `word.update_list` as the discovery and
+      mutation owners for existing Word lists. `word.insert_list` remains the
+      creation owner, while paragraph deletion remains with `word.delete_range`.
       The compatibility tools were removed from the advertised catalog in the
       target-surface retirement slice; historical handlers remain only as local
       implementation helpers where needed.
+- [x] Complete `word.update_table` row/column deletion, merge, width, border,
+      distribute, and header-row behavior. Current contract keeps one table
+      mutation owner, classifies row/column deletion as destructive, gates
+      `merge_cells` on `WordApi 1.4`, and makes `word.read_table` report
+      merged-table diagnostics instead of returning misleading rectangular data
+      when Word cannot provide a uniform matrix.
 - [x] Add content-control CRUD tools: `word.list_content_controls`,
       `word.insert_content_control`, `word.update_content_control`, and
       `word.delete_content_control`, keeping generic text edits owned by
@@ -149,6 +168,15 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       supports rich text and plain text controls, lists metadata without
       duplicating contained document text, updates tag/title/lock/text metadata,
       and deletes controls with explicit keep/delete content handling.
+- [x] Extend content-control owner tools for form controls: checkbox,
+      dropdown-list, and combo-box support remains inside
+      `word.list_content_controls`, `word.insert_content_control`,
+      `word.update_content_control`, and `word.delete_content_control`. The
+      contract gates checkbox state on `WordApi 1.7`, gates dropdown/combobox
+      items and selection on `WordApi 1.9`, returns type-specific state from
+      list reads, rejects higher-tier typed arguments before mutation on older
+      hosts, and keeps picture, date-picker, repeating-section, and group
+      controls deferred until their owner and portability contracts are clear.
 - [x] Add header/footer CRUD tools: `word.get_header_footer` and
       `word.update_header_footer`, keeping main-body reads and writes owned by
       body/range/paragraph tools. Current implementation reads section-scoped
@@ -164,6 +192,11 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       spec contract while reusing the existing fingerprint/stale-index safety
       check. The compatibility tools were removed from the advertised catalog in
       the target-surface retirement slice.
+- [x] Add Track Changes mode control and bulk tracked-change actions. Current
+      implementation adds `word.set_change_tracking` for `off`, `track_all`,
+      and `track_mine_only`, and extends `word.update_tracked_change` with
+      `accept_all` and `reject_all` guarded by `expected_count` so stale bulk
+      requests fail before mutating the document.
 - [x] Update daemon MCP catalog entries, JSON schemas, permission categories,
       task pane tool grouping, runtime evidence scripts, and README text from
       the retired compatibility surface to the refined target surface.
@@ -191,6 +224,49 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       in a Notes category, uses `WordApi 1.5`, treats note indices as current
       collection positions that must be re-read after insertion/deletion, and
       gates destructive deletion through the All permission ceiling.
+- [x] Add field lifecycle tools: `word.list_fields`, `word.insert_field`,
+      `word.update_field`, and `word.delete_field`. The contract keeps field
+      enumeration, curated insertion, refresh/lock/unlock, and deletion in
+      Document & structure, uses `WordApi 1.4` for listing and `WordApi 1.5`
+      for mutations, treats field indices as current collection positions, and
+      exposes a safe table-of-contents insertion path while excluding
+      external-content field types.
+- [x] Add style-catalog tools: `word.list_styles`, `word.create_style`, and
+      `word.update_style`. The contract keeps style definition reads and
+      mutations in Document & structure, uses `WordApi 1.5`, preserves
+      `word.apply_style` as the range-level style application owner, and keeps
+      style deletion out of scope until a separate destructive contract is
+      specified.
+- [x] Add inline image CRUD tools: `word.list_images`, `word.get_image`,
+      `word.update_image`, and `word.delete_image`. The contract keeps image
+      discovery and byte export in Media, preserves `word.insert_image` as the
+      creation owner and `word.resize_image` as the geometry owner, validates
+      replacement bytes with the existing image safety limits, and gates image
+      deletion as destructive while preserving adjacent paragraph text.
+- [x] Add desktop-tier shape tools: `word.list_shapes`, `word.insert_shape`,
+      `word.update_shape`, and `word.delete_shape`. The contract gates the
+      tools on `WordApiDesktop 1.2`, keeps text boxes, geometric shapes,
+      floating pictures, groups, and canvases in the Media owner, exposes
+      bounded text-box previews through `word.list_shapes`, and documents that
+      `word.get_text` remains a main-body text read rather than silently mixing
+      text-box content into body output.
+- [x] Add document-property tools: `word.get_document_properties` and
+      `word.update_document_properties`. The contract keeps document metadata
+      in Document & structure, uses `WordApi 1.3`, reads writable core fields,
+      read-only timestamps/revision metadata, and custom properties, and limits
+      mutation to writable core fields plus custom property upsert/delete.
+- [x] Add selection-setting support: `word.set_selection`. The contract keeps
+      UI selection and cursor movement in Range & selection, uses the shared
+      anchor vocabulary and extent handling, maps `select`, `cursor_start`, and
+      `cursor_end` to Word range selection modes, and classifies the tool as
+      edit because selection state affects later selection-anchored mutations.
+- [x] Add rich-content HTML interchange tools: `word.get_html` and
+      `word.insert_html`. The contract keeps body/range HTML reads and anchored
+      HTML insertion in Range & selection, uses the shared anchor vocabulary,
+      documents Word's host-defined HTML fidelity, rejects unsafe scripts,
+      event handlers, and external resource fetches before mutation, applies
+      the large-result cap to HTML reads, and keeps OOXML interchange out of
+      scope for this slice.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.
