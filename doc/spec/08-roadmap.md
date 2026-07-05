@@ -160,6 +160,15 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       supports rich text and plain text controls, lists metadata without
       duplicating contained document text, updates tag/title/lock/text metadata,
       and deletes controls with explicit keep/delete content handling.
+- [x] Extend content-control owner tools for form controls: checkbox,
+      dropdown-list, and combo-box support remains inside
+      `word.list_content_controls`, `word.insert_content_control`,
+      `word.update_content_control`, and `word.delete_content_control`. The
+      contract gates checkbox state on `WordApi 1.7`, gates dropdown/combobox
+      items and selection on `WordApi 1.9`, returns type-specific state from
+      list reads, rejects higher-tier typed arguments before mutation on older
+      hosts, and keeps picture, date-picker, repeating-section, and group
+      controls deferred until their owner and portability contracts are clear.
 - [x] Add header/footer CRUD tools: `word.get_header_footer` and
       `word.update_header_footer`, keeping main-body reads and writes owned by
       body/range/paragraph tools. Current implementation reads section-scoped

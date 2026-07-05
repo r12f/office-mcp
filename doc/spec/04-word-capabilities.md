@@ -245,8 +245,10 @@ runtime and advertises only tools whose complete implementation is supported:
 |---|---|---|
 | Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection, document properties |
 | Review | `WordApi 1.4` | comments, bookmark anchors, bookmark lifecycle tools, and field listing |
-| Notes, content controls, fields, and styles | `WordApi 1.5` | footnote/endnote lifecycle, content-control lifecycle, field insertion/update/deletion tools, and style-catalog tools |
+| Notes, content controls, fields, and styles | `WordApi 1.5` | footnote/endnote lifecycle, rich-text/plain-text content-control lifecycle, field insertion/update/deletion tools, and style-catalog tools |
 | Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
+| Checkbox content controls | `WordApi 1.7` | checkbox content-control insertion, checked-state listing, and checked-state updates |
+| List content controls | `WordApi 1.9` | dropdown-list and combo-box insertion, item listing, item mutation, and selected-item updates |
 | Host-specific | explicit successful probe | page setup, active-window, and protection metadata |
 
 Header/footer body access and `word.save` use production Word APIs available
@@ -1704,10 +1706,25 @@ requires edit permission and has no destructive variant.
 
 ## 7. Content Controls
 
-The content-control tools use generic `Word.ContentControl` APIs only. v1
-supports rich text and plain text controls; checkbox, dropdown, combo box,
-picture, date picker, repeating-section, group, and desktop-only specialized
-control behavior is deferred.
+The content-control tools own content-control lifecycle, metadata, and
+type-specific form state. v1 supports rich text and plain text controls on
+`WordApi 1.5`, checkbox controls on `WordApi 1.7`, and dropdown-list / combo-box
+controls on `WordApi 1.9`. The four existing owner tools remain the complete
+surface; checkbox and list controls extend their schemas instead of adding new
+tools.
+
+The task pane advertises the content-control tools when the base `WordApi 1.5`
+content-control tier is present. Type-specific arguments that require a higher
+tier MUST fail before mutation with `HOST_CAPABILITY_UNAVAILABLE` and
+`partial_effect: none` when the host does not support the required Word API.
+Session-specific schema narrowing may be added later, but the stable daemon
+schema documents the full cross-host contract.
+
+Picture, date-picker, repeating-section, and group content controls remain
+deferred. Picture controls overlap the Media owner and need explicit byte/fetch
+safety policy; date-picker support is desktop-specific; repeating-section and
+group controls do not yet have enough stable portable CRUD behavior for the v1
+contract.
 
 ### 7.1 `word.list_content_controls`
 
@@ -1717,7 +1734,7 @@ control behavior is deferred.
   "required": ["session_id"],
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
-    "type": { "enum": ["rich_text", "plain_text"] },
+    "type": { "enum": ["rich_text", "plain_text", "checkbox", "dropdown_list", "combo_box"] },
     "tag": { "type": "string" },
     "title": { "type": "string" }
   },
@@ -1727,8 +1744,10 @@ control behavior is deferred.
 
 Returns `{ content_controls, count }`. Each item includes
 `content_control_id`, `tag`, `title`, `type`, `subtype`, `cannot_delete`, and
-`cannot_edit`. It does not return the contained document text; callers use read
-tools for text.
+`cannot_edit`. Checkbox items also include `checked`. Dropdown-list and
+combo-box items include `list_items: [{ display_text, value }]` and
+`selected_text`. The tool does not return arbitrary contained document text for
+rich/plain text controls; callers use read tools for body text.
 
 ### 7.2 `word.insert_content_control`
 
@@ -1739,8 +1758,22 @@ tools for text.
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
     "anchor": { "$ref": "#/$defs/anchor" },
-    "type": { "enum": ["rich_text", "plain_text"] },
+    "type": { "enum": ["rich_text", "plain_text", "checkbox", "dropdown_list", "combo_box"] },
     "text": { "type": "string" },
+    "checked": { "type": "boolean" },
+    "list_items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["display_text"],
+        "properties": {
+          "display_text": { "type": "string", "minLength": 1 },
+          "value": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
     "tag": { "type": "string" },
     "title": { "type": "string" },
     "cannot_delete": { "type": "boolean" },
@@ -1754,7 +1787,11 @@ tools for text.
 ```
 
 When `anchor` is omitted, the current selection is used. When `text` is
-provided, the anchored range is replaced with that text before wrapping it.
+provided for rich/plain text controls, the anchored range is replaced with that
+text before wrapping it. `checked` is valid only with `type: "checkbox"`.
+`list_items` is valid only with `type: "dropdown_list"` or `type: "combo_box"`
+and must provide at least one item. Invalid type-specific arguments fail with
+`INVALID_ARGUMENT` and no mutation.
 
 ### 7.3 `word.update_content_control`
 
@@ -1766,6 +1803,23 @@ provided, the anchored range is replaced with that text before wrapping it.
     "session_id": { "type": "string", "format": "uuid" },
     "content_control_id": { "type": "integer", "minimum": 0 },
     "text": { "type": "string" },
+    "checked": { "type": "boolean" },
+    "selected_value": { "type": "string" },
+    "list_items_add": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["display_text"],
+        "properties": {
+          "display_text": { "type": "string", "minLength": 1 },
+          "value": { "type": "string" },
+          "index": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "list_items_delete": { "type": "array", "items": { "type": "string" } },
+    "list_items_clear": { "type": "boolean", "default": false },
     "tag": { "type": "string" },
     "title": { "type": "string" },
     "cannot_delete": { "type": "boolean" },
@@ -1777,6 +1831,13 @@ provided, the anchored range is replaced with that text before wrapping it.
   "additionalProperties": false
 }
 ```
+
+`checked` is valid only for checkbox controls. `selected_value`,
+`list_items_add`, `list_items_delete`, and `list_items_clear` are valid only for
+dropdown-list or combo-box controls. `selected_value` matches either item value
+or display text and selects exactly one item; ambiguous or missing matches fail
+without mutation. List item deletion matches values or display text and fails if
+any requested item is absent unless a future explicit partial mode is added.
 
 ### 7.4 `word.delete_content_control`
 
@@ -1794,6 +1855,16 @@ provided, the anchored range is replaced with that text before wrapping it.
 ```
 
 The default preserves contents while removing the content-control wrapper.
+
+### 7.5 Office.js Mapping
+
+| Operation | API | Requirement set |
+|---|---|---|
+| Rich/plain content controls | `Range.insertContentControl("RichText" | "PlainText")`, `Body.getContentControls()` | `WordApi 1.5` |
+| Checkbox state | `ContentControl.checkboxContentControl.isChecked` | `WordApi 1.7` |
+| Insert checkbox | `Range.insertContentControl("CheckBox")` | `WordApi 1.7` |
+| Dropdown/combobox object | `ContentControl.dropDownListContentControl` / `comboBoxContentControl` | `WordApi 1.9` |
+| List items | `addListItem(displayText, value, index)`, `deleteAllListItems()`, `ContentControlListItem.delete()` / `select()` | `WordApi 1.9` |
 
 ## 7A. Bookmark Lifecycle
 
