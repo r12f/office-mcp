@@ -31,11 +31,11 @@ That page identifies two API layers and the primary object path:
 
 `office-mcp` exposes workflow-oriented tools for those objects. It must not
 mirror every PowerPoint.js class, property, or method. The target v1 catalog is
-25 tools: large enough to cover presentation orientation, slide CRUD, layout,
+24 tools: large enough to cover presentation orientation, slide CRUD, layout,
 selection, shape/text/table authoring, visual formatting, metadata, and export,
 but small enough to keep each tool's owner and permission profile clear.
 
-Selection rules for the 25-tool budget:
+Selection rules for the 24-tool budget:
 
 - Start from the Microsoft Learn object path: `Presentation` -> `Slide` ->
   `Shape` / `TextRange` / `Table`, with `Layout` as the slide organization
@@ -54,16 +54,18 @@ Selection rules for the 25-tool budget:
   tools.
 - Include presentation-level metadata, tags, active view, and export
   because those are high-value automation workflows and are explicitly surfaced
-  by the PowerPoint core concepts page or the stable Office.js typings.
+  by the PowerPoint core concepts page or the stable Office.js typings;
+  active view belongs to `powerpoint.get_presentation_info`, not a separate
+  method-level tool.
 - Defer charts, SmartArt, media, animations, transitions, comments, speaker
   notes, slide show control, external data, and preview-only APIs until a later
-  user workflow proves that the 25-tool surface cannot express the need safely.
+  user workflow proves that the 24-tool surface cannot express the need safely.
 
 Candidate selection matrix before final pruning:
 
 | User workflow | Object owner | Candidate tools | Why this is enough |
 |---|---|---|---|
-| Inspect and export the deck | `Presentation` / Common `Document` | `powerpoint.get_presentation_info`, `powerpoint.get_active_view`, `powerpoint.export_file` | Covers orientation, edit/read mode, and file/PDF/PPTX export without separate export tools per format. |
+| Inspect and export the deck | `Presentation` / Common `Document` | `powerpoint.get_presentation_info`, `powerpoint.export_file` | Covers orientation, edit/read mode, and file/PDF/PPTX export without separate export tools per format. |
 | Manage presentation metadata | `TagCollection` | `powerpoint.update_tags` | Keeps app-owned presentation tags under one explicit metadata owner; document-property writes and custom XML are deferred. |
 | Read and mutate slides | `SlideCollection` / `Slide` | `powerpoint.list_slides`, `powerpoint.add_slide`, `powerpoint.update_slide`, `powerpoint.delete_slide`, `powerpoint.duplicate_slide`, `powerpoint.move_slide`, `powerpoint.export_slide` | Covers slide inventory, CRUD, ordering, duplication, and single-slide image/PPTX export without adding separate slide selection/export variants. |
 | Use layouts and masters | `SlideMaster` / `SlideLayout` | `powerpoint.list_layouts`, `powerpoint.apply_layout`, `powerpoint.set_slide_background` | Layout and background are the slide organization/visual base owners; shape content remains separate. |
@@ -76,7 +78,7 @@ Candidate tool pressure before Occam reduction:
 
 | Category | Tools | Count | User intent |
 |---|---|---:|---|
-| Presentation | `powerpoint.get_presentation_info`, `powerpoint.get_active_view`, `powerpoint.export_file` | 3 | Inspect and export the connected deck. |
+| Presentation | `powerpoint.get_presentation_info`, `powerpoint.export_file` | 2 | Inspect and export the connected deck. |
 | Metadata | `powerpoint.update_properties`, `powerpoint.update_tags`, `powerpoint.update_custom_xml` | 3 | Manage presentation-level metadata and structured add-in state. |
 | Slides | `powerpoint.list_slides`, `powerpoint.add_slide`, `powerpoint.update_slide`, `powerpoint.delete_slide`, `powerpoint.duplicate_slide`, `powerpoint.move_slide`, `powerpoint.export_slide` | 7 | Slide inventory, lifecycle, ordering, duplication, and slide-level export. |
 | Layout | `powerpoint.list_layouts`, `powerpoint.apply_layout`, `powerpoint.set_slide_background` | 3 | Discover and apply slide organization and base visual styling. |
@@ -85,8 +87,8 @@ Candidate tool pressure before Occam reduction:
 | Text | `powerpoint.read_text`, `powerpoint.replace_text`, `powerpoint.format_text` | 3 | Read, replace, and style text ranges inside shapes. |
 | Tables | `powerpoint.add_table`, `powerpoint.read_table`, `powerpoint.update_table` | 3 | Create, inspect, and mutate slide tables. |
 
-Total: 29. The table above intentionally shows candidate group pressure.
-The accepted v1 budget is 25 tools, so the final accepted set removes four
+Total: 28. The table above intentionally shows candidate group pressure.
+The accepted v1 budget is 24 tools, so the final accepted set removes four
 candidate tools that overlap with stronger owners:
 
 - Remove `powerpoint.update_properties`; fold safe title/subject/author metadata
@@ -103,7 +105,7 @@ Accepted v1 tool set:
 
 | Category | Tools | Count |
 |---|---|---:|
-| Presentation | `powerpoint.get_presentation_info`, `powerpoint.get_active_view`, `powerpoint.export_file` | 3 |
+| Presentation | `powerpoint.get_presentation_info`, `powerpoint.export_file` | 2 |
 | Metadata | `powerpoint.update_tags` | 1 |
 | Slides | `powerpoint.list_slides`, `powerpoint.add_slide`, `powerpoint.update_slide`, `powerpoint.delete_slide`, `powerpoint.move_slide`, `powerpoint.export_slide` | 6 |
 | Layout | `powerpoint.list_layouts`, `powerpoint.apply_layout` | 2 |
@@ -112,13 +114,16 @@ Accepted v1 tool set:
 | Text | `powerpoint.read_text`, `powerpoint.replace_text`, `powerpoint.format_text` | 3 |
 | Tables | `powerpoint.add_table`, `powerpoint.read_table`, `powerpoint.update_table` | 3 |
 
-Total: 25 tools.
+Total: 24 tools.
 
 Rejected v1 expansions:
 
 - No separate `powerpoint.export_pdf` after refinement. It is superseded by
   `powerpoint.export_file` with `format: "pdf" | "pptx"` so export behavior has
   one owner.
+- No separate `powerpoint.get_active_view` after refinement. It is superseded by
+  `powerpoint.get_presentation_info`; active view is presentation orientation
+  metadata and must be returned as a guaranteed field on that owner.
 - No separate `powerpoint.apply_shape_fill`, `powerpoint.move_shape`,
   `powerpoint.resize_shape`, `powerpoint.delete_shape`, or
   `powerpoint.group_shapes`; those belong to `powerpoint.update_shape`.
@@ -141,8 +146,7 @@ Rejected v1 expansions:
 
 | Tool | Status | Category | Side effect | Minimum API | Summary |
 |---|---|---|---|---|---|
-| `powerpoint.get_presentation_info` | implemented | Presentation | read | `PowerPointApi 1.0`; richer properties require `PowerPointApi 1.5+` / `1.7` | Return presentation title/id, host metadata, slide count, selection summary, active view when available, and capability gates. |
-| `powerpoint.get_active_view` | implemented | Presentation | read | Common `Office.Document.getActiveViewAsync` | Return whether the presentation is in editable or read-only presentation view. |
+| `powerpoint.get_presentation_info` | implemented | Presentation | read | `PowerPointApi 1.0`; active view uses Common `Office.Document.getActiveViewAsync`; richer properties require `PowerPointApi 1.5+` / `1.7` | Return presentation title/id, host metadata, slide count, selection summary, guaranteed `active_view` / `active_view_source`, and capability gates. |
 | `powerpoint.export_file` | implemented | Presentation | read | Common `Office.Document.getFileAsync`; PDF/PPTX format support is host-gated | Export the current presentation as PDF or PPTX base64 slices through one export owner, or return explicit host-capability rejection where the host blocks export. |
 | `powerpoint.update_tags` | implemented | Metadata | read/edit/destructive | `PowerPointApi 1.3` | Read, set, or delete presentation tags. |
 | `powerpoint.list_slides` | implemented | Slides | read | `PowerPointApi 1.2` | List slides with id, index, layout/master ids, shape count, tags, and optional thumbnail metadata. |
@@ -170,7 +174,7 @@ Rejected v1 expansions:
 The tools above are the target PowerPoint v1 contract. Implementation work must
 keep the daemon catalog, MCP `tools/list`, PowerPoint task pane
 `available_tools`, task pane permission grouping, documentation, and tests
-aligned with this 25-tool surface. Before implementing or changing a tool,
+aligned with this 24-tool surface. Before implementing or changing a tool,
 verify its minimum requirement set against `@types/office-js` and Microsoft API
 docs, then land the change as a test-first implementation slice with daemon
 catalog coverage, task pane contract coverage, and live PowerPoint smoke
@@ -180,12 +184,14 @@ evidence where the host API cannot be fully proven statically.
 
 - One common user intent has one tool owner. Add a new tool only when it has a
   different object owner, permission profile, or user-visible result.
-- `powerpoint.get_presentation_info` is orientation only. It may include counts
-  and capability gates, but detailed slide inventory belongs to
-  `powerpoint.list_slides`. Its `slide_count` field must be populated from the
-  current presentation slide collection when that collection is available, and
-  must match the number of entries returned by `powerpoint.list_slides` for the
-  same session.
+- `powerpoint.get_presentation_info` owns presentation orientation and summary
+  metadata. It must always include `active_view` as `edit`, `read`, or
+  `unknown`, plus `active_view_source` as `host` when the Common API returns a
+  view and `unavailable` when it cannot. It may include counts and capability
+  gates, but detailed slide inventory belongs to `powerpoint.list_slides`. Its
+  `slide_count` field must be populated from the current presentation slide
+  collection when that collection is available, and must match the number of
+  entries returned by `powerpoint.list_slides` for the same session.
 - `powerpoint.export_file` owns full-presentation export for PDF/PPTX. Do not
   keep a separate `powerpoint.export_pdf` in the refined catalog.
 - `office-mcp` must not advertise a PowerPoint deck save tool until stable

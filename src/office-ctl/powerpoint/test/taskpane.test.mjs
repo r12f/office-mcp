@@ -7,7 +7,6 @@ const ADDIN_ROOT = process.cwd();
 
 const POWERPOINT_V1_TOOLS = [
   'powerpoint.get_presentation_info',
-  'powerpoint.get_active_view',
   'powerpoint.export_file',
   'powerpoint.update_tags',
   'powerpoint.list_slides',
@@ -93,7 +92,7 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.match(html, /class="tools-panel"/);
   assert.match(html, /<span>Tools<\/span>/);
   assert.match(html, /id="toolList"/);
-  assert.match(html, /0\/25/);
+  assert.match(html, /0\/24/);
   assert.doesNotMatch(html, /Enabled \d+ of \d+/);
   assert.match(html, /id="toolModeControl" class="tool-mode-control" role="radiogroup" aria-label="Tool capability mode"/);
   assert.match(html, /data-tool-mode="read"/);
@@ -130,6 +129,9 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(js, /Connecting\.\.\./);
   assert.match(js, /const AVAILABLE_TOOLS = \[/);
   for (const tool of POWERPOINT_V1_TOOLS) assert.match(js, new RegExp(escapeRegExp(tool)));
+  const availableToolsSource = js.match(/const AVAILABLE_TOOLS = \[([\s\S]*?)\];/)?.[1] || '';
+  assert.doesNotMatch(availableToolsSource, /powerpoint\.get_active_view/);
+  assert.doesNotMatch(js, /case 'powerpoint\.get_active_view'/);
   assert.doesNotMatch(js, /powerpoint\.export_pdf/);
   assert.match(js, /function isPowerPointHost\(info\)/);
   assert.match(js, /Office\.HostType\?\.PowerPoint/);
@@ -260,7 +262,13 @@ test('PowerPoint task pane implements advertised tool handlers with host APIs', 
   }
   assert.doesNotMatch(js, /case 'powerpoint\.export_pdf':/);
   assert.match(js, /async function getPresentationInfoTool\(args\)/);
-  assert.match(js, /async function getActiveView\(_?args\)/);
+  const presentationInfoBody = functionBody(js, 'getPresentationInfoTool');
+  assert.match(presentationInfoBody, /const activeView = await getActiveView\(\)/);
+  assert.match(presentationInfoBody, /\.\.\.activeView/);
+  assert.match(js, /async function getActiveView\(\)/);
+  assert.match(functionBody(js, 'getActiveView'), /active_view_source: 'host'/);
+  assert.match(functionBody(js, 'getActiveView'), /active_view_source: 'unavailable'/);
+  assert.match(js, /function normalizeActiveView\(view\)/);
   assert.match(js, /async function exportFile\(args\)/);
   assert.match(js, /async function updateTags\(args\)/);
   const updateTagsBody = functionBody(js, 'updateTags');

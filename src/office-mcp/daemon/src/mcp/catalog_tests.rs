@@ -9,7 +9,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const POWERPOINT_V1_TOOL_NAMES: &[&str] = &[
     "powerpoint.get_presentation_info",
-    "powerpoint.get_active_view",
     "powerpoint.export_file",
     "powerpoint.update_tags",
     "powerpoint.list_slides",
@@ -120,8 +119,8 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.set_slide_background"));
     assert_eq!(WORD_V1_TOOLS.len(), 62);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
-    assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 220);
+    assert_eq!(PowerPointToolCatalog::tools().len(), 24);
+    assert_eq!(tools.len(), 218);
 }
 
 #[test]
@@ -761,10 +760,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 107);
+    assert_eq!(all_tools.len(), 106);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        107
+        106
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1351,6 +1350,9 @@ fn powerpoint_tool_catalog_checks_supported_names() {
         "powerpoint.get_presentation_info"
     ));
     assert!(PowerPointToolCatalog::contains("powerpoint.export_file"));
+    assert!(!PowerPointToolCatalog::contains(
+        "powerpoint.get_active_view"
+    ));
     assert!(PowerPointToolCatalog::contains("powerpoint.list_slides"));
     assert!(PowerPointToolCatalog::contains("powerpoint.apply_layout"));
     assert!(PowerPointToolCatalog::contains("powerpoint.update_table"));
