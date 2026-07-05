@@ -673,6 +673,26 @@ test('word.resolve_anchor returns safe anchor diagnostics without mutating', () 
   assert.doesNotMatch(functionBody(js, 'describeResolvedAnchor'), /document\.body\.text|body\.load\('text'/);
 });
 
+test('word.set_selection is advertised, grouped, and dispatches through anchor selection', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const preflightBody = functionBody(js, 'preflightWordMutatingTool');
+  const setSelectionBody = functionBody(js, 'setSelection');
+
+  assert.match(js, /'word\.set_selection'/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \[[\s\S]*'word\.get_selection'[\s\S]*'word\.set_selection'[\s\S]*'word\.resolve_anchor'[\s\S]*\] \}/);
+  assert.match(js, /\['word\.set_selection', \{ category: 'Range & selection', sideEffect: 'mutating', description: 'Set the current selection or cursor position from an anchor\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.set_selection':\s*data = await setSelection\(args\);/);
+  assert.match(preflightBody, /case 'word\.set_selection':\s*validateSetSelectionArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'availableToolsForRequirements'), /WordApi_1_3[\s\S]*word\.set_selection/);
+  assert.match(setSelectionBody, /const target = await resolveRangeForExtent\(context, args\.anchor, args\.extent\);/);
+  assert.match(setSelectionBody, /target\.select\(selectionModeForSetSelection\(args\.mode\)\);/);
+  assert.match(setSelectionBody, /selected_text_preview: safeTextPreview\(target\.text\)/);
+  assert.match(js, /function selectionModeForSetSelection\(mode\)/);
+  assert.match(functionBody(js, 'selectionModeForSetSelection'), /cursor_start[\s\S]*Word\.SelectionMode\.start/);
+  assert.match(functionBody(js, 'selectionModeForSetSelection'), /cursor_end[\s\S]*Word\.SelectionMode\.end/);
+});
+
 test('word.apply_formatting supports paragraph layout formatting and readback metadata', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const preflightBody = functionBody(js, 'preflightWordMutatingTool');
