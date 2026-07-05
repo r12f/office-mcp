@@ -789,7 +789,7 @@ test('word.apply_formatting supports paragraph layout formatting and readback me
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const preflightBody = functionBody(js, 'preflightWordMutatingTool');
   const applyBody = functionBody(js, 'applyFormatting');
-  const getParagraphBody = functionBody(js, 'getParagraph');
+  const getTextBody = functionBody(js, 'getText');
 
   assert.match(js, /function validateParagraphFormattingArg\(tool, paragraph/);
   assert.match(js, /function hasFormattingFields\(formatting\)/);
@@ -803,7 +803,7 @@ test('word.apply_formatting supports paragraph layout formatting and readback me
   assert.match(js, /function applyParagraphFormattingToParagraph\(paragraph, formatting\)/);
   assert.match(functionBody(js, 'applyParagraphFormattingToParagraph'), /paragraph\.alignment = Word\.Alignment\.centered/);
   assert.match(functionBody(js, 'applyParagraphFormattingToParagraph'), /paragraph\.firstLineIndent = formatting\.first_line_indent_pt/);
-  assert.match(getParagraphBody, /args\.include_formatting/);
+  assert.match(getTextBody, /args\.include_formatting/);
   assert.match(js, /function paragraphFormattingMetadata\(paragraph\)/);
   assert.match(functionBody(js, 'paragraphFormattingMetadata'), /alignment: normalizedParagraphAlignment\(paragraph\.alignment\)/);
   assert.match(functionBody(js, 'paragraphFormattingMetadata'), /space_after_pt: paragraph\.spaceAfter/);

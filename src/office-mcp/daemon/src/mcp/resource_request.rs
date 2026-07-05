@@ -72,10 +72,13 @@ fn word_resource_request_from_uri(
         }),
         [_, "paragraph", index] => Ok(ResourceReadRequest::Forwarded {
             uri: uri.to_string(),
-            tool: "word.get_paragraph",
+            tool: "word.get_text",
             arguments: json!({
                 "session_id": session_id,
-                "index": index.parse::<usize>().map_err(|_| "paragraph index must be a non-negative integer.".to_string())?,
+                "offset": index.parse::<usize>().map_err(|_| "paragraph index must be a non-negative integer.".to_string())?,
+                "limit": 1,
+                "include_metadata": true,
+                "include_formatting": true,
             }),
             check_capability: true,
         }),

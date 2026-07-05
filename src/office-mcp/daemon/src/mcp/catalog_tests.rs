@@ -761,10 +761,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 108);
+    assert_eq!(all_tools.len(), 107);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        108
+        107
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -792,14 +792,8 @@ fn representative_word_schemas_are_specific() {
     assert_required(&text, &["session_id"]);
     assert_eq!(text["properties"]["offset"]["type"], "integer");
     assert_eq!(text["properties"]["limit"]["maximum"], 1000);
-    assert_eq!(
-        text["properties"]["include_metadata"]["type"],
-        "boolean"
-    );
-    assert_eq!(
-        text["properties"]["include_formatting"]["type"],
-        "boolean"
-    );
+    assert_eq!(text["properties"]["include_metadata"]["type"], "boolean");
+    assert_eq!(text["properties"]["include_formatting"]["type"], "boolean");
     assert!(text["properties"].get("paragraph_index").is_none());
 
     let apply_formatting = schema_for("word.apply_formatting");

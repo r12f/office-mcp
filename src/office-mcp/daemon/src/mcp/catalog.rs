@@ -15,7 +15,6 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.get_header_footer",
     "word.get_html",
     "word.get_outline",
-    "word.get_paragraph",
     "word.get_selection",
     "word.set_selection",
     "word.get_text",
@@ -1045,17 +1044,18 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     tool_spec!(
         "word.get_text",
         ["session_id"],
-        ["session_id", "offset", "limit", "include_metadata"]
+        [
+            "session_id",
+            "offset",
+            "limit",
+            "include_metadata",
+            "include_formatting"
+        ]
     ),
     tool_spec!(
         "word.get_outline",
         ["session_id"],
         ["session_id", "max_depth"]
-    ),
-    tool_spec!(
-        "word.get_paragraph",
-        ["session_id", "index"],
-        ["session_id", "index", "include_formatting"]
     ),
     tool_spec!(
         "word.find_text",
@@ -2148,6 +2148,9 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
 }
 
 fn property_schema(tool: &str, name: &str) -> Value {
+    if tool == "word.get_text" && name == "limit" {
+        return json!({ "type": "integer", "minimum": 1, "maximum": 1000 });
+    }
     if let Some(schema) = word_field_property_schema(tool, name) {
         return schema;
     }

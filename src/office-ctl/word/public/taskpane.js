@@ -112,7 +112,6 @@
   const AVAILABLE_TOOLS = [
     'word.get_text',
     'word.get_outline',
-    'word.get_paragraph',
     'word.find_text',
     'word.resolve_anchor',
     'word.insert_bookmark',
@@ -177,7 +176,7 @@
   const TOOL_GROUPS = [
     { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.get_document_properties', 'word.update_document_properties', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.list_fields', 'word.insert_field', 'word.update_field', 'word.delete_field', 'word.list_styles', 'word.create_style', 'word.update_style', 'word.save'] },
     { label: 'Range & selection', tools: ['word.get_selection', 'word.set_selection', 'word.get_html', 'word.insert_html', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
-    { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list', 'word.list_lists', 'word.update_list'] },
+    { label: 'Paragraphs & lists', tools: ['word.insert_paragraph', 'word.update_paragraph', 'word.insert_list', 'word.list_lists', 'word.update_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
     { label: 'Media', tools: ['word.insert_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
@@ -189,7 +188,6 @@
     ['word.get_outline', { category: 'Document & structure', sideEffect: 'read', description: 'Read heading outline and structure.' }],
     ['word.get_header_footer', { category: 'Document & structure', sideEffect: 'read', description: 'Read section header or footer text.' }],
     ['word.get_document_properties', { category: 'Document & structure', sideEffect: 'read', description: 'Read document metadata and custom properties.' }],
-    ['word.get_paragraph', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'Read a single paragraph by index with optional formatting metadata.' }],
     ['word.find_text', { category: 'Range & selection', sideEffect: 'read', description: 'Find text matches in the document body.' }],
     ['word.resolve_anchor', { category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata.' }],
     ['word.insert_bookmark', { category: 'Range & selection', sideEffect: 'mutating', description: 'Create a named bookmark around an anchored range.' }],
@@ -539,9 +537,6 @@
       switch (tool) {
         case 'word.get_text':
           data = await getText(args);
-          break;
-        case 'word.get_paragraph':
-          data = await getParagraph(args);
           break;
         case 'word.get_outline':
           data = await getOutline(args);
@@ -1246,8 +1241,12 @@
       const offset = args.offset ?? 0;
       const limit = args.limit ?? 200;
       const includeMetadata = args.include_metadata ?? false;
+      const includeFormatting = args.include_formatting ?? false;
       const paragraphs = context.document.body.paragraphs;
-      paragraphs.load('items/text,items/style');
+      const paragraphProperties = includeFormatting
+        ? 'items/text,items/style,items/alignment,items/leftIndent,items/rightIndent,items/firstLineIndent,items/lineSpacing,items/lineUnitBefore,items/lineUnitAfter,items/spaceBefore,items/spaceAfter,items/outlineLevel'
+        : 'items/text,items/style';
+      paragraphs.load(paragraphProperties);
       await context.sync();
       const items = paragraphs.items;
       const selected = items.slice(offset, offset + limit);
@@ -1260,26 +1259,17 @@
         untrusted_source: true
       };
       if (includeMetadata) {
-        data.paragraphs = selected.map((paragraph, index) => ({
-          index: offset + index,
-          text: paragraph.text,
-          style: paragraph.style || null,
-          level: headingLevelFromStyle(paragraph.style)
-        }));
+        data.paragraphs = selected.map((paragraph, index) => {
+          const metadata = {
+            index: offset + index,
+            text: paragraph.text,
+            style: paragraph.style || null,
+            level: headingLevelFromStyle(paragraph.style)
+          };
+          if (includeFormatting) metadata.formatting = paragraphFormattingMetadata(paragraph);
+          return metadata;
+        });
       }
-      return data;
-    });
-  }
-
-  async function getParagraph(args) {
-    return Word.run(async (context) => {
-      const paragraphs = context.document.body.paragraphs;
-      paragraphs.load('items/text,items/style,items/alignment,items/leftIndent,items/rightIndent,items/firstLineIndent,items/lineSpacing,items/lineUnitBefore,items/lineUnitAfter,items/spaceBefore,items/spaceAfter,items/outlineLevel');
-      await context.sync();
-      const paragraph = paragraphs.items[args.index];
-      if (!paragraph) throw Object.assign(new Error(`Paragraph index ${args.index} is out of range.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE' });
-      const data = { index: args.index, text: paragraph.text, style: paragraph.style || null, untrusted_source: true };
-      if (args.include_formatting) data.formatting = paragraphFormattingMetadata(paragraph);
       return data;
     });
   }
