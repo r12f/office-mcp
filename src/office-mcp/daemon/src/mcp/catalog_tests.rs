@@ -114,10 +114,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 64);
+    assert_eq!(WORD_V1_TOOLS.len(), 65);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 224);
+    assert_eq!(tools.len(), 226);
 }
 
 #[test]
@@ -759,11 +759,12 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 109);
+    assert_eq!(all_tools.len(), 110);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        109
+        110
     );
+    assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));
     assert!(all_tools.contains(&"powerpoint.add_slide"));
@@ -845,6 +846,17 @@ fn representative_word_schemas_are_specific() {
             .expect("image oneOf")
             .len(),
         2
+    );
+
+    let update_comment = schema_for("word.update_comment");
+    assert_required(&update_comment, &["session_id", "comment_id", "action"]);
+    assert_eq!(update_comment["properties"]["comment_id"]["minLength"], 1);
+    assert_eq!(update_comment["properties"]["reply_id"]["minLength"], 1);
+    assert_eq!(update_comment["properties"]["action"]["enum"][0], "reply");
+    assert_eq!(update_comment["properties"]["action"]["enum"][3], "reopen");
+    assert_eq!(
+        update_comment["properties"]["validate_only"]["type"],
+        "boolean"
     );
 
     let resolve_anchor = schema_for("word.resolve_anchor");

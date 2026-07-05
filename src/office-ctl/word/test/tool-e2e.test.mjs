@@ -833,6 +833,16 @@ const WORD_E2E_CASES = Object.fromEntries([
     args: { comment_id: '${commentResult.comment_id}' },
     verify: wordReadback.comments({ contains: ['Resolve me E2E', 'true'] })
   }],
+  ['word.update_comment', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Update comment target' } },
+        { tool: 'word.add_comment', saveAs: 'commentResult', arguments: { anchor: { kind: 'after_text', text: 'Update comment target' }, text: 'Original comment E2E' } }
+      ]
+    },
+    args: { comment_id: '${commentResult.comment_id}', action: 'reply', text: 'Reply body E2E' },
+    verify: wordReadback.comments({ contains: ['Original comment E2E', 'Reply body E2E'], pathEquals: [{ path: 'comments.0.replies.0.content', value: 'Reply body E2E' }] })
+  }],
   ['word.update_tracked_change', {
     setup: {
       actions: [

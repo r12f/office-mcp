@@ -55,6 +55,11 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(delete_note.category, "Notes");
     assert_eq!(delete_note.side_effect, ToolSideEffect::Destructive);
 
+    let update_comment = tool_metadata("word.update_comment").expect("comment update metadata");
+    assert_eq!(update_comment.app, "word");
+    assert_eq!(update_comment.category, "Review");
+    assert_eq!(update_comment.side_effect, ToolSideEffect::Destructive);
+
     let list_fields = tool_metadata("word.list_fields").expect("field list metadata");
     assert_eq!(list_fields.app, "word");
     assert_eq!(list_fields.category, "Document & structure");

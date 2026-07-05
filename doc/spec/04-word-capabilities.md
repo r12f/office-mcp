@@ -80,7 +80,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | **Media** | `word.insert_image`, `word.resize_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.delete_image`, `word.list_shapes`, `word.insert_shape`, `word.update_shape`, `word.delete_shape` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Notes** | `word.insert_note`, `word.list_notes`, `word.update_note`, `word.delete_note` |
-| **Review** | `word.add_comment`, `word.resolve_comment`, `word.set_change_tracking`, `word.update_tracked_change` |
+| **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_comment`, `word.set_change_tracking`, `word.update_tracked_change` |
 
 ### 1.2 Target refined Word tool surface
 
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 60 tools. It deliberately consolidates specialized tools
+The target surface has 61 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -158,6 +158,7 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.delete_note` | implemented | Notes | destructive | `WordApi 1.5` | Delete one footnote or endnote reference and body by current note index. |
 | `word.add_comment` | implemented | Review | comment | `WordApi 1.4` | Add a comment to an anchored range as the signed-in Office user. |
 | `word.resolve_comment` | implemented | Review | comment | `WordApi 1.4` | Resolve an existing comment. |
+| `word.update_comment` | implemented | Review | comment/destructive | `WordApi 1.4` | Reply to, edit, delete, or reopen an existing comment thread or reply. |
 | `word.set_change_tracking` | implemented | Review | edit | `WordApi 1.4` | Set Track Changes mode and report the previous mode. |
 | `word.update_tracked_change` | implemented | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint, or bulk accept/reject after an expected-count stale check. |
 | `word.save` | implemented | Document & structure | edit | `WordApi 1.1` | Save the current document with the host save behavior. |
@@ -218,6 +219,10 @@ Tool ownership rules:
   the reference anchor, but note body creation, enumeration, body replacement,
   and deletion are owned by `word.insert_note`, `word.list_notes`,
   `word.update_note`, and `word.delete_note`.
+- Review comment tools own comment thread lifecycle. `word.add_comment` creates
+  a top-level thread, `word.resolve_comment` remains the compatibility owner for
+  resolving a thread, and `word.update_comment` owns replies, edits, deletes,
+  and reopening.
 - `word.set_change_tracking` owns document Track Changes mode. The session
   descriptor and tracked-change resource may expose the current mode as
   read-only metadata, but mode mutation stays with this review tool.
@@ -295,7 +300,7 @@ URI scheme and cross-cutting semantics are defined in
 | `office://word/<session_id>/document?offset=0&limit=200` | Paginated plain text | Honors IRM; denial carries `IRM_DENIED` |
 | `office://word/<session_id>/structure` | JSON outline (headings, lists, tables) | Lightweight |
 | `office://word/<session_id>/paragraph/<index>` | Single paragraph | |
-| `office://word/<session_id>/comments` | All comments JSON | |
+| `office://word/<session_id>/comments` | All comments JSON | Includes resolved state and reply ids/text so mutation tools can target threads and replies. |
 | `office://word/<session_id>/track_changes` | Tracked changes JSON | |
 | `office://word/<session_id>/selection` | Currently selected range text + metadata | |
 
@@ -2433,7 +2438,46 @@ indistinguishable from the user doing it themselves.
 }
 ```
 
-### 8.3 `word.set_change_tracking`
+### 8.3 `word.update_comment`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "comment_id", "action"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "comment_id": { "type": "string", "minLength": 1 },
+    "action": { "enum": ["reply", "edit", "delete", "reopen"] },
+    "text": { "type": "string" },
+    "reply_id": { "type": "string", "minLength": 1 },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+`reply` requires `text` and appends to the thread. `edit` requires `text` and
+edits the top-level comment unless `reply_id` is supplied, in which case it
+edits that reply. `delete` removes either the top-level thread or the selected
+reply and is classified destructive. `reopen` clears the resolved state on the
+top-level comment and is the inverse of `word.resolve_comment`.
+
+The comments resource returns each thread as `{ comment_id, content, resolved,
+author, created_at, replies: [{ reply_id, content, author, created_at }] }`.
+Unknown `comment_id` or `reply_id` fails with `INVALID_ARGUMENT` and
+`partial_effect: "none"` before mutation. `validate_only: true` resolves the
+target thread or reply and returns the current metadata without mutating.
+
+| Operation | API | Requirement set |
+|---|---|---|
+| Reply | `Comment.reply(text)` | `WordApi 1.4` |
+| Edit thread | `Comment.content` | `WordApi 1.4` |
+| Edit reply | `CommentReply.content` | `WordApi 1.4` |
+| Delete thread/reply | `Comment.delete()` / `CommentReply.delete()` | `WordApi 1.4` |
+| Reopen/read state | `Comment.resolved` | `WordApi 1.4` |
+| Enumerate replies | `Comment.replies` | `WordApi 1.4` |
+
+### 8.4 `word.set_change_tracking`
 
 ```json
 {
@@ -2453,7 +2497,7 @@ follows: `off` -> `Word.ChangeTrackingMode.off`, `track_all` ->
 `trackAll`, and `track_mine_only` -> `trackMineOnly`. Unsupported host
 capabilities return `HOST_CAPABILITY_UNAVAILABLE` before mutation.
 
-### 8.4 `word.update_tracked_change`
+### 8.5 `word.update_tracked_change`
 
 Stable Office.js tracked-change objects do not expose an ID. The tracked
 changes resource therefore returns each item as

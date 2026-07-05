@@ -106,6 +106,7 @@
     'word.apply_style',
     'word.add_comment',
     'word.resolve_comment',
+    'word.update_comment',
     'word.set_change_tracking',
     'word.update_tracked_change',
     'word.save'
@@ -172,6 +173,7 @@
     'word.apply_style',
     'word.add_comment',
     'word.resolve_comment',
+    'word.update_comment',
     'word.set_change_tracking',
     'word.update_tracked_change',
     'word.save'
@@ -184,7 +186,7 @@
     { label: 'Media', tools: ['word.insert_image', 'word.resize_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image', 'word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
     { label: 'Notes', tools: ['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'] },
-    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.set_change_tracking', 'word.update_tracked_change'] }
+    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_comment', 'word.set_change_tracking', 'word.update_tracked_change'] }
   ];
   const TOOL_METADATA = new Map([
     ['word.get_text', { category: 'Document & structure', sideEffect: 'read', description: 'Read document text by paragraph range.' }],
@@ -249,6 +251,7 @@
     ['word.apply_style', { category: 'Range & selection', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
     ['word.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a comment to an anchored range.' }],
     ['word.resolve_comment', { category: 'Review', sideEffect: 'mutating', description: 'Resolve an existing comment.' }],
+    ['word.update_comment', { category: 'Review', sideEffect: 'destructive', description: 'Reply, edit, delete, or reopen a comment thread.' }],
     ['word.set_change_tracking', { category: 'Review', sideEffect: 'mutating', description: 'Set Track Changes mode.' }],
     ['word.update_tracked_change', { category: 'Review', sideEffect: 'destructive', description: 'Accept, reject, or bulk-finalize tracked changes.' }],
     ['word.save', { category: 'Document & structure', sideEffect: 'mutating', description: 'Save the current document.' }]
@@ -726,6 +729,9 @@
         case 'word.resolve_comment':
           data = await resolveComment(args);
           break;
+        case 'word.update_comment':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateComment(args);
+          break;
         case 'word.set_change_tracking':
           data = await setChangeTracking(args);
           break;
@@ -913,6 +919,9 @@
       case 'word.resolve_comment':
         if (!args.comment_id) throw invalidArgument('word.resolve_comment requires comment_id.');
         break;
+      case 'word.update_comment':
+        validateUpdateCommentArgs(tool, args);
+        break;
       case 'word.set_change_tracking':
         validateChangeTrackingMode(args.mode);
         break;
@@ -968,6 +977,8 @@
         return validateUpdateHeaderFooterOnly(args);
       case 'word.update_list':
         return validateUpdateListOnly(args);
+      case 'word.update_comment':
+        return validateUpdateCommentOnly(args);
       case 'word.update_document_properties':
         validateUpdateDocumentPropertiesArgs(tool, args || {});
         return validationSuccess(tool, { partial_effect: 'none' });
@@ -2989,6 +3000,11 @@
       const comments = context.document.comments;
       comments.load('items/id,items/content,items/resolved,items/authorName,items/creationDate');
       await context.sync();
+      for (const comment of comments.items) {
+        const replies = comment.replies;
+        replies.load('items/id,items/content,items/authorName,items/creationDate');
+      }
+      if (comments.items.length > 0) await context.sync();
       return {
         comments: comments.items.map((comment, index) => ({
           index,
@@ -2997,12 +3013,24 @@
           resolved: comment.resolved,
           author: comment.authorName || null,
           created_at: dateToIso(comment.creationDate),
+          replies: commentRepliesMetadata(comment),
           untrusted_source: true
         })),
         count: comments.items.length,
         untrusted_source: true
       };
     });
+  }
+
+  function commentRepliesMetadata(comment) {
+    return (comment.replies?.items || []).map((reply, index) => ({
+      index,
+      reply_id: reply.id,
+      content: reply.content,
+      author: reply.authorName || null,
+      created_at: dateToIso(reply.creationDate),
+      untrusted_source: true
+    }));
   }
 
   async function getTrackedChanges() {
@@ -3095,6 +3123,84 @@
       comment.resolved = true;
       await context.sync();
       return { comment_id: args.comment_id, resolved: true };
+    });
+  }
+
+  async function updateComment(args) {
+    return Word.run(async (context) => {
+      const target = await resolveCommentTarget(context, args, { loadReplies: true });
+      const action = normalizeUpdateCommentAction(args.action);
+      if (action === 'reply') {
+        const reply = target.comment.reply(args.text);
+        reply.load('id,content,authorName,creationDate');
+        await context.sync();
+        return { comment_id: args.comment_id, action, reply: commentReplyMetadata(reply) };
+      }
+      if (action === 'edit') {
+        const item = target.reply || target.comment;
+        item.content = args.text;
+        await context.sync();
+        return { comment_id: args.comment_id, reply_id: args.reply_id || null, action, content: args.text };
+      }
+      if (action === 'delete') {
+        const item = target.reply || target.comment;
+        item.delete();
+        await context.sync();
+        return { comment_id: args.comment_id, reply_id: args.reply_id || null, action, deleted: true };
+      }
+      target.comment.resolved = false;
+      await context.sync();
+      return { comment_id: args.comment_id, action, resolved: false };
+    });
+  }
+
+  function normalizeUpdateCommentAction(action) {
+    const value = String(action || '').trim().toLowerCase();
+    if (['reply', 'edit', 'delete', 'reopen'].includes(value)) return value;
+    throw invalidArgument('word.update_comment action must be reply, edit, delete, or reopen.');
+  }
+
+  async function resolveCommentTarget(context, args, options = {}) {
+    const comments = context.document.comments;
+    comments.load('items/id,items/content,items/resolved,items/authorName,items/creationDate');
+    await context.sync();
+    const comment = comments.items.find((item) => item.id === args.comment_id);
+    if (!comment) {
+      throw Object.assign(new Error(`Comment ${args.comment_id} was not found.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (options.loadReplies || args.reply_id) {
+      const replies = comment.replies;
+      replies.load('items/id,items/content,items/authorName,items/creationDate');
+      await context.sync();
+      const reply = args.reply_id ? replies.items.find((item) => item.id === args.reply_id) : null;
+      if (args.reply_id && !reply) {
+        throw Object.assign(new Error(`Comment reply ${args.reply_id} was not found.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      return { comment, reply };
+    }
+    return { comment, reply: null };
+  }
+
+  function commentReplyMetadata(reply) {
+    return {
+      reply_id: reply.id,
+      content: reply.content,
+      author: reply.authorName || null,
+      created_at: dateToIso(reply.creationDate),
+      untrusted_source: true
+    };
+  }
+
+  async function validateUpdateCommentOnly(args) {
+    return Word.run(async (context) => {
+      const target = await resolveCommentTarget(context, args, { loadReplies: true });
+      return validationSuccess('word.update_comment', {
+        comment_id: target.comment.id,
+        reply_id: target.reply?.id || null,
+        action: normalizeUpdateCommentAction(args.action),
+        resolved: target.comment.resolved,
+        partial_effect: 'none'
+      });
     });
   }
 
@@ -4095,6 +4201,25 @@
     validateNoteKind(args.kind);
     if (!Number.isInteger(args.index) || args.index < 0) {
       throw invalidArgument(`${tool} requires a non-negative integer index.`);
+    }
+  }
+
+  function validateUpdateCommentArgs(tool, args) {
+    if (!args || typeof args.comment_id !== 'string' || args.comment_id.trim().length < 1) {
+      throw invalidArgument(`${tool} requires comment_id.`);
+    }
+    const action = normalizeUpdateCommentAction(args.action);
+    if ((action === 'reply' || action === 'edit') && typeof args.text !== 'string') {
+      throw invalidArgument(`${tool} ${action} requires text.`);
+    }
+    if (action === 'reply' && args.reply_id !== undefined) {
+      throw invalidArgument(`${tool} reply creates a new reply and must not include reply_id.`);
+    }
+    if (args.reply_id !== undefined && (typeof args.reply_id !== 'string' || args.reply_id.trim().length < 1)) {
+      throw invalidArgument(`${tool} reply_id must be a non-empty string.`);
+    }
+    if (action === 'reopen' && args.reply_id !== undefined) {
+      throw invalidArgument(`${tool} reopen applies to the top-level comment only.`);
     }
   }
 
