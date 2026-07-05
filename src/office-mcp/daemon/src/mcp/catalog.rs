@@ -7,28 +7,42 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.apply_style",
     "word.delete_bookmark",
     "word.delete_content_control",
+    "word.delete_field",
+    "word.delete_image",
+    "word.delete_shape",
     "word.delete_range",
     "word.find_text",
+    "word.get_document_properties",
     "word.get_header_footer",
+    "word.get_html",
     "word.get_outline",
     "word.get_paragraph",
     "word.get_selection",
+    "word.set_selection",
     "word.get_text",
+    "word.get_image",
     "word.insert_bookmark",
     "word.insert_content_control",
     "word.insert_break",
+    "word.insert_field",
+    "word.insert_html",
     "word.insert_hyperlink",
     "word.insert_image",
     "word.insert_list",
     "word.insert_note",
     "word.insert_paragraph",
+    "word.insert_shape",
     "word.insert_table",
     "word.list_bookmarks",
     "word.list_content_controls",
+    "word.list_fields",
     "word.list_hyperlinks",
     "word.list_lists",
+    "word.list_images",
     "word.list_notes",
     "word.list_sections",
+    "word.list_shapes",
+    "word.list_styles",
     "word.read_table",
     "word.remove_hyperlink",
     "word.replace_text",
@@ -36,12 +50,19 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.resolve_comment",
     "word.resize_image",
     "word.save",
+    "word.set_change_tracking",
     "word.update_header_footer",
     "word.update_content_control",
+    "word.update_document_properties",
+    "word.update_field",
+    "word.update_image",
     "word.update_list",
     "word.update_note",
     "word.update_page_setup",
     "word.update_paragraph",
+    "word.update_shape",
+    "word.create_style",
+    "word.update_style",
     "word.update_table",
     "word.update_tracked_change",
     "word.delete_note",
@@ -652,6 +673,61 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
         "word.insert_hyperlink" | "word.list_hyperlinks" | "word.remove_hyperlink" => {
             word_hyperlink_examples(tool)
         }
+        "word.insert_content_control"
+        | "word.update_content_control"
+        | "word.delete_content_control" => content_control_examples_for_tool(tool),
+        "word.insert_bookmark" | "word.list_bookmarks" | "word.delete_bookmark" => {
+            bookmark_examples_for_tool(tool)
+        }
+        "word.insert_note" | "word.list_notes" | "word.update_note" | "word.delete_note" => {
+            note_examples_for_tool(tool)
+        }
+        "word.list_fields" | "word.insert_field" | "word.update_field" | "word.delete_field" => {
+            field_examples_for_tool(tool)
+        }
+        "word.list_styles" | "word.create_style" | "word.update_style" => {
+            style_examples_for_tool(tool)
+        }
+        "word.get_document_properties" | "word.update_document_properties" => {
+            document_property_examples_for_tool(tool)
+        }
+        "word.update_table" => vec![json!({
+            "description": "Merge the first row across two columns after validating table bounds.",
+            "arguments": {
+                "session_id": "session-1",
+                "table_index": 0,
+                "action": "merge_cells",
+                "row_range": [0, 0],
+                "col_range": [0, 1]
+            }
+        })],
+        "excel.update_table" => vec![json!({
+            "description": "Append rows to an Excel table.",
+            "arguments": {
+                "session_id": "session-1",
+                "table": "Table1",
+                "action": "add_rows",
+                "values": [["North", 1200], ["South", 980]]
+            }
+        })],
+        "powerpoint.update_table" => vec![json!({
+            "description": "Update a PowerPoint table cell.",
+            "arguments": {
+                "session_id": "session-1",
+                "slide_index": 0,
+                "shape_id": "table-1",
+                "action": "set_cell_text",
+                "row_index": 0,
+                "column_index": 1,
+                "text": "Q4"
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
+fn content_control_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
         "word.insert_content_control" => vec![json!({
             "description": "Wrap inserted review text in a tagged content control.",
             "arguments": {
@@ -679,42 +755,56 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
                 "delete_contents": false
             }
         })],
-        "word.insert_bookmark" | "word.list_bookmarks" | "word.delete_bookmark" => {
-            bookmark_examples_for_tool(tool)
-        }
-        "word.insert_note" | "word.list_notes" | "word.update_note" | "word.delete_note" => {
-            note_examples_for_tool(tool)
-        }
-        "word.update_table" => vec![json!({
-            "description": "Replace one table cell by row and column index.",
+        _ => Vec::new(),
+    }
+}
+
+fn document_property_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.get_document_properties" => vec![json!({
+            "description": "Read core and custom document metadata.",
             "arguments": {
                 "session_id": "session-1",
-                "table_index": 0,
-                "action": "set_cell_text",
-                "row": 1,
-                "col": 2,
-                "text": "Approved"
+                "include_custom": true
             }
         })],
-        "excel.update_table" => vec![json!({
-            "description": "Append rows to an Excel table.",
+        "word.update_document_properties" => vec![json!({
+            "description": "Set a title and upsert a custom property.",
             "arguments": {
                 "session_id": "session-1",
-                "table": "Table1",
-                "action": "add_rows",
-                "values": [["North", 1200], ["South", 980]]
+                "title": "Quarterly review",
+                "custom_set": [{ "key": "Workflow", "value": "review" }]
             }
         })],
-        "powerpoint.update_table" => vec![json!({
-            "description": "Update a PowerPoint table cell.",
+        _ => Vec::new(),
+    }
+}
+
+fn style_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.list_styles" => vec![json!({
+            "description": "List paragraph styles available in the document.",
             "arguments": {
                 "session_id": "session-1",
-                "slide_index": 0,
-                "shape_id": "table-1",
-                "action": "set_cell_text",
-                "row_index": 0,
-                "column_index": 1,
-                "text": "Q4"
+                "type": "paragraph"
+            }
+        })],
+        "word.create_style" => vec![json!({
+            "description": "Create a reusable paragraph style.",
+            "arguments": {
+                "session_id": "session-1",
+                "name": "Review Heading",
+                "type": "paragraph",
+                "font": { "bold": true, "color": "#1F4E79" },
+                "paragraph": { "alignment": "center" }
+            }
+        })],
+        "word.update_style" => vec![json!({
+            "description": "Update an existing style definition after listing styles.",
+            "arguments": {
+                "session_id": "session-1",
+                "name": "Review Heading",
+                "font": { "italic": true }
             }
         })],
         _ => Vec::new(),
@@ -818,6 +908,43 @@ fn note_examples_for_tool(tool: &str) -> Vec<Value> {
     }
 }
 
+fn field_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.list_fields" => vec![json!({
+            "description": "List document fields with bounded previews.",
+            "arguments": {
+                "session_id": "session-1",
+                "offset": 0,
+                "limit": 50
+            }
+        })],
+        "word.insert_field" => vec![json!({
+            "description": "Insert a hyperlinkable table of contents at the document start.",
+            "arguments": {
+                "session_id": "session-1",
+                "anchor": { "kind": "start_of_document" },
+                "field_type": "toc"
+            }
+        })],
+        "word.update_field" => vec![json!({
+            "description": "Refresh all fields after confirming the current count.",
+            "arguments": {
+                "session_id": "session-1",
+                "action": "refresh_all",
+                "expected_count": 3
+            }
+        })],
+        "word.delete_field" => vec![json!({
+            "description": "Delete one field by current index after re-listing fields.",
+            "arguments": {
+                "session_id": "session-1",
+                "field_index": 0
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
 fn common_errors_for_tool(tool: &str) -> Vec<Value> {
     let mut errors = vec![json!({
         "code": "INVALID_ARGUMENTS",
@@ -862,6 +989,18 @@ fn common_errors_for_tool(tool: &str) -> Vec<Value> {
             errors.push(json!({
                 "code": "INVALID_ARGUMENTS",
                 "cause": "Note kind must be footnote or endnote, and note indices must be refreshed after insertion or deletion."
+            }));
+        }
+        "word.insert_field" | "word.update_field" | "word.delete_field" => {
+            errors.push(json!({
+                "code": "INVALID_ARGUMENTS",
+                "cause": "Field type must be allowlisted, and field indices or expected counts must be refreshed after document edits."
+            }));
+        }
+        "word.create_style" | "word.update_style" => {
+            errors.push(json!({
+                "code": "INVALID_ARGUMENTS",
+                "cause": "Style names and base styles must resolve before mutation, and update_style requires at least one style property."
             }));
         }
         "word.update_table" | "excel.update_table" | "powerpoint.update_table" => {
@@ -943,6 +1082,27 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     ),
     tool_spec!("word.get_selection", ["session_id"], ["session_id"]),
     tool_spec!(
+        "word.set_selection",
+        ["session_id", "anchor"],
+        ["session_id", "anchor", "extent", "mode"]
+    ),
+    tool_spec!(
+        "word.get_html",
+        ["session_id"],
+        ["session_id", "anchor", "extent"]
+    ),
+    tool_spec!(
+        "word.insert_html",
+        ["session_id", "anchor", "html"],
+        [
+            "session_id",
+            "anchor",
+            "html",
+            "insert_location",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
         "word.get_header_footer",
         ["session_id", "location"],
         [
@@ -958,6 +1118,38 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         "word.list_sections",
         ["session_id"],
         ["session_id", "include_page_setup"]
+    ),
+    tool_spec!(
+        "word.list_fields",
+        ["session_id"],
+        ["session_id", "type", "offset", "limit"]
+    ),
+    tool_spec!(
+        "word.list_styles",
+        ["session_id"],
+        ["session_id", "type", "built_in", "in_use_only"]
+    ),
+    tool_spec!(
+        "word.get_document_properties",
+        ["session_id"],
+        ["session_id", "include_custom"]
+    ),
+    tool_spec!(
+        "word.update_document_properties",
+        ["session_id"],
+        [
+            "session_id",
+            "title",
+            "subject",
+            "author",
+            "keywords",
+            "category",
+            "comments",
+            "company",
+            "manager",
+            "custom_set",
+            "custom_delete"
+        ]
     ),
     tool_spec!(
         "word.insert_paragraph",
@@ -1011,6 +1203,79 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "scale_percent",
             "lock_aspect_ratio"
         ]
+    ),
+    tool_spec!("word.list_images", ["session_id"], ["session_id"]),
+    tool_spec!(
+        "word.list_shapes",
+        ["session_id"],
+        ["session_id", "scope", "anchor", "limit"]
+    ),
+    tool_spec!(
+        "word.get_image",
+        ["session_id", "image"],
+        ["session_id", "image"]
+    ),
+    tool_spec!(
+        "word.insert_shape",
+        ["session_id", "shape_type"],
+        [
+            "session_id",
+            "shape_type",
+            "anchor",
+            "text",
+            "image",
+            "name",
+            "width_pt",
+            "height_pt",
+            "left_pt",
+            "top_pt",
+            "alt_text_description",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
+        "word.update_image",
+        ["session_id", "image"],
+        [
+            "session_id",
+            "image",
+            "alt_text_title",
+            "alt_text_description",
+            "hyperlink",
+            "replace_base64",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
+        "word.update_shape",
+        ["session_id", "shape_id", "action"],
+        [
+            "session_id",
+            "shape_id",
+            "action",
+            "text",
+            "name",
+            "width_pt",
+            "height_pt",
+            "left_pt",
+            "top_pt",
+            "alt_text_description",
+            "fill_color",
+            "line_color",
+            "wrap_type",
+            "visible",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
+        "word.delete_image",
+        ["session_id", "image"],
+        ["session_id", "image", "validate_only"]
+    ),
+    tool_spec!(
+        "word.delete_shape",
+        ["session_id", "shape_id"],
+        ["session_id", "shape_id", "validate_only"]
     ),
     tool_spec!(
         "word.insert_break",
@@ -1102,6 +1367,17 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!(
+        "word.insert_field",
+        ["session_id", "anchor", "field_type"],
+        [
+            "session_id",
+            "anchor",
+            "field_type",
+            "code_options",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
         "word.insert_bookmark",
         ["session_id", "name", "anchor"],
         ["session_id", "name", "anchor", "extent", "overwrite"]
@@ -1168,6 +1444,47 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "kind", "index", "validate_only"]
     ),
     tool_spec!(
+        "word.update_field",
+        ["session_id", "action"],
+        [
+            "session_id",
+            "action",
+            "field_index",
+            "expected_count",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
+        "word.delete_field",
+        ["session_id", "field_index"],
+        ["session_id", "field_index", "validate_only"]
+    ),
+    tool_spec!(
+        "word.create_style",
+        ["session_id", "name", "type"],
+        [
+            "session_id",
+            "name",
+            "type",
+            "base_style",
+            "font",
+            "paragraph",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
+        "word.update_style",
+        ["session_id", "name"],
+        [
+            "session_id",
+            "name",
+            "base_style",
+            "font",
+            "paragraph",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
         "word.apply_formatting",
         ["session_id", "anchor"],
         [
@@ -1204,6 +1521,13 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "row",
             "col",
             "text",
+            "index",
+            "values",
+            "row_range",
+            "col_range",
+            "width_pt",
+            "header_row",
+            "borders",
             "data",
             "rows",
             "cols"
@@ -1212,7 +1536,7 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     tool_spec!(
         "word.list_content_controls",
         ["session_id"],
-        ["session_id", "tag", "title"]
+        ["session_id", "type", "tag", "title"]
     ),
     tool_spec!(
         "word.insert_content_control",
@@ -1224,13 +1548,26 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "tag",
             "title",
             "type",
+            "checked",
+            "list_items",
             "match_case"
         ]
     ),
     tool_spec!(
         "word.update_content_control",
         ["session_id", "content_control_id"],
-        ["session_id", "content_control_id", "text", "tag", "title"]
+        [
+            "session_id",
+            "content_control_id",
+            "text",
+            "checked",
+            "selected_value",
+            "list_items_add",
+            "list_items_delete",
+            "list_items_clear",
+            "tag",
+            "title"
+        ]
     ),
     tool_spec!(
         "word.delete_content_control",
@@ -1248,18 +1585,19 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "comment_id"]
     ),
     tool_spec!(
+        "word.set_change_tracking",
+        ["session_id", "mode"],
+        ["session_id", "mode"]
+    ),
+    tool_spec!(
         "word.update_tracked_change",
+        ["session_id", "action"],
         [
             "session_id",
             "action",
             "change_index",
-            "expected_fingerprint"
-        ],
-        [
-            "session_id",
-            "action",
-            "change_index",
-            "expected_fingerprint"
+            "expected_fingerprint",
+            "expected_count"
         ]
     ),
     tool_spec!("excel.get_workbook_info", ["session_id"], ["session_id"]),
@@ -1763,10 +2101,87 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             { "required": ["paragraph"] }
         ]);
     }
+    if tool == "word.update_style" {
+        schema["anyOf"] = json!([
+            { "required": ["base_style"] },
+            { "required": ["font"] },
+            { "required": ["paragraph"] }
+        ]);
+    }
+    if tool == "word.update_document_properties" {
+        schema["anyOf"] = json!([
+            { "required": ["title"] },
+            { "required": ["subject"] },
+            { "required": ["author"] },
+            { "required": ["keywords"] },
+            { "required": ["category"] },
+            { "required": ["comments"] },
+            { "required": ["company"] },
+            { "required": ["manager"] },
+            { "required": ["custom_set"] },
+            { "required": ["custom_delete"] }
+        ]);
+    }
+    if tool == "word.update_image" {
+        schema["anyOf"] = json!([
+            { "required": ["alt_text_title"] },
+            { "required": ["alt_text_description"] },
+            { "required": ["hyperlink"] },
+            { "required": ["replace_base64"] }
+        ]);
+    }
+    if tool == "word.update_tracked_change" {
+        schema["allOf"] = json!([
+            {
+                "if": { "properties": { "action": { "enum": ["accept", "reject"] } } },
+                "then": { "required": ["change_index", "expected_fingerprint"] }
+            },
+            {
+                "if": { "properties": { "action": { "enum": ["accept_all", "reject_all"] } } },
+                "then": { "required": ["expected_count"] }
+            }
+        ]);
+    }
+    if tool == "word.update_field" {
+        schema["allOf"] = json!([
+            {
+                "if": { "properties": { "action": { "enum": ["refresh", "lock", "unlock"] } } },
+                "then": { "required": ["field_index"] }
+            },
+            {
+                "if": { "properties": { "action": { "const": "refresh_all" } } },
+                "then": { "required": ["expected_count"] }
+            }
+        ]);
+    }
     schema
 }
 
 fn property_schema(tool: &str, name: &str) -> Value {
+    if let Some(schema) = word_field_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_style_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_document_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_review_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_table_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_image_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_shape_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_header_footer_property_schema(tool, name) {
+        return schema;
+    }
     if let Some(schema) = word_note_property_schema(tool, name) {
         return schema;
     }
@@ -1776,25 +2191,27 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = word_list_property_schema(tool, name) {
         return schema;
     }
-    if let Some(schema) = common_property_schema(tool, name) {
+    if let Some(schema) = word_html_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_content_control_property_schema(tool, name) {
+        return schema;
+    }
+    if (tool != "word.list_notes" || name != "limit")
+        && !(tool == "word.update_list" && matches!(name, "position" | "level"))
+        && let Some(schema) = generic_property_schema(name)
+    {
         return schema;
     }
     match name {
         "session_id" => json!({ "type": "string", "description": "Office document session ID." }),
-        "limit" if tool == "word.list_lists" => {
-            json!({ "type": "integer", "minimum": 1, "maximum": 200 })
-        }
-        "list_id" | "paragraph_index" => json!({ "type": "integer", "minimum": 0 }),
         "anchor" => anchor_schema_for_tool(tool),
+        "mode" if tool == "word.set_selection" => {
+            json!({ "enum": ["select", "cursor_start", "cursor_end"], "default": "select" })
+        }
         "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
         "image" => image_schema(),
         "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),
-        "location" if tool == "word.get_header_footer" || tool == "word.update_header_footer" => {
-            json!({ "enum": ["header", "footer"] })
-        }
-        "header_footer_type" => {
-            json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" })
-        }
         "break_type" => {
             json!({ "enum": ["page", "line", "section_next", "section_continuous", "section_even", "section_odd"], "default": "page" })
         }
@@ -1809,11 +2226,14 @@ fn property_schema(tool: &str, name: &str) -> Value {
             },
             "additionalProperties": false
         }),
-        "action" if tool == "word.update_header_footer" => {
-            json!({ "enum": ["set_text", "append_paragraph", "clear"] })
+        "formatting" | "font" => formatting_schema(),
+        "paragraph"
+            if tool == "word.apply_formatting"
+                || tool == "word.create_style"
+                || tool == "word.update_style" =>
+        {
+            paragraph_formatting_schema()
         }
-        "formatting" => formatting_schema(),
-        "paragraph" if tool == "word.apply_formatting" => paragraph_formatting_schema(),
         "title_box" | "content_box" => shape_box_schema(),
         "tools" | "values" | "data" | "formulas" | "number_formats" | "items" | "fields"
         | "borders" | "criteria" | "selected_items" | "shape_ids" | "row_indices"
@@ -1824,20 +2244,213 @@ fn property_schema(tool: &str, name: &str) -> Value {
     }
 }
 
-fn common_property_schema(tool: &str, name: &str) -> Option<Value> {
-    let schema = match name {
+fn word_list_property_schema(tool: &str, name: &str) -> Option<Value> {
+    if tool != "word.update_list" {
+        return None;
+    }
+    match name {
+        "list_id" | "paragraph_index" => Some(json!({ "type": "integer", "minimum": 0 })),
+        "level" => Some(json!({ "type": "integer", "minimum": 0, "maximum": 8 })),
+        "action" => Some(json!({
+            "enum": ["add_item", "set_item_level", "attach_paragraph", "detach_paragraph", "set_level_format"]
+        })),
+        "position" => {
+            Some(json!({ "enum": ["start", "end", "after_paragraph"], "default": "end" }))
+        }
+        "numbering" => Some(json!({
+            "enum": ["bullet", "arabic", "upper_roman", "lower_roman", "upper_letter", "lower_letter", "none"]
+        })),
+        "text" => Some(json!({ "type": "string", "minLength": 1 })),
+        "bullet_char" => Some(json!({ "type": "string", "maxLength": 1 })),
+        _ => None,
+    }
+}
+
+fn word_content_control_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_content_control_tool = matches!(
+        tool,
+        "word.list_content_controls"
+            | "word.insert_content_control"
+            | "word.update_content_control"
+    );
+    if !is_content_control_tool {
+        return None;
+    }
+    match name {
+        "type" => Some(
+            json!({ "enum": ["rich_text", "plain_text", "checkbox", "dropdown_list", "combo_box"] }),
+        ),
+        "checked" => Some(json!({ "type": "boolean" })),
+        "list_items" if tool == "word.insert_content_control" => {
+            Some(content_control_list_items_schema(false))
+        }
+        "list_items_add" if tool == "word.update_content_control" => {
+            Some(content_control_list_items_schema(true))
+        }
+        "list_items_delete" if tool == "word.update_content_control" => {
+            Some(json!({ "type": "array", "items": { "type": "string" } }))
+        }
+        "list_items_clear" if tool == "word.update_content_control" => {
+            Some(json!({ "type": "boolean", "default": false }))
+        }
+        "selected_value" if tool == "word.update_content_control" => {
+            Some(json!({ "type": "string" }))
+        }
+        _ => None,
+    }
+}
+
+fn content_control_list_items_schema(with_index: bool) -> Value {
+    let mut properties = json!({
+        "display_text": { "type": "string", "minLength": 1 },
+        "value": { "type": "string" }
+    });
+    if with_index {
+        properties["index"] = json!({ "type": "integer", "minimum": 0 });
+    }
+    json!({
+        "type": "array",
+        "minItems": 1,
+        "items": {
+            "type": "object",
+            "required": ["display_text"],
+            "properties": properties,
+            "additionalProperties": false
+        }
+    })
+}
+
+fn word_html_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_html_tool = matches!(tool, "word.get_html" | "word.insert_html");
+    if !is_html_tool {
+        return None;
+    }
+    match name {
+        "html" if tool == "word.insert_html" => {
+            Some(json!({ "type": "string", "minLength": 1, "maxLength": 1_000_000 }))
+        }
+        "insert_location" if tool == "word.insert_html" => Some(
+            json!({ "enum": ["replace", "before", "after", "start", "end"], "default": "after" }),
+        ),
+        _ => None,
+    }
+}
+
+fn word_image_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_image_tool = matches!(
+        tool,
+        "word.resize_image"
+            | "word.list_images"
+            | "word.get_image"
+            | "word.update_image"
+            | "word.delete_image"
+    );
+    match (is_image_tool, name) {
+        (true, "image") => Some(inline_image_locator_schema()),
+        (true, "alt_text_title" | "alt_text_description" | "replace_base64") => {
+            Some(json!({ "type": "string" }))
+        }
+        (true, "hyperlink") => Some(json!({ "type": "string", "format": "uri" })),
+        _ => None,
+    }
+}
+
+fn word_shape_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_shape_tool = matches!(
+        tool,
+        "word.list_shapes" | "word.insert_shape" | "word.update_shape" | "word.delete_shape"
+    );
+    if !is_shape_tool {
+        return None;
+    }
+    match name {
+        "scope" if tool == "word.list_shapes" => {
+            Some(json!({ "enum": ["body", "paragraph", "anchor"], "default": "body" }))
+        }
+        "shape_type" if tool == "word.insert_shape" => Some(
+            json!({ "enum": ["text_box", "rectangle", "ellipse", "rounded_rectangle", "line", "picture"] }),
+        ),
+        "shape_id" => Some(json!({ "type": "integer", "minimum": 0 })),
+        "image" if tool == "word.insert_shape" => Some(json!({
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["base64"],
+                    "properties": {
+                        "base64": { "type": "string", "minLength": 1 },
+                        "mime_type": { "type": "string" },
+                        "byte_length": { "type": "integer", "minimum": 0 }
+                    },
+                    "additionalProperties": false
+                }
+            ]
+        })),
+        "action" if tool == "word.update_shape" => Some(json!({
+            "enum": ["move", "resize", "set_text", "set_alt_text", "set_fill", "set_line", "set_wrap", "set_visibility"]
+        })),
+        "wrap_type" if tool == "word.update_shape" => {
+            Some(json!({ "enum": ["inline", "square", "tight", "behind", "front", "top_bottom"] }))
+        }
+        "name" | "text" | "alt_text_description" | "fill_color" | "line_color" => {
+            Some(json!({ "type": "string" }))
+        }
+        "visible" => Some(json!({ "type": "boolean" })),
+        _ => None,
+    }
+}
+
+fn word_document_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_document_property_tool = matches!(
+        tool,
+        "word.get_document_properties" | "word.update_document_properties"
+    );
+    if !is_document_property_tool {
+        return None;
+    }
+    match name {
+        "include_custom" => Some(json!({ "type": "boolean", "default": true })),
+        "title" | "subject" | "author" | "keywords" | "category" | "comments" | "company"
+        | "manager" => Some(json!({ "type": "string" })),
+        "custom_set" => Some(json!({
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["key", "value"],
+                "properties": {
+                    "key": { "type": "string", "minLength": 1 },
+                    "value": {
+                        "oneOf": [
+                            { "type": "string" },
+                            { "type": "number" },
+                            { "type": "boolean" }
+                        ]
+                    }
+                },
+                "additionalProperties": false
+            }
+        })),
+        "custom_delete" => Some(json!({
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+        })),
+        _ => None,
+    }
+}
+
+fn generic_property_schema(name: &str) -> Option<Value> {
+    match name {
         "index" | "offset" | "limit" | "occurrence" | "rows" | "cols" | "row" | "col"
         | "table_index" | "change_index" | "content_control_id" | "position" | "slice_size"
         | "section_index" | "slide_index" | "target_index" | "row_index" | "column_index"
-        | "row_count" | "column_count" | "count" | "max_depth"
-            if !(tool == "word.update_list" && name == "position") =>
-        {
-            json!({ "type": "integer", "minimum": 0 })
+        | "row_count" | "column_count" | "count" | "max_depth" | "expected_count" => {
+            Some(json!({ "type": "integer", "minimum": 0 }))
         }
-        "heading_level" | "level" | "columns" => json!({ "type": "integer", "minimum": 1 }),
-        "width_pt" | "height_pt" | "scale_percent" | "width" | "height" | "left" | "top"
-        | "page_width_pt" | "page_height_pt" | "rotation" | "fill_transparency" | "line_weight"
-        | "line_transparency" | "font_size" => json!({ "type": "number" }),
+        "heading_level" | "level" | "columns" => Some(json!({ "type": "integer", "minimum": 1 })),
+        "width_pt" | "height_pt" | "left_pt" | "top_pt" | "scale_percent" | "width" | "height"
+        | "left" | "top" | "page_width_pt" | "page_height_pt" | "rotation"
+        | "fill_transparency" | "line_weight" | "line_transparency" | "font_size" => {
+            Some(json!({ "type": "number" }))
+        }
         "match_case"
         | "whole_word"
         | "wildcards"
@@ -1877,33 +2490,117 @@ fn common_property_schema(tool: &str, name: &str) -> Option<Value> {
         | "delete_contents"
         | "keep_text"
         | "overwrite"
-        | "validate_only" => json!({ "type": "boolean" }),
-        _ => return None,
-    };
-    Some(schema)
-}
-
-fn word_list_property_schema(tool: &str, name: &str) -> Option<Value> {
-    if tool != "word.update_list" {
-        return None;
-    }
-    match name {
-        "level" => Some(json!({ "type": "integer", "minimum": 0, "maximum": 8 })),
-        "action" => Some(json!({
-            "enum": ["add_item", "set_item_level", "attach_paragraph", "detach_paragraph", "set_level_format"]
-        })),
-        "position" => {
-            Some(json!({ "enum": ["start", "end", "after_paragraph"], "default": "end" }))
-        }
-        "numbering" => Some(json!({
-            "enum": ["bullet", "arabic", "upper_roman", "lower_roman", "upper_letter", "lower_letter", "none"]
-        })),
-        "text" => Some(json!({ "type": "string", "minLength": 1 })),
-        "bullet_char" => Some(json!({ "type": "string", "maxLength": 1 })),
+        | "validate_only" => Some(json!({ "type": "boolean" })),
         _ => None,
     }
 }
 
+fn word_table_property_schema(tool: &str, name: &str) -> Option<Value> {
+    if tool != "word.update_table" {
+        return None;
+    }
+    match name {
+        "action" => Some(json!({
+            "enum": [
+                "update_cell",
+                "add_row",
+                "add_column",
+                "format_cell",
+                "delete",
+                "delete_row",
+                "delete_column",
+                "merge_cells",
+                "set_column_width",
+                "distribute_columns",
+                "set_borders",
+                "set_header_row"
+            ]
+        })),
+        "row_range" | "col_range" => Some(json!({
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "minItems": 2,
+            "maxItems": 2
+        })),
+        "width_pt" => Some(json!({ "type": "number", "exclusiveMinimum": 0 })),
+        "header_row" => Some(json!({ "type": "boolean" })),
+        "borders" => Some(json!({
+            "type": "object",
+            "properties": {
+                "edges": {
+                    "type": "array",
+                    "items": { "enum": ["top", "bottom", "left", "right", "inside_horizontal", "inside_vertical", "all"] }
+                },
+                "style": { "enum": ["single", "double", "dotted", "dashed", "none"] },
+                "width_pt": { "type": "number", "minimum": 0 },
+                "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+            },
+            "additionalProperties": false
+        })),
+        _ => None,
+    }
+}
+
+fn word_style_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_style_tool = matches!(
+        tool,
+        "word.list_styles" | "word.create_style" | "word.update_style"
+    );
+    match (is_style_tool, name) {
+        (true, "type") => Some(json!({ "enum": ["paragraph", "character", "table", "list"] })),
+        (true, "name" | "base_style") => Some(json!({ "type": "string", "minLength": 1 })),
+        (true, "built_in" | "in_use_only") => Some(json!({ "type": "boolean" })),
+        _ => None,
+    }
+}
+
+fn word_field_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_field_tool = matches!(
+        tool,
+        "word.list_fields" | "word.insert_field" | "word.update_field" | "word.delete_field"
+    );
+    match (is_field_tool, tool, name) {
+        (true, "word.list_fields", "limit") => {
+            Some(json!({ "type": "integer", "minimum": 1, "maximum": 200 }))
+        }
+        (true, _, "field_index") => Some(json!({ "type": "integer", "minimum": 0 })),
+        (true, "word.insert_field", "field_type") => Some(json!({
+            "enum": ["toc", "page", "num_pages", "date", "time", "ref", "hyperlink", "seq", "styleref"]
+        })),
+        (true, "word.update_field", "action") => {
+            Some(json!({ "enum": ["refresh", "refresh_all", "lock", "unlock"] }))
+        }
+        (true, _, "type" | "code_options") => Some(json!({ "type": "string" })),
+        _ => None,
+    }
+}
+
+fn word_header_footer_property_schema(tool: &str, name: &str) -> Option<Value> {
+    match (tool, name) {
+        ("word.get_header_footer" | "word.update_header_footer", "location") => {
+            Some(json!({ "enum": ["header", "footer"] }))
+        }
+        (_, "header_footer_type") => {
+            Some(json!({ "enum": ["primary", "first_page", "even_pages"], "default": "primary" }))
+        }
+        ("word.update_header_footer", "action") => {
+            Some(json!({ "enum": ["set_text", "append_paragraph", "clear"] }))
+        }
+        _ => None,
+    }
+}
+
+fn word_review_property_schema(tool: &str, name: &str) -> Option<Value> {
+    match (tool, name) {
+        ("word.update_tracked_change", "action") => {
+            Some(json!({ "enum": ["accept", "reject", "accept_all", "reject_all"] }))
+        }
+        ("word.set_change_tracking", "mode") => {
+            Some(json!({ "enum": ["off", "track_all", "track_mine_only"] }))
+        }
+        _ => None,
+    }
+}
 fn word_range_marker_property_schema(tool: &str, name: &str) -> Option<Value> {
     match (tool, name) {
         ("word.list_hyperlinks", "limit") => {
@@ -2030,6 +2727,19 @@ fn image_schema() -> Value {
     })
 }
 
+fn inline_image_locator_schema() -> Value {
+    json!({
+        "type": "object",
+        "required": ["kind", "index"],
+        "properties": {
+            "kind": { "const": "paragraph_index" },
+            "index": { "type": "integer", "minimum": 0 },
+            "image_index": { "type": "integer", "minimum": 0, "default": 0 }
+        },
+        "additionalProperties": false
+    })
+}
+
 fn word_insert_image_placement_schema() -> Value {
     json!({
         "enum": [
@@ -2068,9 +2778,11 @@ fn formatting_schema() -> Value {
             "bold": { "type": "boolean" },
             "italic": { "type": "boolean" },
             "underline": { "type": "boolean" },
-            "font_color": { "type": "string" },
-            "highlight_color": { "type": "string" },
-            "font_size": { "type": "number" }
+            "strikethrough": { "type": "boolean" },
+            "font_name": { "type": "string" },
+            "font_size_pt": { "type": "number", "exclusiveMinimum": 0 },
+            "color": { "type": "string" },
+            "highlight": { "type": "string" }
         },
         "additionalProperties": false
     })

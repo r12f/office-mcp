@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 33 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 54 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -73,14 +73,14 @@ The per-tool JSON Schemas follow in §2-§9.
 
 | Category | Tools |
 |---|---|
-| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.save` |
-| **Range & selection** | `word.get_selection`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
+| **Document & structure** | `word.get_text`, `word.get_outline`, `word.get_header_footer`, `word.update_header_footer`, `word.get_document_properties`, `word.update_document_properties`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`, `word.list_fields`, `word.insert_field`, `word.update_field`, `word.delete_field`, `word.list_styles`, `word.create_style`, `word.update_style`, `word.save` |
+| **Range & selection** | `word.get_selection`, `word.set_selection`, `word.get_html`, `word.insert_html`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list`, `word.list_lists`, `word.update_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
-| **Media** | `word.insert_image`, `word.resize_image` |
+| **Media** | `word.insert_image`, `word.resize_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.delete_image`, `word.list_shapes`, `word.insert_shape`, `word.update_shape`, `word.delete_shape` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Notes** | `word.insert_note`, `word.list_notes`, `word.update_note`, `word.delete_note` |
-| **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_tracked_change` |
+| **Review** | `word.add_comment`, `word.resolve_comment`, `word.set_change_tracking`, `word.update_tracked_change` |
 
 ### 1.2 Target refined Word tool surface
 
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 43 tools. It deliberately consolidates specialized tools
+The target surface has 60 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -101,6 +101,8 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.get_outline` | implemented | Document & structure | read | `WordApi 1.3` | Read headings and lightweight document structure without body text. |
 | `word.get_header_footer` | implemented | Document & structure | read | `WordApi 1.1` | Read section-scoped header or footer text and optional paragraph metadata; non-primary layout validation uses `WordApiDesktop 1.3` when required. |
 | `word.update_header_footer` | implemented | Document & structure | edit/destructive | `WordApi 1.1` | Replace, append to, or clear a section-scoped header or footer body; non-primary layout validation uses `WordApiDesktop 1.3` when required. |
+| `word.get_document_properties` | implemented | Document & structure | read | `WordApi 1.3` | Read writable core document properties, read-only metadata, and optionally custom properties. |
+| `word.update_document_properties` | implemented | Document & structure | edit | `WordApi 1.3` | Update writable core document properties and upsert or delete custom properties. |
 | `word.get_paragraph` | implemented | Paragraphs & lists | read | `WordApi 1.3` | Read one paragraph by index, optionally including direct paragraph formatting metadata. |
 | `word.find_text` | implemented | Range & selection | read | `WordApi 1.3` | Search text with Word search options and return portable paragraph-relative matches. |
 | `word.resolve_anchor` | implemented | Range & selection | read | `WordApi 1.3` | Resolve an anchor to safe diagnostic metadata without returning full document text. |
@@ -108,6 +110,9 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.list_bookmarks` | implemented | Range & selection | read | `WordApi 1.4` | List bookmark names and bounded location previews without returning full document text. |
 | `word.delete_bookmark` | implemented | Range & selection | destructive | `WordApi 1.4` | Delete a bookmark marker without deleting the bookmarked text. |
 | `word.get_selection` | implemented | Range & selection | read | `WordApi 1.3` | Read current selection text and simple selection metadata. |
+| `word.set_selection` | implemented | Range & selection | edit | `WordApi 1.3` | Resolve an anchor and set the current selection or cursor position. |
+| `word.get_html` | implemented | Range & selection | read | `WordApi 1.3`; underlying HTML read APIs are `WordApi 1.1` | Read body or anchored range HTML, subject to the large-result cap. |
+| `word.insert_html` | implemented | Range & selection | edit | `WordApi 1.3`; underlying HTML insert APIs are `WordApi 1.1` | Insert sanitized HTML at an anchored range with explicit insert-location semantics. |
 | `word.insert_hyperlink` | implemented | Range & selection | edit | `WordApi 1.3` | Create a hyperlink on an anchored range or inserted text with URL scheme validation. |
 | `word.list_hyperlinks` | implemented | Range & selection | read | `WordApi 1.3` | List hyperlink text and URLs with paragraph-relative locations. |
 | `word.remove_hyperlink` | implemented | Range & selection | edit | `WordApi 1.3` | Remove hyperlink targets from an anchored range while preserving text by default. |
@@ -115,9 +120,24 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.insert_table` | implemented | Tables | edit | `WordApi 1.3` | Insert a table with optional initial data and style. |
 | `word.insert_image` | implemented | Media | edit | `WordApi 1.3` | Insert a validated image from base64 or a daemon-fetched HTTPS URL. |
 | `word.resize_image` | implemented | Media | edit | `WordApi 1.3` | Resize an existing inline image in place by paragraph index and image index. |
+| `word.list_images` | implemented | Media | read | `WordApi 1.3` | List inline images with paragraph and image indexes, dimensions, alt text, and hyperlink presence. |
+| `word.get_image` | implemented | Media | read | `WordApi 1.3` | Export one inline image as base64 with dimensions and metadata, subject to large-result limits. |
+| `word.update_image` | implemented | Media | edit | `WordApi 1.3` | Update inline image alt text, hyperlink, or bytes in place. |
+| `word.delete_image` | implemented | Media | destructive | `WordApi 1.3` | Delete one inline image without deleting surrounding paragraph text. |
+| `word.list_shapes` | implemented | Media | read | `WordApiDesktop 1.2` | List inline and floating body shapes, including text boxes, geometric shapes, pictures, groups, and canvases, with bounded text previews. |
+| `word.insert_shape` | implemented | Media | edit | `WordApiDesktop 1.2` | Insert a text box, geometric shape, or floating picture at an anchored paragraph or range. |
+| `word.update_shape` | implemented | Media | edit | `WordApiDesktop 1.2` | Update shape text, geometry, alt text, fill, line, wrapping, or visibility through one shape owner. |
+| `word.delete_shape` | implemented | Media | destructive | `WordApiDesktop 1.2` | Delete one shape by current shape id. |
 | `word.insert_break` | implemented | Document & structure | edit | `WordApi 1.3` | Insert a page, line, or section break at an anchor. |
 | `word.list_sections` | implemented | Document & structure | read | `WordApi 1.3` | List document sections with paragraph range and header/footer metadata. |
 | `word.update_page_setup` | implemented | Document & structure | edit | `WordApiDesktop 1.3` | Update document or section page setup such as orientation, margins, and page size. |
+| `word.list_fields` | implemented | Document & structure | read | `WordApi 1.4` | List document fields with current indices, code, result preview, locked state, and paragraph location hints. |
+| `word.insert_field` | implemented | Document & structure | edit | `WordApi 1.5` | Insert curated Word fields, including a default table of contents, at an anchored range. |
+| `word.update_field` | implemented | Document & structure | edit | `WordApi 1.5` | Refresh, lock, or unlock one field, or refresh all fields after an expected-count stale check. |
+| `word.delete_field` | implemented | Document & structure | destructive | `WordApi 1.5` | Delete one field and its current result by current field index. |
+| `word.list_styles` | implemented | Document & structure | read | `WordApi 1.5` | List built-in and custom document styles with type, built-in, in-use, base-style, and priority metadata. |
+| `word.create_style` | implemented | Document & structure | edit | `WordApi 1.5` | Create a paragraph, character, table, or list style with optional base style and formatting. |
+| `word.update_style` | implemented | Document & structure | edit | `WordApi 1.5` | Update an existing style's base style, font formatting, or paragraph formatting. |
 | `word.insert_list` | implemented | Paragraphs & lists | edit | `WordApi 1.3` | Insert a numbered or bulleted list. |
 | `word.list_lists` | implemented | Paragraphs & lists | read | `WordApi 1.3` | List existing document lists and their paragraph items so callers can address list mutations. |
 | `word.update_list` | implemented | Paragraphs & lists | edit/destructive | `WordApi 1.3` | Add items, change item levels, attach/detach paragraphs, and update list level formatting for existing lists. |
@@ -126,8 +146,8 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.delete_range` | implemented | Range & selection | destructive | `WordApi 1.3` | Delete an anchored paragraph, sentence, or selection. |
 | `word.apply_formatting` | implemented | Range & selection | edit | `WordApi 1.3` | Apply direct run and/or paragraph formatting to an anchored range. |
 | `word.apply_style` | implemented | Range & selection | edit | `WordApi 1.3` | Apply an Office style to an anchored range; also owns heading-level changes after migration. |
-| `word.read_table` | implemented | Table | read | `WordApi 1.3` | Read table dimensions, header state, and cell text. |
-| `word.update_table` | implemented | Table | edit/destructive | `WordApi 1.3` | Update table cells, rows, columns, table/cell formatting, and table deletion through one table-owner tool. |
+| `word.read_table` | implemented | Table | read | `WordApi 1.3`; merged-cell diagnostics use `WordApi 1.4` when available | Read table dimensions, header state, cell text, and merged-table diagnostics. |
+| `word.update_table` | implemented | Table | edit/destructive | `WordApi 1.3`; `merge_cells` requires `WordApi 1.4` | Update table cells, rows, columns, widths, borders, header state, merge state, table/cell formatting, and table deletion through one table-owner tool. |
 | `word.list_content_controls` | implemented | Content controls | read | `WordApi 1.5` | List content controls with id/tag/title/type metadata, without duplicating document text reads. |
 | `word.insert_content_control` | implemented | Content controls | edit | `WordApi 1.5` | Create a content control around an anchored range or inserted placeholder content. |
 | `word.update_content_control` | implemented | Content controls | edit | `WordApi 1.5` | Update content control metadata, locked state, or contained text through the content-control owner. |
@@ -138,7 +158,8 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.delete_note` | implemented | Notes | destructive | `WordApi 1.5` | Delete one footnote or endnote reference and body by current note index. |
 | `word.add_comment` | implemented | Review | comment | `WordApi 1.4` | Add a comment to an anchored range as the signed-in Office user. |
 | `word.resolve_comment` | implemented | Review | comment | `WordApi 1.4` | Resolve an existing comment. |
-| `word.update_tracked_change` | implemented | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint. |
+| `word.set_change_tracking` | implemented | Review | edit | `WordApi 1.4` | Set Track Changes mode and report the previous mode. |
+| `word.update_tracked_change` | implemented | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint, or bulk accept/reject after an expected-count stale check. |
 | `word.save` | implemented | Document & structure | edit | `WordApi 1.1` | Save the current document with the host save behavior. |
 
 Superseded target-surface tools:
@@ -162,23 +183,34 @@ Tool ownership rules:
   but mutation tools must not duplicate each other's writes.
 - `word.insert_paragraph` owns paragraph creation, including headings. Do not add
   a separate heading insertion tool after migration.
-- `word.apply_style` owns semantic Office style changes, including heading level.
-  `word.apply_formatting` owns direct character/run and paragraph layout
-  formatting. Direct paragraph layout includes alignment, indentation, spacing,
-  and outline level; named styles remain owned by `word.apply_style`.
+- `word.list_styles`, `word.create_style`, and `word.update_style` own the
+  document style catalog. `word.apply_style` owns applying an existing semantic
+  Office style to a range, including heading level. `word.apply_formatting`
+  owns direct character/run and paragraph layout formatting. Direct paragraph
+  layout includes alignment, indentation, spacing, and outline level; named
+  style definitions remain owned by the style-catalog tools.
 - `word.insert_hyperlink`, `word.list_hyperlinks`, and
   `word.remove_hyperlink` own hyperlink lifecycle. Generic run styling remains
   owned by `word.apply_formatting`, and bookmark creation/deletion remains out
   of scope for these tools.
-- `word.read_table` owns table content reads. `word.update_table` owns table
-  structure, cell value, table/cell formatting, and deletion mutations.
+- `word.read_table` owns table content reads and merged-table diagnostics.
+  `word.update_table` owns table structure, cell value, table/cell formatting,
+  width, borders, header-row state, merge, and deletion mutations.
 - `word.insert_list` owns new list creation. `word.list_lists` owns list
   discovery. `word.update_list` owns mutations of existing list membership,
   item level, and level formatting. Deleting a list item remains paragraph
   deletion and is owned by `word.delete_range`.
-- `word.insert_image` owns new image insertion. `word.resize_image` owns in-place
-  resizing of an existing inline image and must not require re-uploading image
-  bytes or alter surrounding paragraphs.
+- Media tools own inline image lifecycle. `word.insert_image` owns new image
+  insertion. `word.list_images` owns inline image discovery, and
+  `word.get_image` owns bounded image byte export. `word.resize_image` owns
+  geometry-only resizing without re-uploading bytes. `word.update_image` owns
+  alt text, hyperlink, and byte replacement for an existing image.
+  `word.delete_image` owns removing one inline image while preserving
+  surrounding paragraph text. `word.list_shapes`, `word.insert_shape`,
+  `word.update_shape`, and `word.delete_shape` own desktop-tier floating and
+  shape-backed media, including text boxes, geometric shapes, floating
+  pictures, groups, and canvases. Inline image tools must not silently mutate
+  floating pictures; shape tools must not duplicate inline-picture byte export.
 - Content-control tools own content-control lifecycle and metadata. Generic text
   edits inside a known range remain owned by range/paragraph tools unless the
   caller is explicitly targeting a content control.
@@ -186,12 +218,20 @@ Tool ownership rules:
   the reference anchor, but note body creation, enumeration, body replacement,
   and deletion are owned by `word.insert_note`, `word.list_notes`,
   `word.update_note`, and `word.delete_note`.
-- `word.update_tracked_change` owns tracked-change accept/reject actions. The
-  tracked-change resource remains the read owner for current indices and
-  fingerprints.
+- `word.set_change_tracking` owns document Track Changes mode. The session
+  descriptor and tracked-change resource may expose the current mode as
+  read-only metadata, but mode mutation stays with this review tool.
+- `word.update_tracked_change` owns tracked-change accept/reject actions,
+  including bulk accept/reject. The tracked-change resource remains the read
+  owner for current indices, fingerprints, and counts.
 - `word.get_header_footer` and `word.update_header_footer` own header/footer
   body reads and writes. Body, range, and paragraph tools operate on the main
   document body and must not silently reach into headers or footers.
+- `word.get_document_properties` and `word.update_document_properties` own
+  document metadata. The read tool may return writable core fields, read-only
+  metadata such as creation and save timestamps, and custom properties. The
+  update tool owns writable core fields plus custom property upsert/delete; it
+  must not expose read-only fields as writable arguments.
 - `word.insert_break` owns all Word break insertion. The superseded
   `word.insert_page_break` compatibility tool MAY remain callable for older
   clients but MUST NOT be advertised in the daemon catalog or task pane
@@ -202,6 +242,12 @@ Tool ownership rules:
 - `word.update_page_setup` owns page layout mutations for the document or a
   single section and is advertised only after a successful
   `WordApiDesktop 1.3` probe.
+- Field tools own Word field lifecycle. `word.list_fields` reads current field
+  indices and bounded previews; `word.insert_field` owns curated field
+  insertion, including the table-of-contents convenience path; `word.update_field`
+  owns refresh/lock/unlock; and `word.delete_field` owns removal. Paragraph,
+  style, and header/footer tools may create text that fields reference, but they
+  must not create, refresh, or delete fields implicitly.
 
 ### 1.3 Runtime capability tiers
 
@@ -210,10 +256,13 @@ runtime and advertises only tools whose complete implementation is supported:
 
 | Tier | Requirement | Additional tools/features |
 |---|---|---|
-| Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection |
-| Review | `WordApi 1.4` | comments, bookmark anchors and bookmark lifecycle tools |
-| Notes and content controls | `WordApi 1.5` | footnote/endnote lifecycle and content-control lifecycle tools |
+| Core | `WordApi 1.3` | text, paragraphs, search, insert/edit, tables at start/end, styles, selection, document properties |
+| Review | `WordApi 1.4` | comments, bookmark anchors, bookmark lifecycle tools, and field listing |
+| Notes, content controls, fields, and styles | `WordApi 1.5` | footnote/endnote lifecycle, rich-text/plain-text content-control lifecycle, field insertion/update/deletion tools, and style-catalog tools |
 | Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
+| Checkbox content controls | `WordApi 1.7` | checkbox content-control insertion, checked-state listing, and checked-state updates |
+| List content controls | `WordApi 1.9` | dropdown-list and combo-box insertion, item listing, item mutation, and selected-item updates |
+| Desktop shapes | `WordApiDesktop 1.2` | shape and text-box listing, insertion, mutation, deletion, and text-box preview reachability |
 | Host-specific | explicit successful probe | page setup, active-window, and protection metadata |
 
 Header/footer body access and `word.save` use production Word APIs available
@@ -224,6 +273,16 @@ available. Preview APIs are excluded from v1.
 catalog when that probe fails. `word.insert_break` and `word.list_sections` are
 core-tier tools because their required Office.js APIs are available within the
 base Word API tier.
+
+`word.list_shapes`, `word.insert_shape`, `word.update_shape`, and
+`word.delete_shape` require `WordApiDesktop 1.2` and are absent from the catalog
+when that probe fails, including Word on the web. These tools use the desktop
+shape APIs exposed from `Body.shapes`, `Paragraph.shapes`, `Range.shapes`,
+`ShapeCollection.getById`, `Paragraph.insertTextBox`,
+`Paragraph.insertGeometricShape`, `Paragraph.insertPictureFromBase64`, and the
+matching `Range` insertion APIs. Shape ids are stable only within the current
+document session and callers must re-run `word.list_shapes` after insertion,
+deletion, or grouping changes.
 
 ### 1.4 Word resources
 
@@ -351,6 +410,93 @@ promised because Word does not expose portable document offsets.
 
 Returns `{ text, paragraph_count, is_empty }`. A selection may span multiple
 paragraphs; portable character offsets are intentionally not exposed.
+
+### 2.5A `word.set_selection`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "extent": { "$ref": "#/$defs/extent" },
+    "mode": { "enum": ["select", "cursor_start", "cursor_end"], "default": "select" }
+  },
+  "additionalProperties": false
+}
+```
+
+Resolves the shared Word anchor vocabulary, optionally applies the same extent
+rules as other anchored range tools, and calls Word's selection API on the
+resolved range. `mode: "select"` highlights and scrolls to the range;
+`cursor_start` and `cursor_end` collapse the selection to the range boundary.
+The response returns `{ selected_text_preview, paragraph_index, is_empty }`,
+where the preview is bounded to avoid turning selection control into a bulk
+document-read path.
+
+Although `word.set_selection` does not edit document contents, it changes UI
+state and affects later `selection`-anchored mutating calls. It is therefore
+classified as `edit` and is not exposed under the Read permission ceiling.
+
+### 2.5B `word.get_html`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "extent": { "$ref": "#/$defs/extent" }
+  },
+  "additionalProperties": false
+}
+```
+
+Omitting `anchor` reads the whole document body with Word's HTML interchange
+API. Supplying `anchor` resolves the shared Word anchor vocabulary and applies
+the same optional `extent` rules used by other range-scoped tools before
+calling the range HTML API. The response returns `{ html, byte_length,
+truncated: false }` and is marked as untrusted document content.
+
+`word.get_html` is a rich-content interchange read, not a high-fidelity export
+format. Word's HTML conversion is host-defined and may normalize styles,
+attributes, whitespace, lists, and tables. Responses are subject to the daemon's
+`MAX_RESPONSE_BYTES` cap; oversized results fail with `MAX_RESPONSE_SIZE` and
+`max_response_bytes` rather than returning a partial HTML document.
+
+### 2.5C `word.insert_html`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor", "html"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "html": { "type": "string", "minLength": 1, "maxLength": 1000000 },
+    "insert_location": { "enum": ["replace", "before", "after", "start", "end"], "default": "after" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+`word.insert_html` resolves the target anchor and calls Word's HTML insertion
+API. `replace` replaces the resolved range; `before` and `after` insert adjacent
+to the resolved range; `start` and `end` insert inside the resolved range when
+the host supports those locations. `validate_only: true` performs anchor and
+HTML-policy validation and returns a no-write verdict.
+
+The daemon and task pane MUST reject unsafe HTML before mutation with
+`INVALID_ARGUMENT` and `partial_effect: none`. The policy rejects script blocks,
+inline event-handler attributes, `javascript:` URLs, CSS `url(...)` references,
+and external resource-bearing attributes that Word would fetch such as `src`,
+`srcset`, `poster`, and similar media or stylesheet references. Plain links such
+as `https://` anchors are allowed because they are hyperlink targets rather than
+resources fetched during insertion. OOXML interchange is out of scope for this
+tool pair because it has a larger injection and compatibility surface.
 
 ### 2.6 `word.list_bookmarks`
 
@@ -553,7 +699,299 @@ add-in derives the other dimension from the current image dimensions. The tool
 returns old and new dimensions in points and preserves paragraph placement, alt
 text, relationship identity, and adjacent text.
 
-### 3.6 `word.insert_break`
+### 3.6 `word.list_images`
+
+List inline pictures in the main document body without exporting image bytes.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string" }
+  },
+  "additionalProperties": false
+}
+```
+
+The response shape is:
+
+```json
+{
+  "images": [
+    {
+      "paragraph_index": 0,
+      "image_index": 0,
+      "width_pt": 96,
+      "height_pt": 48,
+      "alt_text_title": "Logo",
+      "alt_text_description": "Company logo",
+      "has_hyperlink": true
+    }
+  ],
+  "count": 1
+}
+```
+
+`paragraph_index` is the current zero-based body paragraph index, and
+`image_index` is the zero-based inline-picture index within that paragraph.
+Callers must re-run `word.list_images` after insertion, replacement, or
+deletion before using previously observed indexes.
+
+### 3.7 `word.get_image`
+
+Export one inline picture by the same locator used by `word.resize_image`.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "image"],
+  "properties": {
+    "session_id": { "type": "string" },
+    "image": {
+      "type": "object",
+      "required": ["kind", "index"],
+      "properties": {
+        "kind": { "const": "paragraph_index" },
+        "index": { "type": "integer", "minimum": 0 },
+        "image_index": { "type": "integer", "minimum": 0, "default": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+The tool returns `base64`, `width_pt`, `height_pt`, `alt_text_title`,
+`alt_text_description`, and `has_hyperlink`. Because this exports document
+content, it requires the extract/read permission ceiling used for content reads.
+The add-in MUST reject responses that exceed the daemon's large-result limit
+with a structured result-size error instead of allowing an oversized transport
+payload.
+
+### 3.8 `word.update_image`
+
+Update non-geometry metadata or replace the bytes for an existing inline image.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "image"],
+  "properties": {
+    "session_id": { "type": "string" },
+    "image": {
+      "type": "object",
+      "required": ["kind", "index"],
+      "properties": {
+        "kind": { "const": "paragraph_index" },
+        "index": { "type": "integer", "minimum": 0 },
+        "image_index": { "type": "integer", "minimum": 0, "default": 0 }
+      },
+      "additionalProperties": false
+    },
+    "alt_text_title": { "type": "string" },
+    "alt_text_description": { "type": "string" },
+    "hyperlink": { "type": "string", "format": "uri" },
+    "replace_base64": { "type": "string" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+At least one of `alt_text_title`, `alt_text_description`, `hyperlink`, or
+`replace_base64` is required. Hyperlinks use the same URL scheme allowlist as
+the Word hyperlink tools. Replacement bytes use the same decoded-byte and image
+format validation as `word.insert_image`. `word.update_image` does not resize
+the image; callers use `word.resize_image` for geometry changes.
+
+With `validate_only: true`, the tool resolves the target image and validates
+arguments without changing image metadata or bytes. Invalid locators or action
+arguments fail with `INVALID_ARGUMENT` and `partial_effect: "none"`.
+
+### 3.9 `word.delete_image`
+
+Delete one inline picture by locator.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "image"],
+  "properties": {
+    "session_id": { "type": "string" },
+    "image": {
+      "type": "object",
+      "required": ["kind", "index"],
+      "properties": {
+        "kind": { "const": "paragraph_index" },
+        "index": { "type": "integer", "minimum": 0 },
+        "image_index": { "type": "integer", "minimum": 0, "default": 0 }
+      },
+      "additionalProperties": false
+    },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+The tool removes only the selected inline picture. It MUST preserve adjacent
+text and MUST NOT delete the containing paragraph as a substitute for image
+deletion. With `validate_only: true`, the tool resolves the target image and
+returns without deleting it.
+
+### 3.10 `word.list_shapes`
+
+List desktop-tier Word shapes from the main body by default. Shapes include
+text boxes, geometric shapes, groups, pictures, and canvases exposed by
+`Body.shapes`, `Paragraph.shapes`, and `Range.shapes`.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "scope": { "enum": ["body", "paragraph", "anchor"], "default": "body" },
+    "paragraph_index": { "type": "integer", "minimum": 0 },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "include_text": { "type": "boolean", "default": true }
+  },
+  "additionalProperties": false
+}
+```
+
+For `scope: "paragraph"`, `paragraph_index` is required. For
+`scope: "anchor"`, `anchor` is required. The response returns:
+
+```json
+{
+  "shapes": [
+    {
+      "shape_id": 42,
+      "type": "TextBox",
+      "name": "Text Box 1",
+      "text_preview": "Bounded text-box text",
+      "left_pt": 72,
+      "top_pt": 96,
+      "width_pt": 240,
+      "height_pt": 80,
+      "relative_horizontal_position": "Margin",
+      "relative_vertical_position": "Paragraph",
+      "alt_text_description": "Callout text",
+      "untrusted_source": true
+    }
+  ],
+  "count": 1,
+  "untrusted_source": true
+}
+```
+
+`text_preview` is populated only from shape body or text-frame text that the
+desktop API exposes and must be bounded by the same preview discipline as other
+document text reads. `word.get_text` continues to read the main document body;
+text inside text boxes is reachable through `word.list_shapes` and
+`word.update_shape` rather than silently mixed into body text.
+
+### 3.11 `word.insert_shape`
+
+Insert a desktop-tier text box, geometric shape, or floating picture anchored
+at an existing paragraph or range. The implementation uses
+`Paragraph.insertTextBox`, `Paragraph.insertGeometricShape`,
+`Paragraph.insertPictureFromBase64`, or the equivalent `Range` APIs after
+resolving the anchor.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "shape_type"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "shape_type": { "enum": ["text_box", "rectangle", "ellipse", "rounded_rectangle", "line", "picture"] },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "text": { "type": "string" },
+    "image": { "$ref": "#/$defs/image_input" },
+    "left_pt": { "type": "number" },
+    "top_pt": { "type": "number" },
+    "width_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "height_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "alt_text_description": { "type": "string" },
+    "fill_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "line_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+`shape_type: "text_box"` uses `text` as the inserted text-box body, defaulting
+to an empty string. Geometric shapes map only the small portable enum above to
+Office geometric shape values; unsupported shapes fail `INVALID_ARGUMENT` before
+mutation. `shape_type: "picture"` requires `image` and uses the same daemon
+fetch, byte-size, MIME, and decoded-image validation policy as
+`word.insert_image`. The response returns the new `shape` metadata from
+`word.list_shapes` plus `created: true`.
+
+### 3.12 `word.update_shape`
+
+Mutate one existing desktop-tier shape by current `shape_id`.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "shape_id", "action"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "shape_id": { "type": "integer" },
+    "action": { "enum": ["move", "resize", "set_text", "set_alt_text", "set_fill", "set_line", "set_wrap", "set_visibility"] },
+    "left_pt": { "type": "number" },
+    "top_pt": { "type": "number" },
+    "width_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "height_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "text": { "type": "string" },
+    "alt_text_description": { "type": "string" },
+    "fill_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "line_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "wrap_type": { "enum": ["inline", "square", "tight", "behind", "front", "top_bottom"] },
+    "visible": { "type": "boolean" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Per-action required arguments are preflighted with `INVALID_ARGUMENT` and
+`partial_effect: "none"`. `set_text` applies only to shapes with a body or text
+frame, and unsupported shape types fail before mutation where the host exposes
+enough metadata to decide. `move` changes `left` and/or `top`; `resize` changes
+`width` and/or `height`; `set_wrap` maps the portable wrap enum to
+`Shape.textWrap`. `validate_only: true` resolves the shape and validates the
+arguments without changing it. The response returns `{ action, shape, updated:
+true }`.
+
+### 3.13 `word.delete_shape`
+
+Delete one existing desktop-tier shape by current `shape_id`.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "shape_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "shape_id": { "type": "integer" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+The tool deletes only the target shape and does not delete surrounding body
+paragraphs or inline-picture indexes. With `validate_only: true`, the tool
+resolves the shape and returns without deleting it.
+
+### 3.14 `word.insert_break`
 
 ```json
 {
@@ -1134,7 +1572,13 @@ hanging indent using Word's native `Paragraph.firstLineIndent` semantics.
 }
 ```
 
-Returns `{ rows, cols, data: string[][], header_row: boolean }`.
+Returns `{ rows, cols, data: string[][], header_row: boolean, merged?: object[] }`.
+On uniform tables, `data` is the rectangular cell text matrix. On merged or
+otherwise non-uniform tables where Word cannot provide a rectangular value
+matrix, the tool returns the dimensions plus `merged` diagnostics when the host
+supports the `WordApi 1.4` table APIs; hosts that cannot inspect the merged
+geometry fail with `HOST_CAPABILITY_UNAVAILABLE` instead of returning a
+misleading matrix.
 
 ### 5.2 `word.update_table`
 
@@ -1148,12 +1592,32 @@ one table-owned mutation while preserving the existing v1 table behavior.
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
     "table_index": { "type": "integer", "minimum": 0 },
-    "action": { "enum": ["update_cell", "add_row", "add_column", "format_cell", "delete"] },
+    "action": {
+      "enum": [
+        "update_cell", "add_row", "add_column", "format_cell", "delete",
+        "delete_row", "delete_column", "merge_cells", "set_column_width",
+        "distribute_columns", "set_borders", "set_header_row"
+      ]
+    },
     "row": { "type": "integer", "minimum": 0 },
     "col": { "type": "integer", "minimum": 0 },
     "text": { "type": "string" },
     "index": { "type": "integer", "minimum": 0 },
+    "row_range": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 2, "maxItems": 2 },
+    "col_range": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 2, "maxItems": 2 },
     "values": { "type": "array", "items": { "type": "string" } },
+    "width_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "header_row": { "type": "boolean" },
+    "borders": {
+      "type": "object",
+      "properties": {
+        "edges": { "type": "array", "items": { "enum": ["top", "bottom", "left", "right", "inside_horizontal", "inside_vertical", "all"] } },
+        "style": { "enum": ["single", "double", "dotted", "dashed", "none"] },
+        "width_pt": { "type": "number", "minimum": 0 },
+        "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+      },
+      "additionalProperties": false
+    },
     "background_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
     "horizontal_alignment": { "enum": ["left", "center", "right"] },
     "vertical_alignment": { "enum": ["top", "center", "bottom"] },
@@ -1171,7 +1635,25 @@ Action semantics:
 - `add_column` accepts optional `index` and `values`; omitting `index` appends.
 - `format_cell` requires `row` and `col`; cell background, alignment, padding,
   and run formatting are optional.
+- `delete_row` requires `row` or `row_range`; it deletes one row or an inclusive
+  row span after validating table bounds. This is destructive.
+- `delete_column` requires `col` or `col_range`; it deletes one column or an
+  inclusive column span after validating table bounds. This is destructive.
+- `merge_cells` requires `row_range` and `col_range`; it merges the rectangular
+  span and concatenates cell contents using Word's native table semantics. It
+  requires `WordApi 1.4` host support.
+- `set_column_width` requires `col` and `width_pt`; it updates the target column
+  width without changing cell text.
+- `distribute_columns` distributes columns evenly across the table.
+- `set_borders` requires `borders` and updates table-level borders. When `row`
+  and `col` are provided, it updates the addressed cell borders instead.
+- `set_header_row` requires `header_row` and toggles a single header row.
 - `delete` deletes the whole table and must be requested explicitly.
+
+All new actions preflight live table bounds before mutation. Invalid indices,
+inverted ranges, or missing per-action arguments fail with `INVALID_ARGUMENT`
+and `partial_effect: "none"`. `delete_row` and `delete_column` are destructive
+actions and require the All ceiling; the other new actions are edit actions.
 
 The compatibility tools in §5.3-§5.6 remain documented until the catalog
 migration retires them from advertisement.
@@ -1265,8 +1747,9 @@ Superseded compatibility contract. This tool is no longer advertised; use
 }
 ```
 
-Cell merging and arbitrary border editing are deferred until their
-cross-platform Office.js behavior is verified.
+Cell merging and arbitrary border editing are now owned by `word.update_table`
+through `merge_cells` and `set_borders`; the superseded compatibility tool
+remains documented only for historical argument compatibility.
 
 ## 6. Structure
 
@@ -1307,15 +1790,203 @@ Level `0` converts the paragraph to body text.
 Callers must provide either `style` or `heading_level`. `heading_level` is the
 target replacement for `word.set_heading_level`.
 
-`word.create_style` is reserved for a future capability set after its
-cross-platform Office.js behavior is verified.
+### 6.3 `word.list_styles`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "type": { "enum": ["paragraph", "character", "table", "list"] },
+    "built_in": { "type": "boolean" },
+    "in_use_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns `{ styles, count }`. Each style item includes `name_local`, `type`,
+`built_in`, `in_use`, `base_style`, and `priority`. The tool uses
+`Document.getStyles()` and is advertised only when the `WordApi 1.5` probe
+passes.
+
+### 6.4 `word.create_style`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "name", "type"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1 },
+    "type": { "enum": ["paragraph", "character", "table", "list"] },
+    "base_style": { "type": "string", "minLength": 1 },
+    "font": { "$ref": "#/$defs/run_formatting" },
+    "paragraph": { "$ref": "#/$defs/paragraph_formatting" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Creates a document style via `Document.addStyle(name, type)`, then applies
+optional font and paragraph-formatting properties. Duplicate style names fail
+before mutation with `INVALID_ARGUMENT` and `partial_effect: none`.
+`base_style` is accepted only when a `WordApi 1.6` probe succeeds because
+Office.js exposes `Style.baseStyle` in 1.5 but only supports setting it in 1.6;
+on 1.5-only hosts it fails with `HOST_CAPABILITY_UNAVAILABLE` before mutation.
+`validate_only: true` resolves existing styles and validates arguments without
+creating the style.
+
+### 6.5 `word.update_style`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "name"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1 },
+    "base_style": { "type": "string", "minLength": 1 },
+    "font": { "$ref": "#/$defs/run_formatting" },
+    "paragraph": { "$ref": "#/$defs/paragraph_formatting" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Callers must provide at least one of `base_style`, `font`, or `paragraph`.
+Unknown style names and unknown `base_style` names fail before mutation with
+`INVALID_ARGUMENT` and `partial_effect: none`. `base_style` writes require a
+successful `WordApi 1.6` probe; other style updates remain available at
+`WordApi 1.5`. Built-in styles may be updated when Word allows it; responses
+include `built_in` so clients can present an appropriate warning. Style
+deletion remains out of scope for this tool because deleting an in-use style
+changes document content fallback behavior and needs a separate destructive
+contract.
+
+## 6A. Document Properties
+
+Document-property tools own Word document metadata. Core properties map to
+`Document.properties`; custom properties map to
+`Document.properties.customProperties`. The tool surface keeps read-only Office
+metadata observable but not writable.
+
+### 6A.1 `word.get_document_properties`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "include_custom": { "type": "boolean", "default": true }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns writable core fields (`title`, `subject`, `author`, `keywords`,
+`category`, `comments`, `company`, and `manager`), read-only metadata
+(`last_author`, `revision_number`, `creation_date`, `last_save_time`, and
+`security` when Office returns it), and, when `include_custom` is not false,
+`custom: [{ key, type, value }]`.
+
+The response normalizes Office camelCase names to snake_case. Date values are
+returned as ISO-8601 strings when Word returns a `Date`; missing host values are
+omitted rather than filled with synthetic defaults.
+
+### 6A.2 `word.update_document_properties`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "title": { "type": "string" },
+    "subject": { "type": "string" },
+    "author": { "type": "string" },
+    "keywords": { "type": "string" },
+    "category": { "type": "string" },
+    "comments": { "type": "string" },
+    "company": { "type": "string" },
+    "manager": { "type": "string" },
+    "custom_set": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "value"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "value": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" }
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "custom_delete": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+Callers must provide at least one writable core property, one `custom_set`
+entry, or one `custom_delete` key. Requests that contain no writable operation
+fail with `INVALID_ARGUMENT` and `partial_effect: "none"`. Read-only fields
+such as `last_author`, `revision_number`, `creation_date`, and
+`last_save_time` are intentionally absent from the schema, so attempts to write
+them fail schema validation.
+
+`custom_set` upserts by deleting any existing custom property with the same key
+before adding the new value through `CustomPropertyCollection.add(key, value)`.
+`custom_delete` deletes matching keys and reports unknown keys in the response;
+unknown-key deletes are successful no-ops. `deleteAll` is not exposed because it
+is too broad for the normal metadata-edit workflow.
+
+| Operation | API | Requirement set |
+|---|---|---|
+| Read/write core properties | `Document.properties` / `DocumentProperties` | `WordApi 1.3` |
+| Read read-only metadata | `DocumentProperties.lastAuthor`, `creationDate`, `lastSaveTime`, `revisionNumber`, `security` | `WordApi 1.3` |
+| Enumerate custom properties | `DocumentProperties.customProperties` / `CustomPropertyCollection` | `WordApi 1.3` |
+| Upsert/delete custom properties | `CustomPropertyCollection.add(key, value)` / `CustomProperty.delete()` | `WordApi 1.3` |
+
+Document-property tools are core-tier tools. `word.get_document_properties`
+requires the same read ceiling as document text extraction because metadata can
+contain sensitive author, keyword, and comment values. `word.update_document_properties`
+requires edit permission and has no destructive variant.
 
 ## 7. Content Controls
 
-The content-control tools use generic `Word.ContentControl` APIs only. v1
-supports rich text and plain text controls; checkbox, dropdown, combo box,
-picture, date picker, repeating-section, group, and desktop-only specialized
-control behavior is deferred.
+The content-control tools own content-control lifecycle, metadata, and
+type-specific form state. v1 supports rich text and plain text controls on
+`WordApi 1.5`, checkbox controls on `WordApi 1.7`, and dropdown-list / combo-box
+controls on `WordApi 1.9`. The four existing owner tools remain the complete
+surface; checkbox and list controls extend their schemas instead of adding new
+tools.
+
+The task pane advertises the content-control tools when the base `WordApi 1.5`
+content-control tier is present. Type-specific arguments that require a higher
+tier MUST fail before mutation with `HOST_CAPABILITY_UNAVAILABLE` and
+`partial_effect: none` when the host does not support the required Word API.
+Session-specific schema narrowing may be added later, but the stable daemon
+schema documents the full cross-host contract.
+
+Picture, date-picker, repeating-section, and group content controls remain
+deferred. Picture controls overlap the Media owner and need explicit byte/fetch
+safety policy; date-picker support is desktop-specific; repeating-section and
+group controls do not yet have enough stable portable CRUD behavior for the v1
+contract.
 
 ### 7.1 `word.list_content_controls`
 
@@ -1325,7 +1996,7 @@ control behavior is deferred.
   "required": ["session_id"],
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
-    "type": { "enum": ["rich_text", "plain_text"] },
+    "type": { "enum": ["rich_text", "plain_text", "checkbox", "dropdown_list", "combo_box"] },
     "tag": { "type": "string" },
     "title": { "type": "string" }
   },
@@ -1335,8 +2006,10 @@ control behavior is deferred.
 
 Returns `{ content_controls, count }`. Each item includes
 `content_control_id`, `tag`, `title`, `type`, `subtype`, `cannot_delete`, and
-`cannot_edit`. It does not return the contained document text; callers use read
-tools for text.
+`cannot_edit`. Checkbox items also include `checked`. Dropdown-list and
+combo-box items include `list_items: [{ display_text, value }]` and
+`selected_text`. The tool does not return arbitrary contained document text for
+rich/plain text controls; callers use read tools for body text.
 
 ### 7.2 `word.insert_content_control`
 
@@ -1347,8 +2020,22 @@ tools for text.
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
     "anchor": { "$ref": "#/$defs/anchor" },
-    "type": { "enum": ["rich_text", "plain_text"] },
+    "type": { "enum": ["rich_text", "plain_text", "checkbox", "dropdown_list", "combo_box"] },
     "text": { "type": "string" },
+    "checked": { "type": "boolean" },
+    "list_items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["display_text"],
+        "properties": {
+          "display_text": { "type": "string", "minLength": 1 },
+          "value": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
     "tag": { "type": "string" },
     "title": { "type": "string" },
     "cannot_delete": { "type": "boolean" },
@@ -1362,7 +2049,11 @@ tools for text.
 ```
 
 When `anchor` is omitted, the current selection is used. When `text` is
-provided, the anchored range is replaced with that text before wrapping it.
+provided for rich/plain text controls, the anchored range is replaced with that
+text before wrapping it. `checked` is valid only with `type: "checkbox"`.
+`list_items` is valid only with `type: "dropdown_list"` or `type: "combo_box"`
+and must provide at least one item. Invalid type-specific arguments fail with
+`INVALID_ARGUMENT` and no mutation.
 
 ### 7.3 `word.update_content_control`
 
@@ -1374,6 +2065,23 @@ provided, the anchored range is replaced with that text before wrapping it.
     "session_id": { "type": "string", "format": "uuid" },
     "content_control_id": { "type": "integer", "minimum": 0 },
     "text": { "type": "string" },
+    "checked": { "type": "boolean" },
+    "selected_value": { "type": "string" },
+    "list_items_add": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["display_text"],
+        "properties": {
+          "display_text": { "type": "string", "minLength": 1 },
+          "value": { "type": "string" },
+          "index": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "list_items_delete": { "type": "array", "items": { "type": "string" } },
+    "list_items_clear": { "type": "boolean", "default": false },
     "tag": { "type": "string" },
     "title": { "type": "string" },
     "cannot_delete": { "type": "boolean" },
@@ -1385,6 +2093,13 @@ provided, the anchored range is replaced with that text before wrapping it.
   "additionalProperties": false
 }
 ```
+
+`checked` is valid only for checkbox controls. `selected_value`,
+`list_items_add`, `list_items_delete`, and `list_items_clear` are valid only for
+dropdown-list or combo-box controls. `selected_value` matches either item value
+or display text and selects exactly one item; ambiguous or missing matches fail
+without mutation. List item deletion matches values or display text and fails if
+any requested item is absent unless a future explicit partial mode is added.
 
 ### 7.4 `word.delete_content_control`
 
@@ -1402,6 +2117,16 @@ provided, the anchored range is replaced with that text before wrapping it.
 ```
 
 The default preserves contents while removing the content-control wrapper.
+
+### 7.5 Office.js Mapping
+
+| Operation | API | Requirement set |
+|---|---|---|
+| Rich/plain content controls | `Range.insertContentControl("RichText" | "PlainText")`, `Body.getContentControls()` | `WordApi 1.5` |
+| Checkbox state | `ContentControl.checkboxContentControl.isChecked` | `WordApi 1.7` |
+| Insert checkbox | `Range.insertContentControl("CheckBox")` | `WordApi 1.7` |
+| Dropdown/combobox object | `ContentControl.dropDownListContentControl` / `comboBoxContentControl` | `WordApi 1.9` |
+| List items | `addListItem(displayText, value, index)`, `deleteAllListItems()`, `ContentControlListItem.delete()` / `select()` | `WordApi 1.9` |
 
 ## 7A. Bookmark Lifecycle
 
@@ -1421,6 +2146,12 @@ existence checks described in §3.11 and §4.4. A bookmark anchor remains part o
 the shared anchor vocabulary whether or not the lifecycle tools are enabled;
 however, the lifecycle tools themselves are advertised only when the `WordApi
 1.4` review tier is available.
+
+Selection-setting stays in Range & selection because it targets the same shared
+anchor vocabulary as `word.resolve_anchor` and anchored mutation tools. It is
+implemented with `Range.select("Select" | "Start" | "End")`; the tool itself
+uses the existing Word core anchor-resolution tier (`WordApi 1.3`) rather than
+introducing a separate selection capability gate.
 
 ## 7B. Note Lifecycle
 
@@ -1531,6 +2262,143 @@ same current metadata without deleting it.
 Note lifecycle tools are advertised only when the `WordApi 1.5` notes and
 content-controls tier is available.
 
+## 7C. Field Lifecycle
+
+Word fields are document-structure objects used for generated furniture such as
+tables of contents, page numbers, dates, cross-references, sequence numbers,
+and style references. Field tools own field lifecycle. The field allowlist is
+curated; field types that can import external content or execute unsafe host
+behavior, such as `INCLUDETEXT` or `IMPORT`, are not exposed.
+
+Field indices are current collection positions. Clients that need stable
+addressing across edits must re-read `word.list_fields` after any insert,
+delete, or document edit that can add or remove fields.
+
+### 7C.1 `word.list_fields`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "type": { "type": "string" },
+    "offset": { "type": "integer", "minimum": 0, "default": 0 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+  },
+  "additionalProperties": false
+}
+```
+
+Returns `{ fields: [{ index, type, code, result_preview, locked,
+paragraph_index }], count, truncated }` from `Document.fields`. The optional
+`type` filter accepts the normalized field type names returned by this tool;
+unknown filters return an empty list rather than an error. `code` and
+`result_preview` are bounded previews and must not duplicate full document text.
+
+### 7C.2 `word.insert_field`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "anchor", "field_type"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "field_type": { "enum": ["toc", "page", "num_pages", "date", "time", "ref", "hyperlink", "seq", "styleref"] },
+    "code_options": { "type": "string" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+The add-in resolves the anchor and maps the curated `field_type` to a Word
+field insertion. `field_type: "toc"` uses a safe default table-of-contents
+field code when `code_options` is omitted: `\\o "1-3" \\h \\z \\u`, producing
+a hyperlinkable three-level TOC. Other field types use either the matching
+`Word.FieldType` value or a safe field-code construction when Office.js requires
+code text.
+
+`code_options` is limited to field switches and arguments for the selected
+allowlisted type. The add-in rejects unsupported field types, external-content
+field names, and malformed options with `INVALID_ARGUMENT` and
+`partial_effect: "none"` before queuing writes. With `validate_only: true`, the
+add-in resolves the anchor and validates the field type and options, then
+returns `{ valid: true, operation: "word.insert_field", partial_effect: "none" }`
+without inserting a field.
+
+### 7C.3 `word.update_field`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "action"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "action": { "enum": ["refresh", "refresh_all", "lock", "unlock"] },
+    "field_index": { "type": "integer", "minimum": 0 },
+    "expected_count": { "type": "integer", "minimum": 0 },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "enum": ["refresh", "lock", "unlock"] } } },
+      "then": { "required": ["field_index"] }
+    },
+    {
+      "if": { "properties": { "action": { "const": "refresh_all" } } },
+      "then": { "required": ["expected_count"] }
+    }
+  ]
+}
+```
+
+`refresh` calls `Field.updateResult()` for one current field index. `lock` and
+`unlock` set `Field.locked`. `refresh_all` reloads `Document.fields`, compares
+the live count to `expected_count`, and refreshes every field only when the
+count still matches. Count mismatches fail with `STALE_INDEX` and no mutation.
+Out-of-range indices fail with `INVALID_ARGUMENT` and `partial_effect: "none"`
+before any write is queued. With `validate_only: true`, the add-in resolves the
+target or count guard and returns current metadata without changing the field.
+
+### 7C.4 `word.delete_field`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "field_index"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "field_index": { "type": "integer", "minimum": 0 },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Deletes the addressed field with `Field.delete()`. Deletion removes the field
+and its current result text; it does not preserve a plain-text copy. Out-of-range
+indices fail with `INVALID_ARGUMENT` and `partial_effect: "none"` before any
+deletion. The success response includes `{ deleted: true, field_index, count }`,
+where `count` is the remaining number of fields. With `validate_only: true`, the
+add-in resolves the target field and returns the same current metadata without
+deleting it.
+
+| Operation | API | Requirement set |
+|---|---|---|
+| Enumerate fields | `Document.fields` / `Range.fields` | `WordApi 1.4` |
+| Read field metadata | `Field.type`, `Field.code`, `Field.result`, `Field.locked` | `WordApi 1.4` |
+| Insert field | `Range.insertField(insertLocation, fieldType, text, removeFormatting)` | `WordApi 1.5` |
+| Refresh field result | `Field.updateResult()` | `WordApi 1.5` |
+| Lock/unlock field | `Field.locked` | `WordApi 1.5` |
+| Delete field | `Field.delete()` | `WordApi 1.5` |
+
+`word.list_fields` is advertised when `WordApi 1.4` is available. Mutating
+field tools are advertised only when the `WordApi 1.5` notes, content-controls,
+and fields tier is available.
+
 ## 8. Review
 
 ### 8.1 `word.add_comment`
@@ -1565,7 +2433,27 @@ indistinguishable from the user doing it themselves.
 }
 ```
 
-### 8.3 `word.update_tracked_change`
+### 8.3 `word.set_change_tracking`
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "mode"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "mode": { "enum": ["off", "track_all", "track_mine_only"] }
+  },
+  "additionalProperties": false
+}
+```
+
+The tool maps to `Document.changeTrackingMode` (`WordApi 1.4`) and returns
+`{ previous_mode, mode }`. The accepted modes map to Office.js values as
+follows: `off` -> `Word.ChangeTrackingMode.off`, `track_all` ->
+`trackAll`, and `track_mine_only` -> `trackMineOnly`. Unsupported host
+capabilities return `HOST_CAPABILITY_UNAVAILABLE` before mutation.
+
+### 8.4 `word.update_tracked_change`
 
 Stable Office.js tracked-change objects do not expose an ID. The tracked
 changes resource therefore returns each item as
@@ -1576,21 +2464,39 @@ loaded fields.
 ```json
 {
   "type": "object",
-  "required": ["session_id", "action", "change_index", "expected_fingerprint"],
+  "required": ["session_id", "action"],
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
-    "action": { "enum": ["accept", "reject"] },
+    "action": { "enum": ["accept", "reject", "accept_all", "reject_all"] },
     "change_index": { "type": "integer", "minimum": 0 },
-    "expected_fingerprint": { "type": "string", "minLength": 1 }
+    "expected_fingerprint": { "type": "string", "minLength": 1 },
+    "expected_count": { "type": "integer", "minimum": 0 }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "enum": ["accept", "reject"] } } },
+      "then": { "required": ["change_index", "expected_fingerprint"] }
+    },
+    {
+      "if": { "properties": { "action": { "enum": ["accept_all", "reject_all"] } } },
+      "then": { "required": ["expected_count"] }
+    }
+  ]
 }
 ```
 
 The add-in reloads the collection immediately before mutation. An index or
 fingerprint mismatch returns `STALE_INDEX`; clients must re-read the resource.
+For bulk actions, the add-in compares the live tracked-change count to
+`expected_count` before calling `TrackedChangeCollection.acceptAll()` or
+`rejectAll()`. A count mismatch returns `STALE_INDEX` with no mutation.
+Single-change `accept` and `reject` remain edit actions guarded by current
+index and fingerprint. Bulk `accept_all` and `reject_all` are destructive
+actions because they finalize every tracked revision in the document and are
+available only under the All permission ceiling.
 
-### 8.4 `word.accept_change` and `word.reject_change`
+### 8.5 `word.accept_change` and `word.reject_change`
 
 Compatibility tools retained until the target-surface migration removes them
 from the advertised catalog. New clients should call `word.update_tracked_change`.
@@ -1669,11 +2575,13 @@ information is available.
 
 ### 10.3 Validation-only mode
 
-`word.insert_image`, `word.replace_text`, `word.update_paragraph`, and
-`word.delete_range` MUST support `validate_only: true`. Validation-only mode is
-not a transaction preview; it is a no-write preflight. The add-in MAY call
-read-only Office.js APIs and `context.sync()` to resolve anchors, count matches,
-or load target metadata, but it MUST NOT queue a write before returning.
+Mutating tools that advertise `validate_only: true`, including
+`word.insert_image`, `word.replace_text`, `word.update_paragraph`,
+`word.delete_range`, note lifecycle mutations, header/footer updates, and field
+lifecycle mutations, MUST implement validation-only mode as a no-write preflight.
+Validation-only mode is not a transaction preview. The add-in MAY call read-only
+Office.js APIs and `context.sync()` to resolve anchors, count matches, or load
+target metadata, but it MUST NOT queue a write before returning.
 
 Successful validation-only responses MUST include:
 

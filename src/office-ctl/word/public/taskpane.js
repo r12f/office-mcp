@@ -53,6 +53,7 @@
     taskStatusLabel
   } = window.OfficeCtlMainUi;
   const CONNECT_TIMEOUT_MS = 8000;
+  const MAX_RESPONSE_BYTES = 1024 * 1024;
   const INSERT_IMAGE_PLACEMENTS = new Set([
     'inline',
     'before_paragraph',
@@ -62,15 +63,27 @@
     'replace_paragraph',
     'selection'
   ]);
+  const DOCUMENT_PROPERTY_WRITABLE_FIELDS = ['title', 'subject', 'author', 'keywords', 'category', 'comments', 'company', 'manager'];
   const WORD_MUTATING_TOOLS = new Set([
     'word.insert_paragraph',
     'word.insert_table',
     'word.insert_image',
     'word.resize_image',
+    'word.update_image',
+    'word.delete_image',
+    'word.insert_shape',
+    'word.update_shape',
+    'word.delete_shape',
     'word.insert_break',
     'word.insert_page_break',
     'word.update_page_setup',
     'word.update_header_footer',
+    'word.update_document_properties',
+    'word.insert_field',
+    'word.update_field',
+    'word.delete_field',
+    'word.create_style',
+    'word.update_style',
     'word.insert_list',
     'word.update_list',
     'word.insert_hyperlink',
@@ -78,6 +91,8 @@
     'word.replace_text',
     'word.update_paragraph',
     'word.delete_range',
+    'word.set_selection',
+    'word.insert_html',
     'word.insert_bookmark',
     'word.delete_bookmark',
     'word.insert_note',
@@ -91,6 +106,7 @@
     'word.apply_style',
     'word.add_comment',
     'word.resolve_comment',
+    'word.set_change_tracking',
     'word.update_tracked_change',
     'word.save'
   ]);
@@ -104,15 +120,35 @@
     'word.list_bookmarks',
     'word.delete_bookmark',
     'word.get_selection',
+    'word.set_selection',
+    'word.get_html',
+    'word.insert_html',
     'word.get_header_footer',
+    'word.get_document_properties',
     'word.insert_paragraph',
     'word.insert_image',
     'word.resize_image',
+    'word.list_images',
+    'word.get_image',
+    'word.update_image',
+    'word.delete_image',
+    'word.list_shapes',
+    'word.insert_shape',
+    'word.update_shape',
+    'word.delete_shape',
     'word.insert_table',
     'word.update_header_footer',
+    'word.update_document_properties',
     'word.insert_break',
     'word.list_sections',
     'word.update_page_setup',
+    'word.list_fields',
+    'word.insert_field',
+    'word.update_field',
+    'word.delete_field',
+    'word.list_styles',
+    'word.create_style',
+    'word.update_style',
     'word.insert_list',
     'word.list_lists',
     'word.update_list',
@@ -136,23 +172,25 @@
     'word.apply_style',
     'word.add_comment',
     'word.resolve_comment',
+    'word.set_change_tracking',
     'word.update_tracked_change',
     'word.save'
   ];
   const TOOL_GROUPS = [
-    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.save'] },
-    { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
+    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.get_document_properties', 'word.update_document_properties', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.list_fields', 'word.insert_field', 'word.update_field', 'word.delete_field', 'word.list_styles', 'word.create_style', 'word.update_style', 'word.save'] },
+    { label: 'Range & selection', tools: ['word.get_selection', 'word.set_selection', 'word.get_html', 'word.insert_html', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list', 'word.list_lists', 'word.update_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
-    { label: 'Media', tools: ['word.insert_image', 'word.resize_image'] },
+    { label: 'Media', tools: ['word.insert_image', 'word.resize_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image', 'word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
     { label: 'Notes', tools: ['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'] },
-    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_tracked_change'] }
+    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.set_change_tracking', 'word.update_tracked_change'] }
   ];
   const TOOL_METADATA = new Map([
     ['word.get_text', { category: 'Document & structure', sideEffect: 'read', description: 'Read document text by paragraph range.' }],
     ['word.get_outline', { category: 'Document & structure', sideEffect: 'read', description: 'Read heading outline and structure.' }],
     ['word.get_header_footer', { category: 'Document & structure', sideEffect: 'read', description: 'Read section header or footer text.' }],
+    ['word.get_document_properties', { category: 'Document & structure', sideEffect: 'read', description: 'Read document metadata and custom properties.' }],
     ['word.get_paragraph', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'Read a single paragraph by index with optional formatting metadata.' }],
     ['word.find_text', { category: 'Range & selection', sideEffect: 'read', description: 'Find text matches in the document body.' }],
     ['word.resolve_anchor', { category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata.' }],
@@ -160,15 +198,34 @@
     ['word.list_bookmarks', { category: 'Range & selection', sideEffect: 'read', description: 'List bookmark names and locations.' }],
     ['word.delete_bookmark', { category: 'Range & selection', sideEffect: 'destructive', description: 'Delete a bookmark marker without deleting text.' }],
     ['word.get_selection', { category: 'Range & selection', sideEffect: 'read', description: 'Read the current selection.' }],
+    ['word.set_selection', { category: 'Range & selection', sideEffect: 'mutating', description: 'Set the current selection or cursor position from an anchor.' }],
+    ['word.get_html', { category: 'Range & selection', sideEffect: 'read', description: 'Read document or anchored range HTML.' }],
+    ['word.insert_html', { category: 'Range & selection', sideEffect: 'mutating', description: 'Insert sanitized HTML at an anchored range.' }],
     ['word.insert_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
     ['word.insert_image', { category: 'Media', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
     ['word.resize_image', { category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image.' }],
+    ['word.list_images', { category: 'Media', sideEffect: 'read', description: 'List inline images.' }],
+    ['word.get_image', { category: 'Media', sideEffect: 'read', description: 'Export an inline image with metadata.' }],
+    ['word.update_image', { category: 'Media', sideEffect: 'mutating', description: 'Update inline image metadata or bytes.' }],
+    ['word.delete_image', { category: 'Media', sideEffect: 'destructive', description: 'Delete an inline image without deleting paragraph text.' }],
+    ['word.list_shapes', { category: 'Media', sideEffect: 'read', description: 'List desktop Word shapes and text boxes.' }],
+    ['word.insert_shape', { category: 'Media', sideEffect: 'mutating', description: 'Insert a desktop Word shape or text box.' }],
+    ['word.update_shape', { category: 'Media', sideEffect: 'mutating', description: 'Update desktop Word shape text, geometry, or visual settings.' }],
+    ['word.delete_shape', { category: 'Media', sideEffect: 'destructive', description: 'Delete a desktop Word shape.' }],
     ['word.insert_table', { category: 'Tables', sideEffect: 'mutating', description: 'Insert a table with provided values.' }],
     ['word.insert_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page, line, or section break.' }],
     ['word.insert_page_break', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page break.' }],
     ['word.list_sections', { category: 'Document & structure', sideEffect: 'read', description: 'List document sections.' }],
     ['word.update_page_setup', { category: 'Document & structure', sideEffect: 'mutating', description: 'Update document or section page setup.' }],
+    ['word.list_fields', { category: 'Document & structure', sideEffect: 'read', description: 'List document fields with bounded previews.' }],
+    ['word.insert_field', { category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a curated Word field at an anchored range.' }],
+    ['word.update_field', { category: 'Document & structure', sideEffect: 'mutating', description: 'Refresh, lock, or unlock Word fields.' }],
+    ['word.delete_field', { category: 'Document & structure', sideEffect: 'destructive', description: 'Delete a Word field by current index.' }],
+    ['word.list_styles', { category: 'Document & structure', sideEffect: 'read', description: 'List built-in and custom document styles.' }],
+    ['word.create_style', { category: 'Document & structure', sideEffect: 'mutating', description: 'Create a document style definition.' }],
+    ['word.update_style', { category: 'Document & structure', sideEffect: 'mutating', description: 'Update a document style definition.' }],
     ['word.update_header_footer', { category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer.' }],
+    ['word.update_document_properties', { category: 'Document & structure', sideEffect: 'mutating', description: 'Update document metadata and custom properties.' }],
     ['word.insert_list', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a list.' }],
     ['word.list_lists', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'List existing Word lists and their paragraph items.' }],
     ['word.update_list', { category: 'Paragraphs & lists', sideEffect: 'destructive', description: 'Mutate existing Word list membership, levels, or formatting.' }],
@@ -192,7 +249,8 @@
     ['word.apply_style', { category: 'Range & selection', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
     ['word.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a comment to an anchored range.' }],
     ['word.resolve_comment', { category: 'Review', sideEffect: 'mutating', description: 'Resolve an existing comment.' }],
-    ['word.update_tracked_change', { category: 'Review', sideEffect: 'destructive', description: 'Accept or reject a tracked change by fingerprint.' }],
+    ['word.set_change_tracking', { category: 'Review', sideEffect: 'mutating', description: 'Set Track Changes mode.' }],
+    ['word.update_tracked_change', { category: 'Review', sideEffect: 'destructive', description: 'Accept, reject, or bulk-finalize tracked changes.' }],
     ['word.save', { category: 'Document & structure', sideEffect: 'mutating', description: 'Save the current document.' }]
   ]);
   let socket;
@@ -521,8 +579,20 @@
         case 'word.get_selection':
           data = await getSelection(args);
           break;
+        case 'word.set_selection':
+          data = await setSelection(args);
+          break;
+        case 'word.get_html':
+          data = await getHtml(args || {});
+          break;
+        case 'word.insert_html':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await insertHtml(args);
+          break;
         case 'word.get_header_footer':
           data = await getHeaderFooter(args);
+          break;
+        case 'word.get_document_properties':
+          data = await getDocumentProperties(args || {});
           break;
         case 'word.insert_paragraph':
           data = await insertParagraph(args);
@@ -536,6 +606,30 @@
         case 'word.resize_image':
           data = await resizeImage(args);
           break;
+        case 'word.list_images':
+          data = await listImages(args || {});
+          break;
+        case 'word.get_image':
+          data = await getImage(args);
+          break;
+        case 'word.update_image':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateImage(args);
+          break;
+        case 'word.delete_image':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await deleteImage(args);
+          break;
+        case 'word.list_shapes':
+          data = await listShapes(args || {});
+          break;
+        case 'word.insert_shape':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await insertShape(args);
+          break;
+        case 'word.update_shape':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateShape(args);
+          break;
+        case 'word.delete_shape':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await deleteShape(args);
+          break;
         case 'word.insert_break':
           data = await insertBreak(args);
           break;
@@ -548,8 +642,32 @@
         case 'word.update_page_setup':
           data = await updatePageSetup(args || {});
           break;
+        case 'word.list_fields':
+          data = await listFields(args || {});
+          break;
+        case 'word.insert_field':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await insertField(args);
+          break;
+        case 'word.update_field':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateField(args);
+          break;
+        case 'word.delete_field':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await deleteField(args);
+          break;
+        case 'word.list_styles':
+          data = await listStyles(args || {});
+          break;
+        case 'word.create_style':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await createStyle(args);
+          break;
+        case 'word.update_style':
+          data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateStyle(args);
+          break;
         case 'word.update_header_footer':
           data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateHeaderFooter(args);
+          break;
+        case 'word.update_document_properties':
+          data = await updateDocumentProperties(args || {});
           break;
         case 'word.insert_list':
           data = await insertList(args);
@@ -607,6 +725,9 @@
           break;
         case 'word.resolve_comment':
           data = await resolveComment(args);
+          break;
+        case 'word.set_change_tracking':
+          data = await setChangeTracking(args);
           break;
         case 'word.update_tracked_change':
           data = await updateTrackedChange(args);
@@ -669,6 +790,21 @@
       case 'word.resize_image':
         validateResizeImageArgs(args);
         break;
+      case 'word.update_image':
+        validateUpdateImageArgs(args);
+        break;
+      case 'word.delete_image':
+        validateImageLocator('word.delete_image', args?.image);
+        break;
+      case 'word.insert_shape':
+        validateInsertShapeArgs(tool, args);
+        break;
+      case 'word.update_shape':
+        validateUpdateShapeArgs(tool, args);
+        break;
+      case 'word.delete_shape':
+        validateShapeId(tool, args?.shape_id);
+        break;
       case 'word.insert_break':
         requireAnchor(tool, args.anchor);
         validateBreakType(args.break_type);
@@ -681,6 +817,24 @@
         break;
       case 'word.update_header_footer':
         validateHeaderFooterArgs(tool, args, true);
+        break;
+      case 'word.update_document_properties':
+        validateUpdateDocumentPropertiesArgs(tool, args);
+        break;
+      case 'word.insert_field':
+        validateInsertFieldArgs(tool, args);
+        break;
+      case 'word.update_field':
+        validateUpdateFieldArgs(tool, args);
+        break;
+      case 'word.delete_field':
+        validateDeleteFieldArgs(tool, args);
+        break;
+      case 'word.create_style':
+        validateCreateStyleArgs(tool, args);
+        break;
+      case 'word.update_style':
+        validateUpdateStyleArgs(tool, args);
         break;
       case 'word.insert_list':
         requireAnchor(tool, args.anchor);
@@ -711,6 +865,12 @@
         break;
       case 'word.delete_bookmark':
         validateBookmarkName(tool, args.name, { strictPattern: false });
+        break;
+      case 'word.set_selection':
+        validateSetSelectionArgs(tool, args);
+        break;
+      case 'word.insert_html':
+        validateInsertHtmlArgs(tool, args);
         break;
       case 'word.insert_note':
         validateInsertNoteArgs(tool, args);
@@ -753,10 +913,11 @@
       case 'word.resolve_comment':
         if (!args.comment_id) throw invalidArgument('word.resolve_comment requires comment_id.');
         break;
+      case 'word.set_change_tracking':
+        validateChangeTrackingMode(args.mode);
+        break;
       case 'word.update_tracked_change':
-        requireNonNegativeInteger(tool, 'change_index', args.change_index);
-        validateTrackedChangeAction(args.action);
-        if (!args.expected_fingerprint) throw invalidArgument('word.update_tracked_change requires expected_fingerprint.');
+        validateTrackedChangeArgs(args);
         break;
       default:
         break;
@@ -775,6 +936,10 @@
     switch (tool) {
       case 'word.insert_image':
         return validateInsertImageOnly(args);
+      case 'word.update_image':
+        return validateUpdateImageOnly(args);
+      case 'word.delete_image':
+        return validateDeleteImageOnly(args);
       case 'word.insert_hyperlink':
         return validateInsertHyperlinkOnly(args);
       case 'word.insert_note':
@@ -785,14 +950,29 @@
         return validateUpdateParagraphOnly(args);
       case 'word.update_note':
         return validateUpdateNoteOnly(args);
+      case 'word.insert_field':
+        return validateInsertFieldOnly(args);
+      case 'word.update_field':
+        return validateUpdateFieldOnly(args);
       case 'word.delete_range':
         return validateDeleteRangeOnly(args);
       case 'word.delete_note':
         return validateDeleteNoteOnly(args);
+      case 'word.delete_field':
+        return validateDeleteFieldOnly(args);
+      case 'word.create_style':
+        return validateCreateStyleOnly(args);
+      case 'word.update_style':
+        return validateUpdateStyleOnly(args);
       case 'word.update_header_footer':
         return validateUpdateHeaderFooterOnly(args);
       case 'word.update_list':
         return validateUpdateListOnly(args);
+      case 'word.update_document_properties':
+        validateUpdateDocumentPropertiesArgs(tool, args || {});
+        return validationSuccess(tool, { partial_effect: 'none' });
+      case 'word.insert_html':
+        return validateInsertHtmlOnly(args);
       default:
         throw invalidArgument(`${tool} does not support validate_only.`);
     }
@@ -810,6 +990,26 @@
           image_mime_type: args.image?.mime_type ?? null,
           image_byte_length: args.image?.byte_length ?? null
         }
+      });
+    });
+  }
+
+  async function validateUpdateImageOnly(args) {
+    validateUpdateImageArgs(args);
+    return Word.run(async (context) => {
+      const target = await resolveInlineImage(context, args.image, 'word.update_image');
+      return validationSuccess('word.update_image', {
+        resolved_target: imageTargetSummary(target)
+      });
+    });
+  }
+
+  async function validateDeleteImageOnly(args) {
+    validateImageLocator('word.delete_image', args.image);
+    return Word.run(async (context) => {
+      const target = await resolveInlineImage(context, args.image, 'word.delete_image');
+      return validationSuccess('word.delete_image', {
+        resolved_target: imageTargetSummary(target)
       });
     });
   }
@@ -918,6 +1118,76 @@
       await context.sync();
       return validationSuccess('word.delete_note', {
         resolved_target: noteMetadata(note, args.index, validateNoteKind(args.kind))
+      });
+    });
+  }
+
+  async function validateInsertFieldOnly(args) {
+    return Word.run(async (context) => {
+      validateInsertFieldArgs('word.insert_field', args);
+      const resolved = await resolveValidationAnchor(context, args.anchor);
+      return validationSuccess('word.insert_field', {
+        resolved_target: {
+          ...resolved,
+          field_type: validateFieldType(args.field_type),
+          code: fieldCodeForArgs(args)
+        }
+      });
+    });
+  }
+
+  async function validateUpdateFieldOnly(args) {
+    return Word.run(async (context) => {
+      validateUpdateFieldArgs('word.update_field', args);
+      const action = normalizedFieldAction(args.action);
+      if (action === 'refresh_all') {
+        const fields = await fieldCollectionItems(context);
+        if (fields.length !== args.expected_count) {
+          throw Object.assign(new Error('Field count mismatch; re-read list_fields before refreshing all fields.'), { officeMcpCode: 'STALE_INDEX' });
+        }
+        return validationSuccess('word.update_field', { action, count: fields.length });
+      }
+      const { field } = await getFieldByIndex(context, args.field_index);
+      return validationSuccess('word.update_field', {
+        resolved_target: fieldMetadata(field, args.field_index),
+        action
+      });
+    });
+  }
+
+  async function validateDeleteFieldOnly(args) {
+    return Word.run(async (context) => {
+      validateDeleteFieldArgs('word.delete_field', args);
+      const { field } = await getFieldByIndex(context, args.field_index);
+      return validationSuccess('word.delete_field', {
+        resolved_target: fieldMetadata(field, args.field_index)
+      });
+    });
+  }
+
+  async function validateCreateStyleOnly(args) {
+    return Word.run(async (context) => {
+      validateCreateStyleArgs('word.create_style', args);
+      await ensureStyleNameAvailable(context, args.name);
+      if (args.base_style) await getStyleByName(context, args.base_style);
+      return validationSuccess('word.create_style', {
+        name: args.name,
+        type: normalizedStyleType(args.type),
+        has_font: Boolean(args.font),
+        has_paragraph: Boolean(args.paragraph)
+      });
+    });
+  }
+
+  async function validateUpdateStyleOnly(args) {
+    return Word.run(async (context) => {
+      validateUpdateStyleArgs('word.update_style', args);
+      const style = await getStyleByName(context, args.name);
+      if (args.base_style) await getStyleByName(context, args.base_style);
+      return validationSuccess('word.update_style', {
+        resolved_target: styleMetadata(style),
+        has_font: Boolean(args.font),
+        has_paragraph: Boolean(args.paragraph)
       });
     });
   }
@@ -1096,6 +1366,136 @@
         untrusted_source: true
       };
     });
+  }
+
+  async function setSelection(args) {
+    validateSetSelectionArgs('word.set_selection', args);
+    return Word.run(async (context) => {
+      const target = await resolveRangeForExtent(context, args.anchor, args.extent);
+      target.select(selectionModeForSetSelection(args.mode));
+      target.load('text');
+      await context.sync();
+      const paragraphIndex = await paragraphIndexForRange(context, target);
+      return {
+        selected_text_preview: safeTextPreview(target.text),
+        paragraph_index: paragraphIndex,
+        is_empty: target.text.length === 0,
+        untrusted_source: true
+      };
+    });
+  }
+
+  function selectionModeForSetSelection(mode) {
+    switch (mode || 'select') {
+      case 'select':
+        return Word.SelectionMode.select;
+      case 'cursor_start':
+        return Word.SelectionMode.start;
+      case 'cursor_end':
+        return Word.SelectionMode.end;
+      default:
+        throw invalidArgument(`word.set_selection mode must be select, cursor_start, or cursor_end.`);
+    }
+  }
+
+  async function getHtml(args) {
+    args = args || {};
+    return Word.run(async (context) => {
+      const target = args.anchor ? await resolveRangeForExtent(context, args.anchor, args.extent) : context.document.body;
+      const result = target.getHtml();
+      await context.sync();
+      const html = result.value || '';
+      const byteLength = enforceResponseSizeLimit(html);
+      return {
+        html,
+        byte_length: byteLength,
+        truncated: false,
+        untrusted_source: true
+      };
+    });
+  }
+
+  async function insertHtml(args) {
+    validateInsertHtmlArgs('word.insert_html', args);
+    validateSafeHtmlForWord(args.html);
+    return Word.run(async (context) => {
+      const target = await resolveAnchor(context, args.anchor);
+      const inserted = target.insertHtml(args.html, insertLocationForHtml(args.insert_location));
+      inserted.load('text');
+      await context.sync();
+      return {
+        inserted: true,
+        insert_location: args.insert_location || 'after',
+        text_preview: safeTextPreview(inserted.text || ''),
+        untrusted_source: true
+      };
+    });
+  }
+
+  async function validateInsertHtmlOnly(args) {
+    validateInsertHtmlArgs('word.insert_html', args);
+    return Word.run(async (context) => {
+      const resolved = await resolveValidationAnchor(context, args.anchor);
+      return validationSuccess('word.insert_html', {
+        resolved_target: {
+          ...resolved,
+          insert_location: args.insert_location || 'after',
+          html_byte_length: utf8ByteLength(args.html)
+        }
+      });
+    });
+  }
+
+  function validateInsertHtmlArgs(tool, args) {
+    requireAnchor(tool, args?.anchor);
+    if (typeof args.html !== 'string' || args.html.length < 1) throw invalidArgument(`${tool} requires non-empty html.`);
+    if (args.html.length > 1_000_000) throw invalidArgument(`${tool} html exceeds 1000000 characters.`);
+    validateSafeHtmlForWord(args.html);
+    insertLocationForHtml(args.insert_location);
+  }
+
+  function validateSafeHtmlForWord(html) {
+    const source = String(html || '');
+    if (/<script\b/i.test(source)) throw invalidArgument('word.insert_html rejects script elements.');
+    if (/\bon[a-z]+\s*=/i.test(source)) throw invalidArgument('word.insert_html rejects inline event handlers.');
+    if (/javascript:/i.test(source)) throw invalidArgument('word.insert_html rejects javascript: URLs.');
+    if (/\b(?:src|srcset|poster|background)\s*=/i.test(source)) throw invalidArgument('word.insert_html rejects external resource attributes.');
+    if (/\burl\s*\(/i.test(source)) throw invalidArgument('word.insert_html rejects CSS url() resource references.');
+    return true;
+  }
+
+  function insertLocationForHtml(location) {
+    switch (location || 'after') {
+      case 'replace':
+        return Word.InsertLocation.replace;
+      case 'before':
+        return Word.InsertLocation.before;
+      case 'after':
+        return Word.InsertLocation.after;
+      case 'start':
+        return Word.InsertLocation.start;
+      case 'end':
+        return Word.InsertLocation.end;
+      default:
+        throw invalidArgument('word.insert_html insert_location must be replace, before, after, start, or end.');
+    }
+  }
+
+  function enforceResponseSizeLimit(value) {
+    const byteLength = utf8ByteLength(value);
+    if (byteLength > MAX_RESPONSE_BYTES) {
+      throw Object.assign(new Error(`Response exceeds MAX_RESPONSE_BYTES (${MAX_RESPONSE_BYTES}).`), {
+        officeMcpCode: 'MAX_RESPONSE_SIZE',
+        partialEffect: 'none',
+        max_response_bytes: MAX_RESPONSE_BYTES
+      });
+    }
+    return byteLength;
+  }
+
+  function utf8ByteLength(value) {
+    if (typeof TextEncoder === 'function') return new TextEncoder().encode(String(value)).length;
+    return unescape(encodeURIComponent(String(value))).length;
   }
 
   async function insertNote(args) {
@@ -1367,17 +1767,8 @@
   async function resizeImage(args) {
     validateResizeImageArgs(args);
     return Word.run(async (context) => {
-      const selector = args.image;
-      const paragraph = await getParagraphByIndex(context, selector.index);
-      const pictures = paragraph.inlinePictures;
-      pictures.load('items/width,items/height');
-      await context.sync();
-
-      const imageIndex = selector.image_index ?? 0;
-      const picture = pictures.items[imageIndex];
-      if (!picture) {
-        throw Object.assign(new Error(`Inline image index ${imageIndex} is out of range for paragraph ${selector.index}.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
-      }
+      const target = await resolveInlineImage(context, args.image, 'word.resize_image');
+      const { selector, imageIndex, picture } = target;
 
       const oldWidth = picture.width;
       const oldHeight = picture.height;
@@ -1398,6 +1789,160 @@
           preserve_aspect_ratio: args.preserve_aspect_ratio !== false
         }
       };
+    });
+  }
+
+  async function listImages(args) {
+    return Word.run(async (context) => {
+      const paragraphs = context.document.body.paragraphs;
+      paragraphs.load('items');
+      await context.sync();
+
+      const paragraphItems = paragraphs.items || [];
+      for (const paragraph of paragraphItems) {
+        paragraph.inlinePictures.load('items/width,items/height,items/altTextTitle,items/altTextDescription,items/hyperlink');
+      }
+      await context.sync();
+
+      const images = [];
+      paragraphItems.forEach((paragraph, paragraphIndex) => {
+        const pictures = paragraph.inlinePictures.items || [];
+        pictures.forEach((picture, imageIndex) => {
+          images.push(imageResult(picture, paragraphIndex, imageIndex));
+        });
+      });
+      return { images, count: images.length };
+    });
+  }
+
+  async function getImage(args) {
+    validateImageLocator('word.get_image', args.image);
+    return Word.run(async (context) => {
+      const target = await resolveInlineImage(context, args.image, 'word.get_image');
+      const base64Result = target.picture.getBase64ImageSrc();
+      await context.sync();
+      return {
+        ...imageResult(target.picture, target.selector.index, target.imageIndex),
+        base64: base64Result.value
+      };
+    });
+  }
+
+  async function updateImage(args) {
+    validateUpdateImageArgs(args);
+    return Word.run(async (context) => {
+      const target = await resolveInlineImage(context, args.image, 'word.update_image');
+      const { picture } = target;
+      if (args.alt_text_title !== undefined) picture.altTextTitle = args.alt_text_title;
+      if (args.alt_text_description !== undefined) picture.altTextDescription = args.alt_text_description;
+      if (args.hyperlink !== undefined) picture.hyperlink = args.hyperlink;
+      let replaced = false;
+      if (args.replace_base64 !== undefined) {
+        picture.insertInlinePictureFromBase64(args.replace_base64, Word.InsertLocation.replace);
+        replaced = true;
+      }
+      await context.sync();
+      return {
+        updated: true,
+        replaced,
+        image: imageTargetSummary(target)
+      };
+    });
+  }
+
+  async function deleteImage(args) {
+    validateImageLocator('word.delete_image', args.image);
+    return Word.run(async (context) => {
+      const target = await resolveInlineImage(context, args.image, 'word.delete_image');
+      target.picture.delete();
+      await context.sync();
+      return { deleted: true, image: imageTargetSummary(target) };
+    });
+  }
+
+  async function listShapes(args = {}) {
+    requireWordApiDesktop12('word.list_shapes');
+    return Word.run(async (context) => {
+      const shapes = context.document.body.shapes;
+      shapes.load('items/id,items/name,items/type,items/geometricShapeType,items/width,items/height,items/left,items/top,items/altTextDescription,items/visible');
+      await context.sync();
+
+      const limit = Number.isInteger(args.limit) && args.limit > 0 ? args.limit : 200;
+      const items = (shapes.items || []).slice(0, limit);
+      for (const shape of items) {
+        try {
+          shape.body.load('text');
+        } catch (_error) {
+          // Some shape types do not expose a text body.
+        }
+      }
+      await context.sync();
+      const results = items.map((shape) => shapeMetadata(shape));
+      return { shapes: results, count: results.length, scope: args.scope || 'body' };
+    });
+  }
+
+  async function insertShape(args) {
+    validateInsertShapeArgs('word.insert_shape', args);
+    requireWordApiDesktop12('word.insert_shape');
+    return Word.run(async (context) => {
+      const owner = await shapeInsertOwner(context, args.anchor);
+      let shape;
+      if (args.shape_type === 'text_box') {
+        shape = owner.insertTextBox(String(args.text ?? ''), shapeInsertOptions(args));
+      } else if (args.shape_type === 'picture') {
+        shape = owner.insertPictureFromBase64(args.image.base64, shapeInsertOptions(args));
+      } else {
+        shape = owner.insertGeometricShape(wordGeometricShapeType(args.shape_type), shapeInsertOptions(args));
+      }
+      if (args.name !== undefined) shape.name = String(args.name);
+      if (args.alt_text_description !== undefined) shape.altTextDescription = String(args.alt_text_description);
+      shape.load('id,name,type,geometricShapeType,width,height,left,top,altTextDescription,visible');
+      try {
+        shape.body.load('text');
+      } catch (_error) {
+        // Pictures and other non-text shapes may not expose text.
+      }
+      await context.sync();
+      return { inserted: true, shape: shapeMetadata(shape) };
+    });
+  }
+
+  async function updateShape(args) {
+    validateUpdateShapeArgs('word.update_shape', args);
+    requireWordApiDesktop12('word.update_shape');
+    return Word.run(async (context) => {
+      const shape = await resolveShapeById(context, args.shape_id, 'word.update_shape');
+      if (args.action === 'set_text') shape.body.insertText(String(args.text), Word.InsertLocation.replace);
+      if (args.name !== undefined) shape.name = String(args.name);
+      if (args.alt_text_description !== undefined) shape.altTextDescription = String(args.alt_text_description);
+      if (args.width_pt !== undefined) shape.width = args.width_pt;
+      if (args.height_pt !== undefined) shape.height = args.height_pt;
+      if (args.left_pt !== undefined) shape.left = args.left_pt;
+      if (args.top_pt !== undefined) shape.top = args.top_pt;
+      if (args.visible !== undefined) shape.visible = Boolean(args.visible);
+      shape.load('id,name,type,geometricShapeType,width,height,left,top,altTextDescription,visible');
+      try {
+        shape.body.load('text');
+      } catch (_error) {
+        // Non-text shapes may not expose text.
+      }
+      await context.sync();
+      return { updated: true, shape: shapeMetadata(shape) };
+    });
+  }
+
+  async function deleteShape(args) {
+    validateShapeId('word.delete_shape', args?.shape_id);
+    requireWordApiDesktop12('word.delete_shape');
+    return Word.run(async (context) => {
+      const shape = await resolveShapeById(context, args.shape_id, 'word.delete_shape');
+      shape.load('id,name,type,width,height');
+      await context.sync();
+      const summary = shapeMetadata(shape);
+      shape.delete();
+      await context.sync();
+      return { deleted: true, shape: summary };
     });
   }
 
@@ -1943,10 +2488,17 @@
   async function readTable(args) {
     return Word.run(async (context) => {
       const table = await getTableByIndex(context, args.table_index);
-      table.load('rowCount,columnCount,values');
+      table.load('rowCount,columnCount,values,headerRowCount,isUniform');
       await context.sync();
       const data = table.values ?? [];
-      return { rows: table.rowCount ?? data.length, cols: table.columnCount ?? (data[0]?.length ?? 0), data, header_row: false, untrusted_source: true };
+      return {
+        rows: table.rowCount ?? data.length,
+        cols: table.columnCount ?? (data[0]?.length ?? 0),
+        data,
+        header_row: (table.headerRowCount ?? 0) > 0,
+        is_uniform: table.isUniform ?? null,
+        untrusted_source: true
+      };
     });
   }
 
@@ -1962,6 +2514,20 @@
         return addColumn(args);
       case 'format_cell':
         return formatCell(args);
+      case 'delete_row':
+        return deleteTableRows(args);
+      case 'delete_column':
+        return deleteTableColumns(args);
+      case 'merge_cells':
+        return mergeTableCells(args);
+      case 'set_column_width':
+        return setTableColumnWidth(args);
+      case 'distribute_columns':
+        return distributeTableColumns(args);
+      case 'set_borders':
+        return setTableBorders(args);
+      case 'set_header_row':
+        return setTableHeaderRow(args);
       case 'delete':
         return deleteTable(args);
       default:
@@ -2047,10 +2613,99 @@
     });
   }
 
+  async function deleteTableRows(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      const dimensions = await tableDimensions(context, table);
+      const [start, end] = tableIndexSpan(args.row_range, args.row, 'row_range', 'row');
+      validateTableSpan('row', start, end, dimensions.rows);
+      table.deleteRows(start, end - start + 1);
+      await context.sync();
+      return { deleted_rows: end - start + 1, row_start: start, table_index: args.table_index };
+    });
+  }
+
+  async function deleteTableColumns(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      const dimensions = await tableDimensions(context, table);
+      const [start, end] = tableIndexSpan(args.col_range, args.col, 'col_range', 'col');
+      validateTableSpan('column', start, end, dimensions.cols);
+      table.deleteColumns(start, end - start + 1);
+      await context.sync();
+      return { deleted_columns: end - start + 1, col_start: start, table_index: args.table_index };
+    });
+  }
+
+  async function mergeTableCells(args) {
+    if (!supportsWordApi('1.4')) throw Object.assign(new Error('word.update_table merge_cells requires WordApi 1.4.'), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      const dimensions = await tableDimensions(context, table);
+      const [rowStart, rowEnd] = tableIndexSpan(args.row_range, undefined, 'row_range', 'row');
+      const [colStart, colEnd] = tableIndexSpan(args.col_range, undefined, 'col_range', 'col');
+      validateTableSpan('row', rowStart, rowEnd, dimensions.rows);
+      validateTableSpan('column', colStart, colEnd, dimensions.cols);
+      table.mergeCells(rowStart, colStart, rowEnd, colEnd);
+      await context.sync();
+      return { merged: true, action: 'merge_cells', table_index: args.table_index, row_range: [rowStart, rowEnd], col_range: [colStart, colEnd] };
+    });
+  }
+
+  async function setTableColumnWidth(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      const dimensions = await tableDimensions(context, table);
+      validateTableSpan('column', args.col, args.col, dimensions.cols);
+      for (let row = 0; row < dimensions.rows; row += 1) {
+        table.getCell(row, args.col).columnWidth = args.width_pt;
+      }
+      await context.sync();
+      return { column_width_set: true, table_index: args.table_index, col: args.col, width_pt: args.width_pt };
+    });
+  }
+
+  async function distributeTableColumns(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      table.distributeColumns();
+      await context.sync();
+      return { distributed_columns: true, table_index: args.table_index };
+    });
+  }
+
+  async function setTableBorders(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      if (args.row !== undefined || args.col !== undefined) {
+        const dimensions = await tableDimensions(context, table);
+        validateTableSpan('row', args.row, args.row, dimensions.rows);
+        validateTableSpan('column', args.col, args.col, dimensions.cols);
+      }
+      const target = args.row !== undefined || args.col !== undefined ? table.getCell(args.row, args.col) : table;
+      const update = tableBorderUpdate(args.borders);
+      for (const edge of normalizedTableBorderEdges(args.borders.edges)) {
+        target.getBorder(edge).set(update);
+      }
+      await context.sync();
+      return { borders_set: true, table_index: args.table_index, edges: normalizedTableBorderEdges(args.borders.edges) };
+    });
+  }
+
+  async function setTableHeaderRow(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      table.headerRowCount = args.header_row ? 1 : 0;
+      await context.sync();
+      return { header_row: Boolean(args.header_row), table_index: args.table_index };
+    });
+  }
+
   async function listContentControls(args) {
+    validateContentControlArgs('word.list_content_controls', args || {});
     return Word.run(async (context) => {
       const controls = context.document.body.getContentControls(contentControlFilterOptions(args));
-      controls.load('items/id,items/tag,items/title,items/type,items/subtype,items/cannotDelete,items/cannotEdit');
+      controls.load('items/id,items/tag,items/title,items/type,items/subtype,items/cannotDelete,items/cannotEdit,items/text,items/checkboxContentControl/isChecked,items/dropDownListContentControl/listItems/items/displayText,items/dropDownListContentControl/listItems/items/value,items/comboBoxContentControl/listItems/items/displayText,items/comboBoxContentControl/listItems/items/value');
       await context.sync();
       const filtered = controls.items.filter((control) => {
         if (args.tag !== undefined && control.tag !== String(args.tag)) return false;
@@ -2066,23 +2721,28 @@
   }
 
   async function insertContentControl(args) {
+    validateContentControlArgs('word.insert_content_control', args);
     return Word.run(async (context) => {
       const target = args.anchor ? await resolveAnchor(context, args.anchor) : context.document.getSelection();
       const range = args.text !== undefined ? target.insertText(String(args.text), Word.InsertLocation.replace) : target;
       const control = range.insertContentControl(contentControlTypeFrom(args.type));
       applyContentControlProperties(control, args);
-      control.load('id,tag,title,type,subtype,cannotDelete,cannotEdit');
+      await applyTypedContentControlState(context, control, args);
+      control.load('id,tag,title,type,subtype,cannotDelete,cannotEdit,text,checkboxContentControl/isChecked,dropDownListContentControl/listItems/items/displayText,dropDownListContentControl/listItems/items/value,comboBoxContentControl/listItems/items/displayText,comboBoxContentControl/listItems/items/value');
       await context.sync();
       return { content_control: contentControlMetadata(control, 0), created: true };
     });
   }
 
   async function updateContentControl(args) {
+    validateContentControlTargetArgs('word.update_content_control', args);
+    validateContentControlArgs('word.update_content_control', args);
     return Word.run(async (context) => {
       const control = await targetContentControl(context, args);
       applyContentControlProperties(control, args);
       if (args.text !== undefined) control.insertText(String(args.text), Word.InsertLocation.replace);
-      control.load('id,tag,title,type,subtype,cannotDelete,cannotEdit');
+      await applyTypedContentControlUpdate(context, control, args);
+      control.load('id,tag,title,type,subtype,cannotDelete,cannotEdit,text,checkboxContentControl/isChecked,dropDownListContentControl/listItems/items/displayText,dropDownListContentControl/listItems/items/value,comboBoxContentControl/listItems/items/displayText,comboBoxContentControl/listItems/items/value');
       await context.sync();
       return { content_control: contentControlMetadata(control, 0), updated: true };
     });
@@ -2133,6 +2793,176 @@
       await context.sync();
       const remaining = await bookmarkNames(context, false);
       return { deleted: true, name, count: remaining.length };
+    });
+  }
+
+  async function listFields(args) {
+    return Word.run(async (context) => {
+      const fields = await fieldCollectionItems(context);
+      const typeFilter = args.type ? String(args.type).trim().toLowerCase() : null;
+      const filtered = typeFilter ? fields.filter((field) => normalizedFieldType(field.type) === typeFilter) : fields;
+      const offset = args.offset ?? 0;
+      const limit = args.limit ?? 50;
+      const selected = filtered.slice(offset, offset + limit);
+      const items = selected.map((field, index) => fieldMetadata(field, offset + index));
+      return {
+        fields: items,
+        count: filtered.length,
+        offset,
+        limit,
+        truncated: offset + selected.length < filtered.length,
+        untrusted_source: true
+      };
+    });
+  }
+
+  async function insertField(args) {
+    return Word.run(async (context) => {
+      validateInsertFieldArgs('word.insert_field', args);
+      const field = await insertFieldAtAnchor(context, args);
+      field.load('type,code,result,locked');
+      await context.sync();
+      return { inserted: true, field: fieldMetadata(field, 0) };
+    });
+  }
+
+  async function updateField(args) {
+    const action = normalizedFieldAction(args.action);
+    if (action === 'refresh_all') return refreshAllFields(args);
+    return Word.run(async (context) => {
+      const { field } = await getFieldByIndex(context, args.field_index);
+      if (action === 'refresh') field.updateResult();
+      else field.locked = action === 'lock';
+      field.load('type,code,result,locked');
+      await context.sync();
+      return { updated: true, action, field: fieldMetadata(field, args.field_index) };
+    });
+  }
+
+  async function refreshAllFields(args) {
+    return Word.run(async (context) => {
+      const fields = await fieldCollectionItems(context);
+      const liveCount = fields.length;
+      if (liveCount !== args.expected_count) {
+        throw Object.assign(new Error('Field count mismatch; re-read list_fields before refreshing all fields.'), { officeMcpCode: 'STALE_INDEX' });
+      }
+      fields.forEach((field) => field.updateResult());
+      await context.sync();
+      return { updated: true, action: 'refresh_all', expected_count: args.expected_count, count: liveCount };
+    });
+  }
+
+  async function deleteField(args) {
+    return Word.run(async (context) => {
+      const { field } = await getFieldByIndex(context, args.field_index);
+      field.delete();
+      await context.sync();
+      const remaining = await fieldCollectionItems(context);
+      return { deleted: true, field_index: args.field_index, count: remaining.length };
+    });
+  }
+
+  async function listStyles(args = {}) {
+    return Word.run(async (context) => {
+      const styles = context.document.getStyles();
+      styles.load('items/nameLocal,items/type,items/builtIn,items/inUse,items/baseStyle,items/priority');
+      await context.sync();
+      const requestedType = args.type ? normalizedStyleType(args.type) : null;
+      const requestedBuiltIn = typeof args.built_in === 'boolean' ? args.built_in : null;
+      const items = styles.items
+        .map(styleMetadata)
+        .filter((style) => !requestedType || style.type === requestedType)
+        .filter((style) => requestedBuiltIn === null || style.built_in === requestedBuiltIn)
+        .filter((style) => !args.in_use_only || style.in_use);
+      return { styles: items, count: items.length };
+    });
+  }
+
+  async function createStyle(args) {
+    return Word.run(async (context) => {
+      validateCreateStyleArgs('word.create_style', args);
+      await ensureStyleNameAvailable(context, args.name);
+      if (args.base_style) await getStyleByName(context, args.base_style);
+      const style = context.document.addStyle(args.name, styleTypeToOffice(args.type));
+      applyStyleDefinitionFormatting(style, args);
+      style.load('nameLocal,type,builtIn,inUse,baseStyle,priority');
+      await context.sync();
+      return { created: true, style: styleMetadata(style) };
+    });
+  }
+
+  async function updateStyle(args) {
+    return Word.run(async (context) => {
+      validateUpdateStyleArgs('word.update_style', args);
+      const style = await getStyleByName(context, args.name);
+      if (args.base_style) await getStyleByName(context, args.base_style);
+      applyStyleDefinitionFormatting(style, args);
+      style.load('nameLocal,type,builtIn,inUse,baseStyle,priority');
+      await context.sync();
+      return { updated: true, style: styleMetadata(style) };
+    });
+  }
+
+  async function getDocumentProperties(args) {
+    return Word.run(async (context) => {
+      const properties = context.document.properties;
+      properties.load('title,subject,author,keywords,category,comments,company,manager,lastAuthor,revisionNumber,creationDate,lastSaveTime,security');
+      const includeCustom = args.include_custom !== false;
+      if (includeCustom) properties.customProperties.load('items/key,items/type,items/value');
+      await context.sync();
+      const result = documentPropertiesMetadata(properties);
+      if (includeCustom) result.custom = properties.customProperties.items.map(customPropertyMetadata);
+      return result;
+    });
+  }
+
+  async function updateDocumentProperties(args) {
+    return Word.run(async (context) => {
+      validateUpdateDocumentPropertiesArgs('word.update_document_properties', args);
+      const properties = context.document.properties;
+      const updatedFields = [];
+      for (const field of DOCUMENT_PROPERTY_WRITABLE_FIELDS) {
+        if (args[field] !== undefined) {
+          properties[field] = args[field];
+          updatedFields.push(field);
+        }
+      }
+
+      const customSet = Array.isArray(args.custom_set) ? args.custom_set : [];
+      for (const entry of customSet) {
+        properties.customProperties.add(entry.key, entry.value);
+      }
+
+      const customDelete = Array.isArray(args.custom_delete) ? args.custom_delete : [];
+      const deletedCustom = [];
+      const missingCustom = [];
+      for (const key of customDelete) {
+        const property = properties.customProperties.getItemOrNullObject(key);
+        property.load('isNullObject,key');
+        await context.sync();
+        if (property.isNullObject) {
+          missingCustom.push(key);
+        } else {
+          deletedCustom.push(property.key || key);
+          property.delete();
+        }
+      }
+
+      properties.load('title,subject,author,keywords,category,comments,company,manager,lastAuthor,revisionNumber,creationDate,lastSaveTime,security');
+      properties.customProperties.load('items/key,items/type,items/value');
+      await context.sync();
+
+      return {
+        updated: true,
+        fields: updatedFields,
+        custom_set: customSet.map((entry) => entry.key),
+        custom_deleted: deletedCustom,
+        custom_missing: missingCustom,
+        properties: {
+          ...documentPropertiesMetadata(properties),
+          custom: properties.customProperties.items.map(customPropertyMetadata)
+        }
+      };
     });
   }
 
@@ -2268,11 +3098,22 @@
     });
   }
 
+  async function setChangeTracking(args) {
+    return Word.run(async (context) => {
+      const document = context.document;
+      document.load('changeTrackingMode');
+      await context.sync();
+      const previousMode = changeTrackingModeToResult(document.changeTrackingMode);
+      document.changeTrackingMode = changeTrackingModeFromArg(args.mode);
+      document.load('changeTrackingMode');
+      await context.sync();
+      return { previous_mode: previousMode, mode: changeTrackingModeToResult(document.changeTrackingMode) };
+    });
+  }
+
   async function updateTrackedChange(args) {
     const action = String(args.action || '').trim().toLowerCase();
-    if (action !== 'accept' && action !== 'reject') {
-      throw Object.assign(new Error(`Unsupported tracked-change action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
-    }
+    if (action === 'accept_all' || action === 'reject_all') return mutateAllTrackedChanges(args, action);
     return mutateTrackedChange(args, action);
   }
 
@@ -2291,6 +3132,22 @@
       else change.reject();
       await context.sync();
       return { change_index: args.change_index, fingerprint, action };
+    });
+  }
+
+  async function mutateAllTrackedChanges(args, action) {
+    return Word.run(async (context) => {
+      const changes = context.document.body.getTrackedChanges();
+      changes.load('items');
+      await context.sync();
+      const liveCount = changes.items.length;
+      if (liveCount !== args.expected_count) {
+        throw Object.assign(new Error('Tracked change count mismatch; re-read track_changes before bulk mutating.'), { officeMcpCode: 'STALE_INDEX' });
+      }
+      if (action === 'accept_all') changes.acceptAll();
+      else changes.rejectAll();
+      await context.sync();
+      return { action, expected_count: args.expected_count, affected_count: liveCount };
     });
   }
 
@@ -2445,6 +3302,107 @@
     return index >= 0 ? index : null;
   }
 
+  async function fieldCollectionItems(context) {
+    const fields = context.document.body.fields;
+    fields.load('items/type,items/code,items/result,items/locked');
+    await context.sync();
+    return fields.items || [];
+  }
+
+  async function getFieldByIndex(context, index) {
+    const fields = await fieldCollectionItems(context);
+    const field = fields[index];
+    if (!field) throw Object.assign(new Error(`Field index ${index} is out of range.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE' });
+    return { field, count: fields.length };
+  }
+
+  async function insertFieldAtAnchor(context, args) {
+    const fieldType = fieldTypeToOffice(args.field_type);
+    const code = fieldCodeForArgs(args);
+    if (args.anchor.kind === 'start_of_document') {
+      return context.document.body.getRange().insertField(Word.InsertLocation.start, fieldType, code, false);
+    }
+    if (args.anchor.kind === 'end_of_document') {
+      return context.document.body.getRange().insertField(Word.InsertLocation.end, fieldType, code, false);
+    }
+    const target = await resolveAnchor(context, args.anchor);
+    const range = target.getRange ? target.getRange() : target;
+    const location = args.anchor.kind === 'selection' ? Word.InsertLocation.replace : (isBeforeAnchor(args.anchor) ? Word.InsertLocation.before : Word.InsertLocation.after);
+    return range.insertField(location, fieldType, code, false);
+  }
+
+  function fieldMetadata(field, index) {
+    return {
+      index,
+      type: normalizedFieldType(field.type),
+      code: field.code || '',
+      result_preview: safeTextPreview(field.result),
+      locked: Boolean(field.locked),
+      paragraph_index: null,
+      untrusted_source: true
+    };
+  }
+
+  function normalizedFieldType(type) {
+    const value = String(type || '').trim();
+    if (!value) return 'unknown';
+    return value.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/[\s-]+/g, '_').toLowerCase();
+  }
+
+  function fieldTypeToOffice(type) {
+    const normalized = validateFieldType(type);
+    const fieldTypes = Word.FieldType || {};
+    const mappings = {
+      toc: fieldTypes.toc || fieldTypes.tableOfContents || 'TOC',
+      page: fieldTypes.page || 'PAGE',
+      num_pages: fieldTypes.numPages || fieldTypes.numberOfPages || 'NUMPAGES',
+      date: fieldTypes.date || 'DATE',
+      time: fieldTypes.time || 'TIME',
+      ref: fieldTypes.ref || 'REF',
+      hyperlink: fieldTypes.hyperlink || 'HYPERLINK',
+      seq: fieldTypes.sequence || fieldTypes.seq || 'SEQ',
+      styleref: fieldTypes.styleRef || fieldTypes.styleref || 'STYLEREF'
+    };
+    return mappings[normalized];
+  }
+
+  function validateFieldType(type) {
+    const normalized = String(type || '').trim().toLowerCase();
+    const blocked = ['includetext', 'include_text', 'import', 'includepicture', 'include_picture', 'database', 'dde', 'ddeauto'];
+    if (blocked.includes(normalized)) throw invalidArgument('Unsupported or unsafe field type INCLUDETEXT, IMPORT, INCLUDEPICTURE, DATABASE, DDE, or DDEAUTO.');
+    const allowed = ['toc', 'page', 'num_pages', 'date', 'time', 'ref', 'hyperlink', 'seq', 'styleref'];
+    if (!allowed.includes(normalized)) throw invalidArgument(`Unsupported field type ${type}.`);
+    return normalized;
+  }
+
+  function fieldCodeForArgs(args) {
+    const type = validateFieldType(args.field_type);
+    const options = args.code_options !== undefined ? String(args.code_options).trim() : '';
+    validateFieldCodeOptions(type, options);
+    if (type === 'toc') return options || '\\o "1-3" \\h \\z \\u';
+    const names = {
+      page: 'PAGE',
+      num_pages: 'NUMPAGES',
+      date: 'DATE',
+      time: 'TIME',
+      ref: 'REF',
+      hyperlink: 'HYPERLINK',
+      seq: 'SEQ',
+      styleref: 'STYLEREF'
+    };
+    return options ? `${names[type]} ${options}` : names[type];
+  }
+
+  function validateFieldCodeOptions(type, options) {
+    if (!options) return;
+    if (/\b(INCLUDETEXT|IMPORT|INCLUDEPICTURE|DATABASE|DDE|DDEAUTO)\b/i.test(options)) {
+      throw invalidArgument('Field code options must not reference unsafe external-content field types.');
+    }
+    if ((type === 'hyperlink') && /\b(file:|javascript:)\b/i.test(options)) {
+      throw invalidArgument('Hyperlink field options must not use file: or javascript: URLs.');
+    }
+  }
+
   function resolvedAnchorObjectType(anchor) {
     if (anchor.kind === 'start_of_document' || anchor.kind === 'end_of_document') return 'Body';
     if (isParagraphAnchor(anchor)) return 'Paragraph';
@@ -2509,6 +3467,24 @@
       throw Object.assign(new Error(`Cell ${row},${col} is out of range.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE' });
     }
     return table.getCell(row, col);
+  }
+
+  async function tableDimensions(context, table) {
+    table.load('rowCount,columnCount');
+    await context.sync();
+    return { rows: table.rowCount ?? 0, cols: table.columnCount ?? 0 };
+  }
+
+  function tableIndexSpan(range, index, rangeName, indexName) {
+    if (range !== undefined) return range;
+    if (index !== undefined) return [index, index];
+    throw invalidArgument(`word.update_table requires ${indexName} or ${rangeName}.`);
+  }
+
+  function validateTableSpan(kind, start, end, limit) {
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end >= limit) {
+      throw Object.assign(new Error(`Table ${kind} range ${start}-${end} is out of range.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
+    }
   }
 
   async function headerFooterTarget(context, args) {
@@ -2676,6 +3652,15 @@
     return Office.context?.requirements?.isSetSupported?.('WordApiDesktop', '1.3') === true;
   }
 
+  function supportsWordApiDesktop12() {
+    return Office.context?.requirements?.isSetSupported?.('WordApiDesktop', '1.2') === true;
+  }
+
+  function requireWordApiDesktop12(tool) {
+    if (supportsWordApiDesktop12()) return;
+    throw Object.assign(new Error(`${tool} requires WordApiDesktop 1.2.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+  }
+
   function requireWordApiDesktop13(tool) {
     if (supportsWordApiDesktop13()) return;
     throw Object.assign(new Error(`${tool} requires WordApiDesktop 1.3.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
@@ -2704,6 +3689,9 @@
       subtype: control.subtype || null,
       cannot_delete: Boolean(control.cannotDelete),
       cannot_edit: Boolean(control.cannotEdit),
+      checked: checkboxContentControlChecked(control),
+      list_items: contentControlListItems(control),
+      selected_text: contentControlSelectedText(control),
       untrusted_source: true
     };
   }
@@ -2728,10 +3716,97 @@
       rich: 'RichText',
       plain_text: 'PlainText',
       plaintext: 'PlainText',
-      plain: 'PlainText'
+      plain: 'PlainText',
+      checkbox: 'CheckBox',
+      check_box: 'CheckBox',
+      dropdown_list: 'DropDownList',
+      dropdown: 'DropDownList',
+      drop_down_list: 'DropDownList',
+      combo_box: 'ComboBox',
+      combobox: 'ComboBox'
     };
     if (values[normalized]) return values[normalized];
     throw Object.assign(new Error(`Unsupported content control type ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  function normalizedContentControlType(value) {
+    const type = String(value || '').trim().toLowerCase();
+    if (type.includes('checkbox')) return 'checkbox';
+    if (type.includes('dropdown')) return 'dropdown_list';
+    if (type.includes('combo')) return 'combo_box';
+    if (type.includes('plain')) return 'plain_text';
+    return 'rich_text';
+  }
+
+  function checkboxContentControlChecked(control) {
+    if (normalizedContentControlType(control.type) !== 'checkbox') return null;
+    return Boolean(control.checkboxContentControl?.isChecked);
+  }
+
+  function contentControlListItems(control) {
+    const listControl = listContentControlObject(control);
+    if (!listControl) return null;
+    return (listControl.listItems?.items || []).map((item) => ({
+      display_text: item.displayText || '',
+      value: item.value || ''
+    }));
+  }
+
+  function contentControlSelectedText(control) {
+    const kind = normalizedContentControlType(control.type);
+    return kind === 'dropdown_list' || kind === 'combo_box' ? (control.text || '') : null;
+  }
+
+  function listContentControlObject(control, type) {
+    const kind = normalizedContentControlType(type || control.type);
+    if (kind === 'dropdown_list') return control.dropDownListContentControl;
+    if (kind === 'combo_box') return control.comboBoxContentControl;
+    return null;
+  }
+
+  async function applyTypedContentControlState(context, control, args) {
+    if (args.checked !== undefined) control.checkboxContentControl.isChecked = Boolean(args.checked);
+    if (args.list_items !== undefined) addContentControlListItems(control, args.list_items, args.type);
+    if (args.selected_value !== undefined) await selectContentControlListItem(context, control, args.selected_value);
+  }
+
+  async function applyTypedContentControlUpdate(context, control, args) {
+    control.load('type,text,dropDownListContentControl/listItems/items/displayText,dropDownListContentControl/listItems/items/value,comboBoxContentControl/listItems/items/displayText,comboBoxContentControl/listItems/items/value');
+    await context.sync();
+    if (args.checked !== undefined) control.checkboxContentControl.isChecked = Boolean(args.checked);
+    if (args.list_items_clear === true) listContentControlObject(control).deleteAllListItems();
+    if (args.list_items_delete !== undefined) deleteContentControlListItems(control, args.list_items_delete);
+    if (args.list_items_add !== undefined) addContentControlListItems(control, args.list_items_add);
+    if (args.selected_value !== undefined) await selectContentControlListItem(context, control, args.selected_value);
+  }
+
+  function addContentControlListItems(control, items, type) {
+    const listControl = listContentControlObject(control, type);
+    for (const item of items || []) {
+      const index = Number.isInteger(item.index) ? item.index : undefined;
+      listControl.addListItem(String(item.display_text), item.value === undefined ? undefined : String(item.value), index);
+    }
+  }
+
+  function deleteContentControlListItems(control, values) {
+    const listControl = listContentControlObject(control);
+    const items = listControl.listItems?.items || [];
+    for (const value of values || []) {
+      const wanted = String(value);
+      const match = items.find((item) => item.value === wanted || item.displayText === wanted);
+      if (!match) throw invalidArgument(`Content control list item ${wanted} was not found.`);
+      match.delete();
+    }
+  }
+
+  async function selectContentControlListItem(context, control, value) {
+    const listControl = listContentControlObject(control);
+    const wanted = String(value);
+    const items = listControl.listItems?.items || [];
+    const matches = items.filter((item) => item.value === wanted || item.displayText === wanted);
+    if (matches.length !== 1) throw invalidArgument(`Content control list item ${wanted} must match exactly one item.`);
+    matches[0].select();
+    await context.sync();
   }
 
   function contentControlAppearanceFrom(value) {
@@ -2766,6 +3841,18 @@
     }
     if (strictPattern && !/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(name)) {
       throw invalidArgument(`${tool} bookmark name must start with a letter or underscore and contain only letters, digits, and underscores.`);
+    }
+  }
+
+  function validateSetSelectionArgs(tool, args) {
+    requireAnchor(tool, args?.anchor);
+    const extent = args.extent ?? 'range';
+    if (extent !== 'range' && extent !== 'paragraph' && extent !== 'sentence' && extent !== 'selection') {
+      throw invalidArgument(`${tool} extent must be range, paragraph, sentence, or selection.`);
+    }
+    const mode = args.mode ?? 'select';
+    if (!['select', 'cursor_start', 'cursor_end'].includes(mode)) {
+      throw invalidArgument(`${tool} mode must be select, cursor_start, or cursor_end.`);
     }
   }
 
@@ -3011,6 +4098,114 @@
     }
   }
 
+  function validateInsertFieldArgs(tool, args) {
+    requireAnchor(tool, args.anchor);
+    validateFieldType(args.field_type);
+    if (args.code_options !== undefined && typeof args.code_options !== 'string') {
+      throw invalidArgument(`${tool} code_options must be a string.`);
+    }
+    fieldCodeForArgs(args);
+  }
+
+  function validateUpdateFieldArgs(tool, args) {
+    const action = normalizedFieldAction(args.action);
+    if (action === 'refresh_all') {
+      requireNonNegativeInteger(tool, 'expected_count', args.expected_count);
+      return;
+    }
+    requireNonNegativeInteger(tool, 'field_index', args.field_index);
+  }
+
+  function validateDeleteFieldArgs(tool, args) {
+    requireNonNegativeInteger(tool, 'field_index', args.field_index);
+  }
+
+  function validateCreateStyleArgs(tool, args) {
+    validateStyleName(tool, args.name);
+    normalizedStyleType(args.type);
+    validateStyleFormattingArgs(tool, args);
+  }
+
+  function validateUpdateStyleArgs(tool, args) {
+    validateStyleName(tool, args.name);
+    if (!args.base_style && !args.font && !args.paragraph) {
+      throw invalidArgument(`${tool} requires base_style, font, or paragraph.`);
+    }
+    validateStyleFormattingArgs(tool, args);
+  }
+
+  function validateUpdateDocumentPropertiesArgs(tool, args) {
+    args = args || {};
+    const hasWritableField = DOCUMENT_PROPERTY_WRITABLE_FIELDS.some((field) => args[field] !== undefined);
+    const customSet = args.custom_set;
+    const customDelete = args.custom_delete;
+    const hasCustomSet = Array.isArray(customSet) && customSet.length > 0;
+    const hasCustomDelete = Array.isArray(customDelete) && customDelete.length > 0;
+    if (!hasWritableField && !hasCustomSet && !hasCustomDelete) {
+      throw invalidArgument(`${tool} requires at least one writable property or custom operation.`);
+    }
+    for (const field of DOCUMENT_PROPERTY_WRITABLE_FIELDS) {
+      if (args[field] !== undefined && typeof args[field] !== 'string') {
+        throw invalidArgument(`${tool} ${field} must be a string.`);
+      }
+    }
+    if (customSet !== undefined) {
+      if (!Array.isArray(customSet)) throw invalidArgument(`${tool} custom_set must be an array.`);
+      for (const entry of customSet) validateCustomPropertySetEntry(tool, entry);
+    }
+    if (customDelete !== undefined) {
+      if (!Array.isArray(customDelete)) throw invalidArgument(`${tool} custom_delete must be an array.`);
+      for (const key of customDelete) validateCustomPropertyKey(tool, key, 'custom_delete key');
+    }
+  }
+
+  function validateCustomPropertySetEntry(tool, entry) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw invalidArgument(`${tool} custom_set entries must be objects.`);
+    }
+    validateCustomPropertyKey(tool, entry.key, 'custom_set key');
+    const valueType = typeof entry.value;
+    if (valueType !== 'string' && valueType !== 'number' && valueType !== 'boolean') {
+      throw invalidArgument(`${tool} custom_set values must be strings, numbers, or booleans.`);
+    }
+    if (valueType === 'number' && !Number.isFinite(entry.value)) {
+      throw invalidArgument(`${tool} custom_set number values must be finite.`);
+    }
+  }
+
+  function validateCustomPropertyKey(tool, key, field) {
+    if (typeof key !== 'string' || key.trim().length < 1) {
+      throw invalidArgument(`${tool} ${field} must be a non-empty string.`);
+    }
+  }
+
+  function validateStyleFormattingArgs(tool, args) {
+    if (args.base_style !== undefined) validateStyleName(tool, args.base_style, 'base_style');
+    validateFormattingArg(tool, args.font);
+    validateParagraphFormattingArg(tool, args.paragraph);
+    if (args.base_style !== undefined && !supportsWordApi('1.6')) {
+      throw Object.assign(new Error(`${tool} base_style requires WordApi 1.6.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+    }
+  }
+
+  function validateStyleName(tool, value, field = 'name') {
+    if (typeof value !== 'string' || value.trim().length < 1) {
+      throw invalidArgument(`${tool} ${field} must be a non-empty string.`);
+    }
+  }
+
+  function normalizedStyleType(type) {
+    const value = String(type || '').trim().toLowerCase();
+    if (value === 'paragraph' || value === 'character' || value === 'table' || value === 'list') return value;
+    throw invalidArgument('Word style type must be paragraph, character, table, or list.');
+  }
+
+  function normalizedFieldAction(action) {
+    const normalized = String(action || '').trim().toLowerCase();
+    if (normalized === 'refresh' || normalized === 'refresh_all' || normalized === 'lock' || normalized === 'unlock') return normalized;
+    throw invalidArgument(`Unsupported field action ${action}.`);
+  }
+
   function validateReplaceTextArgs(args) {
     if (!args.find) throw invalidArgument('word.replace_text requires non-empty find text.');
     if (args.limit !== undefined && (!Number.isInteger(args.limit) || args.limit < 1)) {
@@ -3033,12 +4228,34 @@
   function validateUpdateTableArgs(args) {
     requireNonNegativeInteger('word.update_table', 'table_index', args.table_index);
     const action = String(args.action || '').trim().toLowerCase();
-    if (!['update_cell', 'cell', 'add_row', 'add_column', 'format_cell', 'delete'].includes(action)) {
+    if (!['update_cell', 'cell', 'add_row', 'add_column', 'format_cell', 'delete', 'delete_row', 'delete_column', 'merge_cells', 'set_column_width', 'distribute_columns', 'set_borders', 'set_header_row'].includes(action)) {
       throw invalidArgument(`Unsupported table action ${args.action}.`);
     }
     if (action === 'update_cell' || action === 'cell' || action === 'format_cell') {
       requireNonNegativeInteger('word.update_table', 'row', args.row);
       requireNonNegativeInteger('word.update_table', 'col', args.col);
+    }
+    if (action === 'delete_row') validateTableIndexOrRange(args, 'row', 'row_range');
+    if (action === 'delete_column') validateTableIndexOrRange(args, 'col', 'col_range');
+    if (action === 'merge_cells') {
+      validateTableIndexRange('word.update_table', 'row_range', args.row_range);
+      validateTableIndexRange('word.update_table', 'col_range', args.col_range);
+    }
+    if (action === 'set_column_width') {
+      requireNonNegativeInteger('word.update_table', 'col', args.col);
+      validateOptionalPositiveNumber('word.update_table', 'width_pt', args.width_pt);
+      if (args.width_pt === undefined) throw invalidArgument('word.update_table set_column_width requires width_pt.');
+    }
+    if (action === 'set_borders') {
+      validateTableBordersArg(args.borders);
+      if ((args.row === undefined) !== (args.col === undefined)) throw invalidArgument('word.update_table set_borders requires both row and col for cell borders.');
+      if (args.row !== undefined) {
+        requireNonNegativeInteger('word.update_table', 'row', args.row);
+        requireNonNegativeInteger('word.update_table', 'col', args.col);
+      }
+    }
+    if (action === 'set_header_row' && typeof args.header_row !== 'boolean') {
+      throw invalidArgument('word.update_table set_header_row requires boolean header_row.');
     }
     if ((action === 'add_row' || action === 'add_column') && args.index !== undefined) {
       requireNonNegativeInteger('word.update_table', 'index', args.index);
@@ -3048,6 +4265,35 @@
     }
     validateOptionalPositiveNumber('word.update_table', 'padding_pt', args.padding_pt);
     validateFormattingArg('word.update_table', args.formatting);
+  }
+
+  function validateTableIndexOrRange(args, indexName, rangeName) {
+    const hasIndex = args[indexName] !== undefined;
+    const hasRange = args[rangeName] !== undefined;
+    if (hasIndex === hasRange) throw invalidArgument(`word.update_table requires exactly one of ${indexName} or ${rangeName}.`);
+    if (hasIndex) requireNonNegativeInteger('word.update_table', indexName, args[indexName]);
+    if (hasRange) validateTableIndexRange('word.update_table', rangeName, args[rangeName]);
+  }
+
+  function validateTableIndexRange(tool, name, range) {
+    if (!Array.isArray(range) || range.length !== 2 || !range.every((value) => Number.isInteger(value) && value >= 0) || range[0] > range[1]) {
+      throw invalidArgument(`${tool} ${name} must be [start, end] with non-negative integer bounds.`);
+    }
+  }
+
+  function validateTableBordersArg(borders) {
+    if (!borders || typeof borders !== 'object' || Array.isArray(borders)) throw invalidArgument('word.update_table set_borders requires borders.');
+    if (borders.edges !== undefined && (!Array.isArray(borders.edges) || borders.edges.length === 0)) {
+      throw invalidArgument('word.update_table borders.edges must be a non-empty array.');
+    }
+    normalizedTableBorderEdges(borders.edges);
+    if (borders.style !== undefined) tableBorderType(borders.style);
+    if (borders.width_pt !== undefined && (typeof borders.width_pt !== 'number' || !Number.isFinite(borders.width_pt) || borders.width_pt < 0)) {
+      throw invalidArgument('word.update_table borders.width_pt must be a non-negative number.');
+    }
+    if (borders.color !== undefined && !/^#[0-9a-f]{6}$/i.test(String(borders.color))) {
+      throw invalidArgument('word.update_table borders.color must be a #RRGGBB value.');
+    }
   }
 
   function validateContentControlTargetArgs(tool, args) {
@@ -3063,6 +4309,45 @@
     if (args.color !== undefined && !/^#[0-9a-f]{6}$/i.test(String(args.color))) {
       throw invalidArgument(`${tool} color must be a #RRGGBB value.`);
     }
+    validateContentControlTypeSpecificArgs(tool, args);
+  }
+
+  function validateContentControlTypeSpecificArgs(tool, args) {
+    const type = normalizedContentControlType(args.type || 'rich_text');
+    requireContentControlTypeCapability(tool, type);
+    if (args.checked !== undefined) {
+      requireContentControlTypeCapability(tool, 'checkbox');
+      if (tool === 'word.insert_content_control' && type !== 'checkbox') throw invalidArgument(`${tool} checked is valid only for checkbox controls.`);
+    }
+    if (args.list_items !== undefined && type !== 'dropdown_list' && type !== 'combo_box') throw invalidArgument(`${tool} list_items is valid only for dropdown_list or combo_box controls.`);
+    validateContentControlListItems(tool, 'list_items', args.list_items, false);
+    const hasListUpdate = args.selected_value !== undefined || args.list_items_add !== undefined || args.list_items_delete !== undefined || args.list_items_clear !== undefined;
+    if (hasListUpdate) requireContentControlTypeCapability(tool, 'dropdown_list');
+    validateContentControlListItems(tool, 'list_items_add', args.list_items_add, true);
+    if (args.list_items_delete !== undefined && (!Array.isArray(args.list_items_delete) || args.list_items_delete.some((item) => typeof item !== 'string' || item.length < 1))) {
+      throw invalidArgument(`${tool} list_items_delete must contain non-empty strings.`);
+    }
+  }
+
+  function validateContentControlListItems(tool, name, items, allowIndex) {
+    if (items === undefined) return;
+    if (!Array.isArray(items) || items.length < 1) throw invalidArgument(`${tool} ${name} must be a non-empty array.`);
+    for (const item of items) {
+      if (!item || typeof item !== 'object' || typeof item.display_text !== 'string' || item.display_text.length < 1) {
+        throw invalidArgument(`${tool} ${name} items require display_text.`);
+      }
+      if (item.value !== undefined && typeof item.value !== 'string') throw invalidArgument(`${tool} ${name} item value must be a string.`);
+      if (allowIndex && item.index !== undefined && (!Number.isInteger(item.index) || item.index < 0)) throw invalidArgument(`${tool} ${name} item index must be a non-negative integer.`);
+    }
+  }
+
+  function requireContentControlTypeCapability(tool, type) {
+    if (type === 'checkbox' && !supportsWordApi('1.7')) {
+      throw Object.assign(new Error(`${tool} checkbox content controls require WordApi 1.7.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+    }
+    if ((type === 'dropdown_list' || type === 'combo_box') && !supportsWordApi('1.9')) {
+      throw Object.assign(new Error(`${tool} dropdown and combo box content controls require WordApi 1.9.`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+    }
   }
 
   function validateDeleteContentControlMode(mode) {
@@ -3071,23 +4356,50 @@
     }
   }
 
-  function validateTrackedChangeAction(action) {
-    const normalized = String(action || '').trim().toLowerCase();
-    if (normalized !== 'accept' && normalized !== 'reject') {
-      throw invalidArgument(`Unsupported tracked-change action ${action}.`);
+  function validateChangeTrackingMode(mode) {
+    if (mode !== 'off' && mode !== 'track_all' && mode !== 'track_mine_only') {
+      throw invalidArgument('word.set_change_tracking mode must be off, track_all, or track_mine_only.');
     }
   }
 
+  function validateTrackedChangeArgs(args) {
+    const action = validateTrackedChangeAction(args.action);
+    if (action === 'accept' || action === 'reject') {
+      requireNonNegativeInteger('word.update_tracked_change', 'change_index', args.change_index);
+      if (!args.expected_fingerprint) throw invalidArgument('word.update_tracked_change requires expected_fingerprint.');
+      return;
+    }
+    if (args.expected_count === undefined) {
+      throw invalidArgument('word.update_tracked_change requires expected_count.');
+    }
+    requireNonNegativeInteger('word.update_tracked_change', 'expected_count', args.expected_count);
+  }
+
+  function validateTrackedChangeAction(action) {
+    const normalized = String(action || '').trim().toLowerCase();
+    if (normalized !== 'accept' && normalized !== 'reject' && normalized !== 'accept_all' && normalized !== 'reject_all') {
+      throw invalidArgument(`Unsupported tracked-change action ${action}.`);
+    }
+    return normalized;
+  }
+
+  function changeTrackingModeFromArg(mode) {
+    validateChangeTrackingMode(mode);
+    if (mode === 'off') return Word.ChangeTrackingMode.off;
+    if (mode === 'track_all') return Word.ChangeTrackingMode.trackAll;
+    return Word.ChangeTrackingMode.trackMineOnly;
+  }
+
+  function changeTrackingModeToResult(mode) {
+    const normalized = String(mode || '').toLowerCase();
+    if (normalized === 'off') return 'off';
+    if (normalized === 'trackall' || normalized === 'track_all') return 'track_all';
+    if (normalized === 'trackmineonly' || normalized === 'track_mine_only') return 'track_mine_only';
+    return normalized || null;
+  }
+
   function validateResizeImageArgs(args) {
-    if (!args.image || args.image.kind !== 'paragraph_index') {
-      throw Object.assign(new Error('word.resize_image requires image.kind="paragraph_index".'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
-    }
-    if (!Number.isInteger(args.image.index) || args.image.index < 0) {
-      throw Object.assign(new Error('word.resize_image image.index must be a non-negative integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
-    }
-    if (args.image.image_index !== undefined && (!Number.isInteger(args.image.image_index) || args.image.image_index < 0)) {
-      throw Object.assign(new Error('word.resize_image image.image_index must be a non-negative integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
-    }
+    validateImageLocator('word.resize_image', args.image);
     if (args.width_pt === undefined && args.height_pt === undefined) {
       throw Object.assign(new Error('word.resize_image requires width_pt or height_pt.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
@@ -3100,6 +4412,173 @@
     if (args.preserve_aspect_ratio === false && (args.width_pt === undefined || args.height_pt === undefined)) {
       throw Object.assign(new Error('word.resize_image requires both width_pt and height_pt when preserve_aspect_ratio is false.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
+  }
+
+  function validateImageLocator(tool, image) {
+    if (!image || image.kind !== 'paragraph_index') {
+      throw Object.assign(new Error(`${tool} requires image.kind="paragraph_index".`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (!Number.isInteger(image.index) || image.index < 0) {
+      throw Object.assign(new Error(`${tool} image.index must be a non-negative integer.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (image.image_index !== undefined && (!Number.isInteger(image.image_index) || image.image_index < 0)) {
+      throw Object.assign(new Error(`${tool} image.image_index must be a non-negative integer.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
+  function validateUpdateImageArgs(args) {
+    validateImageLocator('word.update_image', args?.image);
+    const hasUpdate = args.alt_text_title !== undefined || args.alt_text_description !== undefined || args.hyperlink !== undefined || args.replace_base64 !== undefined;
+    if (!hasUpdate) throw invalidArgument('word.update_image requires alt_text_title, alt_text_description, hyperlink, or replace_base64.');
+    if (args.alt_text_title !== undefined && typeof args.alt_text_title !== 'string') throw invalidArgument('word.update_image alt_text_title must be a string.');
+    if (args.alt_text_description !== undefined && typeof args.alt_text_description !== 'string') throw invalidArgument('word.update_image alt_text_description must be a string.');
+    if (args.hyperlink !== undefined) validateHyperlinkUrl(args.hyperlink);
+    if (args.replace_base64 !== undefined && typeof args.replace_base64 !== 'string') throw invalidArgument('word.update_image replace_base64 must be a string.');
+  }
+
+  async function resolveInlineImage(context, selector, tool) {
+    validateImageLocator(tool, selector);
+    const paragraph = await getParagraphByIndex(context, selector.index);
+    const pictures = paragraph.inlinePictures;
+    pictures.load('items/width,items/height,items/altTextTitle,items/altTextDescription,items/hyperlink');
+    await context.sync();
+
+    const imageIndex = selector.image_index ?? 0;
+    const picture = pictures.items[imageIndex];
+    if (!picture) {
+      throw Object.assign(new Error(`Inline image index ${imageIndex} is out of range for paragraph ${selector.index}.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
+    }
+    return { selector, imageIndex, picture };
+  }
+
+  function imageResult(picture, paragraphIndex, imageIndex) {
+    return {
+      paragraph_index: paragraphIndex,
+      image_index: imageIndex,
+      width_pt: picture.width,
+      height_pt: picture.height,
+      alt_text_title: picture.altTextTitle || '',
+      alt_text_description: picture.altTextDescription || '',
+      has_hyperlink: Boolean(picture.hyperlink)
+    };
+  }
+
+  function imageTargetSummary(target) {
+    return {
+      paragraph_index: target.selector.index,
+      image_index: target.imageIndex,
+      width_pt: target.picture.width,
+      height_pt: target.picture.height
+    };
+  }
+
+  function validateInsertShapeArgs(tool, args) {
+    if (!args || typeof args !== 'object') throw invalidArgument(`${tool} requires arguments.`);
+    const type = String(args.shape_type || '').trim();
+    if (!['text_box', 'rectangle', 'ellipse', 'rounded_rectangle', 'line', 'picture'].includes(type)) {
+      throw invalidArgument(`${tool} shape_type must be text_box, rectangle, ellipse, rounded_rectangle, line, or picture.`);
+    }
+    if (args.anchor !== undefined) requireAnchor(tool, args.anchor);
+    if (type === 'picture' && (!args.image || typeof args.image.base64 !== 'string' || args.image.base64.length === 0)) {
+      throw invalidArgument(`${tool} picture shapes require image.base64.`);
+    }
+    validateOptionalShapeNumber(tool, 'width_pt', args.width_pt, true);
+    validateOptionalShapeNumber(tool, 'height_pt', args.height_pt, true);
+    validateOptionalShapeNumber(tool, 'left_pt', args.left_pt, false);
+    validateOptionalShapeNumber(tool, 'top_pt', args.top_pt, false);
+  }
+
+  function validateUpdateShapeArgs(tool, args) {
+    validateShapeId(tool, args?.shape_id);
+    const action = String(args?.action || '').trim();
+    if (!['move', 'resize', 'set_text', 'set_alt_text', 'set_fill', 'set_line', 'set_wrap', 'set_visibility'].includes(action)) {
+      throw invalidArgument(`${tool} action is required.`);
+    }
+    if (action === 'set_text' && args.text === undefined) throw invalidArgument(`${tool} set_text requires text.`);
+    if (action === 'set_alt_text' && args.alt_text_description === undefined) throw invalidArgument(`${tool} set_alt_text requires alt_text_description.`);
+    if (action === 'set_visibility' && typeof args.visible !== 'boolean') throw invalidArgument(`${tool} set_visibility requires visible.`);
+    validateOptionalShapeNumber(tool, 'width_pt', args.width_pt, true);
+    validateOptionalShapeNumber(tool, 'height_pt', args.height_pt, true);
+    validateOptionalShapeNumber(tool, 'left_pt', args.left_pt, false);
+    validateOptionalShapeNumber(tool, 'top_pt', args.top_pt, false);
+  }
+
+  function validateShapeId(tool, shapeId) {
+    if (!Number.isInteger(shapeId) || shapeId < 0) throw invalidArgument(`${tool} shape_id must be a non-negative integer.`);
+  }
+
+  function validateOptionalShapeNumber(tool, name, value, positive) {
+    if (value === undefined) return;
+    if (typeof value !== 'number' || !Number.isFinite(value) || (positive && value <= 0)) {
+      throw invalidArgument(`${tool} ${name} must be a ${positive ? 'positive ' : ''}number.`);
+    }
+  }
+
+  async function resolveShapeById(context, shapeId, tool) {
+    validateShapeId(tool, shapeId);
+    const shape = context.document.body.shapes.getByIdOrNullObject(shapeId);
+    shape.load('isNullObject');
+    await context.sync();
+    if (shape.isNullObject) throw Object.assign(new Error(`${tool} could not find shape ${shapeId}.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
+    return shape;
+  }
+
+  async function shapeInsertOwner(context, anchor) {
+    if (!anchor || anchor.kind === 'end_of_document') {
+      const paragraphs = context.document.body.paragraphs;
+      paragraphs.load('items');
+      await context.sync();
+      return paragraphs.items[paragraphs.items.length - 1] || context.document.body.insertParagraph('', Word.InsertLocation.end);
+    }
+    if (anchor.kind === 'start_of_document') {
+      const paragraphs = context.document.body.paragraphs;
+      paragraphs.load('items');
+      await context.sync();
+      return paragraphs.items[0] || context.document.body.insertParagraph('', Word.InsertLocation.start);
+    }
+    const target = await resolveAnchor(context, anchor);
+    if (typeof target.insertTextBox === 'function') return target;
+    return target.getRange();
+  }
+
+  function shapeInsertOptions(args) {
+    return compactObject({
+      width: args.width_pt,
+      height: args.height_pt,
+      left: args.left_pt,
+      top: args.top_pt
+    });
+  }
+
+  function wordGeometricShapeType(shapeType) {
+    const normalized = String(shapeType || '').trim().toLowerCase();
+    if (normalized === 'rectangle') return Word.GeometricShapeType.rectangle;
+    if (normalized === 'ellipse') return Word.GeometricShapeType.ellipse;
+    if (normalized === 'rounded_rectangle') return Word.GeometricShapeType.roundRectangle;
+    if (normalized === 'line') return Word.GeometricShapeType.lineInverse;
+    throw invalidArgument(`Unsupported geometric shape_type ${shapeType}.`);
+  }
+
+  function shapeMetadata(shape) {
+    return {
+      shape_id: shape.id,
+      name: shape.name || '',
+      type: shape.type || null,
+      geometric_shape_type: shape.geometricShapeType || null,
+      width_pt: typeof shape.width === 'number' ? shape.width : null,
+      height_pt: typeof shape.height === 'number' ? shape.height : null,
+      left_pt: typeof shape.left === 'number' ? shape.left : null,
+      top_pt: typeof shape.top === 'number' ? shape.top : null,
+      alt_text_description: shape.altTextDescription || '',
+      visible: typeof shape.visible === 'boolean' ? shape.visible : null,
+      text_preview: safeTextPreview(shape.body?.text)
+    };
+  }
+
+  function safeTextPreview(text, limit = 200) {
+    if (typeof text !== 'string') return '';
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    return normalized.length > limit ? `${normalized.slice(0, limit)}...` : normalized;
   }
 
   function resizedImageSize(args, oldWidth, oldHeight) {
@@ -3177,6 +4656,104 @@
     if (typeof formatting.font_size_pt === 'number') font.size = formatting.font_size_pt;
     if (formatting.color) font.color = formatting.color;
     if (formatting.highlight) font.highlightColor = formatting.highlight;
+  }
+
+  function applyStyleDefinitionFormatting(style, args) {
+    if (args.base_style) style.baseStyle = args.base_style;
+    if (args.font) applyRunFormatting(style.font, args.font);
+    if (args.paragraph) applyParagraphFormattingToParagraph(style.paragraphFormat, args.paragraph);
+  }
+
+  function styleTypeToOffice(type) {
+    const normalized = normalizedStyleType(type);
+    if (normalized === 'paragraph') return Word.StyleType.paragraph;
+    if (normalized === 'character') return Word.StyleType.character;
+    if (normalized === 'table') return Word.StyleType.table;
+    return Word.StyleType.list;
+  }
+
+  function normalizedStyleTypeFromOffice(type) {
+    const value = String(type || '').trim().toLowerCase();
+    if (value === 'paragraph') return 'paragraph';
+    if (value === 'character') return 'character';
+    if (value === 'table') return 'table';
+    if (value === 'list') return 'list';
+    return value || null;
+  }
+
+  function styleMetadata(style) {
+    return {
+      name_local: style.nameLocal || null,
+      type: normalizedStyleTypeFromOffice(style.type),
+      built_in: Boolean(style.builtIn),
+      in_use: Boolean(style.inUse),
+      base_style: style.baseStyle || null,
+      priority: typeof style.priority === 'number' ? style.priority : null
+    };
+  }
+
+  function documentPropertiesMetadata(properties) {
+    return omitUndefined({
+      title: nullableString(properties.title),
+      subject: nullableString(properties.subject),
+      author: nullableString(properties.author),
+      keywords: nullableString(properties.keywords),
+      category: nullableString(properties.category),
+      comments: nullableString(properties.comments),
+      company: nullableString(properties.company),
+      manager: nullableString(properties.manager),
+      last_author: nullableString(properties.lastAuthor),
+      revision_number: nullableString(properties.revisionNumber),
+      creation_date: isoDateOrNull(properties.creationDate),
+      last_save_time: isoDateOrNull(properties.lastSaveTime),
+      security: typeof properties.security === 'number' ? properties.security : undefined
+    });
+  }
+
+  function customPropertyMetadata(property) {
+    return {
+      key: property.key,
+      type: normalizeDocumentPropertyType(property.type),
+      value: property.value instanceof Date ? property.value.toISOString() : property.value
+    };
+  }
+
+  function normalizeDocumentPropertyType(type) {
+    const normalized = String(type || '').toLowerCase();
+    if (normalized === 'string' || normalized === 'number' || normalized === 'boolean' || normalized === 'date') return normalized;
+    return normalized || 'unknown';
+  }
+
+  function nullableString(value) {
+    return typeof value === 'string' ? value : null;
+  }
+
+  function isoDateOrNull(value) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+    return null;
+  }
+
+  function omitUndefined(value) {
+    return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined));
+  }
+
+  async function getStyleByName(context, name) {
+    const style = context.document.getStyles().getByNameOrNullObject(name);
+    style.load('isNullObject,nameLocal,type,builtIn,inUse,baseStyle,priority');
+    await context.sync();
+    if (style.isNullObject) throw invalidArgument(`Style ${name} was not found.`);
+    return style;
+  }
+
+  async function ensureStyleNameAvailable(context, name) {
+    const style = context.document.getStyles().getByNameOrNullObject(name);
+    style.load('isNullObject');
+    await context.sync();
+    if (!style.isNullObject) throw invalidArgument(`Style ${name} already exists.`);
+  }
+
+  function supportsWordApi(version) {
+    return Office.context?.requirements?.isSetSupported?.('WordApi', version) === true;
   }
 
   async function applyParagraphFormatting(context, range, paragraph) {
@@ -3301,6 +4878,41 @@
     return value === 'center' ? Word.VerticalAlignment.center : value === 'bottom' ? Word.VerticalAlignment.bottom : Word.VerticalAlignment.top;
   }
 
+  function normalizedTableBorderEdges(edges) {
+    const source = edges ?? ['all'];
+    return source.map((edge) => tableBorderLocation(edge));
+  }
+
+  function tableBorderLocation(edge) {
+    const normalized = String(edge || '').trim().toLowerCase();
+    if (normalized === 'top') return Word.BorderLocation.top;
+    if (normalized === 'bottom') return Word.BorderLocation.bottom;
+    if (normalized === 'left') return Word.BorderLocation.left;
+    if (normalized === 'right') return Word.BorderLocation.right;
+    if (normalized === 'inside_horizontal') return Word.BorderLocation.insideHorizontal;
+    if (normalized === 'inside_vertical') return Word.BorderLocation.insideVertical;
+    if (normalized === 'all') return Word.BorderLocation.all;
+    throw invalidArgument(`Unsupported table border edge ${edge}.`);
+  }
+
+  function tableBorderType(style) {
+    const normalized = String(style || '').trim().toLowerCase();
+    if (normalized === 'single') return Word.BorderType.single;
+    if (normalized === 'double') return Word.BorderType.double;
+    if (normalized === 'dotted') return Word.BorderType.dotted;
+    if (normalized === 'dashed') return Word.BorderType.dashed;
+    if (normalized === 'none') return Word.BorderType.none;
+    throw invalidArgument(`Unsupported table border style ${style}.`);
+  }
+
+  function tableBorderUpdate(borders) {
+    const update = {};
+    if (borders.style !== undefined) update.type = tableBorderType(borders.style);
+    if (borders.width_pt !== undefined) update.width = borders.width_pt;
+    if (borders.color !== undefined) update.color = borders.color;
+    return update;
+  }
+
   function trackedChangeFingerprint(change, index) {
     const date = change.date instanceof Date ? change.date.toISOString() : String(change.date || '');
     return stableHash([index, change.author || '', date, change.type || '', change.text || ''].join('\u001f'));
@@ -3347,6 +4959,9 @@
       WordApi_1_4: requirements.isSetSupported('WordApi', '1.4') ? '1.4' : null,
       WordApi_1_5: requirements.isSetSupported('WordApi', '1.5') ? '1.5' : null,
       WordApi_1_6: requirements.isSetSupported('WordApi', '1.6') ? '1.6' : null,
+      WordApi_1_7: requirements.isSetSupported('WordApi', '1.7') ? '1.7' : null,
+      WordApi_1_9: requirements.isSetSupported('WordApi', '1.9') ? '1.9' : null,
+      WordApiDesktop_1_2: requirements.isSetSupported('WordApiDesktop', '1.2') ? '1.2' : null,
       WordApiDesktop_1_3: requirements.isSetSupported('WordApiDesktop', '1.3') ? '1.3' : null
     };
   }
@@ -3594,11 +5209,27 @@
 
   function availableToolsForRequirements(requirements = probeRequirementSets()) {
     const supportsNotes = Boolean(requirements.WordApi_1_5);
+    const supportsFieldListing = Boolean(requirements.WordApi_1_4);
+    const supportsFieldMutation = Boolean(requirements.WordApi_1_5);
+    const supportsStyles = Boolean(requirements.WordApi_1_5);
+    const supportsInlineImages = Boolean(requirements.WordApi_1_3);
+    const supportsShapes = Boolean(requirements.WordApiDesktop_1_2);
+    const supportsDocumentProperties = Boolean(requirements.WordApi_1_3);
+    const supportsSetSelection = Boolean(requirements.WordApi_1_3);
+    const supportsHtmlInterchange = Boolean(requirements.WordApi_1_3);
     return AVAILABLE_TOOLS.filter((tool) => {
       if (tool === 'word.update_page_setup') return Boolean(requirements.WordApiDesktop_1_3);
       if (['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'].includes(tool)) {
         return supportsNotes;
       }
+      if (tool === 'word.list_fields') return supportsFieldListing;
+      if (['word.insert_field', 'word.update_field', 'word.delete_field'].includes(tool)) return supportsFieldMutation;
+      if (['word.list_styles', 'word.create_style', 'word.update_style'].includes(tool)) return supportsStyles;
+      if (['word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'].includes(tool)) return supportsInlineImages;
+      if (['word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'].includes(tool)) return supportsShapes;
+      if (['word.get_document_properties', 'word.update_document_properties'].includes(tool)) return supportsDocumentProperties;
+      if (tool === 'word.set_selection') return supportsSetSelection;
+      if (['word.get_html', 'word.insert_html'].includes(tool)) return supportsHtmlInterchange;
       return true;
     });
   }
