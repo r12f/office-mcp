@@ -145,6 +145,25 @@ const TOOL_METADATA: &[ToolMetadata] = &[
     ),
     tool("word.list_images", "word", "Media", ToolSideEffect::Read),
     tool("word.get_image", "word", "Media", ToolSideEffect::Read),
+    tool("word.list_shapes", "word", "Media", ToolSideEffect::Read),
+    tool(
+        "word.insert_shape",
+        "word",
+        "Media",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.update_shape",
+        "word",
+        "Media",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "word.delete_shape",
+        "word",
+        "Media",
+        ToolSideEffect::Destructive,
+    ),
     tool(
         "word.update_image",
         "word",

@@ -114,10 +114,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 58);
+    assert_eq!(WORD_V1_TOOLS.len(), 62);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 212);
+    assert_eq!(tools.len(), 220);
 }
 
 #[test]
@@ -282,6 +282,98 @@ fn word_image_tools_expose_expected_contracts() {
     assert_required(&delete_image_schema, &["session_id", "image"]);
     assert_eq!(
         delete_image_schema["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+}
+
+#[test]
+fn word_shape_tools_expose_expected_contracts() {
+    let list_shapes = tool_for("word.list_shapes");
+    assert_eq!(
+        list_shapes["inputSchema"]["required"],
+        serde_json::json!(["session_id"])
+    );
+    assert_eq!(list_shapes["_meta"]["com.office-mcp/side_effects"], "read");
+
+    let insert_shape = tool_for("word.insert_shape");
+    assert_eq!(
+        insert_shape["inputSchema"]["required"],
+        serde_json::json!(["session_id", "shape_type"])
+    );
+    assert_eq!(
+        insert_shape["inputSchema"]["properties"]["shape_type"]["enum"],
+        serde_json::json!([
+            "text_box",
+            "rectangle",
+            "ellipse",
+            "rounded_rectangle",
+            "line",
+            "picture"
+        ])
+    );
+    assert_eq!(
+        insert_shape["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
+
+    let update_shape = tool_for("word.update_shape");
+    assert_eq!(
+        update_shape["inputSchema"]["required"],
+        serde_json::json!(["session_id", "shape_id", "action"])
+    );
+    assert_eq!(
+        update_shape["inputSchema"]["properties"]["action"]["enum"],
+        serde_json::json!([
+            "move",
+            "resize",
+            "set_text",
+            "set_alt_text",
+            "set_fill",
+            "set_line",
+            "set_wrap",
+            "set_visibility"
+        ])
+    );
+    assert_eq!(
+        update_shape["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
+
+    let delete_shape = tool_for("word.delete_shape");
+    assert_eq!(
+        delete_shape["inputSchema"]["required"],
+        serde_json::json!(["session_id", "shape_id"])
+    );
+    assert_eq!(
+        delete_shape["_meta"]["com.office-mcp/side_effects"],
+        "destructive"
+    );
+
+    let list_shapes_schema = schema_for("word.list_shapes");
+    assert_required(&list_shapes_schema, &["session_id"]);
+    assert_eq!(
+        list_shapes_schema["properties"]["scope"]["enum"],
+        serde_json::json!(["body", "paragraph", "anchor"])
+    );
+
+    let insert_shape_schema = schema_for("word.insert_shape");
+    assert_required(&insert_shape_schema, &["session_id", "shape_type"]);
+    assert_eq!(
+        insert_shape_schema["properties"]["image"]["oneOf"][0]["required"],
+        serde_json::json!(["base64"])
+    );
+
+    let update_shape_schema = schema_for("word.update_shape");
+    assert_required(&update_shape_schema, &["session_id", "shape_id", "action"]);
+    assert_eq!(
+        update_shape_schema["properties"]["wrap_type"]["enum"],
+        serde_json::json!(["inline", "square", "tight", "behind", "front", "top_bottom"])
+    );
+
+    let delete_shape_schema = schema_for("word.delete_shape");
+    assert_required(&delete_shape_schema, &["session_id", "shape_id"]);
+    assert_eq!(
+        delete_shape_schema["properties"]["validate_only"]["type"],
         "boolean"
     );
 }
@@ -667,10 +759,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 103);
+    assert_eq!(all_tools.len(), 107);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        103
+        107
     );
     assert!(all_tools.contains(&"word.update_table"));
     assert!(all_tools.contains(&"excel.write_range"));

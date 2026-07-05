@@ -316,6 +316,63 @@ const WORD_E2E_CASES = Object.fromEntries([
       }
     }
   }],
+  ['word.list_shapes', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_shape', arguments: { shape_type: 'text_box', text: 'List shape E2E text', name: 'E2E List Shape', width_pt: 144, height_pt: 36 } }
+      ]
+    },
+    args: {},
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        contains: ['E2E List Shape', 'List shape E2E text'],
+        pathEquals: [{ path: 'count', value: 1 }]
+      }
+    }
+  }],
+  ['word.insert_shape', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'shape insert anchor marker' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'shape insert anchor marker' }, shape_type: 'text_box', text: 'Inserted shape E2E text', name: 'E2E Insert Shape', width_pt: 144, height_pt: 36, alt_text_description: 'Inserted text box shape' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_shapes',
+      readbackArguments: {},
+      expect: { contains: ['E2E Insert Shape', 'Inserted shape E2E text'] }
+    }
+  }],
+  ['word.update_shape', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_shape', saveAs: 'shapeResult', arguments: { shape_type: 'text_box', text: 'Before shape update', name: 'E2E Update Shape', width_pt: 144, height_pt: 36 } }
+      ]
+    },
+    args: { shape_id: '${shapeResult.shape.shape_id}', action: 'set_text', text: 'Updated shape E2E text', width_pt: 180, height_pt: 48 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_shapes',
+      readbackArguments: {},
+      expect: { contains: ['E2E Update Shape', 'Updated shape E2E text'] }
+    }
+  }],
+  ['word.delete_shape', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_shape', saveAs: 'shapeResult', arguments: { shape_type: 'text_box', text: 'Delete shape E2E text', name: 'E2E Delete Shape', width_pt: 144, height_pt: 36 } }
+      ]
+    },
+    args: { shape_id: '${shapeResult.shape.shape_id}' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.list_shapes',
+      readbackArguments: {},
+      expect: { notContains: ['E2E Delete Shape', 'Delete shape E2E text'] }
+    }
+  }],
   ['word.insert_table', {
     setup: {
       actions: [

@@ -109,7 +109,9 @@ Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_paragraph`,
 `word.insert_table`, `word.insert_image`, `word.resize_image`,
 `word.list_images`, `word.get_image`, `word.update_image`,
-`word.delete_image`, `word.insert_break`, `word.list_sections`, `word.update_page_setup`,
+`word.delete_image`, `word.list_shapes`, `word.insert_shape`,
+`word.update_shape`, `word.delete_shape`, `word.insert_break`,
+`word.list_sections`, `word.update_page_setup`,
 `word.insert_list`, `word.insert_hyperlink`, `word.list_hyperlinks`,
 `word.remove_hyperlink`, `word.replace_text`,
 `word.update_paragraph`, `word.delete_range`, `word.apply_formatting`,
@@ -235,6 +237,13 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       creation owner and `word.resize_image` as the geometry owner, validates
       replacement bytes with the existing image safety limits, and gates image
       deletion as destructive while preserving adjacent paragraph text.
+- [x] Add desktop-tier shape tools: `word.list_shapes`, `word.insert_shape`,
+      `word.update_shape`, and `word.delete_shape`. The contract gates the
+      tools on `WordApiDesktop 1.2`, keeps text boxes, geometric shapes,
+      floating pictures, groups, and canvases in the Media owner, exposes
+      bounded text-box previews through `word.list_shapes`, and documents that
+      `word.get_text` remains a main-body text read rather than silently mixing
+      text-box content into body output.
 - [x] Add document-property tools: `word.get_document_properties` and
       `word.update_document_properties`. The contract keeps document metadata
       in Document & structure, uses `WordApi 1.3`, reads writable core fields,
