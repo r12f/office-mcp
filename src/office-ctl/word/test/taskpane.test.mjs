@@ -673,6 +673,26 @@ test('word.resolve_anchor returns safe anchor diagnostics without mutating', () 
   assert.doesNotMatch(functionBody(js, 'describeResolvedAnchor'), /document\.body\.text|body\.load\('text'/);
 });
 
+test('word.set_selection is advertised, grouped, and dispatches through anchor selection', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const preflightBody = functionBody(js, 'preflightWordMutatingTool');
+  const setSelectionBody = functionBody(js, 'setSelection');
+
+  assert.match(js, /'word\.set_selection'/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \[[\s\S]*'word\.get_selection'[\s\S]*'word\.set_selection'[\s\S]*'word\.resolve_anchor'[\s\S]*\] \}/);
+  assert.match(js, /\['word\.set_selection', \{ category: 'Range & selection', sideEffect: 'mutating', description: 'Set the current selection or cursor position from an anchor\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.set_selection':\s*data = await setSelection\(args\);/);
+  assert.match(preflightBody, /case 'word\.set_selection':\s*validateSetSelectionArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'availableToolsForRequirements'), /WordApi_1_3[\s\S]*word\.set_selection/);
+  assert.match(setSelectionBody, /const target = await resolveRangeForExtent\(context, args\.anchor, args\.extent\);/);
+  assert.match(setSelectionBody, /target\.select\(selectionModeForSetSelection\(args\.mode\)\);/);
+  assert.match(setSelectionBody, /selected_text_preview: safeTextPreview\(target\.text\)/);
+  assert.match(js, /function selectionModeForSetSelection\(mode\)/);
+  assert.match(functionBody(js, 'selectionModeForSetSelection'), /cursor_start[\s\S]*Word\.SelectionMode\.start/);
+  assert.match(functionBody(js, 'selectionModeForSetSelection'), /cursor_end[\s\S]*Word\.SelectionMode\.end/);
+});
+
 test('word.apply_formatting supports paragraph layout formatting and readback metadata', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const preflightBody = functionBody(js, 'preflightWordMutatingTool');
@@ -804,7 +824,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.list_sections'/);
   assert.match(js, /'word\.update_page_setup'/);
   assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.get_document_properties', 'word\.update_document_properties', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.list_fields', 'word\.insert_field', 'word\.update_field', 'word\.delete_field', 'word\.list_styles', 'word\.create_style', 'word\.update_style', 'word\.save'\] \}/);
-  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
+  assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.set_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.resize_image', 'word\.list_images', 'word\.get_image', 'word\.update_image', 'word\.delete_image'\] \}/);

@@ -131,6 +131,23 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { pathEquals: [{ path: 'untrusted_source', value: true }] }
     }
   }],
+  ['word.set_selection', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Selection navigation E2E target' } }
+      ]
+    },
+    args: { anchor: { kind: 'after_text', text: 'Selection navigation E2E target' }, mode: 'select' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_selection',
+      readbackArguments: {},
+      expect: {
+        contains: ['Selection navigation E2E target'],
+        pathEquals: [{ path: 'is_empty', value: false }]
+      }
+    }
+  }],
   ['word.get_header_footer', {
     setup: {
       actions: [

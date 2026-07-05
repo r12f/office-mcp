@@ -103,6 +103,7 @@ user intent.
 
 Target catalog: `word.get_text`, `word.get_outline`, `word.get_paragraph`,
 `word.find_text`, `word.resolve_anchor`, `word.get_selection`,
+`word.set_selection`,
 `word.get_header_footer`, `word.update_header_footer`, `word.insert_bookmark`,
 `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_paragraph`,
 `word.insert_table`, `word.insert_image`, `word.resize_image`,
@@ -229,6 +230,11 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       in Document & structure, uses `WordApi 1.3`, reads writable core fields,
       read-only timestamps/revision metadata, and custom properties, and limits
       mutation to writable core fields plus custom property upsert/delete.
+- [x] Add selection-setting support: `word.set_selection`. The contract keeps
+      UI selection and cursor movement in Range & selection, uses the shared
+      anchor vocabulary and extent handling, maps `select`, `cursor_start`, and
+      `cursor_end` to Word range selection modes, and classifies the tool as
+      edit because selection state affects later selection-anchored mutations.
 - [x] Add compatibility/deprecation tests proving superseded tools are not
       advertised after migration while their target-owner replacements cover the
       same user workflows without duplicate writes.

@@ -14,6 +14,11 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(anchor.category, "Range & selection");
     assert_eq!(anchor.side_effect, ToolSideEffect::Read);
 
+    let set_selection = tool_metadata("word.set_selection").expect("selection metadata");
+    assert_eq!(set_selection.app, "word");
+    assert_eq!(set_selection.category, "Range & selection");
+    assert_eq!(set_selection.side_effect, ToolSideEffect::Mutating);
+
     let list_bookmarks = tool_metadata("word.list_bookmarks").expect("bookmark list metadata");
     assert_eq!(list_bookmarks.app, "word");
     assert_eq!(list_bookmarks.category, "Range & selection");
