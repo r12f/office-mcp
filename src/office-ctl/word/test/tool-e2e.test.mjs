@@ -413,6 +413,32 @@ const WORD_E2E_CASES = Object.fromEntries([
       expect: { contains: ['E2E Updated Style'] }
     }
   }],
+  ['word.update_document_properties', {
+    setup: {
+      actions: [
+        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Document properties setup marker' } }
+      ]
+    },
+    args: { title: 'E2E Document Properties Title', author: 'Office MCP E2E', custom_set: [{ key: 'OfficeMcpE2E', value: 'properties' }] },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'word.get_document_properties',
+      readbackArguments: { include_custom: true },
+      expect: { contains: ['E2E Document Properties Title', 'OfficeMcpE2E'], pathEquals: [{ path: 'title', value: 'E2E Document Properties Title' }, { path: 'author', value: 'Office MCP E2E' }] }
+    }
+  }],
+  ['word.get_document_properties', {
+    setup: {
+      actions: [
+        { tool: 'word.update_document_properties', arguments: { subject: 'E2E Properties Subject', custom_set: [{ key: 'OfficeMcpReadback', value: true }] } }
+      ]
+    },
+    args: { include_custom: true },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E Properties Subject', 'OfficeMcpReadback'], pathEquals: [{ path: 'subject', value: 'E2E Properties Subject' }] }
+    }
+  }],
   ['word.update_header_footer', {
     setup: {
       actions: [

@@ -76,6 +76,8 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word.insert_field"));
     assert!(names.contains(&"word.update_field"));
     assert!(names.contains(&"word.delete_field"));
+    assert!(names.contains(&"word.get_document_properties"));
+    assert!(names.contains(&"word.update_document_properties"));
     assert!(names.contains(&"word.list_styles"));
     assert!(names.contains(&"word.create_style"));
     assert!(names.contains(&"word.update_style"));
@@ -111,10 +113,72 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 53);
+    assert_eq!(WORD_V1_TOOLS.len(), 55);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 202);
+    assert_eq!(tools.len(), 206);
+}
+
+#[test]
+fn word_document_property_tools_expose_expected_contracts() {
+    let get_properties = tool_for("word.get_document_properties");
+    assert_eq!(
+        get_properties["inputSchema"]["required"],
+        serde_json::json!(["session_id"])
+    );
+    assert_eq!(
+        get_properties["inputSchema"]["properties"]["include_custom"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        get_properties["inputSchema"]["properties"]["include_custom"]["default"],
+        true
+    );
+    assert_eq!(
+        get_properties["_meta"]["com.office-mcp/side_effects"],
+        "read"
+    );
+
+    let update_properties = tool_for("word.update_document_properties");
+    assert_eq!(
+        update_properties["inputSchema"]["required"],
+        serde_json::json!(["session_id"])
+    );
+    assert_eq!(
+        update_properties["inputSchema"]["anyOf"],
+        serde_json::json!([
+            { "required": ["title"] },
+            { "required": ["subject"] },
+            { "required": ["author"] },
+            { "required": ["keywords"] },
+            { "required": ["category"] },
+            { "required": ["comments"] },
+            { "required": ["company"] },
+            { "required": ["manager"] },
+            { "required": ["custom_set"] },
+            { "required": ["custom_delete"] }
+        ])
+    );
+    assert_eq!(
+        update_properties["inputSchema"]["properties"]["custom_set"]["items"]["required"],
+        serde_json::json!(["key", "value"])
+    );
+    assert_eq!(
+        update_properties["inputSchema"]["properties"]["custom_set"]["items"]["properties"]["key"]["minLength"],
+        1
+    );
+    assert_eq!(
+        update_properties["inputSchema"]["properties"]["custom_set"]["items"]["properties"]["value"]["oneOf"][2]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        update_properties["inputSchema"]["properties"]["custom_delete"]["items"]["minLength"],
+        1
+    );
+    assert_eq!(
+        update_properties["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
 }
 
 #[test]
@@ -927,6 +991,37 @@ fn word_style_schemas_are_specific() {
     assert_eq!(
         update_style["anyOf"][0]["required"],
         serde_json::json!(["base_style"])
+    );
+}
+
+#[test]
+fn word_document_property_schemas_are_specific() {
+    let get_properties = schema_for("word.get_document_properties");
+    assert_required(&get_properties, &["session_id"]);
+    assert_eq!(get_properties["properties"]["include_custom"]["type"], "boolean");
+    assert_eq!(get_properties["properties"]["include_custom"]["default"], true);
+
+    let update_properties = schema_for("word.update_document_properties");
+    assert_required(&update_properties, &["session_id"]);
+    assert_eq!(update_properties["properties"]["title"]["type"], "string");
+    assert_eq!(update_properties["properties"]["manager"]["type"], "string");
+    assert!(update_properties["properties"].get("last_author").is_none());
+    assert!(update_properties["properties"].get("revision_number").is_none());
+    assert_eq!(
+        update_properties["properties"]["custom_set"]["items"]["additionalProperties"],
+        false
+    );
+    assert_eq!(
+        update_properties["properties"]["custom_set"]["items"]["properties"]["value"]["oneOf"][0]["type"],
+        "string"
+    );
+    assert_eq!(
+        update_properties["properties"]["custom_delete"]["items"]["minLength"],
+        1
+    );
+    assert_eq!(
+        update_properties["anyOf"][9]["required"],
+        serde_json::json!(["custom_delete"])
     );
 }
 

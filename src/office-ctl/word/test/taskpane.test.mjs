@@ -549,6 +549,28 @@ test('Word style tools are advertised, grouped, gated, and dispatched through do
   assert.match(js, /function applyStyleDefinitionFormatting\(style, args\)/);
 });
 
+test('Word document property tools are advertised, grouped, gated, and dispatched through document owners', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+  const preflightBody = functionBody(js, 'preflightWordMutatingTool');
+
+  assert.match(js, /'word\.get_document_properties'/);
+  assert.match(js, /'word\.update_document_properties'/);
+  assert.match(js, /\{ label: 'Document & structure', tools: \[[\s\S]*'word\.get_document_properties'[\s\S]*'word\.update_document_properties'[\s\S]*\] \}/);
+  assert.match(js, /\['word\.get_document_properties', \{ category: 'Document & structure', sideEffect: 'read', description: 'Read document metadata and custom properties\.' \}\]/);
+  assert.match(js, /\['word\.update_document_properties', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Update document metadata and custom properties\.' \}\]/);
+  assert.match(invokeBody, /case 'word\.get_document_properties':\s*data = await getDocumentProperties\(args \|\| \{\}\);/);
+  assert.match(invokeBody, /case 'word\.update_document_properties':\s*data = await updateDocumentProperties\(args \|\| \{\}\);/);
+  assert.match(preflightBody, /case 'word\.update_document_properties':\s*validateUpdateDocumentPropertiesArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'availableToolsForRequirements'), /WordApi_1_3[\s\S]*word\.get_document_properties[\s\S]*word\.update_document_properties/);
+  assert.match(js, /async function getDocumentProperties\(args/);
+  assert.match(js, /async function updateDocumentProperties\(args/);
+  assert.match(js, /function validateUpdateDocumentPropertiesArgs\(tool, args\)/);
+  assert.match(functionBody(js, 'validateUpdateDocumentPropertiesArgs'), /requires at least one writable property or custom operation/);
+  assert.match(functionBody(js, 'updateDocumentProperties'), /custom_set/);
+  assert.match(functionBody(js, 'updateDocumentProperties'), /custom_delete/);
+});
+
 test('Word field tools are advertised, grouped, gated, and dispatched through document owners', () => {
   const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
   const invokeBody = functionBody(js, 'invokeTool');
@@ -781,7 +803,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /'word\.insert_break'/);
   assert.match(js, /'word\.list_sections'/);
   assert.match(js, /'word\.update_page_setup'/);
-  assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.list_fields', 'word\.insert_field', 'word\.update_field', 'word\.delete_field', 'word\.list_styles', 'word\.create_style', 'word\.update_style', 'word\.save'\] \}/);
+  assert.match(js, /\{ label: 'Document & structure', tools: \['word\.get_text', 'word\.get_outline', 'word\.get_header_footer', 'word\.update_header_footer', 'word\.get_document_properties', 'word\.update_document_properties', 'word\.insert_break', 'word\.list_sections', 'word\.update_page_setup', 'word\.list_fields', 'word\.insert_field', 'word\.update_field', 'word\.delete_field', 'word\.list_styles', 'word\.create_style', 'word\.update_style', 'word\.save'\] \}/);
   assert.match(js, /\{ label: 'Range & selection', tools: \['word\.get_selection', 'word\.find_text', 'word\.resolve_anchor', 'word\.insert_bookmark', 'word\.list_bookmarks', 'word\.delete_bookmark', 'word\.insert_hyperlink', 'word\.list_hyperlinks', 'word\.remove_hyperlink', 'word\.replace_text', 'word\.delete_range', 'word\.apply_formatting', 'word\.apply_style'\] \}/);
   assert.match(js, /\{ label: 'Paragraphs & lists', tools: \['word\.get_paragraph', 'word\.insert_paragraph', 'word\.update_paragraph', 'word\.insert_list'\] \}/);
   assert.match(js, /\{ label: 'Tables', tools: \['word\.read_table', 'word\.update_table'\] \}/);
@@ -814,6 +836,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.delete_bookmark', \{ category: 'Range & selection', sideEffect: 'destructive', description: 'Delete a bookmark marker without deleting text\.' \}\]/);
   assert.match(js, /\['word\.get_header_footer', \{ category: 'Document & structure', sideEffect: 'read', description: 'Read section header or footer text\.' \}\]/);
   assert.match(js, /\['word\.update_header_footer', \{ category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer\.' \}\]/);
+  assert.match(js, /\['word\.get_document_properties', \{ category: 'Document & structure', sideEffect: 'read', description: 'Read document metadata and custom properties\.' \}\]/);
+  assert.match(js, /\['word\.update_document_properties', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Update document metadata and custom properties\.' \}\]/);
   assert.match(js, /\['word\.insert_break', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Insert a page, line, or section break\.' \}\]/);
   assert.match(js, /\['word\.list_sections', \{ category: 'Document & structure', sideEffect: 'read', description: 'List document sections\.' \}\]/);
   assert.match(js, /\['word\.update_page_setup', \{ category: 'Document & structure', sideEffect: 'mutating', description: 'Update document or section page setup\.' \}\]/);
@@ -832,6 +856,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept, reject, or bulk-finalize tracked changes\.' \}\]/);
   assert.match(js, /case 'word\.get_header_footer':\s*data = await getHeaderFooter\(args\);/);
   assert.match(js, /case 'word\.update_header_footer':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateHeaderFooter\(args\);/);
+  assert.match(js, /case 'word\.get_document_properties':\s*data = await getDocumentProperties\(args \|\| \{\}\);/);
+  assert.match(js, /case 'word\.update_document_properties':\s*data = await updateDocumentProperties\(args \|\| \{\}\);/);
   assert.match(js, /case 'word\.insert_break':\s*data = await insertBreak\(args\);/);
   assert.match(js, /case 'word\.insert_page_break':\s*data = await insertPageBreak\(args\);/);
   assert.match(js, /case 'word\.list_sections':\s*data = await listSections\(args \|\| \{\}\);/);
@@ -890,6 +916,8 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /async function insertField\(args\)/);
   assert.match(js, /async function updateField\(args\)/);
   assert.match(js, /async function deleteField\(args\)/);
+  assert.match(js, /async function getDocumentProperties\(args\)/);
+  assert.match(js, /async function updateDocumentProperties\(args\)/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.insert_bookmark':\s*requireAnchor\(tool, args\.anchor\);\s*validateBookmarkName\(tool, args\.name\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.delete_bookmark':\s*validateBookmarkName\(tool, args\.name, \{ strictPattern: false \}\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.insert_note':\s*validateInsertNoteArgs\(tool, args\);/);
@@ -898,6 +926,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.insert_field':\s*validateInsertFieldArgs\(tool, args\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.update_field':\s*validateUpdateFieldArgs\(tool, args\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.delete_field':\s*validateDeleteFieldArgs\(tool, args\);/);
+  assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.update_document_properties':\s*validateUpdateDocumentPropertiesArgs\(tool, args\);/);
   assert.match(js, /function validateBookmarkName\(tool, name/);
   assert.match(js, /control\.load\('id'\);\s*await context\.sync\(\);\s*const id = control\.id;/);
   assert.match(js, /async function updateTrackedChange\(args\)/);
