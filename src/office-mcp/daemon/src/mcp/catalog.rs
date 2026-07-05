@@ -104,7 +104,6 @@ const POWERPOINT_V1_TOOLS: &[OfficeToolDefinition] = &[
     "powerpoint.get_selection",
     "powerpoint.set_selection",
     "powerpoint.list_shapes",
-    "powerpoint.add_text_box",
     "powerpoint.add_shape",
     "powerpoint.insert_image",
     "powerpoint.update_shape",
@@ -1909,28 +1908,14 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "slide_id", "slide_index"]
     ),
     tool_spec!(
-        "powerpoint.add_text_box",
-        ["session_id", "text"],
-        [
-            "session_id",
-            "slide_id",
-            "slide_index",
-            "text",
-            "left",
-            "top",
-            "width",
-            "height",
-            "name"
-        ]
-    ),
-    tool_spec!(
         "powerpoint.add_shape",
-        ["session_id", "type"],
+        ["session_id", "shape_type"],
         [
             "session_id",
             "slide_id",
             "slide_index",
-            "type",
+            "shape_type",
+            "text",
             "left",
             "top",
             "width",
@@ -2188,6 +2173,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = word_content_control_property_schema(tool, name) {
         return schema;
     }
+    if let Some(schema) = powerpoint_shape_property_schema(tool, name) {
+        return schema;
+    }
     if (tool != "word.list_notes" || name != "limit")
         && !(tool == "word.update_list" && matches!(name, "position" | "level"))
         && let Some(schema) = generic_property_schema(name)
@@ -2287,6 +2275,19 @@ fn word_content_control_property_schema(tool: &str, name: &str) -> Option<Value>
         "selected_value" if tool == "word.update_content_control" => {
             Some(json!({ "type": "string" }))
         }
+        _ => None,
+    }
+}
+
+fn powerpoint_shape_property_schema(tool: &str, name: &str) -> Option<Value> {
+    if tool != "powerpoint.add_shape" {
+        return None;
+    }
+    match name {
+        "shape_type" => Some(
+            json!({ "enum": ["text_box", "rectangle", "ellipse", "rounded_rectangle", "line"] }),
+        ),
+        "text" => Some(json!({ "type": "string" })),
         _ => None,
     }
 }

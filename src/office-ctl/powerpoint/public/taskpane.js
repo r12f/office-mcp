@@ -45,7 +45,6 @@
     'powerpoint.get_selection',
     'powerpoint.set_selection',
     'powerpoint.list_shapes',
-    'powerpoint.add_text_box',
     'powerpoint.add_shape',
     'powerpoint.insert_image',
     'powerpoint.update_shape',
@@ -62,7 +61,7 @@
     { label: 'Slides', tools: ['powerpoint.list_slides', 'powerpoint.add_slide', 'powerpoint.update_slide', 'powerpoint.delete_slide', 'powerpoint.move_slide', 'powerpoint.export_slide'] },
     { label: 'Layout', tools: ['powerpoint.list_layouts', 'powerpoint.apply_layout'] },
     { label: 'Selection', tools: ['powerpoint.get_selection', 'powerpoint.set_selection'] },
-    { label: 'Shapes', tools: ['powerpoint.list_shapes', 'powerpoint.add_text_box', 'powerpoint.add_shape', 'powerpoint.insert_image', 'powerpoint.update_shape'] },
+    { label: 'Shapes', tools: ['powerpoint.list_shapes', 'powerpoint.add_shape', 'powerpoint.insert_image', 'powerpoint.update_shape'] },
     { label: 'Text', tools: ['powerpoint.read_text', 'powerpoint.replace_text', 'powerpoint.format_text'] },
     { label: 'Tables', tools: ['powerpoint.add_table', 'powerpoint.read_table', 'powerpoint.update_table'] }
   ];
@@ -81,8 +80,7 @@
     ['powerpoint.get_selection', { category: 'Selection', sideEffect: 'read', description: 'Return selected slides, shapes, or text metadata.' }],
     ['powerpoint.set_selection', { category: 'Selection', sideEffect: 'mutating', description: 'Select slides or text where supported.' }],
     ['powerpoint.list_shapes', { category: 'Shapes', sideEffect: 'read', description: 'List shapes on a slide with geometry and content metadata.' }],
-    ['powerpoint.add_text_box', { category: 'Shapes', sideEffect: 'mutating', description: 'Add a text box to a slide.' }],
-    ['powerpoint.add_shape', { category: 'Shapes', sideEffect: 'mutating', description: 'Add a geometric shape or line to a slide.' }],
+    ['powerpoint.add_shape', { category: 'Shapes', sideEffect: 'mutating', description: 'Add a text box, geometric shape, or line to a slide.' }],
     ['powerpoint.insert_image', { category: 'Shapes', sideEffect: 'mutating', description: 'Insert an image on a slide or current selection.' }],
     ['powerpoint.update_shape', { category: 'Shapes', sideEffect: 'destructive', description: 'Update shape geometry, visual settings, metadata, z-order, or deletion.' }],
     ['powerpoint.read_text', { category: 'Text', sideEffect: 'read', description: 'Read text from selected text, a shape, one slide, or all slides.' }],
@@ -365,9 +363,6 @@
           break;
         case 'powerpoint.list_shapes':
           data = await listShapes(args);
-          break;
-        case 'powerpoint.add_text_box':
-          data = await addTextBox(args);
           break;
         case 'powerpoint.add_shape':
           data = await addShape(args);
@@ -723,25 +718,19 @@
     });
   }
 
-  async function addTextBox(args) {
-    requireRequirementSet('PowerPointApi', '1.4', 'text box creation');
-    const text = requiredString(args, 'text', 'powerpoint.add_text_box requires text.');
-    return PowerPoint.run(async (context) => {
-      const slide = targetSlide(context, args);
-      const shape = slide.shapes.addTextBox(text, shapeOptions(args, { left: 72, top: 72, width: 420, height: 80 }));
-      shape.load('id,name,type,left,top,width,height,rotation,textFrame/hasText,textFrame/textRange/text');
-      slide.load('id,index');
-      await context.sync();
-      return { slide_id: slide.id, slide_index: slide.index, shape: shapeMetadata(shape) };
-    });
-  }
-
   async function addShape(args) {
     requireRequirementSet('PowerPointApi', '1.4', 'shape creation');
     return PowerPoint.run(async (context) => {
       const slide = targetSlide(context, args);
-      const type = shapeTypeFrom(args.type);
-      const shape = slide.shapes.addGeometricShape(type, shapeOptions(args, { left: 96, top: 96, width: 160, height: 96 }));
+      const shapeType = stringArg(args, 'shape_type') || stringArg(args, 'type') || 'rectangle';
+      let shape;
+      if (shapeType === 'text_box') {
+        const text = stringArg(args, 'text');
+        shape = slide.shapes.addTextBox(text, shapeOptions(args, { left: 72, top: 72, width: 420, height: 80 }));
+      } else {
+        const type = shapeTypeFrom(args.shape_type || args.type);
+        shape = slide.shapes.addGeometricShape(type, shapeOptions(args, { left: 96, top: 96, width: 160, height: 96 }));
+      }
       applyShapeProperties(shape, args);
       shape.load('id,name,type,left,top,width,height,rotation,textFrame/hasText,textFrame/textRange/text');
       slide.load('id,index');

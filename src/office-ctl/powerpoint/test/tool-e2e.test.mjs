@@ -194,7 +194,7 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
     setup: {
       actions: [
         { tool: 'powerpoint.add_slide', arguments: { layout: 'Blank' } },
-        { tool: 'powerpoint.add_shape', arguments: { slide_index: 0, type: 'rectangle', name: 'E2E Listed Shape' } }
+        { tool: 'powerpoint.add_shape', arguments: { slide_index: 0, shape_type: 'rectangle', name: 'E2E Listed Shape' } }
       ]
     },
     args: { slide_index: 0 },
@@ -238,7 +238,7 @@ const POWERPOINT_E2E_CASES = Object.fromEntries([
   ['powerpoint.update_shape', {
     setup: {
       actions: [
-        { tool: 'powerpoint.add_shape', saveAs: 'shapeResult', arguments: { slide_index: 0, type: 'rectangle', name: 'Shape Before Update' } }
+        { tool: 'powerpoint.add_shape', saveAs: 'shapeResult', arguments: { slide_index: 0, shape_type: 'rectangle', name: 'Shape Before Update' } }
       ]
     },
     args: { slide_index: 0, shape_id: '${shapeResult.shape.shape_id}', name: 'Updated shape' },

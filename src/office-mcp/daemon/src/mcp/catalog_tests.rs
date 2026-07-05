@@ -1329,7 +1329,13 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
     assert_required(&shape, &["session_id", "shape_type"]);
     assert_eq!(
         shape["properties"]["shape_type"]["enum"],
-        serde_json::json!(["text_box", "rectangle", "ellipse", "rounded_rectangle", "line"])
+        serde_json::json!([
+            "text_box",
+            "rectangle",
+            "ellipse",
+            "rounded_rectangle",
+            "line"
+        ])
     );
     assert_eq!(shape["properties"]["text"]["type"], "string");
 
