@@ -241,6 +241,7 @@ fn tool_metadata_covers_every_forwarded_office_tool() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn mixed_action_owner_metadata_declares_complete_action_side_effects() {
     let expected = BTreeMap::from([
         (
@@ -370,7 +371,7 @@ fn mixed_action_owner_metadata_declares_complete_action_side_effects() {
             .action_side_effects
             .expect("mixed owner action map")
             .iter()
-            .copied()
+            .map(|entry| (entry.action, entry.side_effect))
             .collect::<BTreeMap<_, _>>();
         assert_eq!(actual, expected_actions, "{tool} action side effects");
     }

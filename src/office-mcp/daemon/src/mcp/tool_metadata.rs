@@ -19,6 +19,13 @@ pub struct ToolMetadata {
     pub app: &'static str,
     pub category: &'static str,
     pub side_effect: ToolSideEffect,
+    pub action_side_effects: Option<&'static [ActionSideEffect]>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActionSideEffect {
+    pub action: &'static str,
+    pub side_effect: ToolSideEffect,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,6 +55,24 @@ impl AccessMode {
             Self::Write => !matches!(side_effect, ToolSideEffect::Destructive),
             Self::All => true,
         }
+    }
+}
+
+impl ToolMetadata {
+    #[must_use]
+    pub fn side_effect_for_action(self, action: &str) -> Option<ToolSideEffect> {
+        self.action_side_effects.and_then(|actions| {
+            actions
+                .iter()
+                .find(|entry| entry.action == action)
+                .map(|entry| entry.side_effect)
+        })
+    }
+
+    #[must_use]
+    pub fn has_action_allowed_by(self, mode: AccessMode) -> bool {
+        self.action_side_effects
+            .is_some_and(|actions| actions.iter().any(|entry| mode.allows(entry.side_effect)))
     }
 }
 
@@ -152,11 +177,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Media",
         ToolSideEffect::Destructive,
     ),
-    tool(
+    tool_with_actions(
         "word.update_image",
         "word",
         "Media",
         ToolSideEffect::Destructive,
+        WORD_UPDATE_IMAGE_ACTIONS,
     ),
     tool(
         "word.insert_table",
@@ -248,11 +274,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Paragraphs & lists",
         ToolSideEffect::Read,
     ),
-    tool(
+    tool_with_actions(
         "word.update_list",
         "word",
         "Paragraphs & lists",
         ToolSideEffect::Destructive,
+        WORD_UPDATE_LIST_ACTIONS,
     ),
     tool(
         "word.insert_hyperlink",
@@ -272,11 +299,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Range & selection",
         ToolSideEffect::Mutating,
     ),
-    tool(
+    tool_with_actions(
         "word.update_header_footer",
         "word",
         "Document & structure",
         ToolSideEffect::Destructive,
+        WORD_UPDATE_HEADER_FOOTER_ACTIONS,
     ),
     tool(
         "word.replace_text",
@@ -340,11 +368,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool("word.read_table", "word", "Tables", ToolSideEffect::Read),
-    tool(
+    tool_with_actions(
         "word.update_table",
         "word",
         "Tables",
         ToolSideEffect::Destructive,
+        WORD_UPDATE_TABLE_ACTIONS,
     ),
     tool(
         "word.list_content_controls",
@@ -388,11 +417,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Review",
         ToolSideEffect::Mutating,
     ),
-    tool(
+    tool_with_actions(
         "word.update_comment",
         "word",
         "Review",
         ToolSideEffect::Destructive,
+        WORD_UPDATE_COMMENT_ACTIONS,
     ),
     tool(
         "word.set_change_tracking",
@@ -400,11 +430,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Review",
         ToolSideEffect::Mutating,
     ),
-    tool(
+    tool_with_actions(
         "word.update_tracked_change",
         "word",
         "Review",
         ToolSideEffect::Destructive,
+        WORD_UPDATE_TRACKED_CHANGE_ACTIONS,
     ),
     tool(
         "word.save",
@@ -497,11 +528,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Table",
         ToolSideEffect::Mutating,
     ),
-    tool(
+    tool_with_actions(
         "excel.update_table",
         "excel",
         "Table",
         ToolSideEffect::Destructive,
+        EXCEL_UPDATE_TABLE_ACTIONS,
     ),
     tool(
         "excel.create_chart",
@@ -509,11 +541,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Chart",
         ToolSideEffect::Mutating,
     ),
-    tool(
+    tool_with_actions(
         "excel.update_chart",
         "excel",
         "Chart",
         ToolSideEffect::Destructive,
+        EXCEL_UPDATE_CHART_ACTIONS,
     ),
     tool(
         "excel.create_pivot_table",
@@ -521,11 +554,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "PivotTable",
         ToolSideEffect::Mutating,
     ),
-    tool(
+    tool_with_actions(
         "excel.update_pivot_table",
         "excel",
         "PivotTable",
         ToolSideEffect::Destructive,
+        EXCEL_UPDATE_PIVOT_TABLE_ACTIONS,
     ),
     tool(
         "powerpoint.get_presentation_info",
@@ -539,11 +573,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Presentation",
         ToolSideEffect::Read,
     ),
-    tool(
+    tool_with_actions(
         "powerpoint.update_tags",
         "powerpoint",
         "Metadata",
         ToolSideEffect::Destructive,
+        POWERPOINT_UPDATE_TAGS_ACTIONS,
     ),
     tool(
         "powerpoint.list_slides",
@@ -623,11 +658,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Shapes",
         ToolSideEffect::Mutating,
     ),
-    tool(
+    tool_with_actions(
         "powerpoint.update_shape",
         "powerpoint",
         "Shapes",
         ToolSideEffect::Destructive,
+        POWERPOINT_UPDATE_SHAPE_ACTIONS,
     ),
     tool(
         "powerpoint.read_text",
@@ -659,13 +695,144 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Tables",
         ToolSideEffect::Read,
     ),
-    tool(
+    tool_with_actions(
         "powerpoint.update_table",
         "powerpoint",
         "Tables",
         ToolSideEffect::Destructive,
+        POWERPOINT_UPDATE_TABLE_ACTIONS,
     ),
 ];
+
+const WORD_UPDATE_IMAGE_ACTIONS: &[ActionSideEffect] = &[
+    action("resize", ToolSideEffect::Mutating),
+    action("set_alt_text", ToolSideEffect::Mutating),
+    action("set_hyperlink", ToolSideEffect::Mutating),
+    action("replace", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+];
+
+const WORD_UPDATE_LIST_ACTIONS: &[ActionSideEffect] = &[
+    action("add_item", ToolSideEffect::Mutating),
+    action("set_item_level", ToolSideEffect::Mutating),
+    action("attach_paragraph", ToolSideEffect::Mutating),
+    action("detach_paragraph", ToolSideEffect::Mutating),
+    action("set_level_format", ToolSideEffect::Mutating),
+];
+
+const WORD_UPDATE_HEADER_FOOTER_ACTIONS: &[ActionSideEffect] = &[
+    action("set_text", ToolSideEffect::Mutating),
+    action("append_paragraph", ToolSideEffect::Mutating),
+    action("clear", ToolSideEffect::Destructive),
+];
+
+const WORD_UPDATE_TABLE_ACTIONS: &[ActionSideEffect] = &[
+    action("update_cell", ToolSideEffect::Mutating),
+    action("add_row", ToolSideEffect::Mutating),
+    action("add_column", ToolSideEffect::Mutating),
+    action("format_cell", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+    action("delete_row", ToolSideEffect::Destructive),
+    action("delete_column", ToolSideEffect::Destructive),
+    action("merge_cells", ToolSideEffect::Mutating),
+    action("set_column_width", ToolSideEffect::Mutating),
+    action("distribute_columns", ToolSideEffect::Mutating),
+    action("set_borders", ToolSideEffect::Mutating),
+    action("set_header_row", ToolSideEffect::Mutating),
+];
+
+const WORD_UPDATE_COMMENT_ACTIONS: &[ActionSideEffect] = &[
+    action("reply", ToolSideEffect::Mutating),
+    action("edit", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+    action("reopen", ToolSideEffect::Mutating),
+];
+
+const WORD_UPDATE_TRACKED_CHANGE_ACTIONS: &[ActionSideEffect] = &[
+    action("accept", ToolSideEffect::Mutating),
+    action("reject", ToolSideEffect::Mutating),
+    action("accept_all", ToolSideEffect::Destructive),
+    action("reject_all", ToolSideEffect::Destructive),
+];
+
+const EXCEL_UPDATE_TABLE_ACTIONS: &[ActionSideEffect] = &[
+    action("metadata", ToolSideEffect::Read),
+    action("read", ToolSideEffect::Read),
+    action("add_rows", ToolSideEffect::Mutating),
+    action("add_columns", ToolSideEffect::Mutating),
+    action("resize", ToolSideEffect::Mutating),
+    action("rename", ToolSideEffect::Mutating),
+    action("options", ToolSideEffect::Mutating),
+    action("style", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+];
+
+const EXCEL_UPDATE_CHART_ACTIONS: &[ActionSideEffect] = &[
+    action("metadata", ToolSideEffect::Read),
+    action("read", ToolSideEffect::Read),
+    action("title", ToolSideEffect::Mutating),
+    action("legend", ToolSideEffect::Mutating),
+    action("axis", ToolSideEffect::Mutating),
+    action("data", ToolSideEffect::Mutating),
+    action("series_source", ToolSideEffect::Mutating),
+    action("position", ToolSideEffect::Mutating),
+    action("size", ToolSideEffect::Mutating),
+    action("export_image", ToolSideEffect::Read),
+    action("delete", ToolSideEffect::Destructive),
+];
+
+const EXCEL_UPDATE_PIVOT_TABLE_ACTIONS: &[ActionSideEffect] = &[
+    action("metadata", ToolSideEffect::Read),
+    action("read", ToolSideEffect::Read),
+    action("refresh", ToolSideEffect::Mutating),
+    action("add_hierarchy", ToolSideEffect::Mutating),
+    action("remove_hierarchy", ToolSideEffect::Mutating),
+    action("layout", ToolSideEffect::Mutating),
+    action("filter", ToolSideEffect::Mutating),
+    action("clear_filters", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+];
+
+const POWERPOINT_UPDATE_TAGS_ACTIONS: &[ActionSideEffect] = &[
+    action("list", ToolSideEffect::Read),
+    action("set", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+];
+
+const POWERPOINT_UPDATE_SHAPE_ACTIONS: &[ActionSideEffect] = &[
+    action("move", ToolSideEffect::Mutating),
+    action("resize", ToolSideEffect::Mutating),
+    action("rotate", ToolSideEffect::Mutating),
+    action("rename", ToolSideEffect::Mutating),
+    action("set_alt_text", ToolSideEffect::Mutating),
+    action("set_fill", ToolSideEffect::Mutating),
+    action("set_line", ToolSideEffect::Mutating),
+    action("set_z_order", ToolSideEffect::Mutating),
+    action("group", ToolSideEffect::Mutating),
+    action("ungroup", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+];
+
+const POWERPOINT_UPDATE_TABLE_ACTIONS: &[ActionSideEffect] = &[
+    action("set_values", ToolSideEffect::Mutating),
+    action("set_cell", ToolSideEffect::Mutating),
+    action("add_rows", ToolSideEffect::Mutating),
+    action("delete_rows", ToolSideEffect::Destructive),
+    action("add_columns", ToolSideEffect::Mutating),
+    action("delete_columns", ToolSideEffect::Destructive),
+    action("merge_cells", ToolSideEffect::Mutating),
+    action("split_cell", ToolSideEffect::Mutating),
+    action("clear", ToolSideEffect::Mutating),
+    action("style", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+];
+
+const fn action(action: &'static str, side_effect: ToolSideEffect) -> ActionSideEffect {
+    ActionSideEffect {
+        action,
+        side_effect,
+    }
+}
 
 const fn tool(
     name: &'static str,
@@ -678,6 +845,23 @@ const fn tool(
         app,
         category,
         side_effect,
+        action_side_effects: None,
+    }
+}
+
+const fn tool_with_actions(
+    name: &'static str,
+    app: &'static str,
+    category: &'static str,
+    side_effect: ToolSideEffect,
+    action_side_effects: &'static [ActionSideEffect],
+) -> ToolMetadata {
+    ToolMetadata {
+        name,
+        app,
+        category,
+        side_effect,
+        action_side_effects: Some(action_side_effects),
     }
 }
 

@@ -4,6 +4,7 @@ use super::{
     powerpoint_resource_catalog_for_session, powerpoint_resource_templates, tool_catalog_json,
     word_resource_catalog_for_session, word_resource_templates,
 };
+use crate::mcp::tool_metadata_catalog;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -165,6 +166,31 @@ fn tools_list_exposes_action_side_effects_for_mixed_owner_tools() {
         powerpoint_update_tags["_meta"]["com.office-mcp/action_side_effects"]["delete"],
         "destructive"
     );
+}
+
+#[test]
+fn action_side_effect_metadata_covers_advertised_action_enum() {
+    for metadata in tool_metadata_catalog() {
+        let Some(action_side_effects) = metadata.action_side_effects else {
+            continue;
+        };
+        let schema = schema_for(metadata.name);
+        let schema_actions = schema["properties"]["action"]["enum"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{} must advertise action enum", metadata.name))
+            .iter()
+            .map(|action| action.as_str().expect("action string"))
+            .collect::<BTreeSet<_>>();
+        let metadata_actions = action_side_effects
+            .iter()
+            .map(|entry| entry.action)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            schema_actions, metadata_actions,
+            "{} action map",
+            metadata.name
+        );
+    }
 }
 
 #[test]

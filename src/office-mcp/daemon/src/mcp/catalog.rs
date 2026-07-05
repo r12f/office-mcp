@@ -515,6 +515,9 @@ fn tool_json(name: &str, title: &str, description: &str) -> Value {
     if let Some(metadata) = tool_metadata(canonical_name) {
         tool["_meta"]["com.office-mcp/app"] = json!(metadata.app);
         tool["_meta"]["com.office-mcp/category"] = json!(metadata.category);
+        if let Some(action_side_effects) = action_side_effects_json(canonical_name) {
+            tool["_meta"]["com.office-mcp/action_side_effects"] = action_side_effects;
+        }
     }
     tool
 }
@@ -548,6 +551,7 @@ pub fn validate_tool_arguments(tool: &str, arguments: &Value) -> Result<(), Stri
         if !properties.contains_key(key) {
             return Err(format!("{tool} does not accept argument {key}."));
         }
+        validate_enum_argument(tool, key, arguments, &properties[key])?;
     }
     let Some(required_fields) = schema["required"].as_array() else {
         return Err(format!("{tool} has an invalid input schema."));
@@ -562,6 +566,29 @@ pub fn validate_tool_arguments(tool: &str, arguments: &Value) -> Result<(), Stri
     }
     validate_anchor_argument(tool, arguments)?;
     Ok(())
+}
+
+fn validate_enum_argument(
+    tool: &str,
+    key: &str,
+    arguments: &serde_json::Map<String, Value>,
+    schema: &Value,
+) -> Result<(), String> {
+    let Some(allowed_values) = schema.get("enum").and_then(Value::as_array) else {
+        return Ok(());
+    };
+    let Some(value) = arguments.get(key) else {
+        return Ok(());
+    };
+    if allowed_values.iter().any(|allowed| allowed == value) {
+        return Ok(());
+    }
+    let allowed = allowed_values
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>()
+        .join(", ");
+    Err(format!("{tool} argument {key} must be one of {allowed}."))
 }
 
 #[must_use]
@@ -590,6 +617,9 @@ pub fn describe_tool_contract(tool: &str) -> Option<Value> {
     if let Some(metadata) = tool_metadata(canonical_name) {
         contract["app"] = json!(metadata.app);
         contract["category"] = json!(metadata.category);
+        if let Some(action_side_effects) = action_side_effects_json(canonical_name) {
+            contract["action_side_effects"] = action_side_effects;
+        }
     }
     Some(contract)
 }
@@ -632,6 +662,38 @@ fn tool_side_effect(tool: &str) -> Option<&'static str> {
         }
         _ => tool_metadata(tool).map(|metadata| side_effect_name(metadata.side_effect)),
     }
+}
+
+#[must_use]
+pub fn action_side_effect_for_tool<'a>(
+    tool: &str,
+    arguments: &'a Value,
+) -> Option<(&'a str, &'static str)> {
+    let tool = canonical_tool_name(tool);
+    let metadata = tool_metadata(tool)?;
+    let action = action_argument_for_policy(tool, arguments)?;
+    let side_effect = metadata.side_effect_for_action(action)?;
+    Some((action, side_effect_name(side_effect)))
+}
+
+fn action_argument_for_policy<'a>(tool: &str, arguments: &'a Value) -> Option<&'a str> {
+    if tool == "powerpoint.update_tags" && arguments.get("action").is_none() {
+        return Some("list");
+    }
+    arguments.get("action").and_then(Value::as_str)
+}
+
+fn action_side_effects_json(tool: &str) -> Option<Value> {
+    let metadata = tool_metadata(tool)?;
+    let actions = metadata.action_side_effects?;
+    let mut map = serde_json::Map::new();
+    for action in actions {
+        map.insert(
+            action.action.to_string(),
+            json!(side_effect_name(action.side_effect)),
+        );
+    }
+    Some(Value::Object(map))
 }
 
 const fn side_effect_name(side_effect: ToolSideEffect) -> &'static str {
@@ -2176,6 +2238,12 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = powerpoint_shape_property_schema(tool, name) {
         return schema;
     }
+    if let Some(schema) = excel_action_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = powerpoint_action_property_schema(tool, name) {
+        return schema;
+    }
     if (tool != "word.list_notes" || name != "limit")
         && !(tool == "word.update_list" && matches!(name, "position" | "level"))
         && let Some(schema) = generic_property_schema(name)
@@ -2241,6 +2309,42 @@ fn word_list_property_schema(tool: &str, name: &str) -> Option<Value> {
         })),
         "text" => Some(json!({ "type": "string", "minLength": 1 })),
         "bullet_char" => Some(json!({ "type": "string", "maxLength": 1 })),
+        _ => None,
+    }
+}
+
+fn excel_action_property_schema(tool: &str, name: &str) -> Option<Value> {
+    if name != "action" {
+        return None;
+    }
+    match tool {
+        "excel.update_table" => Some(json!({
+            "enum": ["metadata", "read", "add_rows", "add_columns", "resize", "rename", "options", "style", "delete"]
+        })),
+        "excel.update_chart" => Some(json!({
+            "enum": ["metadata", "read", "title", "legend", "axis", "data", "series_source", "position", "size", "export_image", "delete"]
+        })),
+        "excel.update_pivot_table" => Some(json!({
+            "enum": ["metadata", "read", "refresh", "add_hierarchy", "remove_hierarchy", "layout", "filter", "clear_filters", "delete"]
+        })),
+        _ => None,
+    }
+}
+
+fn powerpoint_action_property_schema(tool: &str, name: &str) -> Option<Value> {
+    if name != "action" {
+        return None;
+    }
+    match tool {
+        "powerpoint.update_tags" => {
+            Some(json!({ "enum": ["list", "set", "delete"], "default": "list" }))
+        }
+        "powerpoint.update_shape" => Some(json!({
+            "enum": ["move", "resize", "rotate", "rename", "set_alt_text", "set_fill", "set_line", "set_z_order", "group", "ungroup", "delete"]
+        })),
+        "powerpoint.update_table" => Some(json!({
+            "enum": ["set_values", "set_cell", "add_rows", "delete_rows", "add_columns", "delete_columns", "merge_cells", "split_cell", "clear", "style", "delete"]
+        })),
         _ => None,
     }
 }

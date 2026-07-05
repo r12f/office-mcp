@@ -11,11 +11,12 @@ pub mod tool_result;
 
 pub use catalog::{
     ExcelToolCatalog, OfficeToolCatalog, PowerPointToolCatalog, WORD_V1_TOOLS,
-    all_office_tool_names, canonical_tool_name, describe_tool_contract,
-    excel_resource_catalog_for_session, excel_resource_templates, is_office_tool,
-    office_tool_catalogs, powerpoint_resource_catalog_for_session, powerpoint_resource_templates,
-    tool_catalog_json, tool_catalog_json_for_policy, unknown_tool_contract,
-    validate_tool_arguments, word_resource_catalog_for_session, word_resource_templates,
+    action_side_effect_for_tool, all_office_tool_names, canonical_tool_name,
+    describe_tool_contract, excel_resource_catalog_for_session, excel_resource_templates,
+    is_office_tool, office_tool_catalogs, powerpoint_resource_catalog_for_session,
+    powerpoint_resource_templates, tool_catalog_json, tool_catalog_json_for_policy,
+    unknown_tool_contract, validate_tool_arguments, word_resource_catalog_for_session,
+    word_resource_templates,
 };
 pub use http_frontend::McpHttpFrontend;
 pub(crate) use http_frontend_model::RateLimitWindow;
@@ -33,6 +34,6 @@ pub use tool_metadata::{
     tool_metadata_catalog,
 };
 pub use tool_result::{
-    tool_failure, tool_failure_from_command, tool_failure_without_effect,
-    tool_not_available_by_policy, tool_success,
+    tool_action_not_available_by_policy, tool_failure, tool_failure_from_command,
+    tool_failure_without_effect, tool_not_available_by_policy, tool_success,
 };
