@@ -131,8 +131,8 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.delete_range` | implemented | Range & selection | destructive | `WordApi 1.3` | Delete an anchored paragraph, sentence, or selection. |
 | `word.apply_formatting` | implemented | Range & selection | edit | `WordApi 1.3` | Apply direct run and/or paragraph formatting to an anchored range. |
 | `word.apply_style` | implemented | Range & selection | edit | `WordApi 1.3` | Apply an Office style to an anchored range; also owns heading-level changes after migration. |
-| `word.read_table` | implemented | Table | read | `WordApi 1.3` | Read table dimensions, header state, and cell text. |
-| `word.update_table` | implemented | Table | edit/destructive | `WordApi 1.3` | Update table cells, rows, columns, table/cell formatting, and table deletion through one table-owner tool. |
+| `word.read_table` | implemented | Table | read | `WordApi 1.3`; merged-cell diagnostics use `WordApi 1.4` when available | Read table dimensions, header state, cell text, and merged-table diagnostics. |
+| `word.update_table` | implemented | Table | edit/destructive | `WordApi 1.3`; `merge_cells` requires `WordApi 1.4` | Update table cells, rows, columns, widths, borders, header state, merge state, table/cell formatting, and table deletion through one table-owner tool. |
 | `word.list_content_controls` | implemented | Content controls | read | `WordApi 1.5` | List content controls with id/tag/title/type metadata, without duplicating document text reads. |
 | `word.insert_content_control` | implemented | Content controls | edit | `WordApi 1.5` | Create a content control around an anchored range or inserted placeholder content. |
 | `word.update_content_control` | implemented | Content controls | edit | `WordApi 1.5` | Update content control metadata, locked state, or contained text through the content-control owner. |
@@ -178,8 +178,9 @@ Tool ownership rules:
   `word.remove_hyperlink` own hyperlink lifecycle. Generic run styling remains
   owned by `word.apply_formatting`, and bookmark creation/deletion remains out
   of scope for these tools.
-- `word.read_table` owns table content reads. `word.update_table` owns table
-  structure, cell value, table/cell formatting, and deletion mutations.
+- `word.read_table` owns table content reads and merged-table diagnostics.
+  `word.update_table` owns table structure, cell value, table/cell formatting,
+  width, borders, header-row state, merge, and deletion mutations.
 - `word.insert_image` owns new image insertion. `word.resize_image` owns in-place
   resizing of an existing inline image and must not require re-uploading image
   bytes or alter surrounding paragraphs.
@@ -1059,7 +1060,13 @@ hanging indent using Word's native `Paragraph.firstLineIndent` semantics.
 }
 ```
 
-Returns `{ rows, cols, data: string[][], header_row: boolean }`.
+Returns `{ rows, cols, data: string[][], header_row: boolean, merged?: object[] }`.
+On uniform tables, `data` is the rectangular cell text matrix. On merged or
+otherwise non-uniform tables where Word cannot provide a rectangular value
+matrix, the tool returns the dimensions plus `merged` diagnostics when the host
+supports the `WordApi 1.4` table APIs; hosts that cannot inspect the merged
+geometry fail with `HOST_CAPABILITY_UNAVAILABLE` instead of returning a
+misleading matrix.
 
 ### 5.2 `word.update_table`
 
@@ -1073,12 +1080,32 @@ one table-owned mutation while preserving the existing v1 table behavior.
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
     "table_index": { "type": "integer", "minimum": 0 },
-    "action": { "enum": ["update_cell", "add_row", "add_column", "format_cell", "delete"] },
+    "action": {
+      "enum": [
+        "update_cell", "add_row", "add_column", "format_cell", "delete",
+        "delete_row", "delete_column", "merge_cells", "set_column_width",
+        "distribute_columns", "set_borders", "set_header_row"
+      ]
+    },
     "row": { "type": "integer", "minimum": 0 },
     "col": { "type": "integer", "minimum": 0 },
     "text": { "type": "string" },
     "index": { "type": "integer", "minimum": 0 },
+    "row_range": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 2, "maxItems": 2 },
+    "col_range": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 2, "maxItems": 2 },
     "values": { "type": "array", "items": { "type": "string" } },
+    "width_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "header_row": { "type": "boolean" },
+    "borders": {
+      "type": "object",
+      "properties": {
+        "edges": { "type": "array", "items": { "enum": ["top", "bottom", "left", "right", "inside_horizontal", "inside_vertical", "all"] } },
+        "style": { "enum": ["single", "double", "dotted", "dashed", "none"] },
+        "width_pt": { "type": "number", "minimum": 0 },
+        "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+      },
+      "additionalProperties": false
+    },
     "background_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
     "horizontal_alignment": { "enum": ["left", "center", "right"] },
     "vertical_alignment": { "enum": ["top", "center", "bottom"] },
@@ -1096,7 +1123,25 @@ Action semantics:
 - `add_column` accepts optional `index` and `values`; omitting `index` appends.
 - `format_cell` requires `row` and `col`; cell background, alignment, padding,
   and run formatting are optional.
+- `delete_row` requires `row` or `row_range`; it deletes one row or an inclusive
+  row span after validating table bounds. This is destructive.
+- `delete_column` requires `col` or `col_range`; it deletes one column or an
+  inclusive column span after validating table bounds. This is destructive.
+- `merge_cells` requires `row_range` and `col_range`; it merges the rectangular
+  span and concatenates cell contents using Word's native table semantics. It
+  requires `WordApi 1.4` host support.
+- `set_column_width` requires `col` and `width_pt`; it updates the target column
+  width without changing cell text.
+- `distribute_columns` distributes columns evenly across the table.
+- `set_borders` requires `borders` and updates table-level borders. When `row`
+  and `col` are provided, it updates the addressed cell borders instead.
+- `set_header_row` requires `header_row` and toggles a single header row.
 - `delete` deletes the whole table and must be requested explicitly.
+
+All new actions preflight live table bounds before mutation. Invalid indices,
+inverted ranges, or missing per-action arguments fail with `INVALID_ARGUMENT`
+and `partial_effect: "none"`. `delete_row` and `delete_column` are destructive
+actions and require the All ceiling; the other new actions are edit actions.
 
 The compatibility tools in §5.3-§5.6 remain documented until the catalog
 migration retires them from advertisement.
@@ -1190,8 +1235,9 @@ Superseded compatibility contract. This tool is no longer advertised; use
 }
 ```
 
-Cell merging and arbitrary border editing are deferred until their
-cross-platform Office.js behavior is verified.
+Cell merging and arbitrary border editing are now owned by `word.update_table`
+through `merge_cells` and `set_borders`; the superseded compatibility tool
+remains documented only for historical argument compatibility.
 
 ## 6. Structure
 

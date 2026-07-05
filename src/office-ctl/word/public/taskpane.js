@@ -1889,10 +1889,17 @@
   async function readTable(args) {
     return Word.run(async (context) => {
       const table = await getTableByIndex(context, args.table_index);
-      table.load('rowCount,columnCount,values');
+      table.load('rowCount,columnCount,values,headerRowCount,isUniform');
       await context.sync();
       const data = table.values ?? [];
-      return { rows: table.rowCount ?? data.length, cols: table.columnCount ?? (data[0]?.length ?? 0), data, header_row: false, untrusted_source: true };
+      return {
+        rows: table.rowCount ?? data.length,
+        cols: table.columnCount ?? (data[0]?.length ?? 0),
+        data,
+        header_row: (table.headerRowCount ?? 0) > 0,
+        is_uniform: table.isUniform ?? null,
+        untrusted_source: true
+      };
     });
   }
 
@@ -1908,6 +1915,20 @@
         return addColumn(args);
       case 'format_cell':
         return formatCell(args);
+      case 'delete_row':
+        return deleteTableRows(args);
+      case 'delete_column':
+        return deleteTableColumns(args);
+      case 'merge_cells':
+        return mergeTableCells(args);
+      case 'set_column_width':
+        return setTableColumnWidth(args);
+      case 'distribute_columns':
+        return distributeTableColumns(args);
+      case 'set_borders':
+        return setTableBorders(args);
+      case 'set_header_row':
+        return setTableHeaderRow(args);
       case 'delete':
         return deleteTable(args);
       default:
@@ -1990,6 +2011,94 @@
       table.delete();
       await context.sync();
       return { deleted: true, table_index: args.table_index };
+    });
+  }
+
+  async function deleteTableRows(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      const dimensions = await tableDimensions(context, table);
+      const [start, end] = tableIndexSpan(args.row_range, args.row, 'row_range', 'row');
+      validateTableSpan('row', start, end, dimensions.rows);
+      table.deleteRows(start, end - start + 1);
+      await context.sync();
+      return { deleted_rows: end - start + 1, row_start: start, table_index: args.table_index };
+    });
+  }
+
+  async function deleteTableColumns(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      const dimensions = await tableDimensions(context, table);
+      const [start, end] = tableIndexSpan(args.col_range, args.col, 'col_range', 'col');
+      validateTableSpan('column', start, end, dimensions.cols);
+      table.deleteColumns(start, end - start + 1);
+      await context.sync();
+      return { deleted_columns: end - start + 1, col_start: start, table_index: args.table_index };
+    });
+  }
+
+  async function mergeTableCells(args) {
+    if (!supportsWordApi('1.4')) throw Object.assign(new Error('word.update_table merge_cells requires WordApi 1.4.'), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      const dimensions = await tableDimensions(context, table);
+      const [rowStart, rowEnd] = tableIndexSpan(args.row_range, undefined, 'row_range', 'row');
+      const [colStart, colEnd] = tableIndexSpan(args.col_range, undefined, 'col_range', 'col');
+      validateTableSpan('row', rowStart, rowEnd, dimensions.rows);
+      validateTableSpan('column', colStart, colEnd, dimensions.cols);
+      table.mergeCells(rowStart, colStart, rowEnd, colEnd);
+      await context.sync();
+      return { merged: true, action: 'merge_cells', table_index: args.table_index, row_range: [rowStart, rowEnd], col_range: [colStart, colEnd] };
+    });
+  }
+
+  async function setTableColumnWidth(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      const dimensions = await tableDimensions(context, table);
+      validateTableSpan('column', args.col, args.col, dimensions.cols);
+      for (let row = 0; row < dimensions.rows; row += 1) {
+        table.getCell(row, args.col).columnWidth = args.width_pt;
+      }
+      await context.sync();
+      return { column_width_set: true, table_index: args.table_index, col: args.col, width_pt: args.width_pt };
+    });
+  }
+
+  async function distributeTableColumns(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      table.distributeColumns();
+      await context.sync();
+      return { distributed_columns: true, table_index: args.table_index };
+    });
+  }
+
+  async function setTableBorders(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      if (args.row !== undefined || args.col !== undefined) {
+        const dimensions = await tableDimensions(context, table);
+        validateTableSpan('row', args.row, args.row, dimensions.rows);
+        validateTableSpan('column', args.col, args.col, dimensions.cols);
+      }
+      const target = args.row !== undefined || args.col !== undefined ? table.getCell(args.row, args.col) : table;
+      const update = tableBorderUpdate(args.borders);
+      for (const edge of normalizedTableBorderEdges(args.borders.edges)) {
+        target.getBorder(edge).set(update);
+      }
+      await context.sync();
+      return { borders_set: true, table_index: args.table_index, edges: normalizedTableBorderEdges(args.borders.edges) };
+    });
+  }
+
+  async function setTableHeaderRow(args) {
+    return Word.run(async (context) => {
+      const table = await getTableByIndex(context, args.table_index);
+      table.headerRowCount = args.header_row ? 1 : 0;
+      await context.sync();
+      return { header_row: Boolean(args.header_row), table_index: args.table_index };
     });
   }
 
@@ -2692,6 +2801,24 @@
     return table.getCell(row, col);
   }
 
+  async function tableDimensions(context, table) {
+    table.load('rowCount,columnCount');
+    await context.sync();
+    return { rows: table.rowCount ?? 0, cols: table.columnCount ?? 0 };
+  }
+
+  function tableIndexSpan(range, index, rangeName, indexName) {
+    if (range !== undefined) return range;
+    if (index !== undefined) return [index, index];
+    throw invalidArgument(`word.update_table requires ${indexName} or ${rangeName}.`);
+  }
+
+  function validateTableSpan(kind, start, end, limit) {
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end >= limit) {
+      throw Object.assign(new Error(`Table ${kind} range ${start}-${end} is out of range.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE', partialEffect: 'none' });
+    }
+  }
+
   async function headerFooterTarget(context, args) {
     const sections = context.document.sections;
     sections.load('items');
@@ -3220,12 +3347,34 @@
   function validateUpdateTableArgs(args) {
     requireNonNegativeInteger('word.update_table', 'table_index', args.table_index);
     const action = String(args.action || '').trim().toLowerCase();
-    if (!['update_cell', 'cell', 'add_row', 'add_column', 'format_cell', 'delete'].includes(action)) {
+    if (!['update_cell', 'cell', 'add_row', 'add_column', 'format_cell', 'delete', 'delete_row', 'delete_column', 'merge_cells', 'set_column_width', 'distribute_columns', 'set_borders', 'set_header_row'].includes(action)) {
       throw invalidArgument(`Unsupported table action ${args.action}.`);
     }
     if (action === 'update_cell' || action === 'cell' || action === 'format_cell') {
       requireNonNegativeInteger('word.update_table', 'row', args.row);
       requireNonNegativeInteger('word.update_table', 'col', args.col);
+    }
+    if (action === 'delete_row') validateTableIndexOrRange(args, 'row', 'row_range');
+    if (action === 'delete_column') validateTableIndexOrRange(args, 'col', 'col_range');
+    if (action === 'merge_cells') {
+      validateTableIndexRange('word.update_table', 'row_range', args.row_range);
+      validateTableIndexRange('word.update_table', 'col_range', args.col_range);
+    }
+    if (action === 'set_column_width') {
+      requireNonNegativeInteger('word.update_table', 'col', args.col);
+      validateOptionalPositiveNumber('word.update_table', 'width_pt', args.width_pt);
+      if (args.width_pt === undefined) throw invalidArgument('word.update_table set_column_width requires width_pt.');
+    }
+    if (action === 'set_borders') {
+      validateTableBordersArg(args.borders);
+      if ((args.row === undefined) !== (args.col === undefined)) throw invalidArgument('word.update_table set_borders requires both row and col for cell borders.');
+      if (args.row !== undefined) {
+        requireNonNegativeInteger('word.update_table', 'row', args.row);
+        requireNonNegativeInteger('word.update_table', 'col', args.col);
+      }
+    }
+    if (action === 'set_header_row' && typeof args.header_row !== 'boolean') {
+      throw invalidArgument('word.update_table set_header_row requires boolean header_row.');
     }
     if ((action === 'add_row' || action === 'add_column') && args.index !== undefined) {
       requireNonNegativeInteger('word.update_table', 'index', args.index);
@@ -3235,6 +3384,35 @@
     }
     validateOptionalPositiveNumber('word.update_table', 'padding_pt', args.padding_pt);
     validateFormattingArg('word.update_table', args.formatting);
+  }
+
+  function validateTableIndexOrRange(args, indexName, rangeName) {
+    const hasIndex = args[indexName] !== undefined;
+    const hasRange = args[rangeName] !== undefined;
+    if (hasIndex === hasRange) throw invalidArgument(`word.update_table requires exactly one of ${indexName} or ${rangeName}.`);
+    if (hasIndex) requireNonNegativeInteger('word.update_table', indexName, args[indexName]);
+    if (hasRange) validateTableIndexRange('word.update_table', rangeName, args[rangeName]);
+  }
+
+  function validateTableIndexRange(tool, name, range) {
+    if (!Array.isArray(range) || range.length !== 2 || !range.every((value) => Number.isInteger(value) && value >= 0) || range[0] > range[1]) {
+      throw invalidArgument(`${tool} ${name} must be [start, end] with non-negative integer bounds.`);
+    }
+  }
+
+  function validateTableBordersArg(borders) {
+    if (!borders || typeof borders !== 'object' || Array.isArray(borders)) throw invalidArgument('word.update_table set_borders requires borders.');
+    if (borders.edges !== undefined && (!Array.isArray(borders.edges) || borders.edges.length === 0)) {
+      throw invalidArgument('word.update_table borders.edges must be a non-empty array.');
+    }
+    normalizedTableBorderEdges(borders.edges);
+    if (borders.style !== undefined) tableBorderType(borders.style);
+    if (borders.width_pt !== undefined && (typeof borders.width_pt !== 'number' || !Number.isFinite(borders.width_pt) || borders.width_pt < 0)) {
+      throw invalidArgument('word.update_table borders.width_pt must be a non-negative number.');
+    }
+    if (borders.color !== undefined && !/^#[0-9a-f]{6}$/i.test(String(borders.color))) {
+      throw invalidArgument('word.update_table borders.color must be a #RRGGBB value.');
+    }
   }
 
   function validateContentControlTargetArgs(tool, args) {
@@ -3574,6 +3752,41 @@
 
   function mapVerticalAlignment(value) {
     return value === 'center' ? Word.VerticalAlignment.center : value === 'bottom' ? Word.VerticalAlignment.bottom : Word.VerticalAlignment.top;
+  }
+
+  function normalizedTableBorderEdges(edges) {
+    const source = edges ?? ['all'];
+    return source.map((edge) => tableBorderLocation(edge));
+  }
+
+  function tableBorderLocation(edge) {
+    const normalized = String(edge || '').trim().toLowerCase();
+    if (normalized === 'top') return Word.BorderLocation.top;
+    if (normalized === 'bottom') return Word.BorderLocation.bottom;
+    if (normalized === 'left') return Word.BorderLocation.left;
+    if (normalized === 'right') return Word.BorderLocation.right;
+    if (normalized === 'inside_horizontal') return Word.BorderLocation.insideHorizontal;
+    if (normalized === 'inside_vertical') return Word.BorderLocation.insideVertical;
+    if (normalized === 'all') return Word.BorderLocation.all;
+    throw invalidArgument(`Unsupported table border edge ${edge}.`);
+  }
+
+  function tableBorderType(style) {
+    const normalized = String(style || '').trim().toLowerCase();
+    if (normalized === 'single') return Word.BorderType.single;
+    if (normalized === 'double') return Word.BorderType.double;
+    if (normalized === 'dotted') return Word.BorderType.dotted;
+    if (normalized === 'dashed') return Word.BorderType.dashed;
+    if (normalized === 'none') return Word.BorderType.none;
+    throw invalidArgument(`Unsupported table border style ${style}.`);
+  }
+
+  function tableBorderUpdate(borders) {
+    const update = {};
+    if (borders.style !== undefined) update.type = tableBorderType(borders.style);
+    if (borders.width_pt !== undefined) update.width = borders.width_pt;
+    if (borders.color !== undefined) update.color = borders.color;
+    return update;
   }
 
   function trackedChangeFingerprint(change, index) {

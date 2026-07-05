@@ -463,15 +463,20 @@ const WORD_E2E_CASES = Object.fromEntries([
   ['word.update_table', {
     setup: {
       actions: [
-        { tool: 'word.insert_table', saveAs: 'table', arguments: { anchor: { kind: 'end_of_document' }, rows: 1, cols: 2, data: [['Old', 'Value']] } }
+        { tool: 'word.insert_table', saveAs: 'table', arguments: { anchor: { kind: 'end_of_document' }, rows: 3, cols: 3, data: [['Old', 'Value', 'Delete Col'], ['Delete Row', 'Delete Row B', 'Delete Row C'], ['Keep Row', 'Keep Cell', 'Keep Delete Col']] } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'update_cell', row: 0, col: 0, text: 'Updated table cell' } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'delete_row', row: 1 } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'delete_column', col: 2 } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'set_header_row', header_row: true } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'set_column_width', col: 0, width_pt: 72 } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'set_borders', borders: { edges: ['all'], style: 'single', width_pt: 1, color: '#336699' } } },
+        { tool: 'word.update_table', arguments: { table_index: '${table.table_index}', action: 'distribute_columns' } }
       ]
     },
-    args: { table_index: '${table.table_index}', action: 'update_cell', row: 0, col: 0, text: 'Updated table cell' },
+    args: { table_index: '${table.table_index}', action: 'merge_cells', row_range: [0, 0], col_range: [0, 1] },
     verify: {
-      kind: 'readback',
-      readbackTool: 'word.read_table',
-      readbackArguments: { table_index: '${table.table_index}' },
-      expect: { contains: ['Updated table cell'], notContains: ['Old'] }
+      kind: 'direct-result',
+      expect: { contains: ['merge_cells'], pathEquals: [{ path: 'merged', value: true }] }
     }
   }],
   ['word.list_content_controls', {

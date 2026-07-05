@@ -143,6 +143,12 @@ Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
       The compatibility tools were removed from the advertised catalog in the
       target-surface retirement slice; historical handlers remain only as local
       implementation helpers where needed.
+- [x] Complete `word.update_table` row/column deletion, merge, width, border,
+      distribute, and header-row behavior. Current contract keeps one table
+      mutation owner, classifies row/column deletion as destructive, gates
+      `merge_cells` on `WordApi 1.4`, and makes `word.read_table` report
+      merged-table diagnostics instead of returning misleading rectangular data
+      when Word cannot provide a uniform matrix.
 - [x] Add content-control CRUD tools: `word.list_content_controls`,
       `word.insert_content_control`, `word.update_content_control`, and
       `word.delete_content_control`, keeping generic text edits owned by
