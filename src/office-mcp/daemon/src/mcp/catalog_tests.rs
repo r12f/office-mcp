@@ -618,6 +618,39 @@ fn representative_word_schemas_are_specific() {
         update_header_footer["properties"]["validate_only"]["type"],
         "boolean"
     );
+
+    let update_table = schema_for("word.update_table");
+    assert_required(&update_table, &["session_id", "table_index", "action"]);
+    let actions = update_table["properties"]["action"]["enum"]
+        .as_array()
+        .expect("word.update_table action enum")
+        .iter()
+        .filter_map(|value| value.as_str())
+        .collect::<BTreeSet<_>>();
+    for action in [
+        "delete_row",
+        "delete_column",
+        "merge_cells",
+        "set_column_width",
+        "distribute_columns",
+        "set_borders",
+        "set_header_row",
+    ] {
+        assert!(actions.contains(action), "missing table action {action}");
+    }
+    assert_eq!(update_table["properties"]["row_range"]["type"], "array");
+    assert_eq!(update_table["properties"]["row_range"]["minItems"], 2);
+    assert_eq!(update_table["properties"]["col_range"]["maxItems"], 2);
+    assert_eq!(
+        update_table["properties"]["width_pt"]["exclusiveMinimum"],
+        0
+    );
+    assert_eq!(update_table["properties"]["header_row"]["type"], "boolean");
+    assert_eq!(update_table["properties"]["borders"]["type"], "object");
+    assert_eq!(
+        update_table["properties"]["borders"]["properties"]["style"]["enum"][0],
+        "single"
+    );
 }
 
 #[test]
