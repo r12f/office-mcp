@@ -194,6 +194,18 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Read,
     ),
     tool(
+        "word.get_document_properties",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Read,
+    ),
+    tool(
+        "word.update_document_properties",
+        "word",
+        "Document & structure",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
         "word.create_style",
         "word",
         "Document & structure",

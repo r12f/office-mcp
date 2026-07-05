@@ -11,6 +11,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.delete_image",
     "word.delete_range",
     "word.find_text",
+    "word.get_document_properties",
     "word.get_header_footer",
     "word.get_outline",
     "word.get_paragraph",
@@ -45,6 +46,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.set_change_tracking",
     "word.update_header_footer",
     "word.update_content_control",
+    "word.update_document_properties",
     "word.update_field",
     "word.update_image",
     "word.update_note",
@@ -701,6 +703,9 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
         "word.list_styles" | "word.create_style" | "word.update_style" => {
             style_examples_for_tool(tool)
         }
+        "word.get_document_properties" | "word.update_document_properties" => {
+            document_property_examples_for_tool(tool)
+        }
         "word.update_table" => vec![json!({
             "description": "Merge the first row across two columns after validating table bounds.",
             "arguments": {
@@ -730,6 +735,27 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
                 "row_index": 0,
                 "column_index": 1,
                 "text": "Q4"
+            }
+        })],
+        _ => Vec::new(),
+    }
+}
+
+fn document_property_examples_for_tool(tool: &str) -> Vec<Value> {
+    match tool {
+        "word.get_document_properties" => vec![json!({
+            "description": "Read core and custom document metadata.",
+            "arguments": {
+                "session_id": "session-1",
+                "include_custom": true
+            }
+        })],
+        "word.update_document_properties" => vec![json!({
+            "description": "Set a title and upsert a custom property.",
+            "arguments": {
+                "session_id": "session-1",
+                "title": "Quarterly review",
+                "custom_set": [{ "key": "Workflow", "value": "review" }]
             }
         })],
         _ => Vec::new(),
@@ -1063,6 +1089,28 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         "word.list_styles",
         ["session_id"],
         ["session_id", "type", "built_in", "in_use_only"]
+    ),
+    tool_spec!(
+        "word.get_document_properties",
+        ["session_id"],
+        ["session_id", "include_custom"]
+    ),
+    tool_spec!(
+        "word.update_document_properties",
+        ["session_id"],
+        [
+            "session_id",
+            "title",
+            "subject",
+            "author",
+            "keywords",
+            "category",
+            "comments",
+            "company",
+            "manager",
+            "custom_set",
+            "custom_delete"
+        ]
     ),
     tool_spec!(
         "word.insert_paragraph",
@@ -1938,6 +1986,20 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             { "required": ["paragraph"] }
         ]);
     }
+    if tool == "word.update_document_properties" {
+        schema["anyOf"] = json!([
+            { "required": ["title"] },
+            { "required": ["subject"] },
+            { "required": ["author"] },
+            { "required": ["keywords"] },
+            { "required": ["category"] },
+            { "required": ["comments"] },
+            { "required": ["company"] },
+            { "required": ["manager"] },
+            { "required": ["custom_set"] },
+            { "required": ["custom_delete"] }
+        ]);
+    }
     if tool == "word.update_image" {
         schema["anyOf"] = json!([
             { "required": ["alt_text_title"] },
@@ -1978,6 +2040,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
         return schema;
     }
     if let Some(schema) = word_style_property_schema(tool, name) {
+        return schema;
+    }
+    if let Some(schema) = word_document_property_schema(tool, name) {
         return schema;
     }
     if let Some(schema) = word_review_property_schema(tool, name) {
@@ -2059,6 +2124,44 @@ fn word_image_property_schema(tool: &str, name: &str) -> Option<Value> {
             Some(json!({ "type": "string" }))
         }
         (true, "hyperlink") => Some(json!({ "type": "string", "format": "uri" })),
+        _ => None,
+    }
+}
+
+fn word_document_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_document_property_tool = matches!(
+        tool,
+        "word.get_document_properties" | "word.update_document_properties"
+    );
+    if !is_document_property_tool {
+        return None;
+    }
+    match name {
+        "include_custom" => Some(json!({ "type": "boolean", "default": true })),
+        "title" | "subject" | "author" | "keywords" | "category" | "comments"
+        | "company" | "manager" => Some(json!({ "type": "string" })),
+        "custom_set" => Some(json!({
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["key", "value"],
+                "properties": {
+                    "key": { "type": "string", "minLength": 1 },
+                    "value": {
+                        "oneOf": [
+                            { "type": "string" },
+                            { "type": "number" },
+                            { "type": "boolean" }
+                        ]
+                    }
+                },
+                "additionalProperties": false
+            }
+        })),
+        "custom_delete" => Some(json!({
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+        })),
         _ => None,
     }
 }

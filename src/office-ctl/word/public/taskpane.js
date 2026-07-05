@@ -62,6 +62,7 @@
     'replace_paragraph',
     'selection'
   ]);
+  const DOCUMENT_PROPERTY_WRITABLE_FIELDS = ['title', 'subject', 'author', 'keywords', 'category', 'comments', 'company', 'manager'];
   const WORD_MUTATING_TOOLS = new Set([
     'word.insert_paragraph',
     'word.insert_table',
@@ -73,6 +74,7 @@
     'word.insert_page_break',
     'word.update_page_setup',
     'word.update_header_footer',
+    'word.update_document_properties',
     'word.insert_field',
     'word.update_field',
     'word.delete_field',
@@ -112,6 +114,7 @@
     'word.delete_bookmark',
     'word.get_selection',
     'word.get_header_footer',
+    'word.get_document_properties',
     'word.insert_paragraph',
     'word.insert_image',
     'word.resize_image',
@@ -121,6 +124,7 @@
     'word.delete_image',
     'word.insert_table',
     'word.update_header_footer',
+    'word.update_document_properties',
     'word.insert_break',
     'word.list_sections',
     'word.update_page_setup',
@@ -157,7 +161,7 @@
     'word.save'
   ];
   const TOOL_GROUPS = [
-    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.list_fields', 'word.insert_field', 'word.update_field', 'word.delete_field', 'word.list_styles', 'word.create_style', 'word.update_style', 'word.save'] },
+    { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.get_document_properties', 'word.update_document_properties', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.list_fields', 'word.insert_field', 'word.update_field', 'word.delete_field', 'word.list_styles', 'word.create_style', 'word.update_style', 'word.save'] },
     { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
@@ -170,6 +174,7 @@
     ['word.get_text', { category: 'Document & structure', sideEffect: 'read', description: 'Read document text by paragraph range.' }],
     ['word.get_outline', { category: 'Document & structure', sideEffect: 'read', description: 'Read heading outline and structure.' }],
     ['word.get_header_footer', { category: 'Document & structure', sideEffect: 'read', description: 'Read section header or footer text.' }],
+    ['word.get_document_properties', { category: 'Document & structure', sideEffect: 'read', description: 'Read document metadata and custom properties.' }],
     ['word.get_paragraph', { category: 'Paragraphs & lists', sideEffect: 'read', description: 'Read a single paragraph by index with optional formatting metadata.' }],
     ['word.find_text', { category: 'Range & selection', sideEffect: 'read', description: 'Find text matches in the document body.' }],
     ['word.resolve_anchor', { category: 'Range & selection', sideEffect: 'read', description: 'Resolve an anchor to safe diagnostic metadata.' }],
@@ -197,6 +202,7 @@
     ['word.create_style', { category: 'Document & structure', sideEffect: 'mutating', description: 'Create a document style definition.' }],
     ['word.update_style', { category: 'Document & structure', sideEffect: 'mutating', description: 'Update a document style definition.' }],
     ['word.update_header_footer', { category: 'Document & structure', sideEffect: 'destructive', description: 'Replace, append, or clear a section header or footer.' }],
+    ['word.update_document_properties', { category: 'Document & structure', sideEffect: 'mutating', description: 'Update document metadata and custom properties.' }],
     ['word.insert_list', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a list.' }],
     ['word.insert_hyperlink', { category: 'Range & selection', sideEffect: 'mutating', description: 'Insert or apply a hyperlink at an anchored range.' }],
     ['word.list_hyperlinks', { category: 'Range & selection', sideEffect: 'read', description: 'List document hyperlinks with paragraph-relative locations.' }],
@@ -551,6 +557,9 @@
         case 'word.get_header_footer':
           data = await getHeaderFooter(args);
           break;
+        case 'word.get_document_properties':
+          data = await getDocumentProperties(args || {});
+          break;
         case 'word.insert_paragraph':
           data = await insertParagraph(args);
           break;
@@ -610,6 +619,9 @@
           break;
         case 'word.update_header_footer':
           data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateHeaderFooter(args);
+          break;
+        case 'word.update_document_properties':
+          data = await updateDocumentProperties(args || {});
           break;
         case 'word.insert_list':
           data = await insertList(args);
@@ -744,6 +756,9 @@
         break;
       case 'word.update_header_footer':
         validateHeaderFooterArgs(tool, args, true);
+        break;
+      case 'word.update_document_properties':
+        validateUpdateDocumentPropertiesArgs(tool, args);
         break;
       case 'word.insert_field':
         validateInsertFieldArgs(tool, args);
@@ -881,6 +896,9 @@
         return validateUpdateStyleOnly(args);
       case 'word.update_header_footer':
         return validateUpdateHeaderFooterOnly(args);
+      case 'word.update_document_properties':
+        validateUpdateDocumentPropertiesArgs(tool, args || {});
+        return validationSuccess(tool, { partial_effect: 'none' });
       default:
         throw invalidArgument(`${tool} does not support validate_only.`);
     }
@@ -2409,6 +2427,69 @@
     });
   }
 
+  async function getDocumentProperties(args) {
+    return Word.run(async (context) => {
+      const properties = context.document.properties;
+      properties.load('title,subject,author,keywords,category,comments,company,manager,lastAuthor,revisionNumber,creationDate,lastSaveTime,security');
+      const includeCustom = args.include_custom !== false;
+      if (includeCustom) properties.customProperties.load('items/key,items/type,items/value');
+      await context.sync();
+      const result = documentPropertiesMetadata(properties);
+      if (includeCustom) result.custom = properties.customProperties.items.map(customPropertyMetadata);
+      return result;
+    });
+  }
+
+  async function updateDocumentProperties(args) {
+    return Word.run(async (context) => {
+      validateUpdateDocumentPropertiesArgs('word.update_document_properties', args);
+      const properties = context.document.properties;
+      const updatedFields = [];
+      for (const field of DOCUMENT_PROPERTY_WRITABLE_FIELDS) {
+        if (args[field] !== undefined) {
+          properties[field] = args[field];
+          updatedFields.push(field);
+        }
+      }
+
+      const customSet = Array.isArray(args.custom_set) ? args.custom_set : [];
+      for (const entry of customSet) {
+        properties.customProperties.add(entry.key, entry.value);
+      }
+
+      const customDelete = Array.isArray(args.custom_delete) ? args.custom_delete : [];
+      const deletedCustom = [];
+      const missingCustom = [];
+      for (const key of customDelete) {
+        const property = properties.customProperties.getItemOrNullObject(key);
+        property.load('isNullObject,key');
+        await context.sync();
+        if (property.isNullObject) {
+          missingCustom.push(key);
+        } else {
+          deletedCustom.push(property.key || key);
+          property.delete();
+        }
+      }
+
+      properties.load('title,subject,author,keywords,category,comments,company,manager,lastAuthor,revisionNumber,creationDate,lastSaveTime,security');
+      properties.customProperties.load('items/key,items/type,items/value');
+      await context.sync();
+
+      return {
+        updated: true,
+        fields: updatedFields,
+        custom_set: customSet.map((entry) => entry.key),
+        custom_deleted: deletedCustom,
+        custom_missing: missingCustom,
+        properties: {
+          ...documentPropertiesMetadata(properties),
+          custom: properties.customProperties.items.map(customPropertyMetadata)
+        }
+      };
+    });
+  }
+
   async function setHeadingLevel(args) {
     return Word.run(async (context) => {
       const paragraph = await getParagraphByIndex(context, args.index);
@@ -3409,6 +3490,51 @@
     validateStyleFormattingArgs(tool, args);
   }
 
+  function validateUpdateDocumentPropertiesArgs(tool, args) {
+    args = args || {};
+    const hasWritableField = DOCUMENT_PROPERTY_WRITABLE_FIELDS.some((field) => args[field] !== undefined);
+    const customSet = args.custom_set;
+    const customDelete = args.custom_delete;
+    const hasCustomSet = Array.isArray(customSet) && customSet.length > 0;
+    const hasCustomDelete = Array.isArray(customDelete) && customDelete.length > 0;
+    if (!hasWritableField && !hasCustomSet && !hasCustomDelete) {
+      throw invalidArgument(`${tool} requires at least one writable property or custom operation.`);
+    }
+    for (const field of DOCUMENT_PROPERTY_WRITABLE_FIELDS) {
+      if (args[field] !== undefined && typeof args[field] !== 'string') {
+        throw invalidArgument(`${tool} ${field} must be a string.`);
+      }
+    }
+    if (customSet !== undefined) {
+      if (!Array.isArray(customSet)) throw invalidArgument(`${tool} custom_set must be an array.`);
+      for (const entry of customSet) validateCustomPropertySetEntry(tool, entry);
+    }
+    if (customDelete !== undefined) {
+      if (!Array.isArray(customDelete)) throw invalidArgument(`${tool} custom_delete must be an array.`);
+      for (const key of customDelete) validateCustomPropertyKey(tool, key, 'custom_delete key');
+    }
+  }
+
+  function validateCustomPropertySetEntry(tool, entry) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw invalidArgument(`${tool} custom_set entries must be objects.`);
+    }
+    validateCustomPropertyKey(tool, entry.key, 'custom_set key');
+    const valueType = typeof entry.value;
+    if (valueType !== 'string' && valueType !== 'number' && valueType !== 'boolean') {
+      throw invalidArgument(`${tool} custom_set values must be strings, numbers, or booleans.`);
+    }
+    if (valueType === 'number' && !Number.isFinite(entry.value)) {
+      throw invalidArgument(`${tool} custom_set number values must be finite.`);
+    }
+  }
+
+  function validateCustomPropertyKey(tool, key, field) {
+    if (typeof key !== 'string' || key.trim().length < 1) {
+      throw invalidArgument(`${tool} ${field} must be a non-empty string.`);
+    }
+  }
+
   function validateStyleFormattingArgs(tool, args) {
     if (args.base_style !== undefined) validateStyleName(tool, args.base_style, 'base_style');
     validateFormattingArg(tool, args.font);
@@ -3772,6 +3898,51 @@
       base_style: style.baseStyle || null,
       priority: typeof style.priority === 'number' ? style.priority : null
     };
+  }
+
+  function documentPropertiesMetadata(properties) {
+    return omitUndefined({
+      title: nullableString(properties.title),
+      subject: nullableString(properties.subject),
+      author: nullableString(properties.author),
+      keywords: nullableString(properties.keywords),
+      category: nullableString(properties.category),
+      comments: nullableString(properties.comments),
+      company: nullableString(properties.company),
+      manager: nullableString(properties.manager),
+      last_author: nullableString(properties.lastAuthor),
+      revision_number: nullableString(properties.revisionNumber),
+      creation_date: isoDateOrNull(properties.creationDate),
+      last_save_time: isoDateOrNull(properties.lastSaveTime),
+      security: typeof properties.security === 'number' ? properties.security : undefined
+    });
+  }
+
+  function customPropertyMetadata(property) {
+    return {
+      key: property.key,
+      type: normalizeDocumentPropertyType(property.type),
+      value: property.value instanceof Date ? property.value.toISOString() : property.value
+    };
+  }
+
+  function normalizeDocumentPropertyType(type) {
+    const normalized = String(type || '').toLowerCase();
+    if (normalized === 'string' || normalized === 'number' || normalized === 'boolean' || normalized === 'date') return normalized;
+    return normalized || 'unknown';
+  }
+
+  function nullableString(value) {
+    return typeof value === 'string' ? value : null;
+  }
+
+  function isoDateOrNull(value) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+    return null;
+  }
+
+  function omitUndefined(value) {
+    return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined));
   }
 
   async function getStyleByName(context, name) {
@@ -4247,6 +4418,7 @@
     const supportsFieldMutation = Boolean(requirements.WordApi_1_5);
     const supportsStyles = Boolean(requirements.WordApi_1_5);
     const supportsInlineImages = Boolean(requirements.WordApi_1_3);
+    const supportsDocumentProperties = Boolean(requirements.WordApi_1_3);
     return AVAILABLE_TOOLS.filter((tool) => {
       if (tool === 'word.update_page_setup') return Boolean(requirements.WordApiDesktop_1_3);
       if (['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'].includes(tool)) {
@@ -4256,6 +4428,7 @@
       if (['word.insert_field', 'word.update_field', 'word.delete_field'].includes(tool)) return supportsFieldMutation;
       if (['word.list_styles', 'word.create_style', 'word.update_style'].includes(tool)) return supportsStyles;
       if (['word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'].includes(tool)) return supportsInlineImages;
+      if (['word.get_document_properties', 'word.update_document_properties'].includes(tool)) return supportsDocumentProperties;
       return true;
     });
   }
