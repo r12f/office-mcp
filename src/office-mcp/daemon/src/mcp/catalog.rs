@@ -16,6 +16,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.get_outline",
     "word.get_paragraph",
     "word.get_selection",
+    "word.set_selection",
     "word.get_text",
     "word.get_image",
     "word.insert_bookmark",
@@ -1073,6 +1074,11 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     ),
     tool_spec!("word.get_selection", ["session_id"], ["session_id"]),
     tool_spec!(
+        "word.set_selection",
+        ["session_id", "anchor"],
+        ["session_id", "anchor", "extent", "mode"]
+    ),
+    tool_spec!(
         "word.get_header_footer",
         ["session_id", "location"],
         [
@@ -2083,6 +2089,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
             json!({ "type": "integer", "minimum": 1, "maximum": 200 })
         }
         "anchor" => anchor_schema_for_tool(tool),
+        "mode" if tool == "word.set_selection" => {
+            json!({ "enum": ["select", "cursor_start", "cursor_end"], "default": "select" })
+        }
         "scope" if tool == "word.replace_text" => word_replace_text_scope_schema(),
         "image" => image_schema(),
         "placement" if tool == "word.insert_image" => word_insert_image_placement_schema(),

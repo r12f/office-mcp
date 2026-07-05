@@ -688,6 +688,7 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn representative_word_schemas_are_specific() {
     let describe = schema_for("office.describe_tools");
     assert_required(&describe, &["tools"]);
@@ -772,7 +773,10 @@ fn representative_word_schemas_are_specific() {
     let set_selection = schema_for("word.set_selection");
     assert_required(&set_selection, &["session_id", "anchor"]);
     assert_eq!(set_selection["properties"]["mode"]["default"], "select");
-    assert_eq!(set_selection["properties"]["mode"]["enum"][1], "cursor_start");
+    assert_eq!(
+        set_selection["properties"]["mode"]["enum"][1],
+        "cursor_start"
+    );
     assert!(set_selection["properties"].get("extent").is_some());
     assert_eq!(
         set_selection["properties"]["anchor"]["oneOf"]

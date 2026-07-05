@@ -86,6 +86,7 @@
     'word.replace_text',
     'word.update_paragraph',
     'word.delete_range',
+    'word.set_selection',
     'word.insert_bookmark',
     'word.delete_bookmark',
     'word.insert_note',
@@ -113,6 +114,7 @@
     'word.list_bookmarks',
     'word.delete_bookmark',
     'word.get_selection',
+    'word.set_selection',
     'word.get_header_footer',
     'word.get_document_properties',
     'word.insert_paragraph',
@@ -162,7 +164,7 @@
   ];
   const TOOL_GROUPS = [
     { label: 'Document & structure', tools: ['word.get_text', 'word.get_outline', 'word.get_header_footer', 'word.update_header_footer', 'word.get_document_properties', 'word.update_document_properties', 'word.insert_break', 'word.list_sections', 'word.update_page_setup', 'word.list_fields', 'word.insert_field', 'word.update_field', 'word.delete_field', 'word.list_styles', 'word.create_style', 'word.update_style', 'word.save'] },
-    { label: 'Range & selection', tools: ['word.get_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
+    { label: 'Range & selection', tools: ['word.get_selection', 'word.set_selection', 'word.find_text', 'word.resolve_anchor', 'word.insert_bookmark', 'word.list_bookmarks', 'word.delete_bookmark', 'word.insert_hyperlink', 'word.list_hyperlinks', 'word.remove_hyperlink', 'word.replace_text', 'word.delete_range', 'word.apply_formatting', 'word.apply_style'] },
     { label: 'Paragraphs & lists', tools: ['word.get_paragraph', 'word.insert_paragraph', 'word.update_paragraph', 'word.insert_list'] },
     { label: 'Tables', tools: ['word.read_table', 'word.update_table'] },
     { label: 'Media', tools: ['word.insert_image', 'word.resize_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'] },
@@ -182,6 +184,7 @@
     ['word.list_bookmarks', { category: 'Range & selection', sideEffect: 'read', description: 'List bookmark names and locations.' }],
     ['word.delete_bookmark', { category: 'Range & selection', sideEffect: 'destructive', description: 'Delete a bookmark marker without deleting text.' }],
     ['word.get_selection', { category: 'Range & selection', sideEffect: 'read', description: 'Read the current selection.' }],
+    ['word.set_selection', { category: 'Range & selection', sideEffect: 'mutating', description: 'Set the current selection or cursor position from an anchor.' }],
     ['word.insert_paragraph', { category: 'Paragraphs & lists', sideEffect: 'mutating', description: 'Insert a paragraph near an anchor.' }],
     ['word.insert_image', { category: 'Media', sideEffect: 'mutating', description: 'Insert an image into the document.' }],
     ['word.resize_image', { category: 'Media', sideEffect: 'mutating', description: 'Resize an existing inline image.' }],
@@ -554,6 +557,9 @@
         case 'word.get_selection':
           data = await getSelection(args);
           break;
+        case 'word.set_selection':
+          data = await setSelection(args);
+          break;
         case 'word.get_header_footer':
           data = await getHeaderFooter(args);
           break;
@@ -801,6 +807,9 @@
         break;
       case 'word.delete_bookmark':
         validateBookmarkName(tool, args.name, { strictPattern: false });
+        break;
+      case 'word.set_selection':
+        validateSetSelectionArgs(tool, args);
         break;
       case 'word.insert_note':
         validateInsertNoteArgs(tool, args);
@@ -1280,6 +1289,36 @@
         untrusted_source: true
       };
     });
+  }
+
+  async function setSelection(args) {
+    validateSetSelectionArgs('word.set_selection', args);
+    return Word.run(async (context) => {
+      const target = await resolveRangeForExtent(context, args.anchor, args.extent);
+      target.select(selectionModeForSetSelection(args.mode));
+      target.load('text');
+      await context.sync();
+      const paragraphIndex = await paragraphIndexForRange(context, target);
+      return {
+        selected_text_preview: safeTextPreview(target.text),
+        paragraph_index: paragraphIndex,
+        is_empty: target.text.length === 0,
+        untrusted_source: true
+      };
+    });
+  }
+
+  function selectionModeForSetSelection(mode) {
+    switch (mode || 'select') {
+      case 'select':
+        return Word.SelectionMode.select;
+      case 'cursor_start':
+        return Word.SelectionMode.start;
+      case 'cursor_end':
+        return Word.SelectionMode.end;
+      default:
+        throw invalidArgument(`word.set_selection mode must be select, cursor_start, or cursor_end.`);
+    }
   }
 
   async function insertNote(args) {
@@ -3269,6 +3308,18 @@
     }
   }
 
+  function validateSetSelectionArgs(tool, args) {
+    requireAnchor(tool, args?.anchor);
+    const extent = args.extent ?? 'range';
+    if (extent !== 'range' && extent !== 'paragraph' && extent !== 'sentence' && extent !== 'selection') {
+      throw invalidArgument(`${tool} extent must be range, paragraph, sentence, or selection.`);
+    }
+    const mode = args.mode ?? 'select';
+    if (!['select', 'cursor_start', 'cursor_end'].includes(mode)) {
+      throw invalidArgument(`${tool} mode must be select, cursor_start, or cursor_end.`);
+    }
+  }
+
   function validateOptionalPositiveNumber(tool, name, value) {
     if (value !== undefined && !isPositiveNumber(value)) {
       throw invalidArgument(`${tool} ${name} must be a positive number.`);
@@ -4419,6 +4470,7 @@
     const supportsStyles = Boolean(requirements.WordApi_1_5);
     const supportsInlineImages = Boolean(requirements.WordApi_1_3);
     const supportsDocumentProperties = Boolean(requirements.WordApi_1_3);
+    const supportsSetSelection = Boolean(requirements.WordApi_1_3);
     return AVAILABLE_TOOLS.filter((tool) => {
       if (tool === 'word.update_page_setup') return Boolean(requirements.WordApiDesktop_1_3);
       if (['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'].includes(tool)) {
@@ -4429,6 +4481,7 @@
       if (['word.list_styles', 'word.create_style', 'word.update_style'].includes(tool)) return supportsStyles;
       if (['word.list_images', 'word.get_image', 'word.update_image', 'word.delete_image'].includes(tool)) return supportsInlineImages;
       if (['word.get_document_properties', 'word.update_document_properties'].includes(tool)) return supportsDocumentProperties;
+      if (tool === 'word.set_selection') return supportsSetSelection;
       return true;
     });
   }

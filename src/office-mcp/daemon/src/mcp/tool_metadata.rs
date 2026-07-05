@@ -108,6 +108,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Read,
     ),
     tool(
+        "word.set_selection",
+        "word",
+        "Range & selection",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
         "word.insert_paragraph",
         "word",
         "Paragraphs & lists",
