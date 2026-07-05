@@ -63,7 +63,7 @@ The `$ref` values below refer to these shared definitions.
 
 ### 1.1 Word tool catalog
 
-The current advertised Word v1 tool surface has 48 tools, grouped by object-owner
+The current advertised Word v1 tool surface has 52 tools, grouped by object-owner
 category. Categories are not permission tiers and must not be action buckets such
 as `Read`, `Insert`, and `Edit`; side-effect level is tracked separately per
 tool so the UI can apply Read/Write/All permission modes without hiding the
@@ -77,7 +77,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | **Range & selection** | `word.get_selection`, `word.set_selection`, `word.get_html`, `word.insert_html`, `word.find_text`, `word.resolve_anchor`, `word.insert_bookmark`, `word.list_bookmarks`, `word.delete_bookmark`, `word.insert_hyperlink`, `word.list_hyperlinks`, `word.remove_hyperlink`, `word.replace_text`, `word.delete_range`, `word.apply_formatting`, `word.apply_style` |
 | **Paragraphs & lists** | `word.get_paragraph`, `word.insert_paragraph`, `word.update_paragraph`, `word.insert_list` |
 | **Tables** | `word.insert_table`, `word.read_table`, `word.update_table` |
-| **Media** | `word.insert_image`, `word.resize_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.delete_image` |
+| **Media** | `word.insert_image`, `word.resize_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.delete_image`, `word.list_shapes`, `word.insert_shape`, `word.update_shape`, `word.delete_shape` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Notes** | `word.insert_note`, `word.list_notes`, `word.update_note`, `word.delete_note` |
 | **Review** | `word.add_comment`, `word.resolve_comment`, `word.set_change_tracking`, `word.update_tracked_change` |
@@ -124,6 +124,10 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.get_image` | implemented | Media | read | `WordApi 1.3` | Export one inline image as base64 with dimensions and metadata, subject to large-result limits. |
 | `word.update_image` | implemented | Media | edit | `WordApi 1.3` | Update inline image alt text, hyperlink, or bytes in place. |
 | `word.delete_image` | implemented | Media | destructive | `WordApi 1.3` | Delete one inline image without deleting surrounding paragraph text. |
+| `word.list_shapes` | implemented | Media | read | `WordApiDesktop 1.2` | List inline and floating body shapes, including text boxes, geometric shapes, pictures, groups, and canvases, with bounded text previews. |
+| `word.insert_shape` | implemented | Media | edit | `WordApiDesktop 1.2` | Insert a text box, geometric shape, or floating picture at an anchored paragraph or range. |
+| `word.update_shape` | implemented | Media | edit | `WordApiDesktop 1.2` | Update shape text, geometry, alt text, fill, line, wrapping, or visibility through one shape owner. |
+| `word.delete_shape` | implemented | Media | destructive | `WordApiDesktop 1.2` | Delete one shape by current shape id. |
 | `word.insert_break` | implemented | Document & structure | edit | `WordApi 1.3` | Insert a page, line, or section break at an anchor. |
 | `word.list_sections` | implemented | Document & structure | read | `WordApi 1.3` | List document sections with paragraph range and header/footer metadata. |
 | `word.update_page_setup` | implemented | Document & structure | edit | `WordApiDesktop 1.3` | Update document or section page setup such as orientation, margins, and page size. |
@@ -196,8 +200,11 @@ Tool ownership rules:
   geometry-only resizing without re-uploading bytes. `word.update_image` owns
   alt text, hyperlink, and byte replacement for an existing image.
   `word.delete_image` owns removing one inline image while preserving
-  surrounding paragraph text. Floating shapes remain out of scope for these
-  inline-picture tools.
+  surrounding paragraph text. `word.list_shapes`, `word.insert_shape`,
+  `word.update_shape`, and `word.delete_shape` own desktop-tier floating and
+  shape-backed media, including text boxes, geometric shapes, floating
+  pictures, groups, and canvases. Inline image tools must not silently mutate
+  floating pictures; shape tools must not duplicate inline-picture byte export.
 - Content-control tools own content-control lifecycle and metadata. Generic text
   edits inside a known range remain owned by range/paragraph tools unless the
   caller is explicitly targeting a content control.
@@ -249,6 +256,7 @@ runtime and advertises only tools whose complete implementation is supported:
 | Tracked changes | `WordApi 1.6` | tracked-change resource and accept/reject |
 | Checkbox content controls | `WordApi 1.7` | checkbox content-control insertion, checked-state listing, and checked-state updates |
 | List content controls | `WordApi 1.9` | dropdown-list and combo-box insertion, item listing, item mutation, and selected-item updates |
+| Desktop shapes | `WordApiDesktop 1.2` | shape and text-box listing, insertion, mutation, deletion, and text-box preview reachability |
 | Host-specific | explicit successful probe | page setup, active-window, and protection metadata |
 
 Header/footer body access and `word.save` use production Word APIs available
@@ -259,6 +267,16 @@ available. Preview APIs are excluded from v1.
 catalog when that probe fails. `word.insert_break` and `word.list_sections` are
 core-tier tools because their required Office.js APIs are available within the
 base Word API tier.
+
+`word.list_shapes`, `word.insert_shape`, `word.update_shape`, and
+`word.delete_shape` require `WordApiDesktop 1.2` and are absent from the catalog
+when that probe fails, including Word on the web. These tools use the desktop
+shape APIs exposed from `Body.shapes`, `Paragraph.shapes`, `Range.shapes`,
+`ShapeCollection.getById`, `Paragraph.insertTextBox`,
+`Paragraph.insertGeometricShape`, `Paragraph.insertPictureFromBase64`, and the
+matching `Range` insertion APIs. Shape ids are stable only within the current
+document session and callers must re-run `word.list_shapes` after insertion,
+deletion, or grouping changes.
 
 ### 1.4 Word resources
 
@@ -817,7 +835,157 @@ text and MUST NOT delete the containing paragraph as a substitute for image
 deletion. With `validate_only: true`, the tool resolves the target image and
 returns without deleting it.
 
-### 3.10 `word.insert_break`
+### 3.10 `word.list_shapes`
+
+List desktop-tier Word shapes from the main body by default. Shapes include
+text boxes, geometric shapes, groups, pictures, and canvases exposed by
+`Body.shapes`, `Paragraph.shapes`, and `Range.shapes`.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "scope": { "enum": ["body", "paragraph", "anchor"], "default": "body" },
+    "paragraph_index": { "type": "integer", "minimum": 0 },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "include_text": { "type": "boolean", "default": true }
+  },
+  "additionalProperties": false
+}
+```
+
+For `scope: "paragraph"`, `paragraph_index` is required. For
+`scope: "anchor"`, `anchor` is required. The response returns:
+
+```json
+{
+  "shapes": [
+    {
+      "shape_id": 42,
+      "type": "TextBox",
+      "name": "Text Box 1",
+      "text_preview": "Bounded text-box text",
+      "left_pt": 72,
+      "top_pt": 96,
+      "width_pt": 240,
+      "height_pt": 80,
+      "relative_horizontal_position": "Margin",
+      "relative_vertical_position": "Paragraph",
+      "alt_text_description": "Callout text",
+      "untrusted_source": true
+    }
+  ],
+  "count": 1,
+  "untrusted_source": true
+}
+```
+
+`text_preview` is populated only from shape body or text-frame text that the
+desktop API exposes and must be bounded by the same preview discipline as other
+document text reads. `word.get_text` continues to read the main document body;
+text inside text boxes is reachable through `word.list_shapes` and
+`word.update_shape` rather than silently mixed into body text.
+
+### 3.11 `word.insert_shape`
+
+Insert a desktop-tier text box, geometric shape, or floating picture anchored
+at an existing paragraph or range. The implementation uses
+`Paragraph.insertTextBox`, `Paragraph.insertGeometricShape`,
+`Paragraph.insertPictureFromBase64`, or the equivalent `Range` APIs after
+resolving the anchor.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "shape_type"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "shape_type": { "enum": ["text_box", "rectangle", "ellipse", "rounded_rectangle", "line", "picture"] },
+    "anchor": { "$ref": "#/$defs/anchor" },
+    "text": { "type": "string" },
+    "image": { "$ref": "#/$defs/image_input" },
+    "left_pt": { "type": "number" },
+    "top_pt": { "type": "number" },
+    "width_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "height_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "alt_text_description": { "type": "string" },
+    "fill_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "line_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+`shape_type: "text_box"` uses `text` as the inserted text-box body, defaulting
+to an empty string. Geometric shapes map only the small portable enum above to
+Office geometric shape values; unsupported shapes fail `INVALID_ARGUMENT` before
+mutation. `shape_type: "picture"` requires `image` and uses the same daemon
+fetch, byte-size, MIME, and decoded-image validation policy as
+`word.insert_image`. The response returns the new `shape` metadata from
+`word.list_shapes` plus `created: true`.
+
+### 3.12 `word.update_shape`
+
+Mutate one existing desktop-tier shape by current `shape_id`.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "shape_id", "action"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "shape_id": { "type": "integer" },
+    "action": { "enum": ["move", "resize", "set_text", "set_alt_text", "set_fill", "set_line", "set_wrap", "set_visibility"] },
+    "left_pt": { "type": "number" },
+    "top_pt": { "type": "number" },
+    "width_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "height_pt": { "type": "number", "exclusiveMinimum": 0 },
+    "text": { "type": "string" },
+    "alt_text_description": { "type": "string" },
+    "fill_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "line_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "wrap_type": { "enum": ["inline", "square", "tight", "behind", "front", "top_bottom"] },
+    "visible": { "type": "boolean" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+Per-action required arguments are preflighted with `INVALID_ARGUMENT` and
+`partial_effect: "none"`. `set_text` applies only to shapes with a body or text
+frame, and unsupported shape types fail before mutation where the host exposes
+enough metadata to decide. `move` changes `left` and/or `top`; `resize` changes
+`width` and/or `height`; `set_wrap` maps the portable wrap enum to
+`Shape.textWrap`. `validate_only: true` resolves the shape and validates the
+arguments without changing it. The response returns `{ action, shape, updated:
+true }`.
+
+### 3.13 `word.delete_shape`
+
+Delete one existing desktop-tier shape by current `shape_id`.
+
+```json
+{
+  "type": "object",
+  "required": ["session_id", "shape_id"],
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "shape_id": { "type": "integer" },
+    "validate_only": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": false
+}
+```
+
+The tool deletes only the target shape and does not delete surrounding body
+paragraphs or inline-picture indexes. With `validate_only: true`, the tool
+resolves the shape and returns without deleting it.
+
+### 3.14 `word.insert_break`
 
 ```json
 {
