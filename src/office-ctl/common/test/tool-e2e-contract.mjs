@@ -54,6 +54,13 @@ export function assertConcreteE2eCases({ host, cases }) {
     assertConcreteSetup(tool, toolCase);
     assertConcreteCall(tool, toolCase);
     assertConcreteVerifier(tool, toolCase);
+    for (const [index, scenario] of (toolCase.scenarios || []).entries()) {
+      const scenarioName = `${tool} scenario ${index}`;
+      assert.equal(scenario.tool, tool, `${scenarioName} must call the canonical tool`);
+      assertConcreteSetup(scenarioName, scenario);
+      assertConcreteCall(tool, scenario);
+      assertConcreteVerifier(scenarioName, scenario);
+    }
   }
 }
 
@@ -127,12 +134,13 @@ function catalogSection(source, prefix) {
   return source.slice(start, end + 2);
 }
 
-export function e2eCase(tool, { setup = 'fixed baseline content', args = {}, verify = 'readback' } = {}) {
+export function e2eCase(tool, { setup = 'fixed baseline content', args = {}, verify = 'readback', scenarios = [] } = {}) {
   return {
     tool,
     setup,
     call: { name: tool, arguments: args },
-    verify: normalizeVerifier(verify)
+    verify: normalizeVerifier(verify),
+    scenarios: scenarios.map((scenario) => e2eCase(tool, scenario))
   };
 }
 
@@ -296,7 +304,7 @@ export async function runOfficeToolE2e({ host, cases, driver, reportPath }) {
     report.session = summarizeSession(session);
     report.session_available_tools = [...session.availableTools];
 
-    for (const toolCase of orderedCases(cases, session.availableTools)) {
+    for (const toolCase of orderedCases(cases, session.availableTools).flatMap(expandToolCaseScenarios)) {
       const run = e2eRunMetadata(toolCase);
       const toolRun = createToolRunReport(toolCase, run);
       report.tool_runs.push(toolRun);
@@ -544,6 +552,10 @@ function hostNamedTools(host, tools) {
 
 function orderedCases(cases, availableTools) {
   return availableTools.map((tool) => cases[tool]);
+}
+
+function expandToolCaseScenarios(toolCase) {
+  return [toolCase, ...(toolCase.scenarios || [])];
 }
 
 function e2eRunMetadata(toolCase) {

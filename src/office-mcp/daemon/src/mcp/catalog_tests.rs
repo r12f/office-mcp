@@ -82,11 +82,13 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"word.list_styles"));
     assert!(names.contains(&"word.create_style"));
     assert!(names.contains(&"word.update_style"));
-    assert!(names.contains(&"word.resize_image"));
     assert!(names.contains(&"word.list_images"));
     assert!(names.contains(&"word.get_image"));
     assert!(names.contains(&"word.update_image"));
-    assert!(names.contains(&"word.delete_image"));
+    assert!(!names.contains(&"word.resize_image"));
+    assert!(!names.contains(&"word_resize_image"));
+    assert!(!names.contains(&"word.delete_image"));
+    assert!(!names.contains(&"word_delete_image"));
     assert!(names.contains(&"word.update_table"));
     assert!(names.contains(&"word_update_table"));
     assert!(names.contains(&"word.set_change_tracking"));
@@ -114,10 +116,10 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.export_pdf"));
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
-    assert_eq!(WORD_V1_TOOLS.len(), 65);
+    assert_eq!(WORD_V1_TOOLS.len(), 63);
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 25);
-    assert_eq!(tools.len(), 226);
+    assert_eq!(tools.len(), 222);
 }
 
 #[test]
@@ -211,16 +213,19 @@ fn word_image_tools_expose_expected_contracts() {
     let update_image = tool_for("word.update_image");
     assert_eq!(
         update_image["inputSchema"]["required"],
-        serde_json::json!(["session_id", "image"])
+        serde_json::json!(["session_id", "image", "action"])
     );
     assert_eq!(
-        update_image["inputSchema"]["anyOf"],
-        serde_json::json!([
-            { "required": ["alt_text_title"] },
-            { "required": ["alt_text_description"] },
-            { "required": ["hyperlink"] },
-            { "required": ["replace_base64"] }
-        ])
+        update_image["inputSchema"]["properties"]["action"]["enum"],
+        serde_json::json!(["resize", "set_alt_text", "set_hyperlink", "replace", "delete"])
+    );
+    assert_eq!(
+        update_image["inputSchema"]["properties"]["base64"]["type"],
+        "string"
+    );
+    assert_eq!(
+        update_image["inputSchema"]["properties"]["width_pt"]["exclusiveMinimum"],
+        0
     );
     assert_eq!(
         update_image["inputSchema"]["properties"]["validate_only"]["type"],
@@ -228,20 +233,6 @@ fn word_image_tools_expose_expected_contracts() {
     );
     assert_eq!(
         update_image["_meta"]["com.office-mcp/side_effects"],
-        "mutating"
-    );
-
-    let delete_image = tool_for("word.delete_image");
-    assert_eq!(
-        delete_image["inputSchema"]["required"],
-        serde_json::json!(["session_id", "image"])
-    );
-    assert_eq!(
-        delete_image["inputSchema"]["properties"]["validate_only"]["type"],
-        "boolean"
-    );
-    assert_eq!(
-        delete_image["_meta"]["com.office-mcp/side_effects"],
         "destructive"
     );
 
@@ -264,24 +255,18 @@ fn word_image_tools_expose_expected_contracts() {
     );
 
     let update_image_schema = schema_for("word.update_image");
-    assert_required(&update_image_schema, &["session_id", "image"]);
+    assert_required(&update_image_schema, &["session_id", "image", "action"]);
+    assert_eq!(
+        update_image_schema["properties"]["action"]["enum"],
+        serde_json::json!(["resize", "set_alt_text", "set_hyperlink", "replace", "delete"])
+    );
     assert_eq!(
         update_image_schema["properties"]["hyperlink"]["format"],
         "uri"
     );
+    assert_eq!(update_image_schema["properties"]["base64"]["type"], "string");
     assert_eq!(
         update_image_schema["properties"]["validate_only"]["type"],
-        "boolean"
-    );
-    assert_eq!(
-        update_image_schema["anyOf"][3]["required"],
-        serde_json::json!(["replace_base64"])
-    );
-
-    let delete_image_schema = schema_for("word.delete_image");
-    assert_required(&delete_image_schema, &["session_id", "image"]);
-    assert_eq!(
-        delete_image_schema["properties"]["validate_only"]["type"],
         "boolean"
     );
 }
