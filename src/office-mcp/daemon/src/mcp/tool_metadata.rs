@@ -641,6 +641,20 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         EXCEL_UPDATE_PIVOT_TABLE_ACTIONS,
     ),
     tool(
+        "excel.insert_image",
+        "excel",
+        "Shapes",
+        ToolSideEffect::Mutating,
+    ),
+    tool("excel.list_shapes", "excel", "Shapes", ToolSideEffect::Read),
+    tool_with_actions(
+        "excel.update_shape",
+        "excel",
+        "Shapes",
+        ToolSideEffect::Destructive,
+        EXCEL_UPDATE_SHAPE_ACTIONS,
+    ),
+    tool(
         "powerpoint.get_presentation_info",
         "powerpoint",
         "Presentation",
@@ -869,6 +883,15 @@ const EXCEL_UPDATE_PIVOT_TABLE_ACTIONS: &[ActionSideEffect] = &[
     action("layout", ToolSideEffect::Mutating),
     action("filter", ToolSideEffect::Mutating),
     action("clear_filters", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+];
+
+const EXCEL_UPDATE_SHAPE_ACTIONS: &[ActionSideEffect] = &[
+    action("move", ToolSideEffect::Mutating),
+    action("resize", ToolSideEffect::Mutating),
+    action("set_alt_text", ToolSideEffect::Mutating),
+    action("set_text", ToolSideEffect::Mutating),
+    action("set_z_order", ToolSideEffect::Mutating),
     action("delete", ToolSideEffect::Destructive),
 ];
 

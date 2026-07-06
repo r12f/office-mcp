@@ -47,7 +47,10 @@ impl McpToolArgumentPreprocessor {
 }
 
 fn is_insert_image_tool(tool: &str) -> bool {
-    matches!(tool, "word.insert_image" | "powerpoint.insert_image")
+    matches!(
+        tool,
+        "word.insert_image" | "excel.insert_image" | "powerpoint.insert_image"
+    )
 }
 
 #[cfg(test)]

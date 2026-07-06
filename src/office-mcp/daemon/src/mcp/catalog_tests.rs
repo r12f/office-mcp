@@ -923,10 +923,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 118);
+    assert_eq!(all_tools.len(), 121);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        118
+        121
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1840,8 +1840,14 @@ fn excel_shape_tools_expose_expected_contracts() {
         serde_json::json!(["url"])
     );
     assert_eq!(insert_image["properties"]["left_pt"]["type"], "number");
-    assert_eq!(insert_image["properties"]["width_pt"]["exclusiveMinimum"], 0);
-    assert_eq!(insert_image["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        insert_image["properties"]["width_pt"]["exclusiveMinimum"],
+        0
+    );
+    assert_eq!(
+        insert_image["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 
     let list_shapes = schema_for("excel.list_shapes");
     assert_required(&list_shapes, &["session_id"]);
@@ -1851,28 +1857,55 @@ fn excel_shape_tools_expose_expected_contracts() {
     assert_required(&update_shape, &["session_id", "shape_id", "action"]);
     assert_eq!(
         update_shape["properties"]["action"]["enum"],
-        serde_json::json!(["move", "resize", "set_alt_text", "set_text", "set_z_order", "delete"])
+        serde_json::json!([
+            "move",
+            "resize",
+            "set_alt_text",
+            "set_text",
+            "set_z_order",
+            "delete"
+        ])
     );
     assert_eq!(update_shape["properties"]["shape_id"]["minLength"], 1);
     assert_eq!(
         update_shape["properties"]["z_order"]["enum"],
-        serde_json::json!(["bring_forward", "send_backward", "bring_to_front", "send_to_back"])
+        serde_json::json!([
+            "bring_forward",
+            "send_backward",
+            "bring_to_front",
+            "send_to_back"
+        ])
     );
-    assert_eq!(update_shape["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        update_shape["properties"]["validate_only"]["type"],
+        "boolean"
+    );
 
     let insert_tool = tool_for("excel.insert_image");
-    assert_eq!(insert_tool["_meta"]["com.office-mcp/side_effects"], "mutating");
+    assert_eq!(
+        insert_tool["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
     assert_eq!(insert_tool["_meta"]["com.office-mcp/category"], "Shapes");
-    assert_eq!(insert_tool["_meta"]["com.office-mcp/supports_validate_only"], true);
+    assert_eq!(
+        insert_tool["_meta"]["com.office-mcp/supports_validate_only"],
+        true
+    );
 
     let list_tool = tool_for("excel.list_shapes");
     assert_eq!(list_tool["_meta"]["com.office-mcp/side_effects"], "read");
     assert_eq!(list_tool["_meta"]["com.office-mcp/category"], "Shapes");
 
     let update_tool = tool_for("excel.update_shape");
-    assert_eq!(update_tool["_meta"]["com.office-mcp/side_effects"], "destructive");
+    assert_eq!(
+        update_tool["_meta"]["com.office-mcp/side_effects"],
+        "destructive"
+    );
     assert_eq!(update_tool["_meta"]["com.office-mcp/category"], "Shapes");
-    assert_eq!(update_tool["_meta"]["com.office-mcp/supports_validate_only"], true);
+    assert_eq!(
+        update_tool["_meta"]["com.office-mcp/supports_validate_only"],
+        true
+    );
 }
 
 #[test]

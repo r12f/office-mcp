@@ -79,7 +79,10 @@
     'excel.create_chart',
     'excel.update_chart',
     'excel.create_pivot_table',
-    'excel.update_pivot_table'
+    'excel.update_pivot_table',
+    'excel.insert_image',
+    'excel.list_shapes',
+    'excel.update_shape'
   ];
   const TOOL_GROUPS = [
     { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate', 'excel.list_named_items', 'excel.update_named_item'] },
@@ -91,6 +94,7 @@
     { label: 'Table', tools: ['excel.create_table', 'excel.update_table'] },
     { label: 'Chart', tools: ['excel.create_chart', 'excel.update_chart'] },
     { label: 'PivotTable', tools: ['excel.create_pivot_table', 'excel.update_pivot_table'] },
+    { label: 'Shapes', tools: ['excel.insert_image', 'excel.list_shapes', 'excel.update_shape'] },
     { label: 'Review', tools: ['excel.add_comment', 'excel.list_comments', 'excel.update_comment'] }
   ];
   const TOOL_METADATA = new Map([
@@ -126,7 +130,10 @@
     ['excel.create_chart', { category: 'Chart', sideEffect: 'mutating', description: 'Create a chart from a range.' }],
     ['excel.update_chart', { category: 'Chart', sideEffect: 'destructive', description: 'Read or update chart title, legend, axes, source, position, size, export, and lifecycle.' }],
     ['excel.create_pivot_table', { category: 'PivotTable', sideEffect: 'mutating', description: 'Create a PivotTable from a range or table source.' }],
-    ['excel.update_pivot_table', { category: 'PivotTable', sideEffect: 'destructive', description: 'Read or update PivotTable fields, layout, filters, refresh, and lifecycle.' }]
+    ['excel.update_pivot_table', { category: 'PivotTable', sideEffect: 'destructive', description: 'Read or update PivotTable fields, layout, filters, refresh, and lifecycle.' }],
+    ['excel.insert_image', { category: 'Shapes', sideEffect: 'mutating', description: 'Insert an image as a worksheet shape.' }],
+    ['excel.list_shapes', { category: 'Shapes', sideEffect: 'read', description: 'List worksheet shapes with geometry and content metadata.' }],
+    ['excel.update_shape', { category: 'Shapes', sideEffect: 'destructive', description: 'Move, resize, update metadata or text, z-order, or delete a worksheet shape.' }]
   ]);
   const { instanceId, sessionId } = runtimeIds();
   let runtimeInstanceId = instanceId;
@@ -455,6 +462,15 @@
           break;
         case 'excel.update_pivot_table':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updatePivotTable(args);
+          break;
+        case 'excel.insert_image':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await insertImage(args);
+          break;
+        case 'excel.list_shapes':
+          data = await listShapes(args);
+          break;
+        case 'excel.update_shape':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateShape(args);
           break;
         default:
           throw Object.assign(new Error(`Unsupported tool ${tool}`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE' });
@@ -1289,6 +1305,61 @@
     });
   }
 
+  async function insertImage(args) {
+    requireRequirementSet('ExcelApi', '1.9', 'worksheet shapes');
+    return Excel.run(async (context) => {
+      const shapes = targetWorksheet(context, args).shapes;
+      const shape = shapes.addImage(requiredImageBase64(args));
+      if (args.left_pt !== undefined) shape.left = Number(args.left_pt);
+      if (args.top_pt !== undefined) shape.top = Number(args.top_pt);
+      if (args.width_pt !== undefined) shape.width = positiveNumber(args.width_pt, 'excel.insert_image width_pt must be positive.');
+      if (args.height_pt !== undefined) shape.height = positiveNumber(args.height_pt, 'excel.insert_image height_pt must be positive.');
+      if (args.alt_text !== undefined) shape.altTextDescription = String(args.alt_text ?? '');
+      shape.load('id,name,type,left,top,width,height,altTextDescription,textFrame/textRange/text');
+      await context.sync();
+      return { shape_id: shape.id, shape: shapeMetadata(shape), inserted: true, untrusted_source: true };
+    });
+  }
+
+  async function listShapes(args) {
+    requireRequirementSet('ExcelApi', '1.9', 'worksheet shapes');
+    return Excel.run(async (context) => {
+      const shapes = targetWorksheet(context, args).shapes;
+      shapes.load('items/id,items/name,items/type,items/left,items/top,items/width,items/height,items/altTextDescription,items/textFrame/textRange/text');
+      await context.sync();
+      return { shapes: shapes.items.map(shapeMetadata), count: shapes.items.length, untrusted_source: true };
+    });
+  }
+
+  async function updateShape(args) {
+    requireRequirementSet('ExcelApi', '1.9', 'worksheet shapes');
+    const action = String(args.action || '').trim().toLowerCase();
+    return Excel.run(async (context) => {
+      const shape = targetWorksheet(context, args).shapes.getItem(requiredString(args, 'shape_id', 'excel.update_shape requires shape_id.'));
+      if (action === 'move') {
+        if (args.left_pt !== undefined) shape.left = Number(args.left_pt);
+        if (args.top_pt !== undefined) shape.top = Number(args.top_pt);
+      } else if (action === 'resize') {
+        if (args.width_pt !== undefined) shape.width = positiveNumber(args.width_pt, 'excel.update_shape width_pt must be positive.');
+        if (args.height_pt !== undefined) shape.height = positiveNumber(args.height_pt, 'excel.update_shape height_pt must be positive.');
+      } else if (action === 'set_alt_text') {
+        shape.altTextDescription = String(args.alt_text ?? '');
+      } else if (action === 'set_text') {
+        shape.textFrame.textRange.text = requiredString(args, 'text', 'excel.update_shape set_text requires text.');
+      } else if (action === 'set_z_order') {
+        shape.setZOrder(shapeZOrderFrom(args.z_order));
+      } else if (action === 'delete') {
+        shape.delete();
+        await context.sync();
+        return { shape_id: args.shape_id, action, deleted: true };
+      } else {
+        throw Object.assign(new Error(`Unsupported excel.update_shape action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      await context.sync();
+      return { shape_id: args.shape_id, action, updated: true };
+    });
+  }
+
   async function addComment(args) {
     requireRequirementSet('ExcelApi', '1.10', 'threaded comments');
     return Excel.run(async (context) => {
@@ -1649,6 +1720,51 @@
       fill: Excel.ImageFittingMode.fill
     };
     return enumValueFrom(modes, value, 'chart image fitting mode');
+  }
+
+  function requiredImageBase64(args) {
+    const base64 = args.image?.base64 || args.base64;
+    if (typeof base64 !== 'string' || !base64.trim()) {
+      throw Object.assign(new Error('excel.insert_image requires base64 image data.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return base64.trim();
+  }
+
+  function shapeMetadata(shape) {
+    return {
+      shape_id: shape.id || null,
+      name: shape.name || null,
+      type: shape.type || null,
+      left_pt: numberOrNull(shape.left),
+      top_pt: numberOrNull(shape.top),
+      width_pt: numberOrNull(shape.width),
+      height_pt: numberOrNull(shape.height),
+      alt_text: shape.altTextDescription || null,
+      text_preview: shape.textFrame?.textRange?.text ? String(shape.textFrame.textRange.text).slice(0, 200) : null
+    };
+  }
+
+  function shapeZOrderFrom(value) {
+    const values = {
+      bring_forward: Excel.ShapeZOrder.bringForward,
+      send_backward: Excel.ShapeZOrder.sendBackward,
+      bring_to_front: Excel.ShapeZOrder.bringToFront,
+      send_to_back: Excel.ShapeZOrder.sendToBack
+    };
+    return enumValueFrom(values, value, 'shape z-order');
+  }
+
+  function positiveNumber(value, message) {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number <= 0) {
+      throw Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return number;
+  }
+
+  function numberOrNull(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
   }
 
   function optionalNumber(value) {

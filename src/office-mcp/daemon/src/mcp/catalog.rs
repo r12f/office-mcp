@@ -81,6 +81,7 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.list_conditional_formats",
     "excel.get_used_range",
     "excel.get_workbook_info",
+    "excel.insert_image",
     "excel.insert_range",
     "excel.set_data_validation",
     "excel.set_hyperlink",
@@ -89,6 +90,7 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.calculate",
     "excel.list_named_items",
     "excel.list_comments",
+    "excel.list_shapes",
     "excel.update_named_item",
     "excel.list_sheets",
     "excel.read_range",
@@ -97,6 +99,7 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.update_chart",
     "excel.update_comment",
     "excel.update_pivot_table",
+    "excel.update_shape",
     "excel.update_table",
     "excel.update_sheet",
     "excel.write_range",
@@ -2027,6 +2030,40 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!(
+        "excel.insert_image",
+        ["session_id", "image"],
+        [
+            "session_id",
+            "sheet",
+            "image",
+            "left_pt",
+            "top_pt",
+            "width_pt",
+            "height_pt",
+            "alt_text",
+            "validate_only"
+        ]
+    ),
+    tool_spec!("excel.list_shapes", ["session_id"], ["session_id", "sheet"]),
+    tool_spec!(
+        "excel.update_shape",
+        ["session_id", "shape_id", "action"],
+        [
+            "session_id",
+            "sheet",
+            "shape_id",
+            "action",
+            "left_pt",
+            "top_pt",
+            "width_pt",
+            "height_pt",
+            "alt_text",
+            "text",
+            "z_order",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
         "powerpoint.get_presentation_info",
         ["session_id"],
         ["session_id", "include_selection"]
@@ -2484,7 +2521,7 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = excel_action_property_schema(tool, name) {
         return schema;
     }
-    if let Some(schema) = excel_workbook_property_schema(tool, name) {
+    if let Some(schema) = excel_property_schema(tool, name) {
         return schema;
     }
     if let Some(schema) = powerpoint_action_property_schema(tool, name) {
@@ -2559,6 +2596,10 @@ fn word_list_property_schema(tool: &str, name: &str) -> Option<Value> {
     }
 }
 
+fn excel_property_schema(tool: &str, name: &str) -> Option<Value> {
+    excel_workbook_property_schema(tool, name).or_else(|| excel_shape_property_schema(tool, name))
+}
+
 fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
     match (tool, name) {
         ("excel.calculate", "type") => Some(
@@ -2629,6 +2670,53 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
         | ("excel.set_data_validation", "ignore_blanks")
         | ("excel.copy_range", "skip_blanks" | "transpose")
         | ("excel.list_comments", "resolved") => Some(json!({ "type": "boolean" })),
+        _ => None,
+    }
+}
+
+fn excel_shape_property_schema(tool: &str, name: &str) -> Option<Value> {
+    let is_shape_tool = matches!(
+        tool,
+        "excel.insert_image" | "excel.list_shapes" | "excel.update_shape"
+    );
+    if !is_shape_tool {
+        return None;
+    }
+    match name {
+        "image" if tool == "excel.insert_image" => Some(json!({
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["base64"],
+                    "properties": {
+                        "base64": { "type": "string", "minLength": 1 },
+                        "mime_type": { "type": "string" },
+                        "byte_length": { "type": "integer", "minimum": 0 }
+                    },
+                    "additionalProperties": false
+                },
+                {
+                    "type": "object",
+                    "required": ["url"],
+                    "properties": {
+                        "url": { "type": "string", "format": "uri" }
+                    },
+                    "additionalProperties": false
+                }
+            ]
+        })),
+        "shape_id" if tool == "excel.update_shape" => {
+            Some(json!({ "type": "string", "minLength": 1 }))
+        }
+        "action" if tool == "excel.update_shape" => Some(json!({
+            "enum": ["move", "resize", "set_alt_text", "set_text", "set_z_order", "delete"]
+        })),
+        "left_pt" | "top_pt" => Some(json!({ "type": "number" })),
+        "width_pt" | "height_pt" => Some(json!({ "type": "number", "exclusiveMinimum": 0 })),
+        "alt_text" | "text" => Some(json!({ "type": "string" })),
+        "z_order" if tool == "excel.update_shape" => Some(json!({
+            "enum": ["bring_forward", "send_backward", "bring_to_front", "send_to_back"]
+        })),
         _ => None,
     }
 }
@@ -2723,6 +2811,9 @@ fn excel_action_property_schema(tool: &str, name: &str) -> Option<Value> {
         })),
         "excel.update_conditional_format" => Some(json!({
             "enum": ["add", "delete", "clear_range"]
+        })),
+        "excel.update_shape" => Some(json!({
+            "enum": ["move", "resize", "set_alt_text", "set_text", "set_z_order", "delete"]
         })),
         "excel.update_chart" => Some(json!({
             "enum": ["metadata", "read", "title", "legend", "axis", "data", "series_source", "position", "size", "export_image", "delete"]
