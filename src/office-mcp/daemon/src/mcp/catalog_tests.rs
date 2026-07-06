@@ -109,6 +109,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"excel.calculate"));
     assert!(names.contains(&"excel.list_named_items"));
     assert!(names.contains(&"excel.update_named_item"));
+    assert!(names.contains(&"excel.add_comment"));
+    assert!(names.contains(&"excel.list_comments"));
+    assert!(names.contains(&"excel.update_comment"));
     assert!(names.contains(&"excel.sort_range"));
     assert!(names.contains(&"excel.apply_filter"));
     assert!(names.contains(&"excel.update_table"));
@@ -124,9 +127,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
     assert_eq!(WORD_V1_TOOLS.len(), 62);
-    assert_eq!(ExcelToolCatalog::tools().len(), 24);
+    assert_eq!(ExcelToolCatalog::tools().len(), 27);
     assert_eq!(PowerPointToolCatalog::tools().len(), 23);
-    assert_eq!(tools.len(), 224);
+    assert_eq!(tools.len(), 230);
 }
 
 #[test]
@@ -156,6 +159,19 @@ fn tools_list_exposes_action_side_effects_for_mixed_owner_tools() {
     assert_eq!(
         excel_update_table["_meta"]["com.office-mcp/action_side_effects"]["add_rows"],
         "mutating"
+    );
+
+    let excel_update_comment = tools
+        .iter()
+        .find(|tool| tool["name"] == "excel.update_comment")
+        .expect("excel.update_comment tool");
+    assert_eq!(
+        excel_update_comment["_meta"]["com.office-mcp/action_side_effects"]["reply"],
+        "mutating"
+    );
+    assert_eq!(
+        excel_update_comment["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
     );
 
     let powerpoint_update_tags = tools
@@ -1466,6 +1482,29 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
     );
     assert_eq!(
         update_named_item_tool["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
+    );
+
+    let add_comment = schema_for("excel.add_comment");
+    assert_required(&add_comment, &["session_id", "cell", "text"]);
+    assert_eq!(add_comment["properties"]["text"]["minLength"], 1);
+
+    let list_comments = schema_for("excel.list_comments");
+    assert_required(&list_comments, &["session_id"]);
+    assert_eq!(list_comments["properties"]["resolved"]["type"], "boolean");
+
+    let update_comment = schema_for("excel.update_comment");
+    assert_required(&update_comment, &["session_id", "comment_id", "action"]);
+    assert_eq!(
+        update_comment["properties"]["action"]["enum"],
+        serde_json::json!(["reply", "edit", "resolve", "reopen", "delete"])
+    );
+    assert_eq!(update_comment["properties"]["text"]["minLength"], 1);
+    assert_eq!(update_comment["properties"]["validate_only"]["type"], "boolean");
+
+    let update_comment_tool = tool_for("excel.update_comment");
+    assert_eq!(
+        update_comment_tool["_meta"]["com.office-mcp/action_side_effects"]["delete"],
         "destructive"
     );
 
