@@ -2017,13 +2017,17 @@ Conditional formatting is in scope as a Format follow-up because rule-based
 visual formatting has stable `ExcelApi 1.6` APIs, a distinct lifecycle from
 static `excel.format_range` writes, and user workflows that require listing,
 adding, deleting, and clearing rules.
+Data validation is in scope as a Range follow-up because in-cell dropdowns and
+input constraints are stable `ExcelApi 1.8` range metadata, need typed
+validation before mutation, and require readback before agents overwrite or
+clear existing workbook rules.
 
 Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
 `excel.get_used_range`, `excel.read_range`, `excel.write_range`,
 `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`,
-`excel.set_hyperlink`, `excel.set_formula`,
+`excel.set_hyperlink`, `excel.set_data_validation`, `excel.set_formula`,
 `excel.format_range`, `excel.list_conditional_formats`,
 `excel.update_conditional_format`, `excel.sort_range`, `excel.apply_filter`,
 `excel.create_table`, `excel.update_table`, `excel.create_chart`,
@@ -2036,8 +2040,10 @@ adding another public tool. The #107 follow-up adds `excel.set_hyperlink` and
 extends `excel.read_range` with optional hyperlink readback.
 The #108 follow-up adds conditional formatting list/update tools under the
 Format category.
+The #109 follow-up adds `excel.set_data_validation` and extends
+`excel.read_range` with optional validation readback.
 
-The 31 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 7,
+The 32 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 8,
 Formula 1, Format 3, Data operations 2, Table 2, Chart 2, PivotTable 2, and
 Review 3. This is the current v1 upper bound. Rejected v1 expansions include separate cell CRUD,
 worksheet formatting, freeze panes, protection, legacy notes, shapes, images,
@@ -2095,6 +2101,13 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       Rust/JS tests, typed rule validation, add/delete/clear_range coverage,
       and untrusted-source marking for rule formulas/text. The tools require
       `ExcelApi 1.6`.
+- [ ] Implement data validation slice: `excel.set_data_validation` plus
+      `excel.read_range.include_validation`, including daemon catalog and
+      metadata, action side-effect metadata for `set`/`clear`, task pane
+      handlers, validate-only support, Range permission metadata, Rust/JS
+      tests, typed rule validation, set/clear coverage, and untrusted-source
+      marking for validation formulas/prompts/alerts. The tool and read
+      extension require `ExcelApi 1.8`.
 - [x] Record Excel tool-selection research in
       [04-excel-capabilities.md](04-excel-capabilities.md), starting from the
       Microsoft Learn Excel core object model and related range/table/chart/
