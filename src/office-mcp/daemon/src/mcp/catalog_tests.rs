@@ -1441,6 +1441,26 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
     assert_eq!(range["properties"]["sheet"]["type"], "string");
     assert!(range["properties"].get("range").is_none());
 
+    let workbook_info = schema_for("excel.get_workbook_info");
+    assert_required(&workbook_info, &["session_id"]);
+    assert!(workbook_info["properties"].get("include_styles").is_none());
+
+    let format_range = schema_for("excel.format_range");
+    assert_required(&format_range, &["session_id", "address"]);
+    assert_eq!(
+        format_range["properties"]["merge"]["enum"],
+        serde_json::json!(["merge", "merge_across", "unmerge"])
+    );
+    assert_eq!(format_range["properties"]["column_width_pt"]["minimum"], 0);
+    assert_eq!(format_range["properties"]["row_height_pt"]["minimum"], 0);
+    assert_eq!(format_range["properties"]["hidden_columns"]["type"], "boolean");
+    assert_eq!(format_range["properties"]["hidden_rows"]["type"], "boolean");
+    assert_eq!(format_range["properties"]["style"]["minLength"], 1);
+    assert_eq!(
+        format_range["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
     let save = schema_for("excel.save");
     assert_required(&save, &["session_id"]);
     assert_eq!(save["properties"]["validate_only"]["type"], "boolean");
