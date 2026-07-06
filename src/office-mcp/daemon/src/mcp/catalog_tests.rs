@@ -873,10 +873,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 109);
+    assert_eq!(all_tools.len(), 112);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        109
+        112
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1485,29 +1485,6 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
         "destructive"
     );
 
-    let add_comment = schema_for("excel.add_comment");
-    assert_required(&add_comment, &["session_id", "cell", "text"]);
-    assert_eq!(add_comment["properties"]["text"]["minLength"], 1);
-
-    let list_comments = schema_for("excel.list_comments");
-    assert_required(&list_comments, &["session_id"]);
-    assert_eq!(list_comments["properties"]["resolved"]["type"], "boolean");
-
-    let update_comment = schema_for("excel.update_comment");
-    assert_required(&update_comment, &["session_id", "comment_id", "action"]);
-    assert_eq!(
-        update_comment["properties"]["action"]["enum"],
-        serde_json::json!(["reply", "edit", "resolve", "reopen", "delete"])
-    );
-    assert_eq!(update_comment["properties"]["text"]["minLength"], 1);
-    assert_eq!(update_comment["properties"]["validate_only"]["type"], "boolean");
-
-    let update_comment_tool = tool_for("excel.update_comment");
-    assert_eq!(
-        update_comment_tool["_meta"]["com.office-mcp/action_side_effects"]["delete"],
-        "destructive"
-    );
-
     let slide = schema_for("powerpoint.add_slide");
     assert_required(&slide, &["session_id"]);
     assert_eq!(slide["properties"]["layout"]["type"], "string");
@@ -1534,6 +1511,35 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
         .into_iter()
         .find(|tool| tool["name"] == "powerpoint.add_text_box");
     assert!(retired_text_box.is_none());
+}
+
+#[test]
+fn excel_comment_schemas_are_specific() {
+    let add_comment = schema_for("excel.add_comment");
+    assert_required(&add_comment, &["session_id", "cell", "text"]);
+    assert_eq!(add_comment["properties"]["text"]["minLength"], 1);
+
+    let list_comments = schema_for("excel.list_comments");
+    assert_required(&list_comments, &["session_id"]);
+    assert_eq!(list_comments["properties"]["resolved"]["type"], "boolean");
+
+    let update_comment = schema_for("excel.update_comment");
+    assert_required(&update_comment, &["session_id", "comment_id", "action"]);
+    assert_eq!(
+        update_comment["properties"]["action"]["enum"],
+        serde_json::json!(["reply", "edit", "resolve", "reopen", "delete"])
+    );
+    assert_eq!(update_comment["properties"]["text"]["minLength"], 1);
+    assert_eq!(
+        update_comment["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
+    let update_comment_tool = tool_for("excel.update_comment");
+    assert_eq!(
+        update_comment_tool["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
+    );
 }
 
 #[test]

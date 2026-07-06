@@ -67,6 +67,7 @@ pub const WORD_V1_TOOLS: &[&str] = &[
 ];
 
 const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
+    "excel.add_comment",
     "excel.add_sheet",
     "excel.apply_filter",
     "excel.clear_range",
@@ -81,12 +82,14 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.save",
     "excel.calculate",
     "excel.list_named_items",
+    "excel.list_comments",
     "excel.update_named_item",
     "excel.list_sheets",
     "excel.read_range",
     "excel.set_formula",
     "excel.sort_range",
     "excel.update_chart",
+    "excel.update_comment",
     "excel.update_pivot_table",
     "excel.update_table",
     "excel.update_sheet",
@@ -1695,6 +1698,28 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "comment"
         ]
     ),
+    tool_spec!(
+        "excel.add_comment",
+        ["session_id", "cell", "text"],
+        ["session_id", "sheet", "cell", "text", "validate_only"]
+    ),
+    tool_spec!(
+        "excel.list_comments",
+        ["session_id"],
+        ["session_id", "sheet", "resolved"]
+    ),
+    tool_spec!(
+        "excel.update_comment",
+        ["session_id", "comment_id", "action"],
+        [
+            "session_id",
+            "comment_id",
+            "action",
+            "text",
+            "reply_id",
+            "validate_only"
+        ]
+    ),
     tool_spec!("excel.list_sheets", ["session_id"], ["session_id"]),
     tool_spec!(
         "excel.add_sheet",
@@ -2251,6 +2276,14 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             }
         ]);
     }
+    if tool == "excel.update_comment" {
+        schema["allOf"] = json!([
+            {
+                "if": { "properties": { "action": { "enum": ["reply", "edit"] } } },
+                "then": { "required": ["text"] }
+            }
+        ]);
+    }
     schema
 }
 
@@ -2389,7 +2422,13 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
         ("excel.update_named_item", "scope") => {
             Some(json!({ "enum": ["workbook", "sheet"], "default": "workbook" }))
         }
-        ("excel.update_named_item", "name") => Some(json!({ "type": "string", "minLength": 1 })),
+        ("excel.update_named_item", "name")
+        | ("excel.add_comment", "cell")
+        | ("excel.add_comment" | "excel.update_comment", "text")
+        | ("excel.update_comment", "comment_id" | "reply_id") => {
+            Some(json!({ "type": "string", "minLength": 1 }))
+        }
+        ("excel.list_comments", "resolved") => Some(json!({ "type": "boolean" })),
         _ => None,
     }
 }
@@ -2404,6 +2443,9 @@ fn excel_action_property_schema(tool: &str, name: &str) -> Option<Value> {
         })),
         "excel.update_named_item" => Some(json!({
             "enum": ["add", "edit", "delete"]
+        })),
+        "excel.update_comment" => Some(json!({
+            "enum": ["reply", "edit", "resolve", "reopen", "delete"]
         })),
         "excel.update_chart" => Some(json!({
             "enum": ["metadata", "read", "title", "legend", "axis", "data", "series_source", "position", "size", "export_image", "delete"]

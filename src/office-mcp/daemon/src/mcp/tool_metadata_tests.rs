@@ -159,8 +159,7 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(add_comment.category, "Review");
     assert_eq!(add_comment.side_effect, ToolSideEffect::Mutating);
 
-    let list_comments =
-        tool_metadata("excel.list_comments").expect("excel list comments metadata");
+    let list_comments = tool_metadata("excel.list_comments").expect("excel list comments metadata");
     assert_eq!(list_comments.app, "excel");
     assert_eq!(list_comments.category, "Review");
     assert_eq!(list_comments.side_effect, ToolSideEffect::Read);

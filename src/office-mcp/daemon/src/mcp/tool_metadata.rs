@@ -470,6 +470,25 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         EXCEL_UPDATE_NAMED_ITEM_ACTIONS,
     ),
     tool(
+        "excel.add_comment",
+        "excel",
+        "Review",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
+        "excel.list_comments",
+        "excel",
+        "Review",
+        ToolSideEffect::Read,
+    ),
+    tool_with_actions(
+        "excel.update_comment",
+        "excel",
+        "Review",
+        ToolSideEffect::Destructive,
+        EXCEL_UPDATE_COMMENT_ACTIONS,
+    ),
+    tool(
         "excel.list_sheets",
         "excel",
         "Worksheet",
@@ -816,6 +835,14 @@ const EXCEL_UPDATE_PIVOT_TABLE_ACTIONS: &[ActionSideEffect] = &[
 const EXCEL_UPDATE_NAMED_ITEM_ACTIONS: &[ActionSideEffect] = &[
     action("add", ToolSideEffect::Mutating),
     action("edit", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+];
+
+const EXCEL_UPDATE_COMMENT_ACTIONS: &[ActionSideEffect] = &[
+    action("reply", ToolSideEffect::Mutating),
+    action("edit", ToolSideEffect::Mutating),
+    action("resolve", ToolSideEffect::Mutating),
+    action("reopen", ToolSideEffect::Mutating),
     action("delete", ToolSideEffect::Destructive),
 ];
 

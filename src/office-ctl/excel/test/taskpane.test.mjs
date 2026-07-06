@@ -310,7 +310,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.11', 'comment resolved state'\)/);
   assert.match(js, /context\.workbook\.comments/);
   assert.match(js, /worksheet\.comments/);
-  assert.match(js, /comments\.add\(requiredString\(args, 'cell'/);
+  assert.match(js, /const cell = requiredString\(args, 'cell', 'excel\.add_comment requires cell\.'\)/);
+  assert.match(js, /worksheet\.comments\.add\(range, text\)/);
   assert.match(js, /comment\.replies\.add/);
   assert.match(js, /comment\.resolved = true/);
   assert.match(js, /comment\.resolved = false/);
