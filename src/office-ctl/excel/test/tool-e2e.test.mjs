@@ -492,6 +492,59 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['E2EPivotUpdate', 'Region'] }
     }
   }],
+  ['excel.insert_image', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'AD1', values: [['Image anchor']] } }
+      ]
+    },
+    args: {
+      sheet: 'Sheet1',
+      image: { base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l6jLJwAAAABJRU5ErkJggg==' },
+      left_pt: 24,
+      top_pt: 24,
+      width_pt: 48,
+      height_pt: 48,
+      alt_text: 'E2E Excel image'
+    },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.list_shapes',
+      readbackArguments: { sheet: 'Sheet1' },
+      expect: { contains: ['E2E Excel image'], pathEquals: [{ path: 'untrusted_source', value: true }] }
+    }
+  }],
+  ['excel.list_shapes', {
+    setup: {
+      actions: [
+        { tool: 'excel.insert_image', arguments: { sheet: 'Sheet1', image: { base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l6jLJwAAAABJRU5ErkJggg==' }, alt_text: 'Listed Excel image' } }
+      ]
+    },
+    args: { sheet: 'Sheet1' },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['Listed Excel image'], pathEquals: [{ path: 'untrusted_source', value: true }] }
+    }
+  }],
+  ['excel.update_shape', {
+    setup: {
+      actions: [
+        { tool: 'excel.insert_image', saveAs: 'shapeResult', arguments: { sheet: 'Sheet1', image: { base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l6jLJwAAAABJRU5ErkJggg==' }, alt_text: 'Shape before update' } }
+      ]
+    },
+    args: { sheet: 'Sheet1', shape_id: '${shapeResult.shape_id}', action: 'set_alt_text', alt_text: 'Shape after update' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.list_shapes',
+      readbackArguments: { sheet: 'Sheet1' },
+      expect: { contains: ['Shape after update'], notContains: ['Shape before update'] }
+    },
+    cleanup: {
+      actions: [
+        { tool: 'excel.update_shape', arguments: { sheet: 'Sheet1', shape_id: '${shapeResult.shape_id}', action: 'delete' } }
+      ]
+    }
+  }],
   ['excel.add_comment', {
     setup: {
       actions: [

@@ -112,6 +112,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /\{ label: 'Table', tools: \['excel\.create_table', 'excel\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Chart', tools: \['excel\.create_chart', 'excel\.update_chart'\] \}/);
   assert.match(js, /\{ label: 'PivotTable', tools: \['excel\.create_pivot_table', 'excel\.update_pivot_table'\] \}/);
+  assert.match(js, /\{ label: 'Shapes', tools: \['excel\.insert_image', 'excel\.list_shapes', 'excel\.update_shape'\] \}/);
   assert.match(js, /\{ label: 'Review', tools: \['excel\.add_comment', 'excel\.list_comments', 'excel\.update_comment'\] \}/);
   assert.match(js, /const TOOL_METADATA = new Map\(\[/);
   assert.match(js, /\['excel\.save', \{ category: 'Workbook', sideEffect: 'mutating'/);
@@ -124,6 +125,9 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /\['excel\.update_chart', \{ category: 'Chart', sideEffect: 'destructive'/);
   assert.match(js, /\['excel\.create_pivot_table', \{ category: 'PivotTable', sideEffect: 'mutating'/);
   assert.match(js, /\['excel\.update_pivot_table', \{ category: 'PivotTable', sideEffect: 'destructive'/);
+  assert.match(js, /\['excel\.insert_image', \{ category: 'Shapes', sideEffect: 'mutating'/);
+  assert.match(js, /\['excel\.list_shapes', \{ category: 'Shapes', sideEffect: 'read'/);
+  assert.match(js, /\['excel\.update_shape', \{ category: 'Shapes', sideEffect: 'destructive'/);
   assert.match(js, /\['excel\.add_comment', \{ category: 'Review', sideEffect: 'mutating'/);
   assert.match(js, /\['excel\.list_comments', \{ category: 'Review', sideEffect: 'read'/);
   assert.match(js, /\['excel\.update_comment', \{ category: 'Review', sideEffect: 'destructive'/);
@@ -254,6 +258,9 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /excel\.update_chart/);
   assert.match(js, /excel\.create_pivot_table/);
   assert.match(js, /excel\.update_pivot_table/);
+  assert.match(js, /excel\.insert_image/);
+  assert.match(js, /excel\.list_shapes/);
+  assert.match(js, /excel\.update_shape/);
   assert.match(js, /excel\.add_comment/);
   assert.match(js, /excel\.list_comments/);
   assert.match(js, /excel\.update_comment/);
@@ -280,6 +287,9 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /case 'excel.update_chart':/);
   assert.match(js, /case 'excel.create_pivot_table':/);
   assert.match(js, /case 'excel.update_pivot_table':/);
+  assert.match(js, /case 'excel.insert_image':/);
+  assert.match(js, /case 'excel.list_shapes':/);
+  assert.match(js, /case 'excel.update_shape':/);
   assert.match(js, /case 'excel.add_comment':/);
   assert.match(js, /case 'excel.list_comments':/);
   assert.match(js, /case 'excel.update_comment':/);
@@ -325,6 +335,21 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /async function updateChart/);
   assert.match(js, /async function createPivotTable/);
   assert.match(js, /async function updatePivotTable/);
+  assert.match(js, /async function insertImage/);
+  assert.match(js, /async function listShapes/);
+  assert.match(js, /async function updateShape/);
+  assert.match(js, /requireRequirementSet\('ExcelApi', '1\.9', 'worksheet shapes'\)/);
+  assert.match(js, /targetWorksheet\(context, args\)\.shapes/);
+  assert.match(js, /shapes\.addImage\(requiredImageBase64\(args\)\)/);
+  assert.match(js, /shape\.load\('id,name,type,left,top,width,height,altTextDescription,textFrame\/textRange\/text'\)/);
+  assert.match(js, /function shapeMetadata\(shape\)/);
+  assert.match(js, /text_preview: shape\.textFrame\?\.textRange\?\.text/);
+  assert.match(js, /shape\.altTextDescription = String\(args\.alt_text/);
+  assert.match(js, /shape\.textFrame\.textRange\.text = requiredString\(args, 'text', 'excel\.update_shape set_text requires text\.'\)/);
+  assert.match(js, /shape\.setZOrder\(shapeZOrderFrom\(args\.z_order\)\)/);
+  assert.match(js, /shape\.delete\(\)/);
+  assert.match(js, /function requiredImageBase64\(args\)/);
+  assert.match(js, /function shapeZOrderFrom\(value\)/);
   assert.match(js, /async function addComment/);
   assert.match(js, /async function listComments/);
   assert.match(js, /async function updateComment/);
@@ -565,6 +590,8 @@ test('Excel task pane routes mutating tools through validation-only preflight', 
   assert.match(invokeBody, /case 'excel\.copy_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await copyRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_conditional_format':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateConditionalFormat\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_table':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateTable\(args\);/);
+  assert.match(invokeBody, /case 'excel\.insert_image':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await insertImage\(args\);/);
+  assert.match(invokeBody, /case 'excel\.update_shape':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateShape\(args\);/);
   assert.match(invokeBody, /case 'excel\.add_comment':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await addComment\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_comment':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateComment\(args\);/);
   assert.match(functionBody(js, 'validateExcelMutationOnly'), /valid: true/);
