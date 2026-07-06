@@ -364,6 +364,53 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       readbackArguments: { pivot_table: 'E2EPivotUpdate', action: 'metadata' },
       expect: { contains: ['E2EPivotUpdate', 'Region'] }
     }
+  }],
+  ['excel.add_comment', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'AC1', values: [['Comment target']] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', cell: 'AC1', text: 'E2E Excel comment' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.list_comments',
+      readbackArguments: { sheet: 'Sheet1' },
+      expect: { contains: ['E2E Excel comment'], pathEquals: [{ path: 'untrusted_source', value: true }] }
+    }
+  }],
+  ['excel.list_comments', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'AD1', values: [['List comment target']] } },
+        { tool: 'excel.add_comment', arguments: { sheet: 'Sheet1', cell: 'AD1', text: 'E2E listed comment' } }
+      ]
+    },
+    args: { sheet: 'Sheet1' },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2E listed comment'], pathEquals: [{ path: 'untrusted_source', value: true }] }
+    }
+  }],
+  ['excel.update_comment', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'AE1', values: [['Update comment target']] } },
+        { tool: 'excel.add_comment', saveAs: 'commentResult', arguments: { sheet: 'Sheet1', cell: 'AE1', text: 'E2E original comment' } }
+      ]
+    },
+    args: { comment_id: '${commentResult.comment_id}', action: 'reply', text: 'E2E reply body' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.list_comments',
+      readbackArguments: { sheet: 'Sheet1' },
+      expect: { contains: ['E2E original comment', 'E2E reply body'] }
+    },
+    cleanup: {
+      actions: [
+        { tool: 'excel.update_comment', arguments: { comment_id: '${commentResult.comment_id}', action: 'delete' } }
+      ]
+    }
   }]
 ].map(([tool, options]) => [tool, e2eCase(tool, options)]));
 

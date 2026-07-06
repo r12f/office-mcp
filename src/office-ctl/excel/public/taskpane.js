@@ -52,6 +52,9 @@
     'excel.calculate',
     'excel.list_named_items',
     'excel.update_named_item',
+    'excel.add_comment',
+    'excel.list_comments',
+    'excel.update_comment',
     'excel.list_sheets',
     'excel.add_sheet',
     'excel.update_sheet',
@@ -81,7 +84,8 @@
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
     { label: 'Table', tools: ['excel.create_table', 'excel.update_table'] },
     { label: 'Chart', tools: ['excel.create_chart', 'excel.update_chart'] },
-    { label: 'PivotTable', tools: ['excel.create_pivot_table', 'excel.update_pivot_table'] }
+    { label: 'PivotTable', tools: ['excel.create_pivot_table', 'excel.update_pivot_table'] },
+    { label: 'Review', tools: ['excel.add_comment', 'excel.list_comments', 'excel.update_comment'] }
   ];
   const TOOL_METADATA = new Map([
     ['excel.get_workbook_info', { category: 'Workbook', sideEffect: 'read', description: 'Read workbook state and aggregate object counts.' }],
@@ -89,6 +93,9 @@
     ['excel.calculate', { category: 'Workbook', sideEffect: 'mutating', description: 'Recalculate workbook formulas.' }],
     ['excel.list_named_items', { category: 'Workbook', sideEffect: 'read', description: 'List workbook and worksheet scoped named items.' }],
     ['excel.update_named_item', { category: 'Workbook', sideEffect: 'destructive', description: 'Add, edit, or delete workbook and worksheet scoped named items.' }],
+    ['excel.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a threaded comment to a cell.' }],
+    ['excel.list_comments', { category: 'Review', sideEffect: 'read', description: 'List threaded cell comments.' }],
+    ['excel.update_comment', { category: 'Review', sideEffect: 'destructive', description: 'Reply, edit, resolve, reopen, or delete a threaded comment.' }],
     ['excel.list_sheets', { category: 'Worksheet', sideEffect: 'read', description: 'List workbook worksheets.' }],
     ['excel.add_sheet', { category: 'Worksheet', sideEffect: 'mutating', description: 'Add a worksheet to the workbook.' }],
     ['excel.update_sheet', { category: 'Worksheet', sideEffect: 'mutating', description: 'Rename, activate, move, or restyle a worksheet tab.' }],
@@ -353,6 +360,15 @@
         case 'excel.update_named_item':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateNamedItem(args);
           break;
+        case 'excel.add_comment':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await addComment(args);
+          break;
+        case 'excel.list_comments':
+          data = await listComments(args);
+          break;
+        case 'excel.update_comment':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateComment(args);
+          break;
         case 'excel.list_sheets':
           data = await listSheets(args);
           break;
@@ -448,9 +464,11 @@
         session_id: args?.session_id || null,
         sheet: args?.sheet || null,
         address: args?.address || null,
+        cell: args?.cell || null,
         table: args?.table || null,
         chart: args?.chart || null,
         pivot_table: args?.pivot_table || null,
+        comment_id: args?.comment_id || null,
         action: args?.action || null
       }
     };
@@ -1083,6 +1101,147 @@
       }
       throw Object.assign(new Error(`Unsupported PivotTable action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     });
+  }
+
+  async function addComment(args) {
+    requireRequirementSet('ExcelApi', '1.10', 'threaded comments');
+    return Excel.run(async (context) => {
+      const worksheet = targetWorksheet(context, args);
+      const cell = requiredString(args, 'cell', 'excel.add_comment requires cell.');
+      const text = requiredString(args, 'text', 'excel.add_comment requires text.');
+      const range = worksheet.getRange(cell);
+      range.load('address,rowCount,columnCount');
+      await context.sync();
+      if (range.rowCount !== 1 || range.columnCount !== 1) {
+        throw Object.assign(new Error('excel.add_comment cell must identify a single cell.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      const comment = worksheet.comments.add(range, text);
+      comment.load('id');
+      await context.sync();
+      return { comment_id: comment.id || null, cell: range.address, commented: true };
+    });
+  }
+
+  async function listComments(args) {
+    requireRequirementSet('ExcelApi', '1.10', 'threaded comments');
+    if (args.resolved !== undefined) requireRequirementSet('ExcelApi', '1.11', 'comment resolved state');
+    return Excel.run(async (context) => {
+      const collection = args.sheet ? targetWorksheet(context, args).comments : context.workbook.comments;
+      collection.load('items/id,items/content,items/resolved,items/authorName,items/creationDate');
+      await context.sync();
+      const locations = collection.items.map((comment) => comment.getLocation());
+      for (const comment of collection.items) {
+        comment.replies.load('items/id,items/content,items/authorName,items/creationDate');
+      }
+      for (const location of locations) location.load('address');
+      if (collection.items.length > 0) await context.sync();
+      let comments = collection.items.map((comment, index) => commentInfo(comment, locations[index]));
+      if (args.resolved !== undefined) {
+        const expected = Boolean(args.resolved);
+        comments = comments.filter((comment) => comment.resolved === expected);
+      }
+      return { comments, count: comments.length, untrusted_source: true };
+    });
+  }
+
+  async function updateComment(args) {
+    requireRequirementSet('ExcelApi', '1.10', 'threaded comments');
+    const action = normalizeCommentAction(args.action);
+    if (action === 'resolve' || action === 'reopen') requireRequirementSet('ExcelApi', '1.11', 'comment resolved state');
+    return Excel.run(async (context) => {
+      const target = await resolveCommentTarget(context, args, { loadReplies: true });
+      if (action === 'reply') {
+        const text = requiredString(args, 'text', 'excel.update_comment reply requires text.');
+        const reply = target.comment.replies.add(text);
+        reply.load('id');
+        await context.sync();
+        return { comment_id: target.comment.id, reply_id: reply.id || null, action, updated: true };
+      }
+      if (action === 'edit') {
+        const text = requiredString(args, 'text', 'excel.update_comment edit requires text.');
+        target.reply ? target.reply.content = text : target.comment.content = text;
+        await context.sync();
+        return { comment_id: target.comment.id, reply_id: target.reply?.id || null, action, updated: true };
+      }
+      if (action === 'resolve') {
+        target.comment.resolved = true;
+        await context.sync();
+        return { comment_id: target.comment.id, action, resolved: true };
+      }
+      if (action === 'reopen') {
+        target.comment.resolved = false;
+        await context.sync();
+        return { comment_id: target.comment.id, action, resolved: false };
+      }
+      if (action === 'delete') {
+        if (target.reply) {
+          const replyId = target.reply.id;
+          target.reply.delete();
+          await context.sync();
+          return { comment_id: target.comment.id, reply_id: replyId, action, deleted: true };
+        }
+        target.comment.delete();
+        await context.sync();
+        return { comment_id: args.comment_id, action, deleted: true };
+      }
+      throw Object.assign(new Error(`Unsupported comment action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    });
+  }
+
+  function normalizeCommentAction(action) {
+    const value = String(action || '').trim().toLowerCase();
+    if (['reply', 'edit', 'resolve', 'reopen', 'delete'].includes(value)) return value;
+    throw Object.assign(new Error('excel.update_comment action must be reply, edit, resolve, reopen, or delete.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  async function resolveCommentTarget(context, args, options = {}) {
+    const commentId = requiredString(args, 'comment_id', 'excel.update_comment requires comment_id.');
+    const comments = context.workbook.comments;
+    comments.load('items/id,items/content,items/resolved,items/authorName,items/creationDate');
+    await context.sync();
+    const comment = comments.items.find((item) => item.id === commentId);
+    if (!comment) {
+      throw Object.assign(new Error(`Comment ${commentId} was not found.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    let reply = null;
+    if (options.loadReplies || args.reply_id) {
+      comment.replies.load('items/id,items/content,items/authorName,items/creationDate');
+      await context.sync();
+      if (args.reply_id) {
+        reply = comment.replies.items.find((item) => item.id === String(args.reply_id));
+        if (!reply) {
+          throw Object.assign(new Error(`Comment reply ${args.reply_id} was not found.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+        }
+      }
+    }
+    return { comment, reply };
+  }
+
+  function commentInfo(comment, location) {
+    return {
+      comment_id: comment.id || null,
+      cell: location.address || null,
+      author_name: comment.authorName || null,
+      created: isoDate(comment.creationDate),
+      content: comment.content || '',
+      resolved: Boolean(comment.resolved),
+      replies: commentReplies(comment)
+    };
+  }
+
+  function commentReplies(comment) {
+    return (comment.replies?.items || []).map((reply) => ({
+      reply_id: reply.id || null,
+      author_name: reply.authorName || null,
+      created: isoDate(reply.creationDate),
+      content: reply.content || ''
+    }));
+  }
+
+  function isoDate(value) {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
 
   function targetWorksheet(context, args) {
@@ -1866,6 +2025,8 @@
       excel_api_1_7: requirements.isSetSupported('ExcelApi', '1.7'),
       excel_api_1_8: requirements.isSetSupported('ExcelApi', '1.8'),
       excel_api_1_9: requirements.isSetSupported('ExcelApi', '1.9'),
+      excel_api_1_10: requirements.isSetSupported('ExcelApi', '1.10'),
+      excel_api_1_11: requirements.isSetSupported('ExcelApi', '1.11'),
       excel_api_1_12: requirements.isSetSupported('ExcelApi', '1.12'),
       excel_api_1_13: requirements.isSetSupported('ExcelApi', '1.13')
     };
@@ -2009,6 +2170,7 @@
     if (tool === 'excel.find_replace_cells') return supportsRequirementSet('ExcelApi', '1.9');
     if (tool === 'excel.sort_range') return supportsRequirementSet('ExcelApi', '1.2');
     if (tool === 'excel.apply_filter') return supportsRequirementSet('ExcelApi', '1.9');
+    if (tool === 'excel.add_comment' || tool === 'excel.list_comments' || tool === 'excel.update_comment') return supportsRequirementSet('ExcelApi', '1.10');
     return true;
   }
 

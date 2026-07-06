@@ -154,6 +154,30 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(update_named_item.category, "Workbook");
     assert_eq!(update_named_item.side_effect, ToolSideEffect::Destructive);
 
+    let add_comment = tool_metadata("excel.add_comment").expect("excel add comment metadata");
+    assert_eq!(add_comment.app, "excel");
+    assert_eq!(add_comment.category, "Review");
+    assert_eq!(add_comment.side_effect, ToolSideEffect::Mutating);
+
+    let list_comments = tool_metadata("excel.list_comments").expect("excel list comments metadata");
+    assert_eq!(list_comments.app, "excel");
+    assert_eq!(list_comments.category, "Review");
+    assert_eq!(list_comments.side_effect, ToolSideEffect::Read);
+
+    let update_comment =
+        tool_metadata("excel.update_comment").expect("excel update comment metadata");
+    assert_eq!(update_comment.app, "excel");
+    assert_eq!(update_comment.category, "Review");
+    assert_eq!(update_comment.side_effect, ToolSideEffect::Destructive);
+    assert_eq!(
+        update_comment.side_effect_for_action("reply"),
+        Some(ToolSideEffect::Mutating)
+    );
+    assert_eq!(
+        update_comment.side_effect_for_action("delete"),
+        Some(ToolSideEffect::Destructive)
+    );
+
     let destructive = tool_metadata("powerpoint.delete_slide").expect("powerpoint metadata");
     assert_eq!(destructive.app, "powerpoint");
     assert_eq!(destructive.category, "Slides");
