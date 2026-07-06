@@ -127,9 +127,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
     assert_eq!(WORD_V1_TOOLS.len(), 62);
-    assert_eq!(ExcelToolCatalog::tools().len(), 28);
+    assert_eq!(ExcelToolCatalog::tools().len(), 29);
     assert_eq!(PowerPointToolCatalog::tools().len(), 23);
-    assert_eq!(tools.len(), 232);
+    assert_eq!(tools.len(), 234);
 }
 
 #[test]
@@ -1426,6 +1426,7 @@ fn word_anchor_schemas_advertise_per_tool_supported_kinds() {
 fn representative_excel_and_powerpoint_schemas_are_specific() {
     let range = schema_for("excel.read_range");
     assert_required(&range, &["session_id", "address"]);
+    assert_eq!(range["properties"]["include_hyperlinks"]["type"], "boolean");
 
     let insert_range = schema_for("excel.insert_range");
     assert_required(&insert_range, &["session_id", "address", "shift"]);
@@ -1440,6 +1441,34 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
     );
     assert_eq!(range["properties"]["sheet"]["type"], "string");
     assert!(range["properties"].get("range").is_none());
+
+    let set_hyperlink = schema_for("excel.set_hyperlink");
+    assert_required(&set_hyperlink, &["session_id", "address", "action"]);
+    assert_eq!(
+        set_hyperlink["properties"]["action"]["enum"],
+        serde_json::json!(["set", "clear"])
+    );
+    assert_eq!(set_hyperlink["properties"]["sheet"]["type"], "string");
+    assert_eq!(set_hyperlink["properties"]["url"]["format"], "uri");
+    assert_eq!(
+        set_hyperlink["properties"]["document_reference"]["minLength"],
+        1
+    );
+    assert_eq!(set_hyperlink["properties"]["text_to_display"]["type"], "string");
+    assert_eq!(set_hyperlink["properties"]["screen_tip"]["type"], "string");
+    assert_eq!(
+        set_hyperlink["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+    let set_hyperlink_tool = tool_for("excel.set_hyperlink");
+    assert_eq!(
+        set_hyperlink_tool["_meta"]["com.office-mcp/action_side_effects"]["set"],
+        "mutating"
+    );
+    assert_eq!(
+        set_hyperlink_tool["_meta"]["com.office-mcp/action_side_effects"]["clear"],
+        "mutating"
+    );
 
     let workbook_info = schema_for("excel.get_workbook_info");
     assert_required(&workbook_info, &["session_id"]);
@@ -1593,6 +1622,7 @@ fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.get_used_range"));
     assert!(ExcelToolCatalog::contains("excel.insert_range"));
     assert!(ExcelToolCatalog::contains("excel.clear_range"));
+    assert!(ExcelToolCatalog::contains("excel.set_hyperlink"));
     assert!(ExcelToolCatalog::contains("excel.find_replace_cells"));
     assert!(ExcelToolCatalog::contains("excel.sort_range"));
     assert!(ExcelToolCatalog::contains("excel.apply_filter"));

@@ -137,6 +137,19 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(insert_range.category, "Range");
     assert_eq!(insert_range.side_effect, ToolSideEffect::Mutating);
 
+    let set_hyperlink = tool_metadata("excel.set_hyperlink").expect("excel hyperlink metadata");
+    assert_eq!(set_hyperlink.app, "excel");
+    assert_eq!(set_hyperlink.category, "Range");
+    assert_eq!(set_hyperlink.side_effect, ToolSideEffect::Mutating);
+    assert_eq!(
+        set_hyperlink.side_effect_for_action("set"),
+        Some(ToolSideEffect::Mutating)
+    );
+    assert_eq!(
+        set_hyperlink.side_effect_for_action("clear"),
+        Some(ToolSideEffect::Mutating)
+    );
+
     let save = tool_metadata("excel.save").expect("excel save metadata");
     assert_eq!(save.app, "excel");
     assert_eq!(save.category, "Workbook");
