@@ -6,7 +6,8 @@ use crate::api::{UiStateOptions, UiStateStore};
 use crate::common::{Logger, LoggerLogLevel};
 use std::fs::{read_to_string, remove_dir_all};
 use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
+use std::thread::sleep;
+use std::time::{Duration, Instant, SystemTime};
 
 #[test]
 fn service_renders_runtime_endpoints_and_registry_sessions() {
@@ -36,8 +37,12 @@ fn service_renders_runtime_endpoints_and_registry_sessions() {
 #[test]
 fn writes_structured_tracing_event_for_ui_api_snapshot() {
     let dir = std::env::temp_dir().join(format!(
-        "office-mcp-ui-snapshot-service-log-{}",
-        std::process::id()
+        "office-mcp-ui-snapshot-service-log-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("system clock after epoch")
+            .as_nanos()
     ));
     let path = dir.join("office-mcp.log");
     let (subscriber, guard) =
@@ -61,12 +66,33 @@ fn writes_structured_tracing_event_for_ui_api_snapshot() {
     });
     drop(guard);
 
-    let contents = read_to_string(&path).expect("read tracing log file");
-    assert!(contents.contains("rendered UI API snapshot"));
-    assert!(contents.contains("\"component\":\"ui_snapshot_service\""));
-    assert!(contents.contains("\"documents\":1"));
-    assert!(contents.contains("\"ui_state_lock_failed\":false"));
+    let expected = [
+        "rendered UI API snapshot",
+        "\"component\":\"ui_snapshot_service\"",
+        "\"documents\":1",
+        "\"ui_state_lock_failed\":false",
+    ];
+    let contents = wait_for_log_contents(&path, &expected);
+    for expected_text in expected {
+        assert!(
+            contents.contains(expected_text),
+            "missing {expected_text:?} in tracing log:\n{contents}"
+        );
+    }
     let _ = remove_dir_all(dir);
+}
+
+fn wait_for_log_contents(path: &std::path::Path, expected: &[&str]) -> String {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let mut contents = String::new();
+    while Instant::now() < deadline {
+        contents = read_to_string(path).expect("read tracing log file");
+        if expected.iter().all(|value| contents.contains(value)) {
+            return contents;
+        }
+        sleep(Duration::from_millis(10));
+    }
+    read_to_string(path).unwrap_or(contents)
 }
 
 fn registry_with_session() -> SessionRegistry {
