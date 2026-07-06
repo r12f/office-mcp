@@ -1655,6 +1655,67 @@ fn excel_conditional_format_schemas_are_specific() {
 }
 
 #[test]
+fn excel_data_validation_schemas_are_specific() {
+    let read_range = schema_for("excel.read_range");
+    assert_eq!(read_range["properties"]["include_validation"]["type"], "boolean");
+
+    let set_validation = schema_for("excel.set_data_validation");
+    assert_required(&set_validation, &["session_id", "address", "action"]);
+    assert_eq!(
+        set_validation["properties"]["action"]["enum"],
+        serde_json::json!(["set", "clear"])
+    );
+    assert_eq!(
+        set_validation["properties"]["rule"]["properties"]["type"]["enum"],
+        serde_json::json!([
+            "list",
+            "whole_number",
+            "decimal",
+            "date",
+            "time",
+            "text_length",
+            "custom"
+        ])
+    );
+    assert_eq!(
+        set_validation["properties"]["rule"]["properties"]["operator"]["enum"],
+        serde_json::json!([
+            "between",
+            "not_between",
+            "equal_to",
+            "not_equal_to",
+            "greater_than",
+            "less_than",
+            "greater_than_or_equal_to",
+            "less_than_or_equal_to"
+        ])
+    );
+    assert_eq!(
+        set_validation["properties"]["rule"]["properties"]["list_source"]["oneOf"][0]
+            ["minItems"],
+        1
+    );
+    assert_eq!(
+        set_validation["properties"]["error_alert"]["properties"]["style"]["enum"],
+        serde_json::json!(["stop", "warning", "information"])
+    );
+    assert_eq!(
+        set_validation["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
+    let validation_tool = tool_for("excel.set_data_validation");
+    assert_eq!(
+        validation_tool["_meta"]["com.office-mcp/action_side_effects"]["set"],
+        "mutating"
+    );
+    assert_eq!(
+        validation_tool["_meta"]["com.office-mcp/action_side_effects"]["clear"],
+        "destructive"
+    );
+}
+
+#[test]
 fn excel_comment_schemas_are_specific() {
     let add_comment = schema_for("excel.add_comment");
     assert_required(&add_comment, &["session_id", "cell", "text"]);
@@ -1697,6 +1758,7 @@ fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.insert_range"));
     assert!(ExcelToolCatalog::contains("excel.clear_range"));
     assert!(ExcelToolCatalog::contains("excel.set_hyperlink"));
+    assert!(ExcelToolCatalog::contains("excel.set_data_validation"));
     assert!(ExcelToolCatalog::contains("excel.find_replace_cells"));
     assert!(ExcelToolCatalog::contains("excel.list_conditional_formats"));
     assert!(ExcelToolCatalog::contains(

@@ -150,6 +150,20 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
         Some(ToolSideEffect::Mutating)
     );
 
+    let set_data_validation = tool_metadata("excel.set_data_validation")
+        .expect("excel data validation metadata");
+    assert_eq!(set_data_validation.app, "excel");
+    assert_eq!(set_data_validation.category, "Range");
+    assert_eq!(set_data_validation.side_effect, ToolSideEffect::Destructive);
+    assert_eq!(
+        set_data_validation.side_effect_for_action("set"),
+        Some(ToolSideEffect::Mutating)
+    );
+    assert_eq!(
+        set_data_validation.side_effect_for_action("clear"),
+        Some(ToolSideEffect::Destructive)
+    );
+
     let list_conditional_formats = tool_metadata("excel.list_conditional_formats")
         .expect("excel conditional format list metadata");
     assert_eq!(list_conditional_formats.app, "excel");
