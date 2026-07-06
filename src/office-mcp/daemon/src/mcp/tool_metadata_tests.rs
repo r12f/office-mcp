@@ -132,6 +132,16 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(mutating.category, "Range");
     assert_eq!(mutating.side_effect, ToolSideEffect::Mutating);
 
+    let save = tool_metadata("excel.save").expect("excel save metadata");
+    assert_eq!(save.app, "excel");
+    assert_eq!(save.category, "Workbook");
+    assert_eq!(save.side_effect, ToolSideEffect::Mutating);
+
+    let calculate = tool_metadata("excel.calculate").expect("excel calculate metadata");
+    assert_eq!(calculate.app, "excel");
+    assert_eq!(calculate.category, "Workbook");
+    assert_eq!(calculate.side_effect, ToolSideEffect::Mutating);
+
     let destructive = tool_metadata("powerpoint.delete_slide").expect("powerpoint metadata");
     assert_eq!(destructive.app, "powerpoint");
     assert_eq!(destructive.category, "Slides");
