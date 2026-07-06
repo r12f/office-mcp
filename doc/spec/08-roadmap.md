@@ -2010,13 +2010,16 @@ existing `excel.format_range` owner rather than a new tool: merge/unmerge,
 fixed row or column size, row or column visibility, and named style application
 share the cell-format permission profile. Workbook style-name discovery belongs
 to `excel.get_workbook_info` as workbook state so agents can choose valid style
-names before formatting cells.
+names before formatting cells. Cell hyperlink support is in scope as a Range
+follow-up because links are `Range.hyperlink` metadata, need URL scheme safety
+validation, and need hyperlink-only clearing that preserves displayed text.
 
 Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
 `excel.get_used_range`, `excel.read_range`, `excel.write_range`,
-`excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_formula`,
+`excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`,
+`excel.set_hyperlink`, `excel.set_formula`,
 `excel.format_range`, `excel.sort_range`, `excel.apply_filter`,
 `excel.create_table`, `excel.update_table`, `excel.create_chart`,
 `excel.update_chart`, `excel.create_pivot_table`, and `excel.update_pivot_table`.
@@ -2024,9 +2027,10 @@ The #104 follow-up also adds `excel.add_comment`, `excel.list_comments`, and
 `excel.update_comment` as the Review category. The #105 follow-up adds
 `excel.insert_range` inside the existing Range/cell data category. The #106
 follow-up extends `excel.format_range` and `excel.get_workbook_info` without
-adding another public tool.
+adding another public tool. The #107 follow-up adds `excel.set_hyperlink` and
+extends `excel.read_range` with optional hyperlink readback.
 
-The 28 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 6,
+The 29 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 7,
 Formula 1, Format 1, Data operations 2, Table 2, Chart 2, PivotTable 2, and
 Review 3. This is the current v1 upper bound. Rejected v1 expansions include separate cell CRUD,
 worksheet formatting, freeze panes, protection, legacy notes, shapes, images,
@@ -2070,6 +2074,13 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       and style-before-explicit-format ordering. `excel.get_workbook_info` must
       expose workbook style names behind the `ExcelApi 1.7` gate. This slice
       must not add a new public tool.
+- [ ] Implement cell hyperlink slice: `excel.set_hyperlink` plus
+      `excel.read_range.include_hyperlinks`, including daemon catalog and
+      metadata, task pane handlers, validate-only support, Range permission
+      metadata, Rust/JS tests, URL scheme allowlist, set/clear argument matrix
+      validation, in-workbook document references, and untrusted-source marking
+      for hyperlink readback. The tool and read extension require
+      `ExcelApi 1.7`.
 - [x] Record Excel tool-selection research in
       [04-excel-capabilities.md](04-excel-capabilities.md), starting from the
       Microsoft Learn Excel core object model and related range/table/chart/
