@@ -45,11 +45,39 @@ impl ToolAccessPolicy {
             return true;
         };
 
-        self.access_mode.allows(metadata.side_effect)
+        (self.access_mode.allows(metadata.side_effect)
+            || metadata.has_action_allowed_by(self.access_mode))
             && !self.disabled_apps.contains(metadata.app)
             && !self
                 .disabled_categories
                 .contains(&(metadata.app.to_string(), metadata.category.to_string()))
+    }
+
+    #[must_use]
+    pub fn allows_tool_action(&self, tool: &str, action: Option<&str>) -> bool {
+        if self.disabled_tools.contains(tool) {
+            return false;
+        }
+
+        let Some(metadata) = tool_metadata(tool) else {
+            return true;
+        };
+
+        if self.disabled_apps.contains(metadata.app)
+            || self
+                .disabled_categories
+                .contains(&(metadata.app.to_string(), metadata.category.to_string()))
+        {
+            return false;
+        }
+
+        if let Some(action) = action
+            && let Some(side_effect) = metadata.side_effect_for_action(action)
+        {
+            return self.access_mode.allows(side_effect);
+        }
+
+        self.access_mode.allows(metadata.side_effect)
     }
 
     #[must_use]

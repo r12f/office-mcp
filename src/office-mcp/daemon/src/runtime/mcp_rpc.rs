@@ -5,8 +5,9 @@ use crate::addin_mgr::{
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
 use crate::mcp::{
-    ResourceReadRequest, ToolAccessPolicy, canonical_tool_name, describe_tool_contract,
-    is_office_tool, resource_request_from_uri, tool_failure, tool_failure_without_effect,
+    ResourceReadRequest, ToolAccessPolicy, action_side_effect_for_tool, canonical_tool_name,
+    describe_tool_contract, is_office_tool, resource_request_from_uri,
+    tool_action_not_available_by_policy, tool_failure, tool_failure_without_effect,
     tool_not_available_by_policy, tool_success, unknown_tool_contract, validate_tool_arguments,
 };
 use crate::runtime::json_rpc;
@@ -139,16 +140,6 @@ impl McpJsonRpcRuntime {
         };
         let canonical_name = canonical_tool_name(name);
         let arguments = params.get("arguments").unwrap_or(&Value::Null);
-        if Self::is_forwarded_tool(canonical_name)
-            && !context.tool_access_policy.allows_tool(canonical_name)
-        {
-            return json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": tool_not_available_by_policy(canonical_name)
-            })
-            .to_string();
-        }
         if Self::is_known_tool(canonical_name)
             && let Err(message) = validate_tool_arguments(canonical_name, arguments)
         {
@@ -158,6 +149,29 @@ impl McpJsonRpcRuntime {
                 "result": tool_failure_without_effect("INVALID_ARGUMENTS", &message, Some(canonical_name), false)
             })
             .to_string();
+        }
+        if Self::is_forwarded_tool(canonical_name) {
+            if let Some((action, _side_effect)) =
+                action_side_effect_for_tool(canonical_name, arguments)
+                && !context
+                    .tool_access_policy
+                    .allows_tool_action(canonical_name, Some(action))
+            {
+                return json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": tool_action_not_available_by_policy(canonical_name, action)
+                })
+                .to_string();
+            }
+            if !context.tool_access_policy.allows_tool(canonical_name) {
+                return json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": tool_not_available_by_policy(canonical_name)
+                })
+                .to_string();
+            }
         }
         let result = match canonical_name {
             "office.list_sessions" => tool_success(&json!({

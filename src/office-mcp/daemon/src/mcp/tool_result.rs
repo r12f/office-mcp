@@ -72,6 +72,20 @@ pub fn tool_not_available_by_policy(tool: &str) -> Value {
     result
 }
 
+#[must_use]
+pub fn tool_action_not_available_by_policy(tool: &str, action: &str) -> Value {
+    let mut result = tool_failure(
+        "TOOL_NOT_AVAILABLE",
+        &format!(
+            "Tool {tool} action {action} is disabled by daemon access policy. Refresh tools/list before retrying."
+        ),
+        Some(tool),
+        false,
+    );
+    result["structuredContent"]["error"]["refresh_tools"] = json!(true);
+    result
+}
+
 fn tool_error_result(error: &Value) -> Value {
     json!({
         "isError": true,

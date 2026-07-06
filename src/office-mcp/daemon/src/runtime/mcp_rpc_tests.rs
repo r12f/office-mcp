@@ -5,7 +5,7 @@ use crate::addin_mgr::{
 };
 use crate::api::UiStateStore;
 use crate::common::AuditLog;
-use crate::mcp::ToolAccessPolicy;
+use crate::mcp::{AccessMode, ToolAccessPolicy};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -145,6 +145,22 @@ fn mcp_json_rpc_describes_tool_contracts_from_catalog() {
             .expect("common errors")
             .iter()
             .any(|error| error["code"] == "TOOL_NOT_ENABLED_FOR_DOCUMENT")
+    );
+
+    let action_reply = mcp_handle_body(
+        &registry,
+        br#"{"jsonrpc":"2.0","id":"describe-actions","method":"tools/call","params":{"name":"office.describe_tools","arguments":{"tools":["word.update_table"]}}}"#,
+    );
+    let action_reply: serde_json::Value =
+        serde_json::from_str(&action_reply).expect("action describe json");
+    let action_contract = &action_reply["result"]["structuredContent"]["tools"][0];
+    assert_eq!(
+        action_contract["action_side_effects"]["update_cell"],
+        "mutating"
+    );
+    assert_eq!(
+        action_contract["action_side_effects"]["delete"],
+        "destructive"
     );
 }
 
@@ -925,6 +941,42 @@ fn mcp_json_rpc_daemon_policy_filters_discovery_and_rejects_before_session_prefl
 }
 
 #[test]
+fn mcp_json_rpc_daemon_policy_enforces_action_side_effect_before_dispatch() {
+    let registry = registry_with_excel_session();
+
+    let read_reply = mcp_handle_body_with_policy_and_connection(
+        &registry,
+        &ToolAccessPolicy::default().with_access_mode(AccessMode::Read),
+        "excel-connection",
+        br#"{"jsonrpc":"2.0","id":"table-read","method":"tools/call","params":{"name":"excel.update_table","arguments":{"session_id":"excel-session","table":"Table1","action":"read"}}}"#,
+        Some(r#"{"metadata":{"name":"Table1"}}"#),
+    );
+    let read_reply: serde_json::Value = serde_json::from_str(&read_reply).expect("read reply");
+    assert_eq!(
+        read_reply["result"]["structuredContent"]["metadata"]["name"],
+        "Table1"
+    );
+
+    let blocked_reply = mcp_handle_body_with_policy_and_connection(
+        &registry,
+        &ToolAccessPolicy::default().with_access_mode(AccessMode::Write),
+        "excel-connection",
+        br#"{"jsonrpc":"2.0","id":"table-delete","method":"tools/call","params":{"name":"excel.update_table","arguments":{"session_id":"excel-session","table":"Table1","action":"delete"}}}"#,
+        None,
+    );
+    let blocked_reply: serde_json::Value =
+        serde_json::from_str(&blocked_reply).expect("blocked reply");
+    let error = &blocked_reply["result"]["structuredContent"]["error"];
+    assert_eq!(error["office_mcp_code"], "TOOL_NOT_AVAILABLE");
+    assert_eq!(error["refresh_tools"], true);
+    assert_eq!(error["tool"], "excel.update_table");
+    assert_eq!(
+        error["message"],
+        "Tool excel.update_table action delete is disabled by daemon access policy. Refresh tools/list before retrying."
+    );
+}
+
+#[test]
 fn mcp_json_rpc_forwarded_excel_tool_invokes_addin_connection() {
     let registry = registry_with_excel_session();
     let mut ui_state = UiStateStore::new();
@@ -1237,6 +1289,59 @@ fn mcp_handle_body_with_policy(
         tool_access_policy,
     };
     McpJsonRpcRuntime::handle_body(&mut context, body)
+}
+
+fn mcp_handle_body_with_policy_and_connection(
+    registry: &SessionRegistry,
+    tool_access_policy: &ToolAccessPolicy,
+    connection_id: &'static str,
+    body: &[u8],
+    response_data: Option<&'static str>,
+) -> String {
+    let mut ui_state = UiStateStore::new();
+    let addin_channel = Arc::new(Mutex::new(AddinChannelServer::new()));
+    let connection_hub = Arc::new(AddinConnectionHub::new());
+    connection_hub.register_connection(connection_id);
+    connection_hub.bind_instance(connection_id, "excel-instance");
+    let response_hub = Arc::clone(&connection_hub);
+    let response_thread = response_data.map(|data| {
+        thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(2);
+            let outbound = loop {
+                let outbound = response_hub.take_outbound(connection_id);
+                if !outbound.is_empty() {
+                    break outbound;
+                }
+                assert!(Instant::now() < deadline, "expected forwarded request");
+                thread::sleep(Duration::from_millis(5));
+            };
+            assert_eq!(outbound.len(), 1);
+            let invoke: serde_json::Value =
+                serde_json::from_str(&outbound[0]).expect("invoke json");
+            let request_id = invoke["id"].as_str().expect("request id");
+            assert!(response_hub.complete_from_text(&format!(
+                r#"{{"jsonrpc":"2.0","id":"{request_id}","result":{{"ok":true,"data":{data}}}}}"#
+            )));
+        })
+    });
+    let command_router = Arc::new(Mutex::new(CommandRouter::new()));
+    let mut context = McpDispatchContext {
+        registry,
+        ui_state: &mut ui_state,
+        addin_channel: &addin_channel,
+        connection_hub: &connection_hub,
+        command_router: &command_router,
+        audit_log: &AuditLog::new(),
+        image_fetcher: &ImageFetcher::new(),
+        tool_access_policy,
+    };
+    let reply = McpJsonRpcRuntime::handle_body(&mut context, body);
+    if let Some(response_thread) = response_thread {
+        response_thread.join().expect("response thread");
+    } else {
+        assert!(connection_hub.take_outbound(connection_id).is_empty());
+    }
+    reply
 }
 
 fn registry_with_word_session() -> SessionRegistry {

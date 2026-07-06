@@ -4,6 +4,7 @@ use super::{
     powerpoint_resource_catalog_for_session, powerpoint_resource_templates, tool_catalog_json,
     word_resource_catalog_for_session, word_resource_templates,
 };
+use crate::mcp::tool_metadata_catalog;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -122,6 +123,74 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert_eq!(ExcelToolCatalog::tools().len(), 20);
     assert_eq!(PowerPointToolCatalog::tools().len(), 23);
     assert_eq!(tools.len(), 216);
+}
+
+#[test]
+fn tools_list_exposes_action_side_effects_for_mixed_owner_tools() {
+    let tools = tool_catalog_json();
+    let word_update_table = tools
+        .iter()
+        .find(|tool| tool["name"] == "word.update_table")
+        .expect("word.update_table tool");
+    assert_eq!(
+        word_update_table["_meta"]["com.office-mcp/action_side_effects"]["update_cell"],
+        "mutating"
+    );
+    assert_eq!(
+        word_update_table["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
+    );
+
+    let excel_update_table = tools
+        .iter()
+        .find(|tool| tool["name"] == "excel.update_table")
+        .expect("excel.update_table tool");
+    assert_eq!(
+        excel_update_table["_meta"]["com.office-mcp/action_side_effects"]["read"],
+        "read"
+    );
+    assert_eq!(
+        excel_update_table["_meta"]["com.office-mcp/action_side_effects"]["add_rows"],
+        "mutating"
+    );
+
+    let powerpoint_update_tags = tools
+        .iter()
+        .find(|tool| tool["name"] == "powerpoint.update_tags")
+        .expect("powerpoint.update_tags tool");
+    assert_eq!(
+        powerpoint_update_tags["_meta"]["com.office-mcp/action_side_effects"]["list"],
+        "read"
+    );
+    assert_eq!(
+        powerpoint_update_tags["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
+    );
+}
+
+#[test]
+fn action_side_effect_metadata_covers_advertised_action_enum() {
+    for metadata in tool_metadata_catalog() {
+        let Some(action_side_effects) = metadata.action_side_effects else {
+            continue;
+        };
+        let schema = schema_for(metadata.name);
+        let schema_actions = schema["properties"]["action"]["enum"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{} must advertise action enum", metadata.name))
+            .iter()
+            .map(|action| action.as_str().expect("action string"))
+            .collect::<BTreeSet<_>>();
+        let metadata_actions = action_side_effects
+            .iter()
+            .map(|entry| entry.action)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            schema_actions, metadata_actions,
+            "{} action map",
+            metadata.name
+        );
+    }
 }
 
 #[test]

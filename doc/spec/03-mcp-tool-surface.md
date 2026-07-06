@@ -386,6 +386,21 @@ Required `tools/list` metadata for every public tool:
   slide/shape selectors. Simple tools may expose an empty example array.
 - `_meta["com.office-mcp/app"]` and `_meta["com.office-mcp/category"]` for
   Office-host tools, matching the daemon UI permission catalog.
+- `_meta["com.office-mcp/action_side_effects"]` for any advertised tool whose
+  top-level `action` enum mixes read, edit/mutating, or destructive behavior.
+  The map keys MUST cover the complete advertised `action` enum and the values
+  MUST use `read`, `mutating`, or `destructive`.
+
+For owner tools with `action_side_effects`, the tool-level side effect is the
+maximum effect across all actions and keeps existing UI grouping stable. The
+daemon Global Tool Access policy also evaluates the selected action before
+forwarding the call to an Office session: `Read` allows only mapped `read`
+actions, `Write` allows mapped `read` and `mutating` actions, and `All` allows
+every mapped action including `destructive`. A rejected action returns
+`TOOL_NOT_AVAILABLE` with `refresh_tools: true` and the message
+`Tool <name> action <action> is disabled by daemon access policy. Refresh tools/list before retrying.`
+before session dispatch. Tools without an `action_side_effects` map continue to
+use tool-level access gating.
 
 Schema requirements:
 
@@ -422,9 +437,10 @@ The daemon also exposes `office.describe_tools` as a read-only batch discovery
 helper for clients that want to retrieve multiple detailed tool contracts at
 runtime. Its `tools` argument names public Office MCP tools, and each result
 entry MUST return the same input schema graph, examples, side-effect
-classification, app/category metadata, and common error hints advertised for
-that tool in `tools/list`, plus a top-level `parameters` array derived from the
-schema. Unknown requested tool names return structured per-entry `UNKNOWN_TOOL`
+classification, action side-effect map when present, app/category metadata, and
+common error hints advertised for that tool in `tools/list`, plus a top-level
+`parameters` array derived from the schema. Unknown requested tool names return
+structured per-entry `UNKNOWN_TOOL`
 results rather than being forwarded to an Office session. The helper is for
 contract discovery only; it does not require a document session and must not
 mutate host state. The previous single-tool `office.describe_tool` helper is
