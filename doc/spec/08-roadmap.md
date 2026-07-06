@@ -2013,6 +2013,10 @@ to `excel.get_workbook_info` as workbook state so agents can choose valid style
 names before formatting cells. Cell hyperlink support is in scope as a Range
 follow-up because links are `Range.hyperlink` metadata, need URL scheme safety
 validation, and need hyperlink-only clearing that preserves displayed text.
+Conditional formatting is in scope as a Format follow-up because rule-based
+visual formatting has stable `ExcelApi 1.6` APIs, a distinct lifecycle from
+static `excel.format_range` writes, and user workflows that require listing,
+adding, deleting, and clearing rules.
 
 Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`,
@@ -2020,7 +2024,8 @@ Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.get_used_range`, `excel.read_range`, `excel.write_range`,
 `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`,
 `excel.set_hyperlink`, `excel.set_formula`,
-`excel.format_range`, `excel.sort_range`, `excel.apply_filter`,
+`excel.format_range`, `excel.list_conditional_formats`,
+`excel.update_conditional_format`, `excel.sort_range`, `excel.apply_filter`,
 `excel.create_table`, `excel.update_table`, `excel.create_chart`,
 `excel.update_chart`, `excel.create_pivot_table`, and `excel.update_pivot_table`.
 The #104 follow-up also adds `excel.add_comment`, `excel.list_comments`, and
@@ -2029,9 +2034,11 @@ The #104 follow-up also adds `excel.add_comment`, `excel.list_comments`, and
 follow-up extends `excel.format_range` and `excel.get_workbook_info` without
 adding another public tool. The #107 follow-up adds `excel.set_hyperlink` and
 extends `excel.read_range` with optional hyperlink readback.
+The #108 follow-up adds conditional formatting list/update tools under the
+Format category.
 
-The 29 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 7,
-Formula 1, Format 1, Data operations 2, Table 2, Chart 2, PivotTable 2, and
+The 31 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 7,
+Formula 1, Format 3, Data operations 2, Table 2, Chart 2, PivotTable 2, and
 Review 3. This is the current v1 upper bound. Rejected v1 expansions include separate cell CRUD,
 worksheet formatting, freeze panes, protection, legacy notes, shapes, images,
 slicers, event subscriptions, bindings, custom XML, external data,
@@ -2081,6 +2088,13 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       validation, in-workbook document references, and untrusted-source marking
       for hyperlink readback. The tool and read extension require
       `ExcelApi 1.7`.
+- [ ] Implement conditional formatting slice: `excel.list_conditional_formats`
+      and `excel.update_conditional_format`, including daemon catalog and
+      metadata, action side-effect metadata for `add`/`delete`/`clear_range`,
+      task pane handlers, validate-only support, Format permission metadata,
+      Rust/JS tests, typed rule validation, add/delete/clear_range coverage,
+      and untrusted-source marking for rule formulas/text. The tools require
+      `ExcelApi 1.6`.
 - [x] Record Excel tool-selection research in
       [04-excel-capabilities.md](04-excel-capabilities.md), starting from the
       Microsoft Learn Excel core object model and related range/table/chart/
