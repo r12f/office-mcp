@@ -164,6 +164,19 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
         Some(ToolSideEffect::Destructive)
     );
 
+    let copy_range = tool_metadata("excel.copy_range").expect("excel copy range metadata");
+    assert_eq!(copy_range.app, "excel");
+    assert_eq!(copy_range.category, "Range");
+    assert_eq!(copy_range.side_effect, ToolSideEffect::Mutating);
+    assert_eq!(
+        copy_range.side_effect_for_action("copy"),
+        Some(ToolSideEffect::Mutating)
+    );
+    assert_eq!(
+        copy_range.side_effect_for_action("autofill"),
+        Some(ToolSideEffect::Mutating)
+    );
+
     let list_conditional_formats = tool_metadata("excel.list_conditional_formats")
         .expect("excel conditional format list metadata");
     assert_eq!(list_conditional_formats.app, "excel");

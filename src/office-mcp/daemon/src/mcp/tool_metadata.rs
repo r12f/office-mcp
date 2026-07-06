@@ -545,6 +545,13 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Destructive,
         EXCEL_SET_DATA_VALIDATION_ACTIONS,
     ),
+    tool_with_actions(
+        "excel.copy_range",
+        "excel",
+        "Range",
+        ToolSideEffect::Mutating,
+        EXCEL_COPY_RANGE_ACTIONS,
+    ),
     tool(
         "excel.clear_range",
         "excel",
@@ -887,6 +894,11 @@ const EXCEL_SET_HYPERLINK_ACTIONS: &[ActionSideEffect] = &[
 const EXCEL_SET_DATA_VALIDATION_ACTIONS: &[ActionSideEffect] = &[
     action("set", ToolSideEffect::Mutating),
     action("clear", ToolSideEffect::Destructive),
+];
+
+const EXCEL_COPY_RANGE_ACTIONS: &[ActionSideEffect] = &[
+    action("copy", ToolSideEffect::Mutating),
+    action("autofill", ToolSideEffect::Mutating),
 ];
 
 const EXCEL_UPDATE_CONDITIONAL_FORMAT_ACTIONS: &[ActionSideEffect] = &[

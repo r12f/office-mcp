@@ -66,6 +66,7 @@
     'excel.clear_range',
     'excel.set_hyperlink',
     'excel.set_data_validation',
+    'excel.copy_range',
     'excel.find_replace_cells',
     'excel.set_formula',
     'excel.format_range',
@@ -83,7 +84,7 @@
   const TOOL_GROUPS = [
     { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate', 'excel.list_named_items', 'excel.update_named_item'] },
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
-    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.set_hyperlink', 'excel.set_data_validation', 'excel.find_replace_cells'] },
+    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.set_hyperlink', 'excel.set_data_validation', 'excel.copy_range', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
     { label: 'Format', tools: ['excel.format_range', 'excel.list_conditional_formats', 'excel.update_conditional_format'] },
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
@@ -112,6 +113,7 @@
     ['excel.clear_range', { category: 'Range', sideEffect: 'destructive', description: 'Clear contents, formats, or delete cells in a range.' }],
     ['excel.set_hyperlink', { category: 'Range', sideEffect: 'mutating', description: 'Set or clear cell hyperlinks.' }],
     ['excel.set_data_validation', { category: 'Range', sideEffect: 'destructive', description: 'Set or clear range data validation rules.' }],
+    ['excel.copy_range', { category: 'Range', sideEffect: 'mutating', description: 'Copy or autofill ranges using Excel host semantics.' }],
     ['excel.find_replace_cells', { category: 'Range', sideEffect: 'mutating', description: 'Find cells in a range and optionally replace matches.' }],
     ['excel.set_formula', { category: 'Formula', sideEffect: 'mutating', description: 'Set formulas in a range.' }],
     ['excel.format_range', { category: 'Format', sideEffect: 'mutating', description: 'Apply formatting to a range.' }],
@@ -411,6 +413,9 @@
           break;
         case 'excel.set_data_validation':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await setDataValidation(args);
+          break;
+        case 'excel.copy_range':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await copyRange(args);
           break;
         case 'excel.find_replace_cells':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await findReplaceCells(args);
@@ -792,6 +797,41 @@
       range.dataValidation.load('rule,ignoreBlanks,valid,type,errorAlert,prompt');
       await context.sync();
       return { address: range.address, action, updated: true, validation: dataValidationSummary(range.dataValidation) };
+    });
+  }
+
+  async function copyRange(args) {
+    requireRequirementSet('ExcelApi', '1.9', 'range copy and autofill');
+    const action = validateCopyRangeArgs(args);
+    return Excel.run(async (context) => {
+      const source = await copyRangeTarget(context, args, 'source');
+      const destination = await copyRangeTarget(context, args, 'destination');
+      source.load('address,rowIndex,columnIndex,rowCount,columnCount');
+      destination.load('address,rowIndex,columnIndex,rowCount,columnCount');
+      await context.sync();
+
+      if (action === 'copy') {
+        destination.copyFrom(source, rangeCopyTypeFrom(args.copy_type), Boolean(args.skip_blanks), Boolean(args.transpose));
+        await context.sync();
+        return {
+          action,
+          source: source.address,
+          destination: destination.address,
+          copy_type: copyTypeLabel(args.copy_type),
+          copied: true
+        };
+      }
+
+      validateAutofillContainsSource(source, destination);
+      source.autoFill(destination, autoFillTypeFrom(args.autofill_type));
+      await context.sync();
+      return {
+        action,
+        source: source.address,
+        destination: destination.address,
+        autofill_type: autoFillTypeLabel(args.autofill_type),
+        copied: true
+      };
     });
   }
 
@@ -1896,6 +1936,85 @@
       throw Object.assign(new Error('excel.set_data_validation clear does not accept validation payload fields.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
     return action;
+  }
+
+  function validateCopyRangeArgs(args) {
+    const action = String(args.action || '').trim().toLowerCase();
+    if (!['copy', 'autofill'].includes(action)) {
+      throw Object.assign(new Error(`Unsupported range copy action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    requiredString(args, 'source_address', 'excel.copy_range requires source_address.');
+    requiredString(args, 'destination_address', 'excel.copy_range requires destination_address.');
+    if (args.copy_type !== undefined) rangeCopyTypeFrom(args.copy_type);
+    if (args.autofill_type !== undefined) autoFillTypeFrom(args.autofill_type);
+    if (action === 'copy' && args.autofill_type !== undefined) {
+      throw Object.assign(new Error('excel.copy_range copy does not accept autofill_type.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (action === 'autofill' && (args.copy_type !== undefined || args.skip_blanks !== undefined || args.transpose !== undefined)) {
+      throw Object.assign(new Error('excel.copy_range autofill does not accept copy_type, skip_blanks, or transpose.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return action;
+  }
+
+  function copyRangeTarget(context, args, prefix) {
+    const address = requiredString(args, `${prefix}_address`, `excel.copy_range requires ${prefix}_address.`);
+    const sheet = args[`${prefix}_sheet`] || args.sheet;
+    return resolveRangeTarget(context, { sheet, address });
+  }
+
+  function validateAutofillContainsSource(source, destination) {
+    const containsRows = destination.rowIndex <= source.rowIndex
+      && destination.rowIndex + destination.rowCount >= source.rowIndex + source.rowCount;
+    const containsColumns = destination.columnIndex <= source.columnIndex
+      && destination.columnIndex + destination.columnCount >= source.columnIndex + source.columnCount;
+    if (!containsRows || !containsColumns) {
+      throw Object.assign(new Error('excel.copy_range autofill destination must contain the source range.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
+  function rangeCopyTypeFrom(value) {
+    const key = copyTypeLabel(value);
+    const fallback = { all: 'All', values: 'Values', formulas: 'Formulas', formats: 'Formats', link: 'Link' };
+    const enumValues = Excel.RangeCopyType || {};
+    const values = {
+      all: enumValues.all || enumValues.All || fallback.all,
+      values: enumValues.values || enumValues.Values || fallback.values,
+      formulas: enumValues.formulas || enumValues.Formulas || fallback.formulas,
+      formats: enumValues.formats || enumValues.Formats || fallback.formats,
+      link: enumValues.link || enumValues.Link || fallback.link
+    };
+    return values[key];
+  }
+
+  function copyTypeLabel(value) {
+    const key = String(value || 'all').toLowerCase();
+    if (!['all', 'values', 'formulas', 'formats', 'link'].includes(key)) {
+      throw Object.assign(new Error(`Unsupported range copy type ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return key;
+  }
+
+  function autoFillTypeFrom(value) {
+    const key = autoFillTypeLabel(value);
+    const fallback = { default: 'Default', copy: 'Copy', series: 'Series', formats: 'Formats', values: 'Values', flash_fill: 'FlashFill' };
+    const enumValues = Excel.AutoFillType || {};
+    const values = {
+      default: enumValues.default || enumValues.Default || fallback.default,
+      copy: enumValues.copy || enumValues.Copy || fallback.copy,
+      series: enumValues.series || enumValues.Series || fallback.series,
+      formats: enumValues.formats || enumValues.Formats || fallback.formats,
+      values: enumValues.values || enumValues.Values || fallback.values,
+      flash_fill: enumValues.flashFill || enumValues.FlashFill || fallback.flash_fill
+    };
+    return values[key];
+  }
+
+  function autoFillTypeLabel(value) {
+    const key = String(value || 'default').toLowerCase();
+    if (!['default', 'copy', 'series', 'formats', 'values', 'flash_fill'].includes(key)) {
+      throw Object.assign(new Error(`Unsupported range autofill type ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return key;
   }
 
   function dataValidationRuleFrom(rule) {

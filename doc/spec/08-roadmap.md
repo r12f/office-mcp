@@ -2027,7 +2027,7 @@ Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
 `excel.get_used_range`, `excel.read_range`, `excel.write_range`,
 `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`,
-`excel.set_hyperlink`, `excel.set_data_validation`, `excel.set_formula`,
+`excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range`, `excel.set_formula`,
 `excel.format_range`, `excel.list_conditional_formats`,
 `excel.update_conditional_format`, `excel.sort_range`, `excel.apply_filter`,
 `excel.create_table`, `excel.update_table`, `excel.create_chart`,
@@ -2042,8 +2042,10 @@ The #108 follow-up adds conditional formatting list/update tools under the
 Format category.
 The #109 follow-up adds `excel.set_data_validation` and extends
 `excel.read_range` with optional validation readback.
+The #110 follow-up adds `excel.copy_range` for host-native Range copy and
+autofill workflows.
 
-The 32 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 8,
+The 33 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 9,
 Formula 1, Format 3, Data operations 2, Table 2, Chart 2, PivotTable 2, and
 Review 3. This is the current v1 upper bound. Rejected v1 expansions include separate cell CRUD,
 worksheet formatting, freeze panes, protection, legacy notes, shapes, images,
@@ -2108,6 +2110,12 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       tests, typed rule validation, set/clear coverage, and untrusted-source
       marking for validation formulas/prompts/alerts. The tool and read
       extension require `ExcelApi 1.8`.
+- [ ] Implement range copy/autofill slice: `excel.copy_range`, including daemon
+      catalog and metadata, action side-effect metadata for `copy`/`autofill`,
+      task pane handler, validate-only support, Range permission metadata,
+      Rust/JS tests, `Range.copyFrom` copy types, `Range.autoFill` fill types,
+      cross-sheet copy, transpose/skip-blanks options, and deterministic
+      autofill containment rejection. The tool requires `ExcelApi 1.9`.
 - [x] Record Excel tool-selection research in
       [04-excel-capabilities.md](04-excel-capabilities.md), starting from the
       Microsoft Learn Excel core object model and related range/table/chart/

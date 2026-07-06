@@ -259,6 +259,35 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       ]
     }
   }],
+  ['excel.copy_range', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'J1:K2', values: [['Source', 'Copy'], [1, 2]] } },
+        { tool: 'excel.set_formula', arguments: { sheet: 'Sheet1', address: 'K2', formula: '=J2*2' } }
+      ]
+    },
+    args: { source_sheet: 'Sheet1', source_address: 'J1:K2', destination_sheet: 'Sheet1', destination_address: 'M1:N2', action: 'copy', copy_type: 'all' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'M1:N2', include_formulas: true },
+      expect: { contains: ['Source', 'Copy', '=M2*2'] }
+    }
+  }],
+  ['excel.copy_range', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'O1:O2', values: [[1], [2]] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', source_address: 'O1:O2', destination_address: 'O1:O6', action: 'autofill', autofill_type: 'series' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'O1:O6' },
+      expect: { contains: ['1', '2', '6'] }
+    }
+  }],
   ['excel.find_replace_cells', {
     setup: {
       actions: [

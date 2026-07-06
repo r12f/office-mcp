@@ -71,6 +71,7 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.add_sheet",
     "excel.apply_filter",
     "excel.clear_range",
+    "excel.copy_range",
     "excel.create_chart",
     "excel.create_pivot_table",
     "excel.create_table",
@@ -1812,6 +1813,24 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!(
+        "excel.copy_range",
+        ["session_id", "action"],
+        [
+            "session_id",
+            "sheet",
+            "source_sheet",
+            "source_address",
+            "destination_sheet",
+            "destination_address",
+            "action",
+            "copy_type",
+            "skip_blanks",
+            "transpose",
+            "autofill_type",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
         "excel.find_replace_cells",
         ["session_id", "find"],
         [
@@ -2556,15 +2575,23 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
         | ("excel.add_comment" | "excel.update_comment", "text")
         | ("excel.update_comment", "comment_id" | "reply_id")
         | ("excel.set_hyperlink", "document_reference")
-        | ("excel.update_conditional_format", "id") => {
+        | ("excel.update_conditional_format", "id")
+        | ("excel.copy_range", "source_address" | "destination_address") => {
             Some(json!({ "type": "string", "minLength": 1 }))
         }
+        ("excel.copy_range", "copy_type") => Some(
+            json!({ "enum": ["all", "values", "formulas", "formats", "link"], "default": "all" }),
+        ),
+        ("excel.copy_range", "autofill_type") => Some(
+            json!({ "enum": ["default", "copy", "series", "formats", "values", "flash_fill"], "default": "default" }),
+        ),
         ("excel.insert_range", "shift") => Some(json!({ "enum": ["down", "right"] })),
         ("excel.insert_range", "count") => {
             Some(json!({ "type": "integer", "minimum": 1, "default": 1 }))
         }
         ("excel.set_hyperlink", "url") => Some(json!({ "type": "string", "format": "uri" })),
-        ("excel.set_hyperlink", "text_to_display" | "screen_tip") => {
+        ("excel.set_hyperlink", "text_to_display" | "screen_tip")
+        | ("excel.copy_range", "source_sheet" | "destination_sheet") => {
             Some(json!({ "type": "string" }))
         }
         ("excel.format_range", "merge") => {
@@ -2600,6 +2627,7 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
         }
         ("excel.update_conditional_format", "stop_if_true")
         | ("excel.set_data_validation", "ignore_blanks")
+        | ("excel.copy_range", "skip_blanks" | "transpose")
         | ("excel.list_comments", "resolved") => Some(json!({ "type": "boolean" })),
         _ => None,
     }
@@ -2689,6 +2717,9 @@ fn excel_action_property_schema(tool: &str, name: &str) -> Option<Value> {
         })),
         "excel.set_hyperlink" | "excel.set_data_validation" => Some(json!({
             "enum": ["set", "clear"]
+        })),
+        "excel.copy_range" => Some(json!({
+            "enum": ["copy", "autofill"]
         })),
         "excel.update_conditional_format" => Some(json!({
             "enum": ["add", "delete", "clear_range"]
