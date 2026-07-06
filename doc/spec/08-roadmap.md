@@ -1981,10 +1981,13 @@ The #102 revision expands the target to 22 by adding two workbook-owner tools,
 be represented safely by range or object-owner tools. The #103 revision expands
 the target to 24 by adding named-item discovery and lifecycle because workbook
 and sheet-scoped names are template-stable addressing primitives, not ordinary
-cell ranges. Do not add tools for every Office.js object, property, event,
-shape, comment, slicer, external connection, or preview feature unless a later
-user workflow proves that the current surface cannot express it safely and the
-spec records the distinct owner and permission profile.
+cell ranges. The #104 revision expands the target to 27 by adding threaded cell
+comment lifecycle tools because comments are review objects with a distinct
+permission profile from range content. Do not add tools for every Office.js
+object, property, event, shape, legacy note, slicer, external connection, or
+preview feature unless a later user workflow proves that the current surface
+cannot express it safely and the spec records the distinct owner and permission
+profile.
 
 Research conclusion from the Microsoft Learn core concepts page: Excel v1 must
 be a small workflow API, not an Excel.js mirror. The core path is `Workbook` ->
@@ -1992,11 +1995,14 @@ be a small workflow API, not an Excel.js mirror. The core path is `Workbook` ->
 one-cell ranges; range `values`, `formulas`, and `format` remain separate
 intents because they carry different validation and permission profiles.
 PivotTables are the only extra analysis object in v1 because they represent a
-high-value summarized-analysis workflow. Shapes, comments, slicers, bindings,
-events, external data, Power Query, import/export, save-as/close, and
+high-value summarized-analysis workflow. Shapes, legacy notes, slicers,
+bindings, events, external data, Power Query, import/export, save-as/close, and
 method-level table/chart/PivotTable wrappers remain out of scope. Workbook save,
 calculation, and named items are in scope as stable workbook-owner operations,
-not as file export, save-as, close, event, or binding workflows.
+not as file export, save-as, close, event, or binding workflows. Threaded
+comments are in scope as a Review follow-up surface because comment text and
+reply lifecycle cannot be represented by range tools without losing review
+identity and permission boundaries.
 
 Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`,
@@ -2006,11 +2012,13 @@ Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.format_range`, `excel.sort_range`, `excel.apply_filter`,
 `excel.create_table`, `excel.update_table`, `excel.create_chart`,
 `excel.update_chart`, `excel.create_pivot_table`, and `excel.update_pivot_table`.
+The #104 follow-up also adds `excel.add_comment`, `excel.list_comments`, and
+`excel.update_comment` as the Review category.
 
-The 24 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 5,
-Formula 1, Format 1, Data operations 2, Table 2, Chart 2, and PivotTable 2.
-This is the current v1 upper bound. Rejected v1 expansions include separate cell CRUD,
-worksheet formatting, freeze panes, protection, comments, shapes, images,
+The 27 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 5,
+Formula 1, Format 1, Data operations 2, Table 2, Chart 2, PivotTable 2, and
+Review 3. This is the current v1 upper bound. Rejected v1 expansions include separate cell CRUD,
+worksheet formatting, freeze panes, protection, legacy notes, shapes, images,
 slicers, event subscriptions, bindings, custom XML, external data,
 Power Query, workbook import/export, save-as/close, and method-level table,
 chart, or PivotTable tools that duplicate an existing owner tool.
@@ -2031,6 +2039,12 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       named-item resolution for existing range tools that accept `address`.
       Unknown, duplicate, and non-range name cases must fail deterministically
       with no partial effect.
+- [ ] Implement threaded comment slice: `excel.add_comment`,
+      `excel.list_comments`, and `excel.update_comment`, including daemon
+      catalog entries, task pane handlers, validate-only support, Review
+      permission metadata, Rust/JS tests, and untrusted-source response marking
+      for comment and reply content. Resolve/reopen must be gated on
+      `ExcelApi 1.11`; other threaded comment operations require `ExcelApi 1.10`.
 - [x] Record Excel tool-selection research in
       [04-excel-capabilities.md](04-excel-capabilities.md), starting from the
       Microsoft Learn Excel core object model and related range/table/chart/

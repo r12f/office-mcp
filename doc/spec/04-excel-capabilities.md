@@ -54,16 +54,18 @@ Research basis:
   Excel analysis workflow and are present in the stable Excel.js object model.
   v1 limits PivotTables to normal range/table sources and non-preview APIs.
 
-The refined v1 target is 24 tools. The original 20-tool core covered workbook
+The refined v1 target is 27 tools. The original 20-tool core covered workbook
 orientation, worksheet lifecycle, range work, formulas, formatting, data
 operations, tables, charts, and PivotTables. The workbook owner now also covers
 stable persistence/calculation tasks and named-item lifecycle. These cannot be
 represented by range or object-owner tools: saving the current workbook,
 forcing calculation, and managing workbook/sheet scoped names that formulas and
-templates address indirectly. Do not expand the catalog by copying individual
-Excel.js methods into MCP tools. A future tool can only be added after the
-selection matrix proves that the existing tools cannot express a distinct
-object owner, permission profile, or user-visible workflow safely.
+templates address indirectly. The Review owner now covers threaded cell
+comments because comments are workbook review objects with a distinct
+permission profile from range content. Do not expand the catalog by copying
+individual Excel.js methods into MCP tools. A future tool can only be added
+after the selection matrix proves that the existing tools cannot express a
+distinct object owner, permission profile, or user-visible workflow safely.
 
 The v1 priority order is: workbook orientation, worksheet lifecycle, range/cell
 data CRUD, formulas, formatting, sort/filter, tables, charts, and PivotTables.
@@ -71,7 +73,7 @@ This follows the Excel core concepts path from workbook to worksheet to range,
 then to table and chart objects; PivotTables are included as the only extra v1
 analysis object because summarized workbook analysis is a core Excel user need.
 
-Selection rules for the 15-20 tool budget:
+Selection rules for the core and follow-up tool budget:
 
 - Start from the Microsoft Learn core object path: `Workbook` -> `Worksheet` ->
   `Range` -> `Table` / `Chart`.
@@ -85,12 +87,14 @@ Selection rules for the 15-20 tool budget:
   page because summarized analysis is a central Excel workflow; defer slicers,
   OLAP, Power Pivot, and preview-only APIs.
 
-Out of scope for the core Excel surface: shapes and images, comments and notes,
+Out of scope for the core Excel surface: shapes and images, legacy notes,
 slicers as first-class tools, events/subscriptions, custom XML, external data
 connections, Power Query, Python/preview-only APIs, OLAP/Power Pivot, arbitrary
 file import/export, workbook close, and save-as flows. Workbook save and
 calculation are in scope because they are stable workbook-owner operations, not
-file export, save-as, or close workflows.
+file export, save-as, or close workflows. Threaded comments are in scope as the
+Review follow-up surface; legacy notes remain deferred until ExcelApi 1.18 host
+coverage is verified.
 
 Core tool selection matrix:
 
@@ -104,6 +108,7 @@ Core tool selection matrix:
 | Promote data into a structured table | `Table` | `excel.create_table`, `excel.update_table` | Creation is common enough to be direct; lifecycle, rows/columns, resize, rename, and table style/options share one object-owner update tool. |
 | Visualize data | `Chart` | `excel.create_chart`, `excel.update_chart` | Creation is direct; title, axes, legend, series, size, position, delete, and supported export share one chart-owner update tool. |
 | Analyze summarized data | `PivotTable` | `excel.create_pivot_table`, `excel.update_pivot_table` | Creation is direct; fields, filters, aggregation, refresh, metadata, and delete share one PivotTable-owner update tool. |
+| Review workbook cells | `CommentCollection` / `Comment` / `CommentReply` | `excel.add_comment`, `excel.list_comments`, `excel.update_comment` | Threaded comments have a review permission profile and lifecycle separate from range content; legacy notes remain deferred. |
 
 Final v1 tool set by category:
 
@@ -118,14 +123,15 @@ Final v1 tool set by category:
 | Table | `excel.create_table`, `excel.update_table` | 2 | Promote data to structured tables and manage table-owned lifecycle/options. |
 | Chart | `excel.create_chart`, `excel.update_chart` | 2 | Visualize data and manage chart-owned configuration. |
 | PivotTable | `excel.create_pivot_table`, `excel.update_pivot_table` | 2 | Create and configure summarized analysis views. |
+| Review | `excel.add_comment`, `excel.list_comments`, `excel.update_comment` | 3 | Create, inspect, reply to, resolve, reopen, edit, and delete threaded cell comments. |
 
-Total: 24 tools.
+Total: 27 tools.
 
 Rejected tool families for v1:
 
 - No `excel.read_cell`, `excel.write_cell`, or `excel.delete_cell`; cells are
   one-cell ranges.
-- No separate worksheet format, freeze pane, protection, comments, shapes,
+- No separate worksheet format, freeze pane, protection, legacy notes, shapes,
   images, slicer, event, binding, custom XML, external connection,
   Power Query, workbook import/export, save-as, or close tools. `excel.save`
   intentionally persists the current workbook through host save behavior only;
@@ -166,6 +172,9 @@ Implemented Excel v1 tools:
 | `excel.update_chart` | read/edit/destructive | `ExcelApi 1.1`; image export requires `ExcelApi 1.2`; axis selection and chart type metadata require `ExcelApi 1.7` | Read or update chart configuration, source, export, and lifecycle. |
 | `excel.create_pivot_table` | edit | `ExcelApi 1.8` | Create a PivotTable from a range or table source. |
 | `excel.update_pivot_table` | read/edit/destructive | `ExcelApi 1.3`; hierarchy/layout/delete require `ExcelApi 1.8`; filters require `ExcelApi 1.12` | Read or update PivotTable fields, layout, filters, refresh, and lifecycle. |
+| `excel.add_comment` | comment | `ExcelApi 1.10` | Add a threaded comment to a cell as the signed-in Office user. |
+| `excel.list_comments` | read | `ExcelApi 1.10`; resolved filtering requires `ExcelApi 1.11` | List threaded comments and replies, optionally filtered by resolved state. |
+| `excel.update_comment` | comment/destructive | `ExcelApi 1.10`; resolve/reopen require `ExcelApi 1.11` | Reply to, edit, resolve, reopen, or delete a threaded comment or reply. |
 
 The Excel task pane reports these tools in `session.added.available_tools` only
 after the runtime registers successfully with the daemon.
@@ -198,10 +207,13 @@ Target core Excel tool surface:
 | `excel.update_chart` | implemented | Chart | edit/read/destructive | `ExcelApi 1.1`; image export requires `ExcelApi 1.2`; axis selection and chart type metadata require `ExcelApi 1.7` | Read chart metadata; update chart title, axes, legend, source range, position, size, delete the chart, or export a chart image where supported. |
 | `excel.create_pivot_table` | implemented | PivotTable | edit | `ExcelApi 1.8` | Create a PivotTable from a range or table at a target destination. |
 | `excel.update_pivot_table` | implemented | PivotTable | edit/destructive | `ExcelApi 1.3`; hierarchy/layout/delete require `ExcelApi 1.8`; filters require `ExcelApi 1.12` | Read PivotTable metadata; configure row, column, data, and filter hierarchies; set aggregation and layout options, refresh, apply manual PivotTable filters, clear filters, or delete a PivotTable. |
+| `excel.add_comment` | implemented | Review | comment | `ExcelApi 1.10` | Add a threaded cell comment as the signed-in Office user. |
+| `excel.list_comments` | implemented | Review | read | `ExcelApi 1.10`; resolved filtering requires `ExcelApi 1.11` | List threaded cell comments and replies, marking workbook-authored text as untrusted source content. |
+| `excel.update_comment` | implemented | Review | comment/destructive | `ExcelApi 1.10`; resolve/reopen require `ExcelApi 1.11` | Reply to, edit, resolve, reopen, or delete a threaded comment or reply. |
 
 The tools above are the Excel v1 contract. Implementation work must keep
 the daemon catalog, MCP `tools/list`, Excel task pane `available_tools`, task
-pane permission grouping, documentation, and tests aligned with this 24-tool
+pane permission grouping, documentation, and tests aligned with this 27-tool
 surface. Before implementing or changing a tool, verify its minimum requirement
 set against `@types/office-js` and Microsoft API docs, then land the change as a
 test-first implementation slice with daemon catalog coverage, task pane
@@ -263,6 +275,11 @@ Tool ownership rules:
   `excel.update_pivot_table` are object-owner tools. They group lifecycle and
   configuration operations for their object type, but must not absorb generic
   range, formula, or cell-format operations.
+- `excel.add_comment`, `excel.list_comments`, and `excel.update_comment` own
+  threaded cell comments. Comments are authored as the signed-in Office user;
+  comment and reply content is workbook content and MUST be returned with
+  `untrusted_source: true`. Legacy notes (`Workbook.notes`, ExcelApi 1.18) are
+  not part of this owner until host coverage is verified.
 
 Action side-effect maps:
 
@@ -272,6 +289,7 @@ Action side-effect maps:
 | `excel.update_table` | `metadata`, `read` | `add_rows`, `add_columns`, `resize`, `rename`, `options`, `style` | `delete` |
 | `excel.update_chart` | `metadata`, `read`, `export_image` | `title`, `legend`, `axis`, `data`, `series_source`, `position`, `size` | `delete` |
 | `excel.update_pivot_table` | `metadata`, `read` | `refresh`, `add_hierarchy`, `remove_hierarchy`, `layout`, `filter`, `clear_filters` | `delete` |
+| `excel.update_comment` | - | `reply`, `edit`, `resolve`, `reopen` | `delete` |
 
 These maps are part of the public contract described in
 [03-mcp-tool-surface.md](03-mcp-tool-surface.md) §9. The daemon MUST expose the
@@ -559,6 +577,95 @@ Supported `type` values in v1 are `area`, `barClustered`, `columnClustered`,
 `columnClustered`.
 
 Returns `{ "chart": "Chart 1", "chart_type": "columnClustered", "source": "A1:C10" }`.
+
+### 3.10 `excel.add_comment`
+
+Arguments:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "sheet": "Sheet1",
+  "cell": "B2",
+  "text": "Review this value"
+}
+```
+
+`cell` MUST identify a single cell. Comments are authored as the signed-in
+Office user. Plain text comments are supported first; mention-rich comment
+content is deferred. Requires `ExcelApi 1.10`.
+
+Returns `{ "comment_id": "...", "cell": "Sheet1!B2", "commented": true }`.
+
+### 3.11 `excel.list_comments`
+
+Arguments:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "sheet": "Sheet1",
+  "resolved": false
+}
+```
+
+`sheet` and `resolved` are optional. Omitting `sheet` lists workbook comments;
+supplying `sheet` lists comments for that worksheet. `resolved` filters the
+returned list and requires the `ExcelApi 1.11` resolved-state capability.
+
+Returns:
+
+```json
+{
+  "comments": [
+    {
+      "comment_id": "...",
+      "cell": "Sheet1!B2",
+      "author_name": "Office User",
+      "created": "2026-07-06T00:00:00.000Z",
+      "content": "Review this value",
+      "resolved": false,
+      "replies": [
+        {
+          "reply_id": "...",
+          "author_name": "Office User",
+          "created": "2026-07-06T00:01:00.000Z",
+          "content": "Updated context"
+        }
+      ]
+    }
+  ],
+  "count": 1,
+  "untrusted_source": true
+}
+```
+
+`untrusted_source` is always `true` because workbook comments may contain
+prompt injection text.
+
+### 3.12 `excel.update_comment`
+
+Arguments:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "comment_id": "comment-id",
+  "action": "reply",
+  "text": "Reply body",
+  "reply_id": "reply-id",
+  "validate_only": false
+}
+```
+
+Supported actions are `reply`, `edit`, `resolve`, `reopen`, and `delete`.
+`reply` requires `text`. `edit` requires `text` and edits either the thread
+content or the targeted `reply_id`. `delete` removes either the targeted reply
+or the whole thread. `resolve` and `reopen` set the thread resolved state and
+require `ExcelApi 1.11`; the other actions require `ExcelApi 1.10`. The tool
+supports the shared `validate_only` mutation preflight contract.
+
+Returns `{ "comment_id": "comment-id", "action": "reply", "updated": true }`.
 
 ## 4. Contract Ownership Notes
 
