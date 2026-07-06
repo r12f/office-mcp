@@ -1812,6 +1812,12 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "horizontal_alignment",
             "vertical_alignment",
             "wrap_text",
+            "merge",
+            "column_width_pt",
+            "row_height_pt",
+            "hidden_columns",
+            "hidden_rows",
+            "style",
             "autofit",
             "borders"
         ]
@@ -2438,6 +2444,13 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
         ("excel.insert_range", "count") => {
             Some(json!({ "type": "integer", "minimum": 1, "default": 1 }))
         }
+        ("excel.format_range", "merge") => {
+            Some(json!({ "enum": ["merge", "merge_across", "unmerge"] }))
+        }
+        ("excel.format_range", "column_width_pt" | "row_height_pt") => {
+            Some(json!({ "type": "number", "minimum": 0 }))
+        }
+        ("excel.format_range", "style") => Some(json!({ "type": "string", "minLength": 1 })),
         ("excel.list_comments", "resolved") => Some(json!({ "type": "boolean" })),
         _ => None,
     }
@@ -2706,6 +2719,8 @@ fn generic_property_schema(name: &str) -> Option<Value> {
         | "complete_match"
         | "autofit"
         | "wrap_text"
+        | "hidden_columns"
+        | "hidden_rows"
         | "show_headers"
         | "show_totals"
         | "highlight_first_column"
