@@ -2005,7 +2005,12 @@ reply lifecycle cannot be represented by range tools without losing review
 identity and permission boundaries. Range insertion is in scope as the
 structural complement to `excel.clear_range` delete-with-shift because inserting
 cells, whole rows, and whole columns is a common Range workflow backed by stable
-`ExcelApi 1.1` APIs.
+`ExcelApi 1.1` APIs. Cell layout completion is in scope as an extension of the
+existing `excel.format_range` owner rather than a new tool: merge/unmerge,
+fixed row or column size, row or column visibility, and named style application
+share the cell-format permission profile. Workbook style-name discovery belongs
+to `excel.get_workbook_info` as workbook state so agents can choose valid style
+names before formatting cells.
 
 Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`,
@@ -2017,7 +2022,9 @@ Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.update_chart`, `excel.create_pivot_table`, and `excel.update_pivot_table`.
 The #104 follow-up also adds `excel.add_comment`, `excel.list_comments`, and
 `excel.update_comment` as the Review category. The #105 follow-up adds
-`excel.insert_range` inside the existing Range/cell data category.
+`excel.insert_range` inside the existing Range/cell data category. The #106
+follow-up extends `excel.format_range` and `excel.get_workbook_info` without
+adding another public tool.
 
 The 28 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 6,
 Formula 1, Format 1, Data operations 2, Table 2, Chart 2, PivotTable 2, and
@@ -2056,6 +2063,13 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       or whole-column shift combinations. The tool requires `ExcelApi 1.1` and
       complements `excel.clear_range` delete-with-shift without making insertion
       destructive.
+- [ ] Implement cell layout completion slice by extending `excel.format_range`
+      and `excel.get_workbook_info`. The format owner must cover merge/unmerge,
+      fixed column width, fixed row height, hide/unhide rows and columns, named
+      style application, deterministic fixed-size/autofit conflict rejection,
+      and style-before-explicit-format ordering. `excel.get_workbook_info` must
+      expose workbook style names behind the `ExcelApi 1.7` gate. This slice
+      must not add a new public tool.
 - [x] Record Excel tool-selection research in
       [04-excel-capabilities.md](04-excel-capabilities.md), starting from the
       Microsoft Learn Excel core object model and related range/table/chart/
