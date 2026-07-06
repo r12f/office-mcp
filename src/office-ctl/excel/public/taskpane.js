@@ -64,6 +64,7 @@
     'excel.write_range',
     'excel.insert_range',
     'excel.clear_range',
+    'excel.set_hyperlink',
     'excel.find_replace_cells',
     'excel.set_formula',
     'excel.format_range',
@@ -79,7 +80,7 @@
   const TOOL_GROUPS = [
     { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate', 'excel.list_named_items', 'excel.update_named_item'] },
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
-    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.find_replace_cells'] },
+    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.set_hyperlink', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
     { label: 'Format', tools: ['excel.format_range'] },
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
@@ -106,6 +107,7 @@
     ['excel.write_range', { category: 'Range', sideEffect: 'mutating', description: 'Write a value matrix into a range.' }],
     ['excel.insert_range', { category: 'Range', sideEffect: 'mutating', description: 'Insert cells, rows, or columns and shift existing content.' }],
     ['excel.clear_range', { category: 'Range', sideEffect: 'destructive', description: 'Clear contents, formats, or delete cells in a range.' }],
+    ['excel.set_hyperlink', { category: 'Range', sideEffect: 'mutating', description: 'Set or clear cell hyperlinks.' }],
     ['excel.find_replace_cells', { category: 'Range', sideEffect: 'mutating', description: 'Find cells in a range and optionally replace matches.' }],
     ['excel.set_formula', { category: 'Formula', sideEffect: 'mutating', description: 'Set formulas in a range.' }],
     ['excel.format_range', { category: 'Format', sideEffect: 'mutating', description: 'Apply formatting to a range.' }],
@@ -398,6 +400,9 @@
         case 'excel.clear_range':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await clearRange(args);
           break;
+        case 'excel.set_hyperlink':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await setHyperlink(args);
+          break;
         case 'excel.find_replace_cells':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await findReplaceCells(args);
           break;
@@ -658,9 +663,11 @@
     });
   }
   async function readRange(args) {
+    if (args.include_hyperlinks) requireRequirementSet('ExcelApi', '1.7', 'range hyperlinks');
     return Excel.run(async (context) => {
       const range = await targetRange(context, args);
       range.load('address,values,text,rowCount,columnCount,numberFormat');
+      if (args.include_hyperlinks) range.load('hyperlink');
       await context.sync();
       return {
         address: range.address,
@@ -669,6 +676,7 @@
         row_count: range.rowCount,
         column_count: range.columnCount,
         number_format: range.numberFormat,
+        hyperlinks: args.include_hyperlinks ? hyperlinkMatrix(range) : undefined,
         untrusted_source: true
       };
     });
@@ -727,6 +735,21 @@
       range.clear(applyTo);
       await context.sync();
       return { address: args.address, cleared: true, apply_to: applyTo };
+    });
+  }
+
+  async function setHyperlink(args) {
+    requireRequirementSet('ExcelApi', '1.7', 'range hyperlinks');
+    const action = validateHyperlinkArgs(args);
+    return Excel.run(async (context) => {
+      const range = await targetRange(context, args);
+      if (action === 'clear') {
+        range.clear(Excel.ClearApplyTo.hyperlinks);
+      } else {
+        range.hyperlink = hyperlinkFromArgs(args);
+      }
+      await context.sync();
+      return { address: args.address, action, updated: true };
     });
   }
 
@@ -1723,6 +1746,64 @@
       throw Object.assign(new Error('excel.insert_range count must be a positive integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
     return count;
+  }
+
+  function validateHyperlinkArgs(args) {
+    const action = String(args.action || '').trim().toLowerCase();
+    if (!['set', 'clear'].includes(action)) {
+      throw Object.assign(new Error(`Unsupported hyperlink action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    const hasUrl = optionalTrimmedString(args.url) !== null;
+    const hasDocumentReference = optionalTrimmedString(args.document_reference) !== null;
+    if (action === 'set') {
+      if (hasUrl === hasDocumentReference) {
+        throw Object.assign(new Error('excel.set_hyperlink set requires exactly one of url or document_reference.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      if (hasUrl) validateHyperlinkUrl(args.url);
+    } else if (hasUrl || hasDocumentReference || args.text_to_display !== undefined || args.screen_tip !== undefined) {
+      throw Object.assign(new Error('excel.set_hyperlink clear does not accept hyperlink payload fields.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return action;
+  }
+
+  function hyperlinkFromArgs(args) {
+    const hyperlink = {};
+    const url = optionalTrimmedString(args.url);
+    const documentReference = optionalTrimmedString(args.document_reference);
+    if (url) hyperlink.address = url;
+    if (documentReference) hyperlink.documentReference = documentReference;
+    if (args.text_to_display !== undefined) hyperlink.textToDisplay = String(args.text_to_display);
+    if (args.screen_tip !== undefined) hyperlink.screenTip = String(args.screen_tip);
+    return hyperlink;
+  }
+
+  function validateHyperlinkUrl(url) {
+    let parsed;
+    try {
+      parsed = new URL(String(url));
+    } catch {
+      throw Object.assign(new Error('excel.set_hyperlink url must be an absolute URL.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (!['https:', 'http:', 'mailto:'].includes(parsed.protocol)) {
+      throw Object.assign(new Error('excel.set_hyperlink url scheme must be https, http, or mailto.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
+  function hyperlinkMatrix(range) {
+    const hyperlink = normalizeHyperlink(range.hyperlink);
+    return Array.from({ length: range.rowCount }, () => Array.from({ length: range.columnCount }, () => hyperlink));
+  }
+
+  function normalizeHyperlink(hyperlink) {
+    if (!hyperlink || (!hyperlink.address && !hyperlink.documentReference && !hyperlink.textToDisplay && !hyperlink.screenTip)) {
+      return null;
+    }
+    return {
+      url: hyperlink.address || null,
+      document_reference: hyperlink.documentReference || null,
+      text_to_display: hyperlink.textToDisplay || null,
+      screen_tip: hyperlink.screenTip || null
+    };
   }
 
   function deleteShiftDirectionFrom(value) {

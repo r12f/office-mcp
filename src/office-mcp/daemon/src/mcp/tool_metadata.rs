@@ -531,6 +531,13 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Range",
         ToolSideEffect::Mutating,
     ),
+    tool_with_actions(
+        "excel.set_hyperlink",
+        "excel",
+        "Range",
+        ToolSideEffect::Mutating,
+        EXCEL_SET_HYPERLINK_ACTIONS,
+    ),
     tool(
         "excel.clear_range",
         "excel",
@@ -850,6 +857,11 @@ const EXCEL_UPDATE_COMMENT_ACTIONS: &[ActionSideEffect] = &[
     action("resolve", ToolSideEffect::Mutating),
     action("reopen", ToolSideEffect::Mutating),
     action("delete", ToolSideEffect::Destructive),
+];
+
+const EXCEL_SET_HYPERLINK_ACTIONS: &[ActionSideEffect] = &[
+    action("set", ToolSideEffect::Mutating),
+    action("clear", ToolSideEffect::Mutating),
 ];
 
 const POWERPOINT_UPDATE_TAGS_ACTIONS: &[ActionSideEffect] = &[

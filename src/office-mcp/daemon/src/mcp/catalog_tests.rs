@@ -873,10 +873,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 113);
+    assert_eq!(all_tools.len(), 114);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        113
+        114
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1442,34 +1442,6 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
     assert_eq!(range["properties"]["sheet"]["type"], "string");
     assert!(range["properties"].get("range").is_none());
 
-    let set_hyperlink = schema_for("excel.set_hyperlink");
-    assert_required(&set_hyperlink, &["session_id", "address", "action"]);
-    assert_eq!(
-        set_hyperlink["properties"]["action"]["enum"],
-        serde_json::json!(["set", "clear"])
-    );
-    assert_eq!(set_hyperlink["properties"]["sheet"]["type"], "string");
-    assert_eq!(set_hyperlink["properties"]["url"]["format"], "uri");
-    assert_eq!(
-        set_hyperlink["properties"]["document_reference"]["minLength"],
-        1
-    );
-    assert_eq!(set_hyperlink["properties"]["text_to_display"]["type"], "string");
-    assert_eq!(set_hyperlink["properties"]["screen_tip"]["type"], "string");
-    assert_eq!(
-        set_hyperlink["properties"]["validate_only"]["type"],
-        "boolean"
-    );
-    let set_hyperlink_tool = tool_for("excel.set_hyperlink");
-    assert_eq!(
-        set_hyperlink_tool["_meta"]["com.office-mcp/action_side_effects"]["set"],
-        "mutating"
-    );
-    assert_eq!(
-        set_hyperlink_tool["_meta"]["com.office-mcp/action_side_effects"]["clear"],
-        "mutating"
-    );
-
     let workbook_info = schema_for("excel.get_workbook_info");
     assert_required(&workbook_info, &["session_id"]);
     assert!(workbook_info["properties"].get("include_styles").is_none());
@@ -1556,6 +1528,41 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
         .into_iter()
         .find(|tool| tool["name"] == "powerpoint.add_text_box");
     assert!(retired_text_box.is_none());
+}
+
+#[test]
+fn excel_hyperlink_schema_is_specific() {
+    let set_hyperlink = schema_for("excel.set_hyperlink");
+    assert_required(&set_hyperlink, &["session_id", "address", "action"]);
+    assert_eq!(
+        set_hyperlink["properties"]["action"]["enum"],
+        serde_json::json!(["set", "clear"])
+    );
+    assert_eq!(set_hyperlink["properties"]["sheet"]["type"], "string");
+    assert_eq!(set_hyperlink["properties"]["url"]["format"], "uri");
+    assert_eq!(
+        set_hyperlink["properties"]["document_reference"]["minLength"],
+        1
+    );
+    assert_eq!(
+        set_hyperlink["properties"]["text_to_display"]["type"],
+        "string"
+    );
+    assert_eq!(set_hyperlink["properties"]["screen_tip"]["type"], "string");
+    assert_eq!(
+        set_hyperlink["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
+    let set_hyperlink_tool = tool_for("excel.set_hyperlink");
+    assert_eq!(
+        set_hyperlink_tool["_meta"]["com.office-mcp/action_side_effects"]["set"],
+        "mutating"
+    );
+    assert_eq!(
+        set_hyperlink_tool["_meta"]["com.office-mcp/action_side_effects"]["clear"],
+        "mutating"
+    );
 }
 
 #[test]

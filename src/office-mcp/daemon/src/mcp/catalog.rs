@@ -80,6 +80,7 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.get_used_range",
     "excel.get_workbook_info",
     "excel.insert_range",
+    "excel.set_hyperlink",
     "excel.save",
     "excel.calculate",
     "excel.list_named_items",
@@ -1758,7 +1759,8 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "sheet",
             "address",
             "include_formulas",
-            "include_formatting"
+            "include_formatting",
+            "include_hyperlinks"
         ]
     ),
     tool_spec!(
@@ -1775,6 +1777,20 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         "excel.clear_range",
         ["session_id", "address"],
         ["session_id", "sheet", "address", "apply_to", "delete_shift"]
+    ),
+    tool_spec!(
+        "excel.set_hyperlink",
+        ["session_id", "address", "action"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "action",
+            "url",
+            "document_reference",
+            "text_to_display",
+            "screen_tip"
+        ]
     ),
     tool_spec!(
         "excel.find_replace_cells",
@@ -2296,7 +2312,37 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             }
         ]);
     }
+    add_excel_set_hyperlink_schema_rules(tool, &mut schema);
     schema
+}
+
+fn add_excel_set_hyperlink_schema_rules(tool: &str, schema: &mut Value) {
+    if tool == "excel.set_hyperlink" {
+        schema["allOf"] = json!([
+            {
+                "if": { "properties": { "action": { "const": "set" } } },
+                "then": {
+                    "oneOf": [
+                        { "required": ["url"] },
+                        { "required": ["document_reference"] }
+                    ]
+                }
+            },
+            {
+                "if": { "properties": { "action": { "const": "clear" } } },
+                "then": {
+                    "not": {
+                        "anyOf": [
+                            { "required": ["url"] },
+                            { "required": ["document_reference"] },
+                            { "required": ["text_to_display"] },
+                            { "required": ["screen_tip"] }
+                        ]
+                    }
+                }
+            }
+        ]);
+    }
 }
 
 fn property_schema(tool: &str, name: &str) -> Value {
@@ -2437,12 +2483,17 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
         ("excel.update_named_item", "name")
         | ("excel.add_comment", "cell")
         | ("excel.add_comment" | "excel.update_comment", "text")
-        | ("excel.update_comment", "comment_id" | "reply_id") => {
+        | ("excel.update_comment", "comment_id" | "reply_id")
+        | ("excel.set_hyperlink", "document_reference") => {
             Some(json!({ "type": "string", "minLength": 1 }))
         }
         ("excel.insert_range", "shift") => Some(json!({ "enum": ["down", "right"] })),
         ("excel.insert_range", "count") => {
             Some(json!({ "type": "integer", "minimum": 1, "default": 1 }))
+        }
+        ("excel.set_hyperlink", "url") => Some(json!({ "type": "string", "format": "uri" })),
+        ("excel.set_hyperlink", "text_to_display" | "screen_tip") => {
+            Some(json!({ "type": "string" }))
         }
         ("excel.format_range", "merge") => {
             Some(json!({ "enum": ["merge", "merge_across", "unmerge"] }))
@@ -2469,6 +2520,9 @@ fn excel_action_property_schema(tool: &str, name: &str) -> Option<Value> {
         })),
         "excel.update_comment" => Some(json!({
             "enum": ["reply", "edit", "resolve", "reopen", "delete"]
+        })),
+        "excel.set_hyperlink" => Some(json!({
+            "enum": ["set", "clear"]
         })),
         "excel.update_chart" => Some(json!({
             "enum": ["metadata", "read", "title", "legend", "axis", "data", "series_source", "position", "size", "export_image", "delete"]
@@ -2708,6 +2762,7 @@ fn generic_property_schema(name: &str) -> Option<Value> {
         | "include_text_preview"
         | "include_formatting"
         | "include_formulas"
+        | "include_hyperlinks"
         | "include_selection"
         | "include_page_setup"
         | "include_tags"
