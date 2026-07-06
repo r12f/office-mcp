@@ -244,6 +244,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /excel\.clear_range/);
   assert.match(js, /excel\.set_hyperlink/);
   assert.match(js, /excel\.set_data_validation/);
+  assert.match(js, /excel\.copy_range/);
   assert.match(js, /excel\.find_replace_cells/);
   assert.match(js, /excel\.list_conditional_formats/);
   assert.match(js, /excel\.update_conditional_format/);
@@ -269,6 +270,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /case 'excel.clear_range':/);
   assert.match(js, /case 'excel.set_hyperlink':/);
   assert.match(js, /case 'excel.set_data_validation':/);
+  assert.match(js, /case 'excel.copy_range':/);
   assert.match(js, /case 'excel.find_replace_cells':/);
   assert.match(js, /case 'excel.list_conditional_formats':/);
   assert.match(js, /case 'excel.update_conditional_format':/);
@@ -313,6 +315,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /async function clearRange/);
   assert.match(js, /async function setHyperlink/);
   assert.match(js, /async function setDataValidation/);
+  assert.match(js, /async function copyRange/);
   assert.match(js, /async function findReplaceCells/);
   assert.match(js, /async function listConditionalFormats/);
   assert.match(js, /async function updateConditionalFormat/);
@@ -519,6 +522,13 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /function filterCriteriaFrom\(criteria\)/);
   assert.match(js, /function filterOnFrom\(value\)/);
   assert.match(js, /function sortOrientationFrom\(value\)/);
+  assert.match(js, /requireRequirementSet\('ExcelApi', '1\.9', 'range copy and autofill'\)/);
+  assert.match(js, /destination\.copyFrom\(source, rangeCopyTypeFrom\(args\.copy_type\), Boolean\(args\.skip_blanks\), Boolean\(args\.transpose\)\)/);
+  assert.match(js, /source\.autoFill\(destination, autoFillTypeFrom\(args\.autofill_type\)\)/);
+  assert.match(js, /function validateCopyRangeArgs\(args\)/);
+  assert.match(js, /function rangeCopyTypeFrom\(value\)/);
+  assert.match(js, /function autoFillTypeFrom\(value\)/);
+  assert.match(js, /function validateAutofillContainsSource\(source, destination\)/);
   assert.match(js, /context\.workbook\.tables\.add/);
   assert.match(js, /worksheet\.charts\.add/);
   assert.match(js, /function chartTypeFrom/);
@@ -552,6 +562,7 @@ test('Excel task pane routes mutating tools through validation-only preflight', 
   assert.match(invokeBody, /case 'excel\.clear_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await clearRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.set_hyperlink':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await setHyperlink\(args\);/);
   assert.match(invokeBody, /case 'excel\.set_data_validation':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await setDataValidation\(args\);/);
+  assert.match(invokeBody, /case 'excel\.copy_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await copyRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_conditional_format':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateConditionalFormat\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_table':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateTable\(args\);/);
   assert.match(invokeBody, /case 'excel\.add_comment':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await addComment\(args\);/);

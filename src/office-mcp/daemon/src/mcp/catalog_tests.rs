@@ -127,7 +127,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
     assert_eq!(WORD_V1_TOOLS.len(), 62);
-    assert_eq!(ExcelToolCatalog::tools().len(), 32);
+    assert_eq!(ExcelToolCatalog::tools().len(), 33);
     assert_eq!(PowerPointToolCatalog::tools().len(), 23);
     assert_eq!(tools.len(), 240);
 }
@@ -189,6 +189,19 @@ fn tools_list_exposes_action_side_effects_for_mixed_owner_tools() {
     assert_eq!(
         excel_update_conditional_format["_meta"]["com.office-mcp/action_side_effects"]["clear_range"],
         "destructive"
+    );
+
+    let excel_copy_range = tools
+        .iter()
+        .find(|tool| tool["name"] == "excel.copy_range")
+        .expect("excel.copy_range tool");
+    assert_eq!(
+        excel_copy_range["_meta"]["com.office-mcp/action_side_effects"]["copy"],
+        "mutating"
+    );
+    assert_eq!(
+        excel_copy_range["_meta"]["com.office-mcp/action_side_effects"]["autofill"],
+        "mutating"
     );
 
     let powerpoint_update_tags = tools
@@ -1718,6 +1731,47 @@ fn excel_data_validation_schemas_are_specific() {
 }
 
 #[test]
+fn excel_copy_range_schema_is_specific() {
+    let copy_range = schema_for("excel.copy_range");
+    assert_required(&copy_range, &["session_id", "action"]);
+    assert_eq!(
+        copy_range["properties"]["action"]["enum"],
+        serde_json::json!(["copy", "autofill"])
+    );
+    assert_eq!(copy_range["properties"]["source_sheet"]["type"], "string");
+    assert_eq!(copy_range["properties"]["source_address"]["type"], "string");
+    assert_eq!(
+        copy_range["properties"]["destination_sheet"]["type"],
+        "string"
+    );
+    assert_eq!(
+        copy_range["properties"]["destination_address"]["type"],
+        "string"
+    );
+    assert_eq!(
+        copy_range["properties"]["copy_type"]["enum"],
+        serde_json::json!(["all", "values", "formulas", "formats", "link"])
+    );
+    assert_eq!(
+        copy_range["properties"]["autofill_type"]["enum"],
+        serde_json::json!(["default", "copy", "series", "formats", "values", "flash_fill"])
+    );
+    assert_eq!(copy_range["properties"]["skip_blanks"]["type"], "boolean");
+    assert_eq!(copy_range["properties"]["transpose"]["type"], "boolean");
+    assert_eq!(copy_range["properties"]["validate_only"]["type"], "boolean");
+
+    let copy_tool = tool_for("excel.copy_range");
+    assert_eq!(
+        copy_tool["_meta"]["com.office-mcp/action_side_effects"]["copy"],
+        "mutating"
+    );
+    assert_eq!(
+        copy_tool["_meta"]["com.office-mcp/action_side_effects"]["autofill"],
+        "mutating"
+    );
+}
+
+#[test]
 fn excel_comment_schemas_are_specific() {
     let add_comment = schema_for("excel.add_comment");
     assert_required(&add_comment, &["session_id", "cell", "text"]);
@@ -1761,6 +1815,7 @@ fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.clear_range"));
     assert!(ExcelToolCatalog::contains("excel.set_hyperlink"));
     assert!(ExcelToolCatalog::contains("excel.set_data_validation"));
+    assert!(ExcelToolCatalog::contains("excel.copy_range"));
     assert!(ExcelToolCatalog::contains("excel.find_replace_cells"));
     assert!(ExcelToolCatalog::contains("excel.list_conditional_formats"));
     assert!(ExcelToolCatalog::contains(
