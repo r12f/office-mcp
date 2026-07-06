@@ -321,11 +321,11 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /untrusted_source: true/);
   assert.match(js, /const insertShift = insertShiftDirectionFrom\(args\.shift\)/);
   assert.match(js, /validateInsertRangeShift\(args\.address, args\.shift\)/);
-  assert.match(js, /const insertTarget = insertRangeAddress\(range, args\.count\)/);
+  assert.match(js, /const insertTarget = insertRangeAddress\(range, args\.shift, args\.count\)/);
   assert.match(js, /insertTarget\.insert\(insertShift\)/);
   assert.match(js, /function insertShiftDirectionFrom\(value\)/);
   assert.match(js, /function validateInsertRangeShift\(address, shift\)/);
-  assert.match(js, /function insertRangeAddress\(range, count\)/);
+  assert.match(js, /function insertRangeAddress\(range, shift, count\)/);
   assert.match(js, /const applyTo = clearApplyToFrom/);
   assert.match(js, /range\.clear\(applyTo\)/);
   assert.match(js, /range\.delete\(deleteShiftDirectionFrom\(deleteShift\)\)/);

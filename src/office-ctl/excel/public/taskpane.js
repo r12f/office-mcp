@@ -62,6 +62,7 @@
     'excel.get_used_range',
     'excel.read_range',
     'excel.write_range',
+    'excel.insert_range',
     'excel.clear_range',
     'excel.find_replace_cells',
     'excel.set_formula',
@@ -78,7 +79,7 @@
   const TOOL_GROUPS = [
     { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate', 'excel.list_named_items', 'excel.update_named_item'] },
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
-    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.clear_range', 'excel.find_replace_cells'] },
+    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
     { label: 'Format', tools: ['excel.format_range'] },
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
@@ -103,6 +104,7 @@
     ['excel.get_used_range', { category: 'Range', sideEffect: 'read', description: 'Read the used range address and dimensions.' }],
     ['excel.read_range', { category: 'Range', sideEffect: 'read', description: 'Read values, text, formulas, and number formats from a range.' }],
     ['excel.write_range', { category: 'Range', sideEffect: 'mutating', description: 'Write a value matrix into a range.' }],
+    ['excel.insert_range', { category: 'Range', sideEffect: 'mutating', description: 'Insert cells, rows, or columns and shift existing content.' }],
     ['excel.clear_range', { category: 'Range', sideEffect: 'destructive', description: 'Clear contents, formats, or delete cells in a range.' }],
     ['excel.find_replace_cells', { category: 'Range', sideEffect: 'mutating', description: 'Find cells in a range and optionally replace matches.' }],
     ['excel.set_formula', { category: 'Formula', sideEffect: 'mutating', description: 'Set formulas in a range.' }],
@@ -389,6 +391,9 @@
           break;
         case 'excel.write_range':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await writeRange(args);
+          break;
+        case 'excel.insert_range':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await insertRange(args);
           break;
         case 'excel.clear_range':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await clearRange(args);
@@ -678,6 +683,29 @@
         row_count: args.values.length,
         column_count: args.values[0].length,
         wrote_values: true
+      };
+    });
+  }
+
+  async function insertRange(args) {
+    validateInsertRangeShift(args.address, args.shift);
+    return Excel.run(async (context) => {
+      const range = await targetRange(context, args);
+      const insertShift = insertShiftDirectionFrom(args.shift);
+      range.load('address,rowCount,columnCount');
+      await context.sync();
+      const insertTarget = insertRangeAddress(range, args.shift, args.count);
+      insertTarget.load('address');
+      insertTarget.insert(insertShift);
+      const usedRange = targetWorksheet(context, args).getUsedRangeOrNullObject(true);
+      usedRange.load('address,isNullObject');
+      await context.sync();
+      return {
+        address: insertTarget.address,
+        shift: String(args.shift).trim().toLowerCase(),
+        count: insertCount(args.count),
+        inserted: true,
+        new_used_range: usedRange.isNullObject ? null : usedRange.address
       };
     });
   }
@@ -1644,6 +1672,49 @@
       throw Object.assign(new Error(`Unsupported clear mode ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
     return modes[key];
+  }
+
+  function insertShiftDirectionFrom(value) {
+    const shifts = {
+      down: Excel.InsertShiftDirection?.down || Excel.InsertShiftDirection?.Down || 'Down',
+      right: Excel.InsertShiftDirection?.right || Excel.InsertShiftDirection?.Right || 'Right'
+    };
+    const key = String(value || '').trim().toLowerCase();
+    if (!shifts[key]) {
+      throw Object.assign(new Error(`Unsupported insert shift ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return shifts[key];
+  }
+
+  function validateInsertRangeShift(address, shift) {
+    const normalized = String(address || '').trim().replace(/\$/g, '');
+    const key = String(shift || '').trim().toLowerCase();
+    const isWholeRow = /^\d+(:\d+)?$/.test(normalized);
+    const isWholeColumn = /^[A-Za-z]+(:[A-Za-z]+)?$/.test(normalized);
+    if (isWholeRow && key !== 'down') {
+      throw Object.assign(new Error('Whole-row insertion requires shift down.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (isWholeColumn && key !== 'right') {
+      throw Object.assign(new Error('Whole-column insertion requires shift right.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
+  function insertRangeAddress(range, shift, count) {
+    const requestedCount = insertCount(count);
+    if (requestedCount === 1) return range;
+    if (String(shift || '').trim().toLowerCase() === 'right') {
+      return range.getResizedRange(0, range.columnCount * requestedCount - range.columnCount);
+    }
+    return range.getResizedRange(range.rowCount * requestedCount - range.rowCount, 0);
+  }
+
+  function insertCount(value) {
+    if (value === undefined || value === null) return 1;
+    const count = Number(value);
+    if (!Number.isInteger(count) || count < 1) {
+      throw Object.assign(new Error('excel.insert_range count must be a positive integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return count;
   }
 
   function deleteShiftDirectionFrom(value) {

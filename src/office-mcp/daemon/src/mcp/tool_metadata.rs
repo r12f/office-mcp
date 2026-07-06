@@ -526,6 +526,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
+        "excel.insert_range",
+        "excel",
+        "Range",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
         "excel.clear_range",
         "excel",
         "Range",

@@ -79,6 +79,7 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.format_range",
     "excel.get_used_range",
     "excel.get_workbook_info",
+    "excel.insert_range",
     "excel.save",
     "excel.calculate",
     "excel.list_named_items",
@@ -1766,6 +1767,11 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "sheet", "address", "values"]
     ),
     tool_spec!(
+        "excel.insert_range",
+        ["session_id", "address", "shift"],
+        ["session_id", "sheet", "address", "shift", "count"]
+    ),
+    tool_spec!(
         "excel.clear_range",
         ["session_id", "address"],
         ["session_id", "sheet", "address", "apply_to", "delete_shift"]
@@ -2427,6 +2433,10 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
         | ("excel.add_comment" | "excel.update_comment", "text")
         | ("excel.update_comment", "comment_id" | "reply_id") => {
             Some(json!({ "type": "string", "minLength": 1 }))
+        }
+        ("excel.insert_range", "shift") => Some(json!({ "enum": ["down", "right"] })),
+        ("excel.insert_range", "count") => {
+            Some(json!({ "type": "integer", "minimum": 1, "default": 1 }))
         }
         ("excel.list_comments", "resolved") => Some(json!({ "type": "boolean" })),
         _ => None,
