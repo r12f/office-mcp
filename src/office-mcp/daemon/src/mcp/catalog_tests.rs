@@ -127,9 +127,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
     assert_eq!(WORD_V1_TOOLS.len(), 62);
-    assert_eq!(ExcelToolCatalog::tools().len(), 29);
+    assert_eq!(ExcelToolCatalog::tools().len(), 31);
     assert_eq!(PowerPointToolCatalog::tools().len(), 23);
-    assert_eq!(tools.len(), 234);
+    assert_eq!(tools.len(), 238);
 }
 
 #[test]
@@ -171,6 +171,23 @@ fn tools_list_exposes_action_side_effects_for_mixed_owner_tools() {
     );
     assert_eq!(
         excel_update_comment["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
+    );
+
+    let excel_update_conditional_format = tools
+        .iter()
+        .find(|tool| tool["name"] == "excel.update_conditional_format")
+        .expect("excel.update_conditional_format tool");
+    assert_eq!(
+        excel_update_conditional_format["_meta"]["com.office-mcp/action_side_effects"]["add"],
+        "mutating"
+    );
+    assert_eq!(
+        excel_update_conditional_format["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
+    );
+    assert_eq!(
+        excel_update_conditional_format["_meta"]["com.office-mcp/action_side_effects"]["clear_range"],
         "destructive"
     );
 
@@ -873,10 +890,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 114);
+    assert_eq!(all_tools.len(), 116);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        114
+        116
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1588,6 +1605,56 @@ fn excel_format_range_schema_covers_layout_completion() {
 }
 
 #[test]
+fn excel_conditional_format_schemas_are_specific() {
+    let list_formats = schema_for("excel.list_conditional_formats");
+    assert_required(&list_formats, &["session_id"]);
+    assert_eq!(list_formats["properties"]["sheet"]["type"], "string");
+    assert_eq!(list_formats["properties"]["address"]["type"], "string");
+
+    let update_format = schema_for("excel.update_conditional_format");
+    assert_required(&update_format, &["session_id", "action"]);
+    assert_eq!(
+        update_format["properties"]["action"]["enum"],
+        serde_json::json!(["add", "delete", "clear_range"])
+    );
+    assert_eq!(update_format["properties"]["id"]["minLength"], 1);
+    assert_eq!(update_format["properties"]["priority"]["minimum"], 0);
+    assert_eq!(
+        update_format["properties"]["stop_if_true"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        update_format["properties"]["rule"]["properties"]["type"]["enum"],
+        serde_json::json!([
+            "cell_value",
+            "color_scale",
+            "data_bar",
+            "icon_set",
+            "top_bottom",
+            "preset_criteria",
+            "contains_text",
+            "custom_formula"
+        ])
+    );
+    assert_eq!(
+        update_format["properties"]["rule"]["properties"]["colors"]["minItems"],
+        2
+    );
+    assert_eq!(
+        update_format["properties"]["rule"]["properties"]["colors"]["maxItems"],
+        3
+    );
+    assert_eq!(
+        update_format["properties"]["rule"]["properties"]["format"]["properties"]["fill_color"]["pattern"],
+        "^#[0-9A-Fa-f]{6}$"
+    );
+    assert_eq!(
+        update_format["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+}
+
+#[test]
 fn excel_comment_schemas_are_specific() {
     let add_comment = schema_for("excel.add_comment");
     assert_required(&add_comment, &["session_id", "cell", "text"]);
@@ -1631,6 +1698,10 @@ fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.clear_range"));
     assert!(ExcelToolCatalog::contains("excel.set_hyperlink"));
     assert!(ExcelToolCatalog::contains("excel.find_replace_cells"));
+    assert!(ExcelToolCatalog::contains("excel.list_conditional_formats"));
+    assert!(ExcelToolCatalog::contains(
+        "excel.update_conditional_format"
+    ));
     assert!(ExcelToolCatalog::contains("excel.sort_range"));
     assert!(ExcelToolCatalog::contains("excel.apply_filter"));
     assert!(ExcelToolCatalog::contains("excel.update_table"));

@@ -150,6 +150,33 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
         Some(ToolSideEffect::Mutating)
     );
 
+    let list_conditional_formats = tool_metadata("excel.list_conditional_formats")
+        .expect("excel conditional format list metadata");
+    assert_eq!(list_conditional_formats.app, "excel");
+    assert_eq!(list_conditional_formats.category, "Format");
+    assert_eq!(list_conditional_formats.side_effect, ToolSideEffect::Read);
+
+    let update_conditional_format = tool_metadata("excel.update_conditional_format")
+        .expect("excel conditional format update metadata");
+    assert_eq!(update_conditional_format.app, "excel");
+    assert_eq!(update_conditional_format.category, "Format");
+    assert_eq!(
+        update_conditional_format.side_effect,
+        ToolSideEffect::Destructive
+    );
+    assert_eq!(
+        update_conditional_format.side_effect_for_action("add"),
+        Some(ToolSideEffect::Mutating)
+    );
+    assert_eq!(
+        update_conditional_format.side_effect_for_action("delete"),
+        Some(ToolSideEffect::Destructive)
+    );
+    assert_eq!(
+        update_conditional_format.side_effect_for_action("clear_range"),
+        Some(ToolSideEffect::Destructive)
+    );
+
     let save = tool_metadata("excel.save").expect("excel save metadata");
     assert_eq!(save.app, "excel");
     assert_eq!(save.category, "Workbook");

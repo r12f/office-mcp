@@ -292,6 +292,38 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['0.00'] }
     }
   }],
+  ['excel.list_conditional_formats', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'F1:F3', values: [[-1], [2], [-3]] } },
+        { tool: 'excel.update_conditional_format', arguments: { sheet: 'Sheet1', address: 'F1:F3', action: 'add', rule: { type: 'cell_value', operator: 'less_than', values: [0], format: { fill_color: '#FFC7CE', font_color: '#9C0006' } } } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'F1:F3' },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['cell_value', 'less_than', '#FFC7CE'], pathEquals: [{ path: 'count', value: 1 }] }
+    }
+  }],
+  ['excel.update_conditional_format', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'G1:G3', values: [[1], [2], [3]] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'G1:G3', action: 'add', rule: { type: 'color_scale', colors: ['#63BE7B', '#FFEB84', '#F8696B'] } },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.list_conditional_formats',
+      readbackArguments: { sheet: 'Sheet1', address: 'G1:G3' },
+      expect: { contains: ['color_scale', '#63BE7B', '#F8696B'] }
+    },
+    cleanup: {
+      actions: [
+        { tool: 'excel.update_conditional_format', arguments: { sheet: 'Sheet1', address: 'G1:G3', action: 'clear_range' } }
+      ]
+    }
+  }],
   ['excel.sort_range', {
     setup: {
       actions: [

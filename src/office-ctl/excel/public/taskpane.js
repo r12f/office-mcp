@@ -68,6 +68,8 @@
     'excel.find_replace_cells',
     'excel.set_formula',
     'excel.format_range',
+    'excel.list_conditional_formats',
+    'excel.update_conditional_format',
     'excel.sort_range',
     'excel.apply_filter',
     'excel.create_table',
@@ -82,7 +84,7 @@
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
     { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.set_hyperlink', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
-    { label: 'Format', tools: ['excel.format_range'] },
+    { label: 'Format', tools: ['excel.format_range', 'excel.list_conditional_formats', 'excel.update_conditional_format'] },
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
     { label: 'Table', tools: ['excel.create_table', 'excel.update_table'] },
     { label: 'Chart', tools: ['excel.create_chart', 'excel.update_chart'] },
@@ -111,6 +113,8 @@
     ['excel.find_replace_cells', { category: 'Range', sideEffect: 'mutating', description: 'Find cells in a range and optionally replace matches.' }],
     ['excel.set_formula', { category: 'Formula', sideEffect: 'mutating', description: 'Set formulas in a range.' }],
     ['excel.format_range', { category: 'Format', sideEffect: 'mutating', description: 'Apply formatting to a range.' }],
+    ['excel.list_conditional_formats', { category: 'Format', sideEffect: 'read', description: 'List conditional formatting rules for a worksheet or range.' }],
+    ['excel.update_conditional_format', { category: 'Format', sideEffect: 'destructive', description: 'Add, delete, or clear conditional formatting rules.' }],
     ['excel.sort_range', { category: 'Data', sideEffect: 'mutating', description: 'Sort a range or table by one or more keys.' }],
     ['excel.apply_filter', { category: 'Data', sideEffect: 'mutating', description: 'Apply, clear, remove, or reapply range and table filters.' }],
     ['excel.create_table', { category: 'Table', sideEffect: 'mutating', description: 'Create a table from a range.' }],
@@ -411,6 +415,12 @@
           break;
         case 'excel.format_range':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await formatRange(args);
+          break;
+        case 'excel.list_conditional_formats':
+          data = await listConditionalFormats(args);
+          break;
+        case 'excel.update_conditional_format':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateConditionalFormat(args);
           break;
         case 'excel.sort_range':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await sortRange(args);
@@ -884,6 +894,51 @@
       if (args.autofit_rows === true) range.format.autofitRows();
       await context.sync();
       return { address: args.address, formatted: true };
+    });
+  }
+
+  async function listConditionalFormats(args) {
+    requireRequirementSet('ExcelApi', '1.6', 'conditional formatting');
+    return Excel.run(async (context) => {
+      const collection = await targetConditionalFormatCollection(context, args);
+      collection.conditionalFormats.load('items/id,items/type,items/priority,items/stopIfTrue');
+      await context.sync();
+      const formats = collection.conditionalFormats.items.map((format) => conditionalFormatSummary(format));
+      return {
+        sheet: args.sheet || null,
+        address: collection.address || null,
+        conditional_formats: formats,
+        count: formats.length,
+        untrusted_source: true
+      };
+    });
+  }
+
+  async function updateConditionalFormat(args) {
+    requireRequirementSet('ExcelApi', '1.6', 'conditional formatting');
+    const action = validateConditionalFormatArgs(args);
+    return Excel.run(async (context) => {
+      if (action === 'delete') {
+        const worksheet = targetWorksheet(context, args);
+        const conditionalFormat = worksheet.conditionalFormats.getItem(requiredString(args, 'id', 'excel.update_conditional_format delete requires id.'));
+        conditionalFormat.delete();
+        await context.sync();
+        return { action, id: args.id, deleted: true };
+      }
+      const collection = await targetConditionalFormatCollection(context, args);
+      if (action === 'clear_range') {
+        collection.conditionalFormats.clearAll();
+        await context.sync();
+        return { action, address: collection.address, cleared: true };
+      }
+      const rule = args.rule;
+      const conditionalFormat = collection.conditionalFormats.add(conditionalFormatTypeFrom(rule.type));
+      applyConditionalFormatRule(conditionalFormat, rule);
+      if (args.priority !== undefined) conditionalFormat.priority = Number(args.priority);
+      if (args.stop_if_true !== undefined) conditionalFormat.stopIfTrue = Boolean(args.stop_if_true);
+      conditionalFormat.load('id,type,priority,stopIfTrue');
+      await context.sync();
+      return { action, address: collection.address, conditional_format: conditionalFormatSummary(conditionalFormat), added: true };
     });
   }
 
@@ -1946,6 +2001,208 @@
     if (args.row_height_pt !== undefined) range.format.rowHeight = Number(args.row_height_pt);
     if (args.hidden_columns !== undefined) range.format.columnHidden = Boolean(args.hidden_columns);
     if (args.hidden_rows !== undefined) range.format.rowHidden = Boolean(args.hidden_rows);
+  }
+
+  async function targetConditionalFormatCollection(context, args) {
+    if (args.address !== undefined && args.address !== null) {
+      const range = await targetRange(context, args);
+      range.load('address');
+      await context.sync();
+      return { conditionalFormats: range.conditionalFormats, address: range.address };
+    }
+    const worksheet = targetWorksheet(context, args);
+    worksheet.load('name');
+    await context.sync();
+    return { conditionalFormats: worksheet.conditionalFormats, address: null, sheet: worksheet.name };
+  }
+
+  function validateConditionalFormatArgs(args) {
+    const action = String(args.action || '').trim().toLowerCase();
+    if (!['add', 'delete', 'clear_range'].includes(action)) {
+      throw Object.assign(new Error(`Unsupported conditional format action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (action === 'add') {
+      requiredString(args, 'address', 'excel.update_conditional_format add requires address.');
+      if (!args.rule || typeof args.rule !== 'object' || Array.isArray(args.rule)) {
+        throw Object.assign(new Error('excel.update_conditional_format add requires rule.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      conditionalFormatTypeFrom(args.rule.type);
+    } else if (action === 'delete') {
+      requiredString(args, 'id', 'excel.update_conditional_format delete requires id.');
+    } else {
+      requiredString(args, 'address', 'excel.update_conditional_format clear_range requires address.');
+    }
+    if (args.priority !== undefined && (!Number.isInteger(Number(args.priority)) || Number(args.priority) < 0)) {
+      throw Object.assign(new Error('excel.update_conditional_format priority must be a non-negative integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return action;
+  }
+
+  function conditionalFormatTypeFrom(value) {
+    const types = {
+      cell_value: Excel.ConditionalFormatType.cellValue,
+      color_scale: Excel.ConditionalFormatType.colorScale,
+      data_bar: Excel.ConditionalFormatType.dataBar,
+      icon_set: Excel.ConditionalFormatType.iconSet,
+      top_bottom: Excel.ConditionalFormatType.topBottom,
+      preset_criteria: Excel.ConditionalFormatType.presetCriteria,
+      contains_text: Excel.ConditionalFormatType.containsText,
+      custom_formula: Excel.ConditionalFormatType.custom
+    };
+    return enumValueFrom(types, value, 'conditional format type');
+  }
+
+  function applyConditionalFormatRule(conditionalFormat, rule) {
+    const type = String(rule.type || '').trim().toLowerCase();
+    if (type === 'cell_value') {
+      conditionalFormat.cellValue.format = conditionalFormatCellFormat(rule.format);
+      conditionalFormat.cellValue.rule = {
+        operator: conditionalCellValueOperatorFrom(rule.operator || 'equal_to'),
+        formula1: conditionalFormulaValue(rule.values?.[0]),
+        formula2: rule.values?.[1] === undefined ? undefined : conditionalFormulaValue(rule.values[1])
+      };
+    } else if (type === 'color_scale') {
+      applyColorScaleRule(conditionalFormat.colorScale, rule);
+    } else if (type === 'data_bar') {
+      if (rule.colors?.[0]) conditionalFormat.dataBar.barColor = String(rule.colors[0]);
+    } else if (type === 'icon_set') {
+      conditionalFormat.iconSet.style = iconSetStyleFrom(rule.icon_set || 'three_traffic_lights1');
+    } else if (type === 'top_bottom') {
+      conditionalFormat.topBottom.format = conditionalFormatCellFormat(rule.format);
+      conditionalFormat.topBottom.rule = {
+        rank: Number(rule.rank || 10),
+        type: topBottomCriterionTypeFrom(rule.operator || 'top_items')
+      };
+    } else if (type === 'preset_criteria') {
+      conditionalFormat.preset.format = conditionalFormatCellFormat(rule.format);
+      conditionalFormat.preset.rule = { criterion: presetCriterionFrom(rule.preset || rule.operator || 'blank') };
+    } else if (type === 'contains_text') {
+      conditionalFormat.textComparison.format = conditionalFormatCellFormat(rule.format);
+      conditionalFormat.textComparison.rule = {
+        operator: conditionalTextOperatorFrom(rule.operator || 'contains'),
+        text: requiredNonEmptyString(rule.text, 'contains_text conditional format requires text.')
+      };
+    } else if (type === 'custom_formula') {
+      conditionalFormat.custom.format = conditionalFormatCellFormat(rule.format);
+      conditionalFormat.custom.rule = { formula: requiredNonEmptyString(rule.formula, 'custom_formula conditional format requires formula.') };
+    }
+  }
+
+  function applyColorScaleRule(colorScale, rule) {
+    if (!Array.isArray(rule.colors) || rule.colors.length < 2 || rule.colors.length > 3) {
+      throw Object.assign(new Error('color_scale conditional format requires two or three colors.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    const criteria = [
+      { type: Excel.ConditionalFormatColorCriterionType.lowestValue, color: String(rule.colors[0]) },
+      { type: Excel.ConditionalFormatColorCriterionType.highestValue, color: String(rule.colors[rule.colors.length - 1]) }
+    ];
+    if (rule.colors.length === 3) criteria.splice(1, 0, { type: Excel.ConditionalFormatColorCriterionType.percentile, formula: '50', color: String(rule.colors[1]) });
+    colorScale.criteria = { minimum: criteria[0], midpoint: criteria[1], maximum: criteria[2] || criteria[1] };
+  }
+
+  function conditionalFormatCellFormat(format) {
+    const cellFormat = {};
+    if (!format || typeof format !== 'object' || Array.isArray(format)) return cellFormat;
+    if (format.fill_color !== undefined) cellFormat.fill = { color: String(format.fill_color) };
+    if (format.font_color !== undefined || format.bold !== undefined || format.italic !== undefined) {
+      cellFormat.font = {};
+      if (format.font_color !== undefined) cellFormat.font.color = String(format.font_color);
+      if (format.bold !== undefined) cellFormat.font.bold = Boolean(format.bold);
+      if (format.italic !== undefined) cellFormat.font.italic = Boolean(format.italic);
+    }
+    return cellFormat;
+  }
+
+  function conditionalFormatSummary(format) {
+    return {
+      id: format.id || null,
+      type: normalizeConditionalFormatType(format.type),
+      priority: format.priority ?? null,
+      stop_if_true: format.stopIfTrue ?? null,
+      untrusted_source: true
+    };
+  }
+
+  function normalizeConditionalFormatType(value) {
+    const normalized = String(value || '').replace(/([a-z])([A-Z])/g, '$1_$2').replace(/\s+/g, '_').toLowerCase();
+    if (normalized === 'cellvalue') return 'cell_value';
+    if (normalized === 'colorscale') return 'color_scale';
+    if (normalized === 'databar') return 'data_bar';
+    if (normalized === 'iconset') return 'icon_set';
+    if (normalized === 'topbottom') return 'top_bottom';
+    if (normalized === 'presetcriteria' || normalized === 'preset') return 'preset_criteria';
+    if (normalized === 'containstext' || normalized === 'textcomparison') return 'contains_text';
+    if (normalized === 'custom') return 'custom_formula';
+    return normalized || null;
+  }
+
+  function conditionalFormulaValue(value) {
+    if (value === undefined || value === null) {
+      throw Object.assign(new Error('cell_value conditional format requires values.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return typeof value === 'number' ? String(value) : String(value);
+  }
+
+  function conditionalCellValueOperatorFrom(value) {
+    const operators = {
+      between: Excel.ConditionalCellValueOperator.between,
+      not_between: Excel.ConditionalCellValueOperator.notBetween,
+      equal_to: Excel.ConditionalCellValueOperator.equalTo,
+      not_equal_to: Excel.ConditionalCellValueOperator.notEqualTo,
+      greater_than: Excel.ConditionalCellValueOperator.greaterThan,
+      less_than: Excel.ConditionalCellValueOperator.lessThan,
+      greater_than_or_equal: Excel.ConditionalCellValueOperator.greaterThanOrEqual,
+      less_than_or_equal: Excel.ConditionalCellValueOperator.lessThanOrEqual
+    };
+    return enumValueFrom(operators, value, 'conditional cell value operator');
+  }
+
+  function topBottomCriterionTypeFrom(value) {
+    const types = {
+      top_items: Excel.ConditionalTopBottomCriterionType.topItems,
+      top_percent: Excel.ConditionalTopBottomCriterionType.topPercent,
+      bottom_items: Excel.ConditionalTopBottomCriterionType.bottomItems,
+      bottom_percent: Excel.ConditionalTopBottomCriterionType.bottomPercent
+    };
+    return enumValueFrom(types, value, 'top bottom criterion type');
+  }
+
+  function presetCriterionFrom(value) {
+    const criteria = {
+      blank: Excel.ConditionalFormatPresetCriterion.blanks,
+      blanks: Excel.ConditionalFormatPresetCriterion.blanks,
+      non_blank: Excel.ConditionalFormatPresetCriterion.nonBlanks,
+      non_blanks: Excel.ConditionalFormatPresetCriterion.nonBlanks,
+      errors: Excel.ConditionalFormatPresetCriterion.errors,
+      no_errors: Excel.ConditionalFormatPresetCriterion.nonErrors,
+      duplicates: Excel.ConditionalFormatPresetCriterion.duplicateValues,
+      unique: Excel.ConditionalFormatPresetCriterion.uniqueValues
+    };
+    return enumValueFrom(criteria, value, 'preset conditional format criterion');
+  }
+
+  function conditionalTextOperatorFrom(value) {
+    const operators = {
+      contains: Excel.ConditionalTextOperator.contains,
+      not_contains: Excel.ConditionalTextOperator.notContains,
+      begins_with: Excel.ConditionalTextOperator.beginsWith,
+      ends_with: Excel.ConditionalTextOperator.endsWith
+    };
+    return enumValueFrom(operators, value, 'conditional text operator');
+  }
+
+  function iconSetStyleFrom(value) {
+    const styles = {
+      three_traffic_lights1: Excel.IconSet.threeTrafficLights1,
+      three_traffic_lights2: Excel.IconSet.threeTrafficLights2,
+      three_arrows: Excel.IconSet.threeArrows,
+      three_symbols: Excel.IconSet.threeSymbols,
+      four_arrows: Excel.IconSet.fourArrows,
+      four_traffic_lights: Excel.IconSet.fourTrafficLights,
+      five_arrows: Excel.IconSet.fiveArrows,
+      five_quarters: Excel.IconSet.fiveQuarters
+    };
+    return enumValueFrom(styles, value, 'conditional icon set');
   }
 
   function validateMatrixShape(matrix, rows, columns, label) {

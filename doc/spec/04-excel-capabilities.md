@@ -54,7 +54,7 @@ Research basis:
   Excel analysis workflow and are present in the stable Excel.js object model.
   v1 limits PivotTables to normal range/table sources and non-preview APIs.
 
-The refined v1 target is 29 tools. The original 20-tool core covered workbook
+The refined v1 target is 31 tools. The original 20-tool core covered workbook
 orientation, worksheet lifecycle, range work, formulas, formatting, data
 operations, tables, charts, and PivotTables. The workbook owner now also covers
 stable persistence/calculation tasks and named-item lifecycle. These cannot be
@@ -68,7 +68,10 @@ permission profile from range content. The Range owner now also covers
 columns without emulating that workflow through reads and writes. The Range
 owner now also covers `excel.set_hyperlink` because cell hyperlinks are visible
 cell metadata that need URL security validation and hyperlink-only clearing that
-cannot be represented by generic value, formula, or formatting writes. Do not
+cannot be represented by generic value, formula, or formatting writes. The
+Format owner now also covers conditional formatting because rule-based visual
+formatting has a distinct lifecycle from static one-shot range formatting while
+still sharing the cell-format permission profile. Do not
 expand the catalog by copying individual Excel.js methods into MCP tools. A
 future tool can only be added after the selection matrix proves that the
 existing tools cannot express a distinct object owner, permission profile, or
@@ -119,7 +122,7 @@ Core tool selection matrix:
 | Inspect, persist, calculate, and address workbook state; navigate sheets | `Workbook` / `Workbook.names` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, workbook orientation, style-name discovery, persistence, formula recalculation, and template-stable named item addressing without reading cell contents. |
 | Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; insertion and delete-with-shift are the structural Range pair, and hyperlink writes need URL-specific validation while staying range-owned. |
 | Work with formulas | `Range` formulas | `excel.set_formula` | Formula writes are distinct from literal value writes and can support scalar or matrix input. |
-| Apply user-visible cell formatting | `RangeFormat` / `Range` style and merge APIs | `excel.format_range` | Keeps font, fill, number format, borders, alignment, wrapping, autofit, merge state, row/column sizing, row/column visibility, and named style application under one cell-format owner. |
+| Apply user-visible cell formatting | `RangeFormat` / `Range` style, merge, and conditional format APIs | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | Keeps static cell formatting in `excel.format_range` and rule-based conditional formatting in a dedicated list/update owner so agents can inspect, add, delete, and clear rules without duplicating value or table tools. |
 | Sort and filter data | `RangeSort` / table filter owners | `excel.sort_range`, `excel.apply_filter` | One data-operation owner covers both plain ranges and table bodies; table tools must not duplicate it. |
 | Promote data into a structured table | `Table` | `excel.create_table`, `excel.update_table` | Creation is common enough to be direct; lifecycle, rows/columns, resize, rename, and table style/options share one object-owner update tool. |
 | Visualize data | `Chart` | `excel.create_chart`, `excel.update_chart` | Creation is direct; title, axes, legend, series, size, position, delete, and supported export share one chart-owner update tool. |
@@ -134,14 +137,14 @@ Final v1 tool set by category:
 | Worksheet | `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | 4 | Sheet inventory and lifecycle. |
 | Range / cell data | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink` | 7 | Locate, read, write, insert, clear/delete, search, and manage cell hyperlinks through ranges. |
 | Formula | `excel.set_formula` | 1 | Author formulas distinctly from literal value writes. |
-| Format | `excel.format_range` | 1 | Apply user-visible cell formatting. |
+| Format | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | 3 | Apply static cell formatting and manage rule-based conditional formatting. |
 | Data operations | `excel.sort_range`, `excel.apply_filter` | 2 | Sort and filter plain ranges or table bodies. |
 | Table | `excel.create_table`, `excel.update_table` | 2 | Promote data to structured tables and manage table-owned lifecycle/options. |
 | Chart | `excel.create_chart`, `excel.update_chart` | 2 | Visualize data and manage chart-owned configuration. |
 | PivotTable | `excel.create_pivot_table`, `excel.update_pivot_table` | 2 | Create and configure summarized analysis views. |
 | Review | `excel.add_comment`, `excel.list_comments`, `excel.update_comment` | 3 | Create, inspect, reply to, resolve, reopen, edit, and delete threaded cell comments. |
 
-Total: 29 tools.
+Total: 31 tools.
 
 Rejected tool families for v1:
 
@@ -182,6 +185,8 @@ Implemented Excel v1 tools:
 | `excel.find_replace_cells` | read/edit | `ExcelApi 1.9` | Find the first matching cell in a range or replace matching cells. |
 | `excel.set_formula` | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
 | `excel.format_range` | edit | `ExcelApi 1.1`; fixed sizing, hide/unhide, and autofit require `ExcelApi 1.2`; named styles require `ExcelApi 1.7` | Apply font, fill, number formats, borders, alignment, wrapping, merge/unmerge, fixed row or column size, row or column visibility, named styles, and autofit. |
+| `excel.list_conditional_formats` | read | `ExcelApi 1.6` | List conditional formatting rules for a range or worksheet. |
+| `excel.update_conditional_format` | edit/destructive | `ExcelApi 1.6` | Add, delete, or clear range conditional formatting rules. |
 | `excel.sort_range` | edit | `ExcelApi 1.2` | Sort a range or table body by one or more keys. |
 | `excel.apply_filter` | edit | Range filters require `ExcelApi 1.9`; table column filters require `ExcelApi 1.2` | Apply, clear, remove, or reapply range and table filters. |
 | `excel.create_table` | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
@@ -219,6 +224,8 @@ Target core Excel tool surface:
 | `excel.find_replace_cells` | implemented | Range | read/edit | `ExcelApi 1.9` | Search cell contents in a range and optionally replace matches. |
 | `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
 | `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1`; fixed sizing, hide/unhide, and autofit require `ExcelApi 1.2`; named styles require `ExcelApi 1.7` | Apply font, fill, scalar or matrix number formats, borders, alignment, wrapping, merge/unmerge, fixed row or column size, row or column visibility, named styles, and autofit. |
+| `excel.list_conditional_formats` | implemented | Format | read | `ExcelApi 1.6` | List conditional formatting rules for an explicit range or the active/named worksheet. |
+| `excel.update_conditional_format` | implemented | Format | edit/destructive | `ExcelApi 1.6` | Add typed conditional formatting rules, delete a rule by id, or clear all conditional formats for a range. |
 | `excel.sort_range` | implemented | Data | edit | `ExcelApi 1.2` | Sort a range or table body by one or more column keys; table structure changes belong to `excel.update_table`. |
 | `excel.apply_filter` | implemented | Data | edit | Range filters require `ExcelApi 1.9`; table column filters require `ExcelApi 1.2` | Apply, clear, remove, or reapply worksheet range or table filter criteria; PivotTable filters belong to `excel.update_pivot_table`. |
 | `excel.create_table` | implemented | Table | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
@@ -233,7 +240,7 @@ Target core Excel tool surface:
 
 The tools above are the Excel v1 contract. Implementation work must keep
 the daemon catalog, MCP `tools/list`, Excel task pane `available_tools`, task
-pane permission grouping, documentation, and tests aligned with this 29-tool
+pane permission grouping, documentation, and tests aligned with this 31-tool
 surface. Before implementing or changing a tool, verify its minimum requirement
 set against `@types/office-js` and Microsoft API docs, then land the change as a
 test-first implementation slice with daemon catalog coverage, task pane
@@ -293,6 +300,10 @@ Tool ownership rules:
   style to cells remains range formatting. Table style/options remain in
   `excel.update_table`; chart visual settings remain in `excel.update_chart`;
   PivotTable layout/format settings remain in `excel.update_pivot_table`.
+- `excel.list_conditional_formats` and `excel.update_conditional_format` own
+  rule-based cell formatting. Static one-shot formatting remains in
+  `excel.format_range`; conditional formatting rule lifecycle must not be
+  represented as table, data-filter, or static range-format operations.
 - `excel.sort_range` and `excel.apply_filter` own sorting and filtering for both
   plain ranges and table bodies. `excel.update_table` must not duplicate table
   sort/filter behavior.
@@ -315,6 +326,7 @@ Action side-effect maps:
 |---|---|---|---|
 | `excel.find_replace_cells` | omitted `replace` / find-only mode | replace mode | - |
 | `excel.set_hyperlink` | - | `set`, `clear` | - |
+| `excel.update_conditional_format` | - | `add` | `delete`, `clear_range` |
 | `excel.update_table` | `metadata`, `read` | `add_rows`, `add_columns`, `resize`, `rename`, `options`, `style` | `delete` |
 | `excel.update_chart` | `metadata`, `read`, `export_image` | `title`, `legend`, `axis`, `data`, `series_source`, `position`, `size` | `delete` |
 | `excel.update_pivot_table` | `metadata`, `read` | `refresh`, `add_hierarchy`, `remove_hierarchy`, `layout`, `filter`, `clear_filters` | `delete` |
@@ -596,7 +608,62 @@ before explicit formatting fields in the same request, so explicit fields win.
 
 Returns `{ "address": "A1:C2", "formatted": true }`.
 
-### 3.8 `excel.sort_range`
+### 3.8 `excel.list_conditional_formats`
+
+Arguments:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "sheet": "Sheet1",
+  "address": "A1:D20"
+}
+```
+
+`address` is optional. When omitted, the tool lists conditional formats for
+the active or named worksheet. When supplied, it lists rules attached to the
+target range. Requires `ExcelApi 1.6`.
+
+Returns `{ "conditional_formats": [{ "id", "type", "address", "priority", "stop_if_true", "rule_summary" }], "count": 1, "untrusted_source": true }`.
+Rule formulas, text criteria, and addresses are workbook-authored content and
+MUST be treated as untrusted source text.
+
+### 3.9 `excel.update_conditional_format`
+
+Arguments:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "sheet": "Sheet1",
+  "address": "A1:D20",
+  "action": "add",
+  "rule": {
+    "type": "cell_value",
+    "operator": "less_than",
+    "values": [0],
+    "format": { "font_color": "#9C0006", "fill_color": "#FFC7CE" }
+  },
+  "priority": 0,
+  "stop_if_true": false,
+  "validate_only": false
+}
+```
+
+Supported actions are `add`, `delete`, and `clear_range`. `add` requires
+`address` and `rule`; `delete` requires `id`; `clear_range` requires `address`
+and removes every conditional format attached to that target range. `delete`
+and `clear_range` are destructive actions because they remove rules; `add` is
+mutating. Supported rule types are `cell_value`, `color_scale`, `data_bar`,
+`icon_set`, `top_bottom`, `preset_criteria`, `contains_text`, and
+`custom_formula`. Invalid rule/type/argument combinations fail with
+`INVALID_ARGUMENT` and `partial_effect: "none"` before mutation where they are
+deterministically checkable. Requires `ExcelApi 1.6` and supports the shared
+`validate_only` mutation preflight contract.
+
+Returns `{ "action": "add", "id": "conditional-format-id", "address": "Sheet1!A1:D20", "updated": true }`.
+
+### 3.10 `excel.sort_range`
 
 Arguments for a plain range sort:
 
@@ -630,7 +697,7 @@ Range and table sorting require `ExcelApi 1.2`.
 
 Returns `{ "target_type": "range", "address": "A1:D20", "sorted": true }`.
 
-### 3.9 `excel.apply_filter`
+### 3.11 `excel.apply_filter`
 
 Arguments for a range filter:
 
@@ -665,7 +732,7 @@ belong to `excel.update_pivot_table`.
 
 Returns `{ "target_type": "range", "address": "A1:D20", "filtered": true }`.
 
-### 3.10 `excel.create_table`
+### 3.12 `excel.create_table`
 
 Arguments:
 
@@ -684,7 +751,7 @@ Arguments:
 
 Returns `{ "table": "SalesTable", "address": "A1:C10", "has_headers": true }`.
 
-### 3.11 `excel.create_chart`
+### 3.13 `excel.create_chart`
 
 Arguments:
 
@@ -704,7 +771,7 @@ Supported `type` values in v1 are `area`, `barClustered`, `columnClustered`,
 
 Returns `{ "chart": "Chart 1", "chart_type": "columnClustered", "source": "A1:C10" }`.
 
-### 3.12 `excel.add_comment`
+### 3.14 `excel.add_comment`
 
 Arguments:
 
@@ -723,7 +790,7 @@ content is deferred. Requires `ExcelApi 1.10`.
 
 Returns `{ "comment_id": "...", "cell": "Sheet1!B2", "commented": true }`.
 
-### 3.13 `excel.list_comments`
+### 3.15 `excel.list_comments`
 
 Arguments:
 
@@ -769,7 +836,7 @@ Returns:
 `untrusted_source` is always `true` because workbook comments may contain
 prompt injection text.
 
-### 3.14 `excel.update_comment`
+### 3.16 `excel.update_comment`
 
 Arguments:
 

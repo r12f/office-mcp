@@ -563,6 +563,19 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
+        "excel.list_conditional_formats",
+        "excel",
+        "Format",
+        ToolSideEffect::Read,
+    ),
+    tool_with_actions(
+        "excel.update_conditional_format",
+        "excel",
+        "Format",
+        ToolSideEffect::Destructive,
+        EXCEL_UPDATE_CONDITIONAL_FORMAT_ACTIONS,
+    ),
+    tool(
         "excel.sort_range",
         "excel",
         "Data",
@@ -862,6 +875,12 @@ const EXCEL_UPDATE_COMMENT_ACTIONS: &[ActionSideEffect] = &[
 const EXCEL_SET_HYPERLINK_ACTIONS: &[ActionSideEffect] = &[
     action("set", ToolSideEffect::Mutating),
     action("clear", ToolSideEffect::Mutating),
+];
+
+const EXCEL_UPDATE_CONDITIONAL_FORMAT_ACTIONS: &[ActionSideEffect] = &[
+    action("add", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+    action("clear_range", ToolSideEffect::Destructive),
 ];
 
 const POWERPOINT_UPDATE_TAGS_ACTIONS: &[ActionSideEffect] = &[

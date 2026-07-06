@@ -244,6 +244,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /excel\.clear_range/);
   assert.match(js, /excel\.set_hyperlink/);
   assert.match(js, /excel\.find_replace_cells/);
+  assert.match(js, /excel\.list_conditional_formats/);
+  assert.match(js, /excel\.update_conditional_format/);
   assert.match(js, /excel\.sort_range/);
   assert.match(js, /excel\.apply_filter/);
   assert.match(js, /excel\.update_table/);
@@ -266,6 +268,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /case 'excel.clear_range':/);
   assert.match(js, /case 'excel.set_hyperlink':/);
   assert.match(js, /case 'excel.find_replace_cells':/);
+  assert.match(js, /case 'excel.list_conditional_formats':/);
+  assert.match(js, /case 'excel.update_conditional_format':/);
   assert.match(js, /case 'excel.sort_range':/);
   assert.match(js, /case 'excel.apply_filter':/);
   assert.match(js, /case 'excel.update_table':/);
@@ -307,6 +311,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /async function clearRange/);
   assert.match(js, /async function setHyperlink/);
   assert.match(js, /async function findReplaceCells/);
+  assert.match(js, /async function listConditionalFormats/);
+  assert.match(js, /async function updateConditionalFormat/);
   assert.match(js, /async function sortRange/);
   assert.match(js, /async function applyFilter/);
   assert.match(js, /async function updateTable/);
@@ -351,6 +357,17 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /const criteria = searchCriteriaFrom\(args\)/);
   assert.match(js, /range\.findOrNullObject\(query, criteria\)/);
   assert.match(js, /range\.replaceAll\(query, replacement, replaceCriteriaFrom/);
+  assert.match(js, /requireRequirementSet\('ExcelApi', '1\.6', 'conditional formatting'\)/);
+  assert.match(js, /targetConditionalFormatCollection\(context, args\)/);
+  assert.match(js, /conditionalFormats\.load\('items\/id,items\/type,items\/priority,items\/stopIfTrue'\)/);
+  assert.match(js, /conditionalFormats\.add\(conditionalFormatTypeFrom\(rule\.type\)\)/);
+  assert.match(js, /conditionalFormats\.clearAll\(\)/);
+  assert.match(js, /conditionalFormat\.delete\(\)/);
+  assert.match(js, /applyConditionalFormatRule\(conditionalFormat, rule\)/);
+  assert.match(js, /function validateConditionalFormatArgs\(args\)/);
+  assert.match(js, /function conditionalFormatTypeFrom\(value\)/);
+  assert.match(js, /function applyConditionalFormatRule\(conditionalFormat, rule\)/);
+  assert.match(js, /function conditionalFormatSummary\(format\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.2', 'range sorting'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.9', 'range filtering'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.2', 'table filtering'\)/);
@@ -521,6 +538,7 @@ test('Excel task pane routes mutating tools through validation-only preflight', 
   assert.match(invokeBody, /case 'excel\.insert_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await insertRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.clear_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await clearRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.set_hyperlink':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await setHyperlink\(args\);/);
+  assert.match(invokeBody, /case 'excel\.update_conditional_format':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateConditionalFormat\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_table':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateTable\(args\);/);
   assert.match(invokeBody, /case 'excel\.add_comment':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await addComment\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_comment':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateComment\(args\);/);
