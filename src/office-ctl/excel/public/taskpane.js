@@ -337,13 +337,13 @@
           data = await listSheets(args);
           break;
         case 'excel.add_sheet':
-          data = await addSheet(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await addSheet(args);
           break;
         case 'excel.update_sheet':
-          data = await updateSheet(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateSheet(args);
           break;
         case 'excel.delete_sheet':
-          data = await deleteSheet(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await deleteSheet(args);
           break;
         case 'excel.get_used_range':
           data = await getUsedRange(args);
@@ -352,43 +352,43 @@
           data = await readRange(args);
           break;
         case 'excel.write_range':
-          data = await writeRange(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await writeRange(args);
           break;
         case 'excel.clear_range':
-          data = await clearRange(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await clearRange(args);
           break;
         case 'excel.find_replace_cells':
-          data = await findReplaceCells(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await findReplaceCells(args);
           break;
         case 'excel.set_formula':
-          data = await setFormula(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await setFormula(args);
           break;
         case 'excel.format_range':
-          data = await formatRange(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await formatRange(args);
           break;
         case 'excel.sort_range':
-          data = await sortRange(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await sortRange(args);
           break;
         case 'excel.apply_filter':
-          data = await applyFilter(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await applyFilter(args);
           break;
         case 'excel.create_table':
-          data = await createTable(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await createTable(args);
           break;
         case 'excel.update_table':
-          data = await updateTable(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateTable(args);
           break;
         case 'excel.create_chart':
-          data = await createChart(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await createChart(args);
           break;
         case 'excel.update_chart':
-          data = await updateChart(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateChart(args);
           break;
         case 'excel.create_pivot_table':
-          data = await createPivotTable(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await createPivotTable(args);
           break;
         case 'excel.update_pivot_table':
-          data = await updatePivotTable(args);
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updatePivotTable(args);
           break;
         default:
           throw Object.assign(new Error(`Unsupported tool ${tool}`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE' });
@@ -417,6 +417,23 @@
       officeMcpCode: 'TOOL_DISABLED_BY_USER',
       partialEffect: 'none'
     });
+  }
+
+  async function validateExcelMutationOnly(tool, args) {
+    return {
+      valid: true,
+      operation: tool,
+      partial_effect: 'none',
+      resolved_target: {
+        session_id: args?.session_id || null,
+        sheet: args?.sheet || null,
+        address: args?.address || null,
+        table: args?.table || null,
+        chart: args?.chart || null,
+        pivot_table: args?.pivot_table || null,
+        action: args?.action || null
+      }
+    };
   }
 
   async function getWorkbookInfoTool(args) {

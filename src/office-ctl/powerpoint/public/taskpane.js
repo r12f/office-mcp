@@ -329,22 +329,22 @@
           data = await exportFile(args);
           break;
         case 'powerpoint.update_tags':
-          data = await updateTags(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await updateTags(args);
           break;
         case 'powerpoint.list_slides':
           data = await listSlides(args);
           break;
         case 'powerpoint.add_slide':
-          data = await addSlide(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await addSlide(args);
           break;
         case 'powerpoint.update_slide':
-          data = await updateSlide(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await updateSlide(args);
           break;
         case 'powerpoint.delete_slide':
-          data = await deleteSlide(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await deleteSlide(args);
           break;
         case 'powerpoint.move_slide':
-          data = await moveSlide(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await moveSlide(args);
           break;
         case 'powerpoint.export_slide':
           data = await exportSlide(args);
@@ -353,43 +353,43 @@
           data = await listLayouts(args);
           break;
         case 'powerpoint.apply_layout':
-          data = await applyLayout(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await applyLayout(args);
           break;
         case 'powerpoint.get_selection':
           data = await getSelection(args);
           break;
         case 'powerpoint.set_selection':
-          data = await setSelection(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await setSelection(args);
           break;
         case 'powerpoint.list_shapes':
           data = await listShapes(args);
           break;
         case 'powerpoint.add_shape':
-          data = await addShape(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await addShape(args);
           break;
         case 'powerpoint.insert_image':
-          data = await insertImage(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await insertImage(args);
           break;
         case 'powerpoint.update_shape':
-          data = await updateShape(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await updateShape(args);
           break;
         case 'powerpoint.read_text':
           data = await readText(args);
           break;
         case 'powerpoint.replace_text':
-          data = await replaceText(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await replaceText(args);
           break;
         case 'powerpoint.format_text':
-          data = await formatText(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await formatText(args);
           break;
         case 'powerpoint.add_table':
-          data = await addTable(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await addTable(args);
           break;
         case 'powerpoint.read_table':
           data = await readTable(args);
           break;
         case 'powerpoint.update_table':
-          data = await updateTable(args);
+          data = args?.validate_only ? await validatePowerPointMutationOnly(tool, args) : await updateTable(args);
           break;
         default:
           throw Object.assign(new Error(`Unsupported tool ${tool}`), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
@@ -418,6 +418,21 @@
       officeMcpCode: 'TOOL_DISABLED_BY_USER',
       partialEffect: 'none'
     });
+  }
+
+  async function validatePowerPointMutationOnly(tool, args) {
+    return {
+      valid: true,
+      operation: tool,
+      partial_effect: 'none',
+      resolved_target: {
+        session_id: args?.session_id || null,
+        slide_id: args?.slide_id || null,
+        slide_index: args?.slide_index ?? null,
+        shape_id: args?.shape_id || null,
+        action: args?.action || null
+      }
+    };
   }
 
   async function addSlide(args) {

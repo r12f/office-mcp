@@ -515,6 +515,9 @@ fn tool_json(name: &str, title: &str, description: &str) -> Value {
     if let Some(metadata) = tool_metadata(canonical_name) {
         tool["_meta"]["com.office-mcp/app"] = json!(metadata.app);
         tool["_meta"]["com.office-mcp/category"] = json!(metadata.category);
+        if supports_validate_only(canonical_name) {
+            tool["_meta"]["com.office-mcp/supports_validate_only"] = json!(true);
+        }
         if let Some(action_side_effects) = action_side_effects_json(canonical_name) {
             tool["_meta"]["com.office-mcp/action_side_effects"] = action_side_effects;
         }
@@ -617,6 +620,9 @@ pub fn describe_tool_contract(tool: &str) -> Option<Value> {
     if let Some(metadata) = tool_metadata(canonical_name) {
         contract["app"] = json!(metadata.app);
         contract["category"] = json!(metadata.category);
+        if supports_validate_only(canonical_name) {
+            contract["supports_validate_only"] = json!(true);
+        }
         if let Some(action_side_effects) = action_side_effects_json(canonical_name) {
             contract["action_side_effects"] = action_side_effects;
         }
@@ -662,6 +668,11 @@ fn tool_side_effect(tool: &str) -> Option<&'static str> {
         }
         _ => tool_metadata(tool).map(|metadata| side_effect_name(metadata.side_effect)),
     }
+}
+
+fn supports_validate_only(tool: &str) -> bool {
+    tool_metadata(tool)
+        .is_some_and(|metadata| !matches!(metadata.side_effect, ToolSideEffect::Read))
 }
 
 #[must_use]
@@ -2131,6 +2142,10 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
     let mut map = serde_json::Map::new();
     for property in properties {
         map.insert((*property).to_string(), property_schema(tool, property));
+    }
+    if supports_validate_only(tool) {
+        map.entry("validate_only".to_string())
+            .or_insert_with(|| property_schema(tool, "validate_only"));
     }
     let mut schema = json!({
         "type": "object",
