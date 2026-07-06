@@ -100,16 +100,20 @@ file export, save-as, or close workflows. Threaded comments are in scope as the
 Review follow-up surface; legacy notes remain deferred until ExcelApi 1.18 host
 coverage is verified. Range insertion is in scope as the structural complement
 to range deletion because `Range.insert` is stable in `ExcelApi 1.1` and owns a
-common cell/row/column workflow that cannot be represented by clearing.
+common cell/row/column workflow that cannot be represented by clearing. Cell
+layout controls such as merge/unmerge, fixed row or column size, row or column
+visibility, and named style application remain in scope as extensions of
+`excel.format_range` because they share the existing RangeFormat owner and
+formatting permission profile instead of introducing a new object owner.
 
 Core tool selection matrix:
 
 | User workflow | Object owner | v1 tools | Why this is enough |
 |---|---|---|---|
-| Inspect, persist, calculate, and address workbook state; navigate sheets | `Workbook` / `Workbook.names` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, workbook orientation, persistence, formula recalculation, and template-stable named item addressing without reading cell contents. |
+| Inspect, persist, calculate, and address workbook state; navigate sheets | `Workbook` / `Workbook.names` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, workbook orientation, style-name discovery, persistence, formula recalculation, and template-stable named item addressing without reading cell contents. |
 | Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; insertion and delete-with-shift are the structural Range pair. |
 | Work with formulas | `Range` formulas | `excel.set_formula` | Formula writes are distinct from literal value writes and can support scalar or matrix input. |
-| Apply user-visible cell formatting | `RangeFormat` | `excel.format_range` | Keeps font, fill, number format, borders, alignment, wrapping, and autofit under one cell-format owner. |
+| Apply user-visible cell formatting | `RangeFormat` / `Range` style and merge APIs | `excel.format_range` | Keeps font, fill, number format, borders, alignment, wrapping, autofit, merge state, row/column sizing, row/column visibility, and named style application under one cell-format owner. |
 | Sort and filter data | `RangeSort` / table filter owners | `excel.sort_range`, `excel.apply_filter` | One data-operation owner covers both plain ranges and table bodies; table tools must not duplicate it. |
 | Promote data into a structured table | `Table` | `excel.create_table`, `excel.update_table` | Creation is common enough to be direct; lifecycle, rows/columns, resize, rename, and table style/options share one object-owner update tool. |
 | Visualize data | `Chart` | `excel.create_chart`, `excel.update_chart` | Creation is direct; title, axes, legend, series, size, position, delete, and supported export share one chart-owner update tool. |
@@ -154,7 +158,7 @@ Implemented Excel v1 tools:
 
 | Tool | Side effect | Minimum API | Summary |
 |---|---|---|---|
-| `excel.get_workbook_info` | read | `ExcelApi 1.1` | Return workbook identity, active sheet, and aggregate object counts. |
+| `excel.get_workbook_info` | read | `ExcelApi 1.1`; style names require `ExcelApi 1.7` | Return workbook identity, active sheet, aggregate object counts, and style names when supported. |
 | `excel.save` | edit | `ExcelApi 1.11`; dirty state uses `ExcelApi 1.9` when available | Save the current workbook through host save behavior and report the pre-save dirty state when supported. |
 | `excel.calculate` | edit | `ExcelApi 1.1`; `full_rebuild` requires `ExcelApi 1.2` | Recalculate workbook formulas and report the calculation mode. |
 | `excel.list_named_items` | read | `ExcelApi 1.1`; sheet-scoped names require `ExcelApi 1.4` | List workbook and/or worksheet scoped named items, including non-range constants and formulas. |
@@ -170,7 +174,7 @@ Implemented Excel v1 tools:
 | `excel.clear_range` | destructive | `ExcelApi 1.1` | Clear contents, formats, all range data, or delete cells with a shift direction. |
 | `excel.find_replace_cells` | read/edit | `ExcelApi 1.9` | Find the first matching cell in a range or replace matching cells. |
 | `excel.set_formula` | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
-| `excel.format_range` | edit | `ExcelApi 1.1`; autofit requires `ExcelApi 1.2` | Apply font, fill, number formats, borders, alignment, wrapping, and autofit. |
+| `excel.format_range` | edit | `ExcelApi 1.1`; fixed sizing, hide/unhide, and autofit require `ExcelApi 1.2`; named styles require `ExcelApi 1.7` | Apply font, fill, number formats, borders, alignment, wrapping, merge/unmerge, fixed row or column size, row or column visibility, named styles, and autofit. |
 | `excel.sort_range` | edit | `ExcelApi 1.2` | Sort a range or table body by one or more keys. |
 | `excel.apply_filter` | edit | Range filters require `ExcelApi 1.9`; table column filters require `ExcelApi 1.2` | Apply, clear, remove, or reapply range and table filters. |
 | `excel.create_table` | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
@@ -190,7 +194,7 @@ Target core Excel tool surface:
 
 | Tool | Status | Category | Side effect | Minimum API | Summary |
 |---|---|---|---|---|---|
-| `excel.get_workbook_info` | implemented | Workbook | read | `ExcelApi 1.1` | Return workbook identity, workbook-level state, active sheet name/id, and aggregate object counts; detailed sheet inventory belongs to `excel.list_sheets`. |
+| `excel.get_workbook_info` | implemented | Workbook | read | `ExcelApi 1.1`; style names require `ExcelApi 1.7` | Return workbook identity, workbook-level state, active sheet name/id, aggregate object counts, and style names when supported; detailed sheet inventory belongs to `excel.list_sheets`. |
 | `excel.save` | implemented | Workbook | edit | `ExcelApi 1.11`; dirty state uses `ExcelApi 1.9` when available | Save the current workbook through host save behavior. Save-as, export, prompts, and close flows remain out of scope. |
 | `excel.calculate` | implemented | Workbook | edit | `ExcelApi 1.1`; `full_rebuild` requires `ExcelApi 1.2` | Recalculate workbook formulas with `recalculate`, `full`, or `full_rebuild` mode and return the calculation mode. |
 | `excel.list_named_items` | implemented | Workbook | read | `ExcelApi 1.1`; sheet-scoped names require `ExcelApi 1.4` | List workbook and/or worksheet scoped named items, returning range addresses when available and formulas for non-range items. |
@@ -206,7 +210,7 @@ Target core Excel tool surface:
 | `excel.clear_range` | implemented | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, or all range data; optional cell deletion with shift direction. Hyperlink-specific clear modes are deferred because they require `ExcelApi 1.7`. |
 | `excel.find_replace_cells` | implemented | Range | read/edit | `ExcelApi 1.9` | Search cell contents in a range and optionally replace matches. |
 | `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
-| `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1`; autofit requires `ExcelApi 1.2` | Apply font, fill, scalar or matrix number formats, borders, alignment, wrapping, and autofit. |
+| `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1`; fixed sizing, hide/unhide, and autofit require `ExcelApi 1.2`; named styles require `ExcelApi 1.7` | Apply font, fill, scalar or matrix number formats, borders, alignment, wrapping, merge/unmerge, fixed row or column size, row or column visibility, named styles, and autofit. |
 | `excel.sort_range` | implemented | Data | edit | `ExcelApi 1.2` | Sort a range or table body by one or more column keys; table structure changes belong to `excel.update_table`. |
 | `excel.apply_filter` | implemented | Data | edit | Range filters require `ExcelApi 1.9`; table column filters require `ExcelApi 1.2` | Apply, clear, remove, or reapply worksheet range or table filter criteria; PivotTable filters belong to `excel.update_pivot_table`. |
 | `excel.create_table` | implemented | Table | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
@@ -269,10 +273,14 @@ Tool ownership rules:
 - `excel.write_range` writes literal values. `excel.set_formula` writes formulas
   and formula matrices. Formula strings passed to `excel.write_range` remain
   literal input unless explicitly documented otherwise during implementation.
-- `excel.format_range` owns cell-level visual formatting. Table style/options
-  remain in `excel.update_table`; chart visual settings remain in
-  `excel.update_chart`; PivotTable layout/format settings remain in
-  `excel.update_pivot_table`.
+- `excel.format_range` owns cell-level visual formatting and layout. This
+  includes font, fill, number format, borders, alignment, wrapping, autofit,
+  merge/unmerge, fixed row or column size, row or column visibility, and named
+  style application. Style names are discoverable through
+  `excel.get_workbook_info` because they are workbook state, while applying a
+  style to cells remains range formatting. Table style/options remain in
+  `excel.update_table`; chart visual settings remain in `excel.update_chart`;
+  PivotTable layout/format settings remain in `excel.update_pivot_table`.
 - `excel.sort_range` and `excel.apply_filter` own sorting and filtering for both
   plain ranges and table bodies. `excel.update_table` must not duplicate table
   sort/filter behavior.
@@ -498,6 +506,12 @@ Arguments:
   "horizontal_alignment": "center",
   "vertical_alignment": "top",
   "wrap_text": true,
+  "merge": "merge_across",
+  "column_width_pt": 72,
+  "row_height_pt": 24,
+  "hidden_columns": false,
+  "hidden_rows": false,
+  "style": "Heading 1",
   "borders": [
     { "side": "top", "style": "continuous", "weight": "thin", "color": "#17202A" }
   ],
@@ -508,9 +522,19 @@ Arguments:
 All formatting fields are optional. `number_format`, when supplied, is written
 as a scalar matrix matching the target range dimensions. `number_formats` may be
 supplied instead as a two-dimensional matrix that exactly matches the target
-range shape. Supported alignment, border side, border style, and border weight
-values are restricted to stable Office.js enum values. `autofit_rows` and
-`autofit_columns` require `ExcelApi 1.2`; unsupported hosts return
+range shape. Supported alignment, border side, border style, border weight, and
+merge values are restricted to stable Office.js enum values. `merge` accepts
+`merge`, `merge_across`, or `unmerge`; host merge semantics keep the upper-left
+cell value when merged cells overlap existing values, so callers should read the
+target range first when data preservation matters. `column_width_pt` and
+`row_height_pt` set fixed sizes for every column or row intersecting the target
+range. `hidden_columns` and `hidden_rows` hide or unhide every intersecting
+column or row. Passing a fixed column width with `autofit_columns: true`, or a
+fixed row height with `autofit_rows: true`, fails with `INVALID_ARGUMENT` and
+`partial_effect: "none"` before mutation. `style` applies a workbook style name
+before explicit formatting fields in the same request, so explicit fields win.
+`autofit_rows`, `autofit_columns`, fixed sizing, and hide/unhide require
+`ExcelApi 1.2`; `style` requires `ExcelApi 1.7`. Unsupported hosts return
 `HOST_CAPABILITY_UNAVAILABLE` with no partial effect.
 
 Returns `{ "address": "A1:C2", "formatted": true }`.

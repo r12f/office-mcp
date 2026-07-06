@@ -28,7 +28,8 @@ const EXCEL_E2E_CASES = Object.fromEntries([
           { path: 'is_read_only', value: false },
           { path: 'is_protected', value: false }
         ]
-      }
+      },
+      contains: ['Normal']
     }
   }],
   ['excel.save', {
@@ -251,7 +252,17 @@ const EXCEL_E2E_CASES = Object.fromEntries([
         { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B2', values: [[12.5, 20], [3, 4]] } }
       ]
     },
-    args: { sheet: 'Sheet1', address: 'A1:B2', number_format: '0.00' },
+    args: {
+      sheet: 'Sheet1',
+      address: 'A1:B2',
+      style: 'Normal',
+      number_format: '0.00',
+      column_width_pt: 72,
+      row_height_pt: 24,
+      hidden_columns: false,
+      hidden_rows: false,
+      merge: 'merge_across'
+    },
     verify: {
       kind: 'readback',
       readbackTool: 'excel.read_range',

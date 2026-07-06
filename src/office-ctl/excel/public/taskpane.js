@@ -484,8 +484,11 @@
       const workbook = context.workbook;
       const worksheets = workbook.worksheets;
       const tables = workbook.tables;
+      requireRequirementSet('ExcelApi', '1.7', 'workbook styles');
+      const styles = context.workbook.styles;
       worksheets.load('items/id,items/name,items/position,items/visibility,items/tabColor');
       tables.load('items/name');
+      styles.load('items/name');
       await context.sync();
       let activeSheet = null;
       try {
@@ -504,6 +507,7 @@
         active_sheet: activeSheet,
         sheet_count: worksheets.items.length,
         table_count: tables.items.length,
+        styles: workbookStyleNames(styles),
         is_dirty: documentInfo?.is_dirty ?? null,
         is_read_only: documentInfo?.is_read_only ?? false,
         is_protected: documentInfo?.is_protected ?? false
@@ -832,12 +836,14 @@
   }
 
   async function formatRange(args) {
+    validateFormatRangeLayoutArgs(args);
     return Excel.run(async (context) => {
       const range = await targetRange(context, args);
       if (args.number_format !== undefined || args.number_formats !== undefined) {
         range.load('rowCount,columnCount');
         await context.sync();
       }
+      if (args.style !== undefined) applyRangeStyle(range, args.style);
       if (args.bold !== undefined) range.format.font.bold = Boolean(args.bold);
       if (args.italic !== undefined) range.format.font.italic = Boolean(args.italic);
       if (args.font_color) range.format.font.color = String(args.font_color);
@@ -847,6 +853,8 @@
       if (args.horizontal_alignment !== undefined) range.format.horizontalAlignment = alignmentFrom(args.horizontal_alignment, 'horizontal');
       if (args.vertical_alignment !== undefined) range.format.verticalAlignment = alignmentFrom(args.vertical_alignment, 'vertical');
       if (args.wrap_text !== undefined) range.format.wrapText = Boolean(args.wrap_text);
+      if (args.merge !== undefined) applyRangeMerge(range, args.merge);
+      applyRangeLayout(range, args);
       if (args.borders !== undefined) applyBorders(range, args.borders);
       if (args.autofit_columns === true || args.autofit_rows === true) requireRequirementSet('ExcelApi', '1.2', 'autofit formatting');
       if (args.autofit_columns === true) range.format.autofitColumns();
@@ -1815,6 +1823,50 @@
     return args.number_formats.map((row) => row.map((value) => String(value ?? 'General')));
   }
 
+  function workbookStyleNames(styles) {
+    return (styles.items || []).map((style) => style.name).filter(Boolean);
+  }
+
+  function validateFormatRangeLayoutArgs(args) {
+    if (args.column_width_pt !== undefined && args.autofit_columns === true) {
+      throw Object.assign(new Error('column_width_pt cannot be combined with autofit_columns.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (args.row_height_pt !== undefined && args.autofit_rows === true) {
+      throw Object.assign(new Error('row_height_pt cannot be combined with autofit_rows.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
+  function applyRangeStyle(range, style) {
+    requireRequirementSet('ExcelApi', '1.7', 'range style formatting');
+    range.style = requiredNonEmptyString(style, 'excel.format_range style must be a non-empty string.');
+  }
+
+  function applyRangeMerge(range, value) {
+    const key = String(value || '').trim().toLowerCase();
+    if (key === 'merge') {
+      range.merge(false);
+      return;
+    }
+    if (key === 'merge_across') {
+      range.merge(true);
+      return;
+    }
+    if (key === 'unmerge') {
+      range.unmerge();
+      return;
+    }
+    throw Object.assign(new Error(`Unsupported merge action ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  function applyRangeLayout(range, args) {
+    if (args.column_width_pt === undefined && args.row_height_pt === undefined && args.hidden_columns === undefined && args.hidden_rows === undefined) return;
+    requireRequirementSet('ExcelApi', '1.2', 'range layout formatting');
+    if (args.column_width_pt !== undefined) range.format.columnWidth = Number(args.column_width_pt);
+    if (args.row_height_pt !== undefined) range.format.rowHeight = Number(args.row_height_pt);
+    if (args.hidden_columns !== undefined) range.format.columnHidden = Boolean(args.hidden_columns);
+    if (args.hidden_rows !== undefined) range.format.rowHidden = Boolean(args.hidden_rows);
+  }
+
   function validateMatrixShape(matrix, rows, columns, label) {
     if (!Array.isArray(matrix) || matrix.length !== rows) {
       throw Object.assign(new Error(`${label} must be a ${rows} by ${columns} matrix.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
@@ -1828,6 +1880,14 @@
 
   function matrixFromScalar(value, rows, columns) {
     return Array.from({ length: rows }, () => Array.from({ length: columns }, () => value));
+  }
+
+  function requiredNonEmptyString(value, message) {
+    const text = String(value ?? '').trim();
+    if (!text) {
+      throw Object.assign(new Error(message), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return text;
   }
 
   function alignmentFrom(value, axis) {
