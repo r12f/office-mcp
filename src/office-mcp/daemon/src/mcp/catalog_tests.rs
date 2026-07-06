@@ -127,9 +127,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
     assert_eq!(WORD_V1_TOOLS.len(), 62);
-    assert_eq!(ExcelToolCatalog::tools().len(), 27);
+    assert_eq!(ExcelToolCatalog::tools().len(), 28);
     assert_eq!(PowerPointToolCatalog::tools().len(), 23);
-    assert_eq!(tools.len(), 230);
+    assert_eq!(tools.len(), 232);
 }
 
 #[test]
@@ -873,10 +873,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 112);
+    assert_eq!(all_tools.len(), 113);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        112
+        113
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1426,6 +1426,18 @@ fn word_anchor_schemas_advertise_per_tool_supported_kinds() {
 fn representative_excel_and_powerpoint_schemas_are_specific() {
     let range = schema_for("excel.read_range");
     assert_required(&range, &["session_id", "address"]);
+
+    let insert_range = schema_for("excel.insert_range");
+    assert_required(&insert_range, &["session_id", "address", "shift"]);
+    assert_eq!(
+        insert_range["properties"]["shift"]["enum"],
+        serde_json::json!(["down", "right"])
+    );
+    assert_eq!(insert_range["properties"]["count"]["minimum"], 1);
+    assert_eq!(
+        insert_range["properties"]["validate_only"]["type"],
+        "boolean"
+    );
     assert_eq!(range["properties"]["sheet"]["type"], "string");
     assert!(range["properties"].get("range").is_none());
 
@@ -1553,6 +1565,7 @@ fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.update_sheet"));
     assert!(ExcelToolCatalog::contains("excel.delete_sheet"));
     assert!(ExcelToolCatalog::contains("excel.get_used_range"));
+    assert!(ExcelToolCatalog::contains("excel.insert_range"));
     assert!(ExcelToolCatalog::contains("excel.clear_range"));
     assert!(ExcelToolCatalog::contains("excel.find_replace_cells"));
     assert!(ExcelToolCatalog::contains("excel.sort_range"));

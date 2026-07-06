@@ -54,7 +54,7 @@ Research basis:
   Excel analysis workflow and are present in the stable Excel.js object model.
   v1 limits PivotTables to normal range/table sources and non-preview APIs.
 
-The refined v1 target is 27 tools. The original 20-tool core covered workbook
+The refined v1 target is 28 tools. The original 20-tool core covered workbook
 orientation, worksheet lifecycle, range work, formulas, formatting, data
 operations, tables, charts, and PivotTables. The workbook owner now also covers
 stable persistence/calculation tasks and named-item lifecycle. These cannot be
@@ -62,10 +62,14 @@ represented by range or object-owner tools: saving the current workbook,
 forcing calculation, and managing workbook/sheet scoped names that formulas and
 templates address indirectly. The Review owner now covers threaded cell
 comments because comments are workbook review objects with a distinct
-permission profile from range content. Do not expand the catalog by copying
-individual Excel.js methods into MCP tools. A future tool can only be added
-after the selection matrix proves that the existing tools cannot express a
-distinct object owner, permission profile, or user-visible workflow safely.
+permission profile from range content. The Range owner now also covers
+`excel.insert_range`, the non-destructive structural complement to
+`excel.clear_range` delete-with-shift, so agents can insert cells, rows, and
+columns without emulating that workflow through reads and writes. Do not expand
+the catalog by copying individual Excel.js methods into MCP tools. A future tool
+can only be added after the selection matrix proves that the existing tools
+cannot express a distinct object owner, permission profile, or user-visible
+workflow safely.
 
 The v1 priority order is: workbook orientation, worksheet lifecycle, range/cell
 data CRUD, formulas, formatting, sort/filter, tables, charts, and PivotTables.
@@ -94,14 +98,16 @@ file import/export, workbook close, and save-as flows. Workbook save and
 calculation are in scope because they are stable workbook-owner operations, not
 file export, save-as, or close workflows. Threaded comments are in scope as the
 Review follow-up surface; legacy notes remain deferred until ExcelApi 1.18 host
-coverage is verified.
+coverage is verified. Range insertion is in scope as the structural complement
+to range deletion because `Range.insert` is stable in `ExcelApi 1.1` and owns a
+common cell/row/column workflow that cannot be represented by clearing.
 
 Core tool selection matrix:
 
 | User workflow | Object owner | v1 tools | Why this is enough |
 |---|---|---|---|
 | Inspect, persist, calculate, and address workbook state; navigate sheets | `Workbook` / `Workbook.names` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, workbook orientation, persistence, formula recalculation, and template-stable named item addressing without reading cell contents. |
-| Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.clear_range`, `excel.find_replace_cells` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools. |
+| Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; insertion and delete-with-shift are the structural Range pair. |
 | Work with formulas | `Range` formulas | `excel.set_formula` | Formula writes are distinct from literal value writes and can support scalar or matrix input. |
 | Apply user-visible cell formatting | `RangeFormat` | `excel.format_range` | Keeps font, fill, number format, borders, alignment, wrapping, and autofit under one cell-format owner. |
 | Sort and filter data | `RangeSort` / table filter owners | `excel.sort_range`, `excel.apply_filter` | One data-operation owner covers both plain ranges and table bodies; table tools must not duplicate it. |
@@ -116,7 +122,7 @@ Final v1 tool set by category:
 |---|---|---:|---|
 | Workbook | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item` | 5 | Inspect workbook-level state, persist changes, recalculate formulas, and manage named ranges/items without reading cell contents. |
 | Worksheet | `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | 4 | Sheet inventory and lifecycle. |
-| Range / cell data | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.clear_range`, `excel.find_replace_cells` | 5 | Locate, read, write, clear, and search cells through ranges. |
+| Range / cell data | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells` | 6 | Locate, read, write, insert, clear/delete, and search cells through ranges. |
 | Formula | `excel.set_formula` | 1 | Author formulas distinctly from literal value writes. |
 | Format | `excel.format_range` | 1 | Apply user-visible cell formatting. |
 | Data operations | `excel.sort_range`, `excel.apply_filter` | 2 | Sort and filter plain ranges or table bodies. |
@@ -125,7 +131,7 @@ Final v1 tool set by category:
 | PivotTable | `excel.create_pivot_table`, `excel.update_pivot_table` | 2 | Create and configure summarized analysis views. |
 | Review | `excel.add_comment`, `excel.list_comments`, `excel.update_comment` | 3 | Create, inspect, reply to, resolve, reopen, edit, and delete threaded cell comments. |
 
-Total: 27 tools.
+Total: 28 tools.
 
 Rejected tool families for v1:
 
@@ -160,6 +166,7 @@ Implemented Excel v1 tools:
 | `excel.get_used_range` | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet. |
 | `excel.read_range` | read | `ExcelApi 1.1` | Read values, display text, dimensions, and number format for a range. |
 | `excel.write_range` | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
+| `excel.insert_range` | edit | `ExcelApi 1.1` | Insert cells, rows, or columns and shift existing content down or right. |
 | `excel.clear_range` | destructive | `ExcelApi 1.1` | Clear contents, formats, all range data, or delete cells with a shift direction. |
 | `excel.find_replace_cells` | read/edit | `ExcelApi 1.9` | Find the first matching cell in a range or replace matching cells. |
 | `excel.set_formula` | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
@@ -195,6 +202,7 @@ Target core Excel tool surface:
 | `excel.get_used_range` | implemented | Range | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet; cell values/text/formulas belong to `excel.read_range`. |
 | `excel.read_range` | implemented | Range | read | `ExcelApi 1.1` | Read values, display text, formulas, dimensions, and number format for an explicit range. |
 | `excel.write_range` | implemented | Range | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
+| `excel.insert_range` | implemented | Range | edit | `ExcelApi 1.1` | Insert cells, whole rows, or whole columns from a range address, shifting existing content down or right. |
 | `excel.clear_range` | implemented | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, or all range data; optional cell deletion with shift direction. Hyperlink-specific clear modes are deferred because they require `ExcelApi 1.7`. |
 | `excel.find_replace_cells` | implemented | Range | read/edit | `ExcelApi 1.9` | Search cell contents in a range and optionally replace matches. |
 | `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
@@ -213,7 +221,7 @@ Target core Excel tool surface:
 
 The tools above are the Excel v1 contract. Implementation work must keep
 the daemon catalog, MCP `tools/list`, Excel task pane `available_tools`, task
-pane permission grouping, documentation, and tests aligned with this 27-tool
+pane permission grouping, documentation, and tests aligned with this 28-tool
 surface. Before implementing or changing a tool, verify its minimum requirement
 set against `@types/office-js` and Microsoft API docs, then land the change as a
 test-first implementation slice with daemon catalog coverage, task pane
@@ -389,7 +397,44 @@ Returns:
 }
 ```
 
-### 3.3 `excel.add_sheet`
+### 3.3 `excel.insert_range`
+
+Arguments:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "sheet": "Sheet1",
+  "address": "3:3",
+  "shift": "down",
+  "count": 2,
+  "validate_only": false
+}
+```
+
+`address` accepts cell ranges such as `B2:C3`, whole-row addresses such as
+`3:5`, and whole-column addresses such as `B:B`. `shift` is required and must
+be `down` or `right`. Whole-row addresses require `shift: "down"`; whole-column
+addresses require `shift: "right"`; incompatible combinations fail with
+`INVALID_ARGUMENT` and `partial_effect: "none"` before mutation. `count`
+defaults to `1` and expands the target before a single `Range.insert` call, so
+multi-row or multi-column insertion remains one host operation. The host adjusts
+formulas and shifted references exactly as if the user inserted cells
+interactively. Requires `ExcelApi 1.1`.
+
+Returns:
+
+```json
+{
+  "address": "Sheet1!3:4",
+  "shift": "down",
+  "count": 2,
+  "inserted": true,
+  "new_used_range": "Sheet1!A1:D20"
+}
+```
+
+### 3.4 `excel.add_sheet`
 
 Arguments:
 
@@ -406,7 +451,7 @@ Arguments:
 
 Returns `{ "sheet": "Analysis", "activated": true }`.
 
-### 3.4 `excel.set_formula`
+### 3.5 `excel.set_formula`
 
 Arguments:
 
@@ -436,7 +481,7 @@ Matrix example:
 
 Returns `{ "address": "C2:C10", "formula": "=B2*2", "wrote_formula": true }`.
 
-### 3.5 `excel.format_range`
+### 3.6 `excel.format_range`
 
 Arguments:
 
@@ -470,7 +515,7 @@ values are restricted to stable Office.js enum values. `autofit_rows` and
 
 Returns `{ "address": "A1:C2", "formatted": true }`.
 
-### 3.6 `excel.sort_range`
+### 3.7 `excel.sort_range`
 
 Arguments for a plain range sort:
 
@@ -504,7 +549,7 @@ Range and table sorting require `ExcelApi 1.2`.
 
 Returns `{ "target_type": "range", "address": "A1:D20", "sorted": true }`.
 
-### 3.7 `excel.apply_filter`
+### 3.8 `excel.apply_filter`
 
 Arguments for a range filter:
 
@@ -539,7 +584,7 @@ belong to `excel.update_pivot_table`.
 
 Returns `{ "target_type": "range", "address": "A1:D20", "filtered": true }`.
 
-### 3.8 `excel.create_table`
+### 3.9 `excel.create_table`
 
 Arguments:
 
@@ -558,7 +603,7 @@ Arguments:
 
 Returns `{ "table": "SalesTable", "address": "A1:C10", "has_headers": true }`.
 
-### 3.9 `excel.create_chart`
+### 3.10 `excel.create_chart`
 
 Arguments:
 
@@ -578,7 +623,7 @@ Supported `type` values in v1 are `area`, `barClustered`, `columnClustered`,
 
 Returns `{ "chart": "Chart 1", "chart_type": "columnClustered", "source": "A1:C10" }`.
 
-### 3.10 `excel.add_comment`
+### 3.11 `excel.add_comment`
 
 Arguments:
 
@@ -597,7 +642,7 @@ content is deferred. Requires `ExcelApi 1.10`.
 
 Returns `{ "comment_id": "...", "cell": "Sheet1!B2", "commented": true }`.
 
-### 3.11 `excel.list_comments`
+### 3.12 `excel.list_comments`
 
 Arguments:
 
@@ -643,7 +688,7 @@ Returns:
 `untrusted_source` is always `true` because workbook comments may contain
 prompt injection text.
 
-### 3.12 `excel.update_comment`
+### 3.13 `excel.update_comment`
 
 Arguments:
 
@@ -676,9 +721,11 @@ Planned tools should keep contracts coarse and workflow-oriented:
 - Range tools own cell data, formulas, cell-level formatting, search/replace,
   sorting, filtering, and clearing. A single-cell operation is represented as a
   one-cell range.
-- `excel.clear_range` is the only destructive cell primitive. It covers
-  content/format/all clearing and explicit delete-with-shift modes instead of
-  adding a separate delete-cell tool.
+- `excel.insert_range` and `excel.clear_range` are the structural Range pair.
+  `excel.insert_range` inserts cells, whole rows, and whole columns with a
+  required shift direction; `excel.clear_range` remains the only destructive
+  cell primitive and covers content/format/all clearing plus explicit
+  delete-with-shift modes instead of adding a separate delete-cell tool.
 - `excel.update_table`, `excel.update_chart`, and `excel.update_pivot_table`
   intentionally group object lifecycle and configuration by owner so the MCP
   catalog stays compact while still covering user-visible Excel workflows.

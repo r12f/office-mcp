@@ -132,6 +132,11 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(mutating.category, "Range");
     assert_eq!(mutating.side_effect, ToolSideEffect::Mutating);
 
+    let insert_range = tool_metadata("excel.insert_range").expect("excel insert metadata");
+    assert_eq!(insert_range.app, "excel");
+    assert_eq!(insert_range.category, "Range");
+    assert_eq!(insert_range.side_effect, ToolSideEffect::Mutating);
+
     let save = tool_metadata("excel.save").expect("excel save metadata");
     assert_eq!(save.app, "excel");
     assert_eq!(save.category, "Workbook");
