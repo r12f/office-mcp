@@ -2577,25 +2577,15 @@ information is available.
 
 ### 10.3 Validation-only mode
 
-Mutating tools that advertise `validate_only: true`, including
-`word.insert_image`, `word.replace_text`, `word.update_paragraph`,
-`word.delete_range`, note lifecycle mutations, header/footer updates, and field
-lifecycle mutations, MUST implement validation-only mode as a no-write preflight.
-Validation-only mode is not a transaction preview. The add-in MAY call read-only
-Office.js APIs and `context.sync()` to resolve anchors, count matches, or load
-target metadata, but it MUST NOT queue a write before returning.
+Word follows the cross-app validation-only contract in
+[03-mcp-tool-surface.md](03-mcp-tool-surface.md) §6. Every advertised mutating
+Word tool MUST accept `validate_only: true` and return the portable no-write
+preflight envelope with `valid: true`, `operation`, `partial_effect: "none"`,
+and target-specific planning metadata when validation succeeds.
 
-Successful validation-only responses MUST include:
-
-- `valid: true`
-- `operation`: the tool name
-- `partial_effect: "none"`
-- `resolved_target` or equivalent tool-specific planning metadata when a target
-  can be resolved
-
-Invalid validation-only requests use the normal MCP error envelope with
-`INVALID_ARGUMENT` and `partial_effect: "none"`. If the add-in can identify a
-safe correction, it SHOULD include a small structured `suggestion` object.
+`word.replace_text.dry_run` remains an accepted compatibility synonym for the
+documented transition window, but `validate_only` is the preferred advertised
+argument and the only name new tools may introduce.
 
 ### 10.4 Undo grouping
 

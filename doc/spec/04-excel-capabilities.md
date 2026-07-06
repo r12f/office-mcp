@@ -202,6 +202,11 @@ Tool ownership rules:
   state reads use `get_*` / `list_*`, range content reads use `read_*`, sheet
   collection operations use `add_*`, promoted workbook objects use `create_*`,
   and lifecycle/configuration changes use object-owner `update_*` tools.
+- Excel follows the cross-app validation-only contract in
+  [03-mcp-tool-surface.md](03-mcp-tool-surface.md) §6. Every advertised
+  mutating Excel tool MUST accept `validate_only: true`, must advertise
+  `_meta["com.office-mcp/supports_validate_only"]: true`, and must return the
+  portable no-write preflight envelope before queuing workbook writes.
 - One tool owns each common user intent. Do not add a second tool unless it has a
   different object owner, permission profile, or user-visible result.
 - `excel.get_workbook_info` is workbook state only. It may include the active

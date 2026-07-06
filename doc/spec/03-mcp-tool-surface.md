@@ -298,26 +298,40 @@ call to the add-in. Unsupported anchor kinds fail with `INVALID_ARGUMENTS` and
 `partial_effect: none`; they must not reach Office.js and must not mutate the
 document.
 
-Mutating tools MAY advertise `validate_only: true` when they can check the
-request without applying a document write. The daemon still performs the same
-schema, policy, session, and daemon-owned preprocessing checks as a normal
-call, then forwards the request to the add-in with `validate_only` preserved.
-The add-in MUST run deterministic semantic validation and target resolution,
-but MUST NOT queue mutating Office.js calls such as `insertText`, `delete`,
-`insertInlinePictureFromBase64`, or `context.document.save`.
+Every advertised mutating Office tool MUST accept `validate_only: true` and
+implement it as a no-write preflight. This includes tools whose overall side
+effect is `mutating` or `destructive`, and mixed-effect owner tools when the
+selected `action` mutates state. Read-only actions on mixed-effect tools MAY
+ignore `validate_only`, but accepting the argument keeps planning code portable.
 
-For Word v1, `word.insert_image`, `word.delete_range`, `word.replace_text`,
-and `word.update_paragraph` MUST support `validate_only`. `word.replace_text`
-keeps the existing `dry_run` alias for compatibility; `validate_only: true`
-has the same no-mutation behavior and SHOULD be preferred by new clients for a
-consistent contract across mutating tools.
+The daemon still performs the same schema, policy, session, and daemon-owned
+preprocessing checks as a normal call, then forwards the request to the add-in
+with `validate_only` preserved. The add-in MUST run deterministic semantic
+validation and target resolution, but MUST NOT queue mutating Office.js calls
+such as `insertText`, `delete`, `insertInlinePictureFromBase64`,
+`Range.clear`, `Shape.delete`, or document save operations.
 
-A validation-only success returns tool-specific planning metadata and includes
-`valid: true`. A validation-only failure uses the same MCP tool error envelope
-as normal preflight failures, with a stable `INVALID_ARGUMENT` or
-`INVALID_ARGUMENTS` code and `partial_effect: none`. When the implementation
-can infer a correction, the structured response SHOULD include a `suggestion`
-object, for example a compatible image `placement`.
+Successful validation-only responses MUST include this portable envelope:
+
+```json
+{
+  "valid": true,
+  "operation": "<tool name>",
+  "partial_effect": "none",
+  "resolved_target": { "tool_specific": "planning metadata" }
+}
+```
+
+Tools MAY add `matches` for search-style operations or `suggestion` when a
+deterministic correction is identifiable. A validation-only failure uses the
+same MCP tool error envelope as normal preflight failures, with a stable
+`INVALID_ARGUMENT` or `INVALID_ARGUMENTS` code and `partial_effect: none`.
+
+`word.replace_text.dry_run` and PowerPoint replace-text dry-run arguments remain
+accepted compatibility synonyms for one release window. They MUST NOT be the
+preferred advertised shape for new tools; `validate_only` is the portable
+contract and the daemon exposes support with
+`_meta["com.office-mcp/supports_validate_only"]: true` in `tools/list`.
 
 Paragraph indices are 0-based and refer to the *current* document state at the
 moment the tool call is processed. Clients must not cache indices across edits.
