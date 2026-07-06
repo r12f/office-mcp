@@ -2044,14 +2044,17 @@ The #109 follow-up adds `excel.set_data_validation` and extends
 `excel.read_range` with optional validation readback.
 The #110 follow-up adds `excel.copy_range` for host-native Range copy and
 autofill workflows.
+The #111 follow-up adds `excel.insert_image`, `excel.list_shapes`, and
+`excel.update_shape` as the Shapes category for floating worksheet objects.
 
-The 33 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 9,
-Formula 1, Format 3, Data operations 2, Table 2, Chart 2, PivotTable 2, and
-Review 3. This is the current v1 upper bound. Rejected v1 expansions include separate cell CRUD,
-worksheet formatting, freeze panes, protection, legacy notes, shapes, images,
-slicers, event subscriptions, bindings, custom XML, external data,
-Power Query, workbook import/export, save-as/close, and method-level table,
-chart, or PivotTable tools that duplicate an existing owner tool.
+The 36 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 9,
+Formula 1, Format 3, Data operations 2, Table 2, Chart 2, PivotTable 2,
+Shapes 3, and Review 3. This is the current v1 upper bound. Rejected v1
+expansions include separate cell CRUD, worksheet formatting, freeze panes,
+protection, legacy notes, slicers, event subscriptions, bindings, custom XML,
+external data, Power Query, workbook import/export, save-as/close, and
+method-level table, chart, PivotTable, or shape tools that duplicate an
+existing owner tool.
 
 - [x] Implement workbook and worksheet discovery/lifecycle slice:
       `excel.get_workbook_info`, `excel.list_sheets`, `excel.update_sheet`,
@@ -2116,6 +2119,14 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       Rust/JS tests, `Range.copyFrom` copy types, `Range.autoFill` fill types,
       cross-sheet copy, transpose/skip-blanks options, and deterministic
       autofill containment rejection. The tool requires `ExcelApi 1.9`.
+- [ ] Implement shape/image slice: `excel.insert_image`, `excel.list_shapes`,
+      and `excel.update_shape`, including daemon catalog and metadata, action
+      side-effect metadata for `move`/`resize`/`set_alt_text`/`set_text`/
+      `set_z_order`/`delete`, daemon image preprocessing for base64 and HTTPS
+      URL image inputs, task pane handlers, validate-only support, Shapes
+      permission metadata, Rust/JS tests, worksheet shape metadata readback,
+      text-preview untrusted-source marking, and deterministic delete coverage.
+      The tools require `ExcelApi 1.9`.
 - [x] Record Excel tool-selection research in
       [04-excel-capabilities.md](04-excel-capabilities.md), starting from the
       Microsoft Learn Excel core object model and related range/table/chart/

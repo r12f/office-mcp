@@ -450,6 +450,17 @@ fn mixed_action_owner_metadata_declares_complete_action_side_effects() {
             ]),
         ),
         (
+            "excel.update_shape",
+            BTreeMap::from([
+                ("move", ToolSideEffect::Mutating),
+                ("resize", ToolSideEffect::Mutating),
+                ("set_alt_text", ToolSideEffect::Mutating),
+                ("set_text", ToolSideEffect::Mutating),
+                ("set_z_order", ToolSideEffect::Mutating),
+                ("delete", ToolSideEffect::Destructive),
+            ]),
+        ),
+        (
             "powerpoint.update_tags",
             BTreeMap::from([
                 ("list", ToolSideEffect::Read),

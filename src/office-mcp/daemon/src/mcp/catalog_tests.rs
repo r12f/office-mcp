@@ -118,6 +118,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"excel.update_chart"));
     assert!(names.contains(&"excel.create_pivot_table"));
     assert!(names.contains(&"excel.update_pivot_table"));
+    assert!(names.contains(&"excel.insert_image"));
+    assert!(names.contains(&"excel.list_shapes"));
+    assert!(names.contains(&"excel.update_shape"));
     for name in POWERPOINT_V1_TOOL_NAMES {
         assert!(names.contains(name), "missing PowerPoint tool {name}");
     }
@@ -127,9 +130,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
     assert_eq!(WORD_V1_TOOLS.len(), 62);
-    assert_eq!(ExcelToolCatalog::tools().len(), 33);
+    assert_eq!(ExcelToolCatalog::tools().len(), 36);
     assert_eq!(PowerPointToolCatalog::tools().len(), 23);
-    assert_eq!(tools.len(), 242);
+    assert_eq!(tools.len(), 248);
 }
 
 #[test]
@@ -202,6 +205,23 @@ fn tools_list_exposes_action_side_effects_for_mixed_owner_tools() {
     assert_eq!(
         excel_copy_range["_meta"]["com.office-mcp/action_side_effects"]["autofill"],
         "mutating"
+    );
+
+    let excel_update_shape = tools
+        .iter()
+        .find(|tool| tool["name"] == "excel.update_shape")
+        .expect("excel.update_shape tool");
+    assert_eq!(
+        excel_update_shape["_meta"]["com.office-mcp/action_side_effects"]["move"],
+        "mutating"
+    );
+    assert_eq!(
+        excel_update_shape["_meta"]["com.office-mcp/action_side_effects"]["set_z_order"],
+        "mutating"
+    );
+    assert_eq!(
+        excel_update_shape["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
     );
 
     let powerpoint_update_tags = tools
@@ -903,10 +923,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 118);
+    assert_eq!(all_tools.len(), 121);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        118
+        121
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1808,6 +1828,87 @@ fn excel_comment_schemas_are_specific() {
 }
 
 #[test]
+fn excel_shape_tools_expose_expected_contracts() {
+    let insert_image = schema_for("excel.insert_image");
+    assert_required(&insert_image, &["session_id", "image"]);
+    assert_eq!(
+        insert_image["properties"]["image"]["oneOf"][0]["required"],
+        serde_json::json!(["base64"])
+    );
+    assert_eq!(
+        insert_image["properties"]["image"]["oneOf"][1]["required"],
+        serde_json::json!(["url"])
+    );
+    assert_eq!(insert_image["properties"]["left_pt"]["type"], "number");
+    assert_eq!(
+        insert_image["properties"]["width_pt"]["exclusiveMinimum"],
+        0
+    );
+    assert_eq!(
+        insert_image["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
+    let list_shapes = schema_for("excel.list_shapes");
+    assert_required(&list_shapes, &["session_id"]);
+    assert_eq!(list_shapes["properties"]["sheet"]["type"], "string");
+
+    let update_shape = schema_for("excel.update_shape");
+    assert_required(&update_shape, &["session_id", "shape_id", "action"]);
+    assert_eq!(
+        update_shape["properties"]["action"]["enum"],
+        serde_json::json!([
+            "move",
+            "resize",
+            "set_alt_text",
+            "set_text",
+            "set_z_order",
+            "delete"
+        ])
+    );
+    assert_eq!(update_shape["properties"]["shape_id"]["minLength"], 1);
+    assert_eq!(
+        update_shape["properties"]["z_order"]["enum"],
+        serde_json::json!([
+            "bring_forward",
+            "send_backward",
+            "bring_to_front",
+            "send_to_back"
+        ])
+    );
+    assert_eq!(
+        update_shape["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
+    let insert_tool = tool_for("excel.insert_image");
+    assert_eq!(
+        insert_tool["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
+    assert_eq!(insert_tool["_meta"]["com.office-mcp/category"], "Shapes");
+    assert_eq!(
+        insert_tool["_meta"]["com.office-mcp/supports_validate_only"],
+        true
+    );
+
+    let list_tool = tool_for("excel.list_shapes");
+    assert_eq!(list_tool["_meta"]["com.office-mcp/side_effects"], "read");
+    assert_eq!(list_tool["_meta"]["com.office-mcp/category"], "Shapes");
+
+    let update_tool = tool_for("excel.update_shape");
+    assert_eq!(
+        update_tool["_meta"]["com.office-mcp/side_effects"],
+        "destructive"
+    );
+    assert_eq!(update_tool["_meta"]["com.office-mcp/category"], "Shapes");
+    assert_eq!(
+        update_tool["_meta"]["com.office-mcp/supports_validate_only"],
+        true
+    );
+}
+
+#[test]
 fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.get_workbook_info"));
     assert!(ExcelToolCatalog::contains("excel.save"));
@@ -1834,6 +1935,9 @@ fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.update_chart"));
     assert!(ExcelToolCatalog::contains("excel.create_pivot_table"));
     assert!(ExcelToolCatalog::contains("excel.update_pivot_table"));
+    assert!(ExcelToolCatalog::contains("excel.insert_image"));
+    assert!(ExcelToolCatalog::contains("excel.list_shapes"));
+    assert!(ExcelToolCatalog::contains("excel.update_shape"));
     assert!(ExcelToolCatalog::contains("excel.write_range"));
     assert!(!ExcelToolCatalog::contains("excel.unsupported"));
 }

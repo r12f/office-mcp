@@ -54,7 +54,7 @@ Research basis:
   Excel analysis workflow and are present in the stable Excel.js object model.
   v1 limits PivotTables to normal range/table sources and non-preview APIs.
 
-The refined v1 target is 33 tools. The original 20-tool core covered workbook
+The refined v1 target is 36 tools. The original 20-tool core covered workbook
 orientation, worksheet lifecycle, range work, formulas, formatting, data
 operations, tables, charts, and PivotTables. The workbook owner now also covers
 stable persistence/calculation tasks and named-item lifecycle. These cannot be
@@ -77,7 +77,10 @@ formats, relative references, and host fill semantics that cannot be safely
 emulated through client-side read/write loops. The
 Format owner now also covers conditional formatting because rule-based visual
 formatting has a distinct lifecycle from static one-shot range formatting while
-still sharing the cell-format permission profile. Do not
+still sharing the cell-format permission profile. The Shapes owner now covers
+worksheet image insertion, shape discovery, and shape update/delete workflows
+because floating worksheet objects are not range, chart, or table content and
+need their own geometry, metadata, text, and z-order contract. Do not
 expand the catalog by copying individual Excel.js methods into MCP tools. A
 future tool can only be added after the selection matrix proves that the
 existing tools cannot express a distinct object owner, permission profile, or
@@ -103,8 +106,8 @@ Selection rules for the core and follow-up tool budget:
   page because summarized analysis is a central Excel workflow; defer slicers,
   OLAP, Power Pivot, and preview-only APIs.
 
-Out of scope for the core Excel surface: shapes and images, legacy notes,
-slicers as first-class tools, events/subscriptions, custom XML, external data
+Out of scope for the core Excel surface: legacy notes, slicers as first-class
+tools, events/subscriptions, custom XML, external data
 connections, Power Query, Python/preview-only APIs, OLAP/Power Pivot, arbitrary
 file import/export, workbook close, and save-as flows. Workbook save and
 calculation are in scope because they are stable workbook-owner operations, not
@@ -124,6 +127,10 @@ Data validation is in scope as a Range follow-up because Office.js exposes it
 through `Range.dataValidation`, in-cell dropdowns and input rules are common
 spreadsheet authoring workflows, and agents need readback before overwriting
 cell input constraints.
+Shapes and images are in scope as a Shapes follow-up because Office.js exposes
+worksheet floating objects through `Worksheet.shapes`, image insertion is a
+common workbook composition workflow, and shape geometry/metadata/text/z-order
+cannot be represented by range, table, chart, or PivotTable owner tools.
 
 Core tool selection matrix:
 
@@ -137,6 +144,7 @@ Core tool selection matrix:
 | Promote data into a structured table | `Table` | `excel.create_table`, `excel.update_table` | Creation is common enough to be direct; lifecycle, rows/columns, resize, rename, and table style/options share one object-owner update tool. |
 | Visualize data | `Chart` | `excel.create_chart`, `excel.update_chart` | Creation is direct; title, axes, legend, series, size, position, delete, and supported export share one chart-owner update tool. |
 | Analyze summarized data | `PivotTable` | `excel.create_pivot_table`, `excel.update_pivot_table` | Creation is direct; fields, filters, aggregation, refresh, metadata, and delete share one PivotTable-owner update tool. |
+| Work with floating worksheet objects | `Worksheet.shapes` / `Shape` | `excel.insert_image`, `excel.list_shapes`, `excel.update_shape` | Image insertion is direct; listing, geometry, text, alt text, z-order, and deletion use one Shapes owner so floating objects do not leak into range/chart/table tools. |
 | Review workbook cells | `CommentCollection` / `Comment` / `CommentReply` | `excel.add_comment`, `excel.list_comments`, `excel.update_comment` | Threaded comments have a review permission profile and lifecycle separate from range content; legacy notes remain deferred. |
 
 Final v1 tool set by category:
@@ -152,16 +160,17 @@ Final v1 tool set by category:
 | Table | `excel.create_table`, `excel.update_table` | 2 | Promote data to structured tables and manage table-owned lifecycle/options. |
 | Chart | `excel.create_chart`, `excel.update_chart` | 2 | Visualize data and manage chart-owned configuration. |
 | PivotTable | `excel.create_pivot_table`, `excel.update_pivot_table` | 2 | Create and configure summarized analysis views. |
+| Shapes | `excel.insert_image`, `excel.list_shapes`, `excel.update_shape` | 3 | Insert images and inspect or update floating worksheet shapes. |
 | Review | `excel.add_comment`, `excel.list_comments`, `excel.update_comment` | 3 | Create, inspect, reply to, resolve, reopen, edit, and delete threaded cell comments. |
 
-Total: 33 tools.
+Total: 36 tools.
 
 Rejected tool families for v1:
 
 - No `excel.read_cell`, `excel.write_cell`, or `excel.delete_cell`; cells are
   one-cell ranges.
-- No separate worksheet format, freeze pane, protection, legacy notes, shapes,
-  images, slicer, event, binding, custom XML, external connection,
+- No separate worksheet format, freeze pane, protection, legacy notes, slicer,
+  event, binding, custom XML, external connection,
   Power Query, workbook import/export, save-as, or close tools. `excel.save`
   intentionally persists the current workbook through host save behavior only;
   it does not expose save-as, export, prompt, path, or close semantics.
@@ -207,6 +216,9 @@ Implemented Excel v1 tools:
 | `excel.update_chart` | read/edit/destructive | `ExcelApi 1.1`; image export requires `ExcelApi 1.2`; axis selection and chart type metadata require `ExcelApi 1.7` | Read or update chart configuration, source, export, and lifecycle. |
 | `excel.create_pivot_table` | edit | `ExcelApi 1.8` | Create a PivotTable from a range or table source. |
 | `excel.update_pivot_table` | read/edit/destructive | `ExcelApi 1.3`; hierarchy/layout/delete require `ExcelApi 1.8`; filters require `ExcelApi 1.12` | Read or update PivotTable fields, layout, filters, refresh, and lifecycle. |
+| `excel.insert_image` | edit | `ExcelApi 1.9` | Insert a PNG or JPEG image as a floating worksheet shape from daemon-validated base64 or URL input. |
+| `excel.list_shapes` | read | `ExcelApi 1.9` | List floating worksheet shapes with id, name, type, geometry, alt text, and bounded text previews. |
+| `excel.update_shape` | edit/destructive | `ExcelApi 1.9` | Move, resize, update alt text or text, adjust z-order, or delete a floating worksheet shape. |
 | `excel.add_comment` | comment | `ExcelApi 1.10` | Add a threaded comment to a cell as the signed-in Office user. |
 | `excel.list_comments` | read | `ExcelApi 1.10`; resolved filtering requires `ExcelApi 1.11` | List threaded comments and replies, optionally filtered by resolved state. |
 | `excel.update_comment` | comment/destructive | `ExcelApi 1.10`; resolve/reopen require `ExcelApi 1.11` | Reply to, edit, resolve, reopen, or delete a threaded comment or reply. |
@@ -248,13 +260,16 @@ Target core Excel tool surface:
 | `excel.update_chart` | implemented | Chart | edit/read/destructive | `ExcelApi 1.1`; image export requires `ExcelApi 1.2`; axis selection and chart type metadata require `ExcelApi 1.7` | Read chart metadata; update chart title, axes, legend, source range, position, size, delete the chart, or export a chart image where supported. |
 | `excel.create_pivot_table` | implemented | PivotTable | edit | `ExcelApi 1.8` | Create a PivotTable from a range or table at a target destination. |
 | `excel.update_pivot_table` | implemented | PivotTable | edit/destructive | `ExcelApi 1.3`; hierarchy/layout/delete require `ExcelApi 1.8`; filters require `ExcelApi 1.12` | Read PivotTable metadata; configure row, column, data, and filter hierarchies; set aggregation and layout options, refresh, apply manual PivotTable filters, clear filters, or delete a PivotTable. |
+| `excel.insert_image` | implemented | Shapes | edit | `ExcelApi 1.9` | Insert a daemon-validated PNG or JPEG image onto the active or named worksheet with optional geometry and alt text. |
+| `excel.list_shapes` | implemented | Shapes | read | `ExcelApi 1.9` | List worksheet shapes with stable IDs, names, types, geometry, alt text, and bounded text previews. |
+| `excel.update_shape` | implemented | Shapes | edit/destructive | `ExcelApi 1.9` | Move, resize, set alt text, set text, set z-order, or delete a worksheet shape. |
 | `excel.add_comment` | implemented | Review | comment | `ExcelApi 1.10` | Add a threaded cell comment as the signed-in Office user. |
 | `excel.list_comments` | implemented | Review | read | `ExcelApi 1.10`; resolved filtering requires `ExcelApi 1.11` | List threaded cell comments and replies, marking workbook-authored text as untrusted source content. |
 | `excel.update_comment` | implemented | Review | comment/destructive | `ExcelApi 1.10`; resolve/reopen require `ExcelApi 1.11` | Reply to, edit, resolve, reopen, or delete a threaded comment or reply. |
 
 The tools above are the Excel v1 contract. Implementation work must keep
 the daemon catalog, MCP `tools/list`, Excel task pane `available_tools`, task
-pane permission grouping, documentation, and tests aligned with this 32-tool
+pane permission grouping, documentation, and tests aligned with this 36-tool
 surface. Before implementing or changing a tool, verify its minimum requirement
 set against `@types/office-js` and Microsoft API docs, then land the change as a
 test-first implementation slice with daemon catalog coverage, task pane
@@ -338,6 +353,11 @@ Tool ownership rules:
   `excel.update_pivot_table` are object-owner tools. They group lifecycle and
   configuration operations for their object type, but must not absorb generic
   range, formula, or cell-format operations.
+- `excel.insert_image`, `excel.list_shapes`, and `excel.update_shape` own
+  floating worksheet objects. They must not read or mutate cell contents, chart
+  internals, table structure, or PivotTable configuration. Image input is
+  normalized by the daemon before forwarding, and workbook-authored shape text
+  returned by `excel.list_shapes` MUST be marked as untrusted source content.
 - `excel.add_comment`, `excel.list_comments`, and `excel.update_comment` own
   threaded cell comments. Comments are authored as the signed-in Office user;
   comment and reply content is workbook content and MUST be returned with
@@ -356,6 +376,7 @@ Action side-effect maps:
 | `excel.update_table` | `metadata`, `read` | `add_rows`, `add_columns`, `resize`, `rename`, `options`, `style` | `delete` |
 | `excel.update_chart` | `metadata`, `read`, `export_image` | `title`, `legend`, `axis`, `data`, `series_source`, `position`, `size` | `delete` |
 | `excel.update_pivot_table` | `metadata`, `read` | `refresh`, `add_hierarchy`, `remove_hierarchy`, `layout`, `filter`, `clear_filters` | `delete` |
+| `excel.update_shape` | - | `move`, `resize`, `set_alt_text`, `set_text`, `set_z_order` | `delete` |
 | `excel.update_comment` | - | `reply`, `edit`, `resolve`, `reopen` | `delete` |
 
 These maps are part of the public contract described in
