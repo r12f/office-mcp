@@ -240,6 +240,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /excel\.update_sheet/);
   assert.match(js, /excel\.delete_sheet/);
   assert.match(js, /excel\.get_used_range/);
+  assert.match(js, /excel\.insert_range/);
   assert.match(js, /excel\.clear_range/);
   assert.match(js, /excel\.find_replace_cells/);
   assert.match(js, /excel\.sort_range/);
@@ -260,6 +261,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /case 'excel.update_sheet':/);
   assert.match(js, /case 'excel.delete_sheet':/);
   assert.match(js, /case 'excel.get_used_range':/);
+  assert.match(js, /case 'excel.insert_range':/);
   assert.match(js, /case 'excel.clear_range':/);
   assert.match(js, /case 'excel.find_replace_cells':/);
   assert.match(js, /case 'excel.sort_range':/);
@@ -295,6 +297,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /async function updateSheet/);
   assert.match(js, /async function deleteSheet/);
   assert.match(js, /async function getUsedRange/);
+  assert.match(js, /async function insertRange/);
   assert.match(js, /async function clearRange/);
   assert.match(js, /async function findReplaceCells/);
   assert.match(js, /async function sortRange/);
@@ -316,6 +319,13 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /comment\.resolved = true/);
   assert.match(js, /comment\.resolved = false/);
   assert.match(js, /untrusted_source: true/);
+  assert.match(js, /const insertShift = insertShiftDirectionFrom\(args\.shift\)/);
+  assert.match(js, /validateInsertRangeShift\(args\.address, args\.shift\)/);
+  assert.match(js, /const insertTarget = insertRangeAddress\(range, args\.count\)/);
+  assert.match(js, /insertTarget\.insert\(insertShift\)/);
+  assert.match(js, /function insertShiftDirectionFrom\(value\)/);
+  assert.match(js, /function validateInsertRangeShift\(address, shift\)/);
+  assert.match(js, /function insertRangeAddress\(range, count\)/);
   assert.match(js, /const applyTo = clearApplyToFrom/);
   assert.match(js, /range\.clear\(applyTo\)/);
   assert.match(js, /range\.delete\(deleteShiftDirectionFrom\(deleteShift\)\)/);
@@ -468,6 +478,7 @@ test('Excel task pane routes mutating tools through validation-only preflight', 
   assert.match(invokeBody, /case 'excel\.calculate':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await calculateWorkbook\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_named_item':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateNamedItem\(args\);/);
   assert.match(invokeBody, /case 'excel\.write_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await writeRange\(args\);/);
+  assert.match(invokeBody, /case 'excel\.insert_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await insertRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.clear_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await clearRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_table':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateTable\(args\);/);
   assert.match(invokeBody, /case 'excel\.add_comment':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await addComment\(args\);/);

@@ -189,6 +189,20 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['updated', 'marker', '3', '4'], notContains: ['baseline'] }
     }
   }],
+  ['excel.insert_range', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:A3', values: [['before'], ['shift-me'], ['after']] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'A2', shift: 'down', count: 1 },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'A1:A4' },
+      expect: { contains: ['before', 'shift-me', 'after'], pathEquals: [{ path: 'row_count', value: 4 }] }
+    }
+  }],
   ['excel.clear_range', {
     setup: {
       actions: [
