@@ -78,6 +78,8 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.format_range",
     "excel.get_used_range",
     "excel.get_workbook_info",
+    "excel.save",
+    "excel.calculate",
     "excel.list_sheets",
     "excel.read_range",
     "excel.set_formula",
@@ -1670,6 +1672,8 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!("excel.get_workbook_info", ["session_id"], ["session_id"]),
+    tool_spec!("excel.save", ["session_id"], ["session_id"]),
+    tool_spec!("excel.calculate", ["session_id"], ["session_id", "type"]),
     tool_spec!("excel.list_sheets", ["session_id"], ["session_id"]),
     tool_spec!(
         "excel.add_sheet",
@@ -2256,6 +2260,9 @@ fn property_schema(tool: &str, name: &str) -> Value {
     if let Some(schema) = excel_action_property_schema(tool, name) {
         return schema;
     }
+    if let Some(schema) = excel_workbook_property_schema(tool, name) {
+        return schema;
+    }
     if let Some(schema) = powerpoint_action_property_schema(tool, name) {
         return schema;
     }
@@ -2324,6 +2331,15 @@ fn word_list_property_schema(tool: &str, name: &str) -> Option<Value> {
         })),
         "text" => Some(json!({ "type": "string", "minLength": 1 })),
         "bullet_char" => Some(json!({ "type": "string", "maxLength": 1 })),
+        _ => None,
+    }
+}
+
+fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
+    match (tool, name) {
+        ("excel.calculate", "type") => Some(
+            json!({ "enum": ["recalculate", "full", "full_rebuild"], "default": "recalculate" }),
+        ),
         _ => None,
     }
 }

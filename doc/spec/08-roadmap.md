@@ -1973,13 +1973,16 @@ owner before implementation.
 Selection criteria: prioritize the operations users actually ask Excel to do in
 an agent workflow: workbook orientation, sheet inventory/lifecycle, range/cell
 value CRUD, formula authoring, formatting, sorting/filtering, table management,
-chart creation/customization, and PivotTable analysis. The API budget is 15-20
-tools; v1 intentionally lands at 20 because that is the smallest catalog that
-covers workbook, sheet, range/cell, formula, format, data, table, chart, and
-PivotTable workflows without method-level sprawl. Do not add tools for every
+chart creation/customization, PivotTable analysis, and workbook persistence /
+calculation. The original API budget was 15-20 tools and landed at 20 for the
+core workbook/sheet/range/formula/format/data/table/chart/PivotTable surface.
+The #102 revision expands the target to 22 by adding two workbook-owner tools,
+`excel.save` and `excel.calculate`, because persistence and recalculation cannot
+be represented safely by range or object-owner tools. Do not add tools for every
 Office.js object, property, event, shape, comment, slicer, external connection,
-or preview feature unless a later user workflow proves that the 20-tool surface
-cannot express it safely and the spec either retires or merges another tool.
+or preview feature unless a later user workflow proves that the current surface
+cannot express it safely and the spec records the distinct owner and permission
+profile.
 
 Research conclusion from the Microsoft Learn core concepts page: Excel v1 must
 be a small workflow API, not an Excel.js mirror. The core path is `Workbook` ->
@@ -1989,20 +1992,22 @@ intents because they carry different validation and permission profiles.
 PivotTables are the only extra analysis object in v1 because they represent a
 high-value summarized-analysis workflow. Shapes, comments, slicers, bindings,
 events, named items, external data, Power Query, import/export, save-as/close,
-and method-level table/chart/PivotTable wrappers remain out of scope.
+and method-level table/chart/PivotTable wrappers remain out of scope. Workbook
+save and calculation are in scope as stable workbook-owner operations, not as
+file export, save-as, or close workflows.
 
-Target catalog: `excel.get_workbook_info`, `excel.list_sheets`,
-`excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
-`excel.get_used_range`, `excel.read_range`, `excel.write_range`,
-`excel.clear_range`, `excel.find_replace_cells`, `excel.set_formula`,
-`excel.format_range`, `excel.sort_range`, `excel.apply_filter`,
-`excel.create_table`, `excel.update_table`, `excel.create_chart`,
-`excel.update_chart`, `excel.create_pivot_table`, and
+Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
+`excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`,
+`excel.delete_sheet`, `excel.get_used_range`, `excel.read_range`,
+`excel.write_range`, `excel.clear_range`, `excel.find_replace_cells`,
+`excel.set_formula`, `excel.format_range`, `excel.sort_range`,
+`excel.apply_filter`, `excel.create_table`, `excel.update_table`,
+`excel.create_chart`, `excel.update_chart`, `excel.create_pivot_table`, and
 `excel.update_pivot_table`.
 
-The 20 tools are grouped as: Workbook 1, Worksheet 4, Range/cell data 5,
+The 22 tools are grouped as: Workbook 3, Worksheet 4, Range/cell data 5,
 Formula 1, Format 1, Data operations 2, Table 2, Chart 2, and PivotTable 2.
-This is the v1 upper bound. Rejected v1 expansions include separate cell CRUD,
+This is the current v1 upper bound. Rejected v1 expansions include separate cell CRUD,
 worksheet formatting, freeze panes, protection, comments, shapes, images,
 slicers, event subscriptions, bindings, named items, custom XML, external data,
 Power Query, workbook import/export, save-as/close, and method-level table,
@@ -2013,6 +2018,11 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       `excel.delete_sheet`, and `excel.get_used_range`, including daemon catalog
       entries, task pane handlers, and Rust/JS tests. Committed as
       `excel: add workbook and worksheet tools`.
+- [ ] Implement workbook persistence/calculation slice: `excel.save` and
+      `excel.calculate`, including daemon catalog entries, task pane handlers,
+      validate-only support, permission metadata, and Rust/JS tests. `excel.save`
+      must use host save behavior only; save-as, export, prompt, path, and close
+      flows remain out of scope.
 - [x] Record Excel tool-selection research in
       [04-excel-capabilities.md](04-excel-capabilities.md), starting from the
       Microsoft Learn Excel core object model and related range/table/chart/
@@ -2045,14 +2055,15 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       permission grouping, and documentation must all expose the same tool names
       and categories. Current evidence: daemon catalog tests, MCP `tools/list`
       tests, Excel task pane contract tests, and runtime evidence tests all name
-      the same 20 tools.
+      the same 20 pre-#102 tools.
 - [x] Keep the runtime Excel catalog capped at the refined 20-tool target unless
       a future spec update identifies a distinct object owner, permission
       profile, or user-visible workflow that cannot be represented by the
-      existing tools. Any proposed expansion must update the selection matrix
-      and retire or merge an existing tool before implementation. Current
-      evidence: `ExcelToolCatalog`, daemon catalog/list-tools tests, and Excel
-      task pane `AVAILABLE_TOOLS` expose exactly the 20-tool v1 catalog.
+      existing tools. #102 is that spec update for workbook save/calculate, so
+      implementation may expand the runtime catalog to 22 tools. Current
+      evidence before #102: `ExcelToolCatalog`, daemon catalog/list-tools tests,
+      and Excel task pane `AVAILABLE_TOOLS` expose exactly the 20-tool v1
+      catalog.
 - [x] Add or keep contract tests that fail if the daemon catalog, Excel task
       pane available-tools metadata, or UI permission grouping advertises more
       than the v1 20-tool target without a spec update. The tests should also

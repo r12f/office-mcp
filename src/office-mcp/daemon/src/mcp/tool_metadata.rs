@@ -449,6 +449,13 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Workbook",
         ToolSideEffect::Read,
     ),
+    tool("excel.save", "excel", "Workbook", ToolSideEffect::Mutating),
+    tool(
+        "excel.calculate",
+        "excel",
+        "Workbook",
+        ToolSideEffect::Mutating,
+    ),
     tool(
         "excel.list_sheets",
         "excel",
