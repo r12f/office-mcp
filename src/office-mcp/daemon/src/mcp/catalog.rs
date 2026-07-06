@@ -81,6 +81,7 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.get_used_range",
     "excel.get_workbook_info",
     "excel.insert_range",
+    "excel.set_data_validation",
     "excel.set_hyperlink",
     "excel.update_conditional_format",
     "excel.save",
@@ -1762,7 +1763,8 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "address",
             "include_formulas",
             "include_formatting",
-            "include_hyperlinks"
+            "include_hyperlinks",
+            "include_validation"
         ]
     ),
     tool_spec!(
@@ -1792,6 +1794,21 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "document_reference",
             "text_to_display",
             "screen_tip"
+        ]
+    ),
+    tool_spec!(
+        "excel.set_data_validation",
+        ["session_id", "address", "action"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "action",
+            "rule",
+            "ignore_blanks",
+            "error_alert",
+            "input_prompt",
+            "validate_only"
         ]
     ),
     tool_spec!(
@@ -2334,9 +2351,21 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             }
         ]);
     }
+    add_excel_data_validation_schema_rules(tool, &mut schema);
     add_excel_set_hyperlink_schema_rules(tool, &mut schema);
     add_excel_conditional_format_schema_rules(tool, &mut schema);
     schema
+}
+
+fn add_excel_data_validation_schema_rules(tool: &str, schema: &mut Value) {
+    if tool == "excel.set_data_validation" {
+        schema["allOf"] = json!([
+            {
+                "if": { "properties": { "action": { "const": "set" } } },
+                "then": { "required": ["rule"] }
+            }
+        ]);
+    }
 }
 
 fn add_excel_conditional_format_schema_rules(tool: &str, schema: &mut Value) {
@@ -2545,14 +2574,57 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
             Some(json!({ "type": "number", "minimum": 0 }))
         }
         ("excel.format_range", "style") => Some(json!({ "type": "string", "minLength": 1 })),
+        ("excel.set_data_validation", "rule") => Some(excel_data_validation_rule_schema()),
+        ("excel.set_data_validation", "error_alert") => Some(json!({
+            "type": "object",
+            "properties": {
+                "style": { "enum": ["stop", "warning", "information"], "default": "stop" },
+                "title": { "type": "string" },
+                "message": { "type": "string" },
+                "show_alert": { "type": "boolean", "default": true }
+            },
+            "additionalProperties": false
+        })),
+        ("excel.set_data_validation", "input_prompt") => Some(json!({
+            "type": "object",
+            "properties": {
+                "title": { "type": "string" },
+                "message": { "type": "string" },
+                "show_prompt": { "type": "boolean", "default": true }
+            },
+            "additionalProperties": false
+        })),
         ("excel.update_conditional_format", "rule") => Some(excel_conditional_format_rule_schema()),
         ("excel.update_conditional_format", "priority") => {
             Some(json!({ "type": "integer", "minimum": 0 }))
         }
         ("excel.update_conditional_format", "stop_if_true")
+        | ("excel.set_data_validation", "ignore_blanks")
         | ("excel.list_comments", "resolved") => Some(json!({ "type": "boolean" })),
         _ => None,
     }
+}
+
+fn excel_data_validation_rule_schema() -> Value {
+    json!({
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+            "type": { "enum": ["list", "whole_number", "decimal", "date", "time", "text_length", "custom"] },
+            "operator": { "enum": ["between", "not_between", "equal_to", "not_equal_to", "greater_than", "less_than", "greater_than_or_equal_to", "less_than_or_equal_to"] },
+            "value1": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "value2": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+            "list_source": {
+                "oneOf": [
+                    { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+                    { "type": "string", "minLength": 1 }
+                ]
+            },
+            "in_cell_dropdown": { "type": "boolean", "default": true },
+            "formula": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+    })
 }
 
 fn excel_conditional_format_rule_schema() -> Value {
@@ -2615,7 +2687,7 @@ fn excel_action_property_schema(tool: &str, name: &str) -> Option<Value> {
         "excel.update_comment" => Some(json!({
             "enum": ["reply", "edit", "resolve", "reopen", "delete"]
         })),
-        "excel.set_hyperlink" => Some(json!({
+        "excel.set_hyperlink" | "excel.set_data_validation" => Some(json!({
             "enum": ["set", "clear"]
         })),
         "excel.update_conditional_format" => Some(json!({
@@ -2860,6 +2932,7 @@ fn generic_property_schema(name: &str) -> Option<Value> {
         | "include_formatting"
         | "include_formulas"
         | "include_hyperlinks"
+        | "include_validation"
         | "include_selection"
         | "include_page_setup"
         | "include_tags"

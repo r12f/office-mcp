@@ -538,6 +538,13 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
         EXCEL_SET_HYPERLINK_ACTIONS,
     ),
+    tool_with_actions(
+        "excel.set_data_validation",
+        "excel",
+        "Range",
+        ToolSideEffect::Destructive,
+        EXCEL_SET_DATA_VALIDATION_ACTIONS,
+    ),
     tool(
         "excel.clear_range",
         "excel",
@@ -875,6 +882,11 @@ const EXCEL_UPDATE_COMMENT_ACTIONS: &[ActionSideEffect] = &[
 const EXCEL_SET_HYPERLINK_ACTIONS: &[ActionSideEffect] = &[
     action("set", ToolSideEffect::Mutating),
     action("clear", ToolSideEffect::Mutating),
+];
+
+const EXCEL_SET_DATA_VALIDATION_ACTIONS: &[ActionSideEffect] = &[
+    action("set", ToolSideEffect::Mutating),
+    action("clear", ToolSideEffect::Destructive),
 ];
 
 const EXCEL_UPDATE_CONDITIONAL_FORMAT_ACTIONS: &[ActionSideEffect] = &[

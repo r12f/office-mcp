@@ -54,7 +54,7 @@ Research basis:
   Excel analysis workflow and are present in the stable Excel.js object model.
   v1 limits PivotTables to normal range/table sources and non-preview APIs.
 
-The refined v1 target is 31 tools. The original 20-tool core covered workbook
+The refined v1 target is 32 tools. The original 20-tool core covered workbook
 orientation, worksheet lifecycle, range work, formulas, formatting, data
 operations, tables, charts, and PivotTables. The workbook owner now also covers
 stable persistence/calculation tasks and named-item lifecycle. These cannot be
@@ -69,6 +69,9 @@ columns without emulating that workflow through reads and writes. The Range
 owner now also covers `excel.set_hyperlink` because cell hyperlinks are visible
 cell metadata that need URL security validation and hyperlink-only clearing that
 cannot be represented by generic value, formula, or formatting writes. The
+Range owner now also covers `excel.set_data_validation` because in-cell
+dropdowns and input constraints are range-owned metadata with typed rule
+validation and readback needs before mutation. The
 Format owner now also covers conditional formatting because rule-based visual
 formatting has a distinct lifecycle from static one-shot range formatting while
 still sharing the cell-format permission profile. Do not
@@ -114,13 +117,17 @@ formatting permission profile instead of introducing a new object owner. Cell
 hyperlinks are in scope as a Range follow-up because Office.js exposes them as
 `Range.hyperlink`, they require URL scheme validation, and agents need a
 hyperlink-only clear path that preserves displayed cell text.
+Data validation is in scope as a Range follow-up because Office.js exposes it
+through `Range.dataValidation`, in-cell dropdowns and input rules are common
+spreadsheet authoring workflows, and agents need readback before overwriting
+cell input constraints.
 
 Core tool selection matrix:
 
 | User workflow | Object owner | v1 tools | Why this is enough |
 |---|---|---|---|
 | Inspect, persist, calculate, and address workbook state; navigate sheets | `Workbook` / `Workbook.names` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, workbook orientation, style-name discovery, persistence, formula recalculation, and template-stable named item addressing without reading cell contents. |
-| Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; insertion and delete-with-shift are the structural Range pair, and hyperlink writes need URL-specific validation while staying range-owned. |
+| Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; insertion and delete-with-shift are the structural Range pair, and hyperlink/data-validation writes need typed validation while staying range-owned. |
 | Work with formulas | `Range` formulas | `excel.set_formula` | Formula writes are distinct from literal value writes and can support scalar or matrix input. |
 | Apply user-visible cell formatting | `RangeFormat` / `Range` style, merge, and conditional format APIs | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | Keeps static cell formatting in `excel.format_range` and rule-based conditional formatting in a dedicated list/update owner so agents can inspect, add, delete, and clear rules without duplicating value or table tools. |
 | Sort and filter data | `RangeSort` / table filter owners | `excel.sort_range`, `excel.apply_filter` | One data-operation owner covers both plain ranges and table bodies; table tools must not duplicate it. |
@@ -135,7 +142,7 @@ Final v1 tool set by category:
 |---|---|---:|---|
 | Workbook | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item` | 5 | Inspect workbook-level state, persist changes, recalculate formulas, and manage named ranges/items without reading cell contents. |
 | Worksheet | `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | 4 | Sheet inventory and lifecycle. |
-| Range / cell data | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink` | 7 | Locate, read, write, insert, clear/delete, search, and manage cell hyperlinks through ranges. |
+| Range / cell data | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation` | 8 | Locate, read, write, insert, clear/delete, search, and manage cell hyperlinks and validation rules through ranges. |
 | Formula | `excel.set_formula` | 1 | Author formulas distinctly from literal value writes. |
 | Format | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | 3 | Apply static cell formatting and manage rule-based conditional formatting. |
 | Data operations | `excel.sort_range`, `excel.apply_filter` | 2 | Sort and filter plain ranges or table bodies. |
@@ -144,7 +151,7 @@ Final v1 tool set by category:
 | PivotTable | `excel.create_pivot_table`, `excel.update_pivot_table` | 2 | Create and configure summarized analysis views. |
 | Review | `excel.add_comment`, `excel.list_comments`, `excel.update_comment` | 3 | Create, inspect, reply to, resolve, reopen, edit, and delete threaded cell comments. |
 
-Total: 31 tools.
+Total: 32 tools.
 
 Rejected tool families for v1:
 
@@ -177,11 +184,12 @@ Implemented Excel v1 tools:
 | `excel.update_sheet` | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
 | `excel.delete_sheet` | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
 | `excel.get_used_range` | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet. |
-| `excel.read_range` | read | `ExcelApi 1.1`; hyperlink readback requires `ExcelApi 1.7` | Read values, display text, dimensions, number format, and optional hyperlink metadata for a range. |
+| `excel.read_range` | read | `ExcelApi 1.1`; hyperlink readback requires `ExcelApi 1.7`; data-validation readback requires `ExcelApi 1.8` | Read values, display text, dimensions, number format, and optional hyperlink and data-validation metadata for a range. |
 | `excel.write_range` | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
 | `excel.insert_range` | edit | `ExcelApi 1.1` | Insert cells, rows, or columns and shift existing content down or right. |
 | `excel.clear_range` | destructive | `ExcelApi 1.1` | Clear contents, formats, all range data, or delete cells with a shift direction. |
 | `excel.set_hyperlink` | edit | `ExcelApi 1.7` | Set or clear external or in-workbook hyperlinks while preserving displayed text on clear. |
+| `excel.set_data_validation` | edit/destructive | `ExcelApi 1.8` | Set or clear range data-validation rules, including list dropdowns, numeric/date/time/text-length constraints, custom formulas, prompts, and error alerts. |
 | `excel.find_replace_cells` | read/edit | `ExcelApi 1.9` | Find the first matching cell in a range or replace matching cells. |
 | `excel.set_formula` | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
 | `excel.format_range` | edit | `ExcelApi 1.1`; fixed sizing, hide/unhide, and autofit require `ExcelApi 1.2`; named styles require `ExcelApi 1.7` | Apply font, fill, number formats, borders, alignment, wrapping, merge/unmerge, fixed row or column size, row or column visibility, named styles, and autofit. |
@@ -216,11 +224,12 @@ Target core Excel tool surface:
 | `excel.update_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
 | `excel.delete_sheet` | implemented | Worksheet | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
 | `excel.get_used_range` | implemented | Range | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet; cell values/text/formulas belong to `excel.read_range`. |
-| `excel.read_range` | implemented | Range | read | `ExcelApi 1.1`; hyperlink readback requires `ExcelApi 1.7` | Read values, display text, formulas, dimensions, number format, and optional hyperlink metadata for an explicit range. |
+| `excel.read_range` | implemented | Range | read | `ExcelApi 1.1`; hyperlink readback requires `ExcelApi 1.7`; data-validation readback requires `ExcelApi 1.8` | Read values, display text, formulas, dimensions, number format, and optional hyperlink and data-validation metadata for an explicit range. |
 | `excel.write_range` | implemented | Range | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
 | `excel.insert_range` | implemented | Range | edit | `ExcelApi 1.1` | Insert cells, whole rows, or whole columns from a range address, shifting existing content down or right. |
 | `excel.clear_range` | implemented | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, or all range data; optional cell deletion with shift direction. Hyperlink-only clearing belongs to `excel.set_hyperlink`. |
 | `excel.set_hyperlink` | implemented | Range | edit | `ExcelApi 1.7` | Set or clear external or in-workbook cell hyperlinks with deterministic scheme and argument validation. |
+| `excel.set_data_validation` | implemented | Range | edit/destructive | `ExcelApi 1.8` | Set or clear range data-validation rules with deterministic type/operator/payload validation and optional prompt/error-alert metadata. |
 | `excel.find_replace_cells` | implemented | Range | read/edit | `ExcelApi 1.9` | Search cell contents in a range and optionally replace matches. |
 | `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
 | `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1`; fixed sizing, hide/unhide, and autofit require `ExcelApi 1.2`; named styles require `ExcelApi 1.7` | Apply font, fill, scalar or matrix number formats, borders, alignment, wrapping, merge/unmerge, fixed row or column size, row or column visibility, named styles, and autofit. |
@@ -240,7 +249,7 @@ Target core Excel tool surface:
 
 The tools above are the Excel v1 contract. Implementation work must keep
 the daemon catalog, MCP `tools/list`, Excel task pane `available_tools`, task
-pane permission grouping, documentation, and tests aligned with this 31-tool
+pane permission grouping, documentation, and tests aligned with this 32-tool
 surface. Before implementing or changing a tool, verify its minimum requirement
 set against `@types/office-js` and Microsoft API docs, then land the change as a
 test-first implementation slice with daemon catalog coverage, task pane
@@ -289,6 +298,11 @@ Tool ownership rules:
   URL links, in-workbook document references, and hyperlink-only clearing while
   preserving displayed text on clear. `excel.clear_range` must not grow a
   duplicate hyperlink-clear mode.
+- `excel.set_data_validation` is the Excel data-validation owner. It handles
+  in-cell list dropdowns, numeric/date/time/text-length constraints, custom
+  validation formulas, prompts, alerts, and validation clearing. `excel.read_range`
+  owns validation readback through `include_validation`; validation formulas,
+  prompts, and alert text are workbook-authored untrusted source content.
 - `excel.write_range` writes literal values. `excel.set_formula` writes formulas
   and formula matrices. Formula strings passed to `excel.write_range` remain
   literal input unless explicitly documented otherwise during implementation.
@@ -326,6 +340,7 @@ Action side-effect maps:
 |---|---|---|---|
 | `excel.find_replace_cells` | omitted `replace` / find-only mode | replace mode | - |
 | `excel.set_hyperlink` | - | `set`, `clear` | - |
+| `excel.set_data_validation` | - | `set` | `clear` |
 | `excel.update_conditional_format` | - | `add` | `delete`, `clear_range` |
 | `excel.update_table` | `metadata`, `read` | `add_rows`, `add_columns`, `resize`, `rename`, `options`, `style` | `delete` |
 | `excel.update_chart` | `metadata`, `read`, `export_image` | `title`, `legend`, `axis`, `data`, `series_source`, `position`, `size` | `delete` |
@@ -383,7 +398,8 @@ Arguments:
   "session_id": "excel-session-id",
   "sheet": "Sheet1",
   "address": "A1:B2",
-  "include_hyperlinks": false
+  "include_hyperlinks": false,
+  "include_validation": false
 }
 ```
 
@@ -404,9 +420,13 @@ Returns:
 `include_hyperlinks` defaults to `false`. When `true`, the response includes a
 `hyperlinks` matrix with the same shape as `values`; each cell is either `null`
 or `{ "url", "document_reference", "text_to_display", "screen_tip" }`.
-Hyperlink readback requires `ExcelApi 1.7`. `untrusted_source` is always `true`
-because workbook content, including hyperlink URLs and display text, may contain
-prompt injection text.
+Hyperlink readback requires `ExcelApi 1.7`. `include_validation` defaults to
+`false`. When `true`, the response includes a `validation` object for the
+target range with `{ "type", "rule_summary", "ignore_blanks", "valid" }` when
+the host exposes those fields. Data-validation readback requires
+`ExcelApi 1.8`. `untrusted_source` is always `true` because workbook content,
+including hyperlink URLs, display text, validation formulas, and validation
+messages, may contain prompt injection text.
 
 ### 3.2 `excel.write_range`
 
@@ -511,7 +531,65 @@ Returns:
 }
 ```
 
-### 3.5 `excel.add_sheet`
+### 3.5 `excel.set_data_validation`
+
+Arguments:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "sheet": "Sheet1",
+  "address": "B2:B20",
+  "action": "set",
+  "rule": {
+    "type": "list",
+    "list_source": ["Open", "Closed"],
+    "in_cell_dropdown": true
+  },
+  "ignore_blanks": true,
+  "error_alert": {
+    "style": "stop",
+    "title": "Invalid status",
+    "message": "Choose a value from the list.",
+    "show_alert": true
+  },
+  "input_prompt": {
+    "title": "Status",
+    "message": "Pick the current status.",
+    "show_prompt": true
+  },
+  "validate_only": false
+}
+```
+
+`action` is `set` or `clear`. `set` requires `rule`; `clear` removes validation
+rules from the range without changing cell values. Supported rule types are
+`list`, `whole_number`, `decimal`, `date`, `time`, `text_length`, and `custom`.
+List rules require `list_source`, either an inline non-empty string array or an
+A1/named-reference string. Numeric/date/time/text-length rules require an
+`operator` and `value1`; `between` and `not_between` also require `value2`.
+Custom rules require `formula`. Invalid type/operator/payload combinations fail
+with `INVALID_ARGUMENT` and `partial_effect: "none"` before mutation. Requires
+`ExcelApi 1.8`.
+
+Returns:
+
+```json
+{
+  "address": "Sheet1!B2:B20",
+  "action": "set",
+  "updated": true,
+  "validation": {
+    "type": "list",
+    "rule_summary": { "source": "Open,Closed", "in_cell_dropdown": true },
+    "ignore_blanks": true,
+    "valid": null,
+    "untrusted_source": true
+  }
+}
+```
+
+### 3.6 `excel.add_sheet`
 
 Arguments:
 
@@ -528,7 +606,7 @@ Arguments:
 
 Returns `{ "sheet": "Analysis", "activated": true }`.
 
-### 3.6 `excel.set_formula`
+### 3.7 `excel.set_formula`
 
 Arguments:
 
@@ -558,7 +636,7 @@ Matrix example:
 
 Returns `{ "address": "C2:C10", "formula": "=B2*2", "wrote_formula": true }`.
 
-### 3.7 `excel.format_range`
+### 3.8 `excel.format_range`
 
 Arguments:
 
@@ -608,7 +686,7 @@ before explicit formatting fields in the same request, so explicit fields win.
 
 Returns `{ "address": "A1:C2", "formatted": true }`.
 
-### 3.8 `excel.list_conditional_formats`
+### 3.9 `excel.list_conditional_formats`
 
 Arguments:
 
@@ -628,7 +706,7 @@ Returns `{ "conditional_formats": [{ "id", "type", "address", "priority", "stop_
 Rule formulas, text criteria, and addresses are workbook-authored content and
 MUST be treated as untrusted source text.
 
-### 3.9 `excel.update_conditional_format`
+### 3.10 `excel.update_conditional_format`
 
 Arguments:
 
@@ -663,7 +741,7 @@ deterministically checkable. Requires `ExcelApi 1.6` and supports the shared
 
 Returns `{ "action": "add", "id": "conditional-format-id", "address": "Sheet1!A1:D20", "updated": true }`.
 
-### 3.10 `excel.sort_range`
+### 3.11 `excel.sort_range`
 
 Arguments for a plain range sort:
 
@@ -697,7 +775,7 @@ Range and table sorting require `ExcelApi 1.2`.
 
 Returns `{ "target_type": "range", "address": "A1:D20", "sorted": true }`.
 
-### 3.11 `excel.apply_filter`
+### 3.12 `excel.apply_filter`
 
 Arguments for a range filter:
 
@@ -732,7 +810,7 @@ belong to `excel.update_pivot_table`.
 
 Returns `{ "target_type": "range", "address": "A1:D20", "filtered": true }`.
 
-### 3.12 `excel.create_table`
+### 3.13 `excel.create_table`
 
 Arguments:
 
@@ -751,7 +829,7 @@ Arguments:
 
 Returns `{ "table": "SalesTable", "address": "A1:C10", "has_headers": true }`.
 
-### 3.13 `excel.create_chart`
+### 3.14 `excel.create_chart`
 
 Arguments:
 
@@ -771,7 +849,7 @@ Supported `type` values in v1 are `area`, `barClustered`, `columnClustered`,
 
 Returns `{ "chart": "Chart 1", "chart_type": "columnClustered", "source": "A1:C10" }`.
 
-### 3.14 `excel.add_comment`
+### 3.15 `excel.add_comment`
 
 Arguments:
 
@@ -790,7 +868,7 @@ content is deferred. Requires `ExcelApi 1.10`.
 
 Returns `{ "comment_id": "...", "cell": "Sheet1!B2", "commented": true }`.
 
-### 3.15 `excel.list_comments`
+### 3.16 `excel.list_comments`
 
 Arguments:
 
@@ -836,7 +914,7 @@ Returns:
 `untrusted_source` is always `true` because workbook comments may contain
 prompt injection text.
 
-### 3.16 `excel.update_comment`
+### 3.17 `excel.update_comment`
 
 Arguments:
 
@@ -876,6 +954,9 @@ Planned tools should keep contracts coarse and workflow-oriented:
   delete-with-shift modes instead of adding a separate delete-cell tool.
 - `excel.set_hyperlink` owns cell hyperlink writes and hyperlink-only clearing.
   `excel.read_range` owns hyperlink readback through `include_hyperlinks`; the
+  default read payload remains unchanged.
+- `excel.set_data_validation` owns range validation writes and clearing.
+  `excel.read_range` owns validation readback through `include_validation`; the
   default read payload remains unchanged.
 - `excel.update_table`, `excel.update_chart`, and `excel.update_pivot_table`
   intentionally group object lifecycle and configuration by owner so the MCP

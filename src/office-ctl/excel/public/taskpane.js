@@ -65,6 +65,7 @@
     'excel.insert_range',
     'excel.clear_range',
     'excel.set_hyperlink',
+    'excel.set_data_validation',
     'excel.find_replace_cells',
     'excel.set_formula',
     'excel.format_range',
@@ -82,7 +83,7 @@
   const TOOL_GROUPS = [
     { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate', 'excel.list_named_items', 'excel.update_named_item'] },
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
-    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.set_hyperlink', 'excel.find_replace_cells'] },
+    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.set_hyperlink', 'excel.set_data_validation', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
     { label: 'Format', tools: ['excel.format_range', 'excel.list_conditional_formats', 'excel.update_conditional_format'] },
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
@@ -110,6 +111,7 @@
     ['excel.insert_range', { category: 'Range', sideEffect: 'mutating', description: 'Insert cells, rows, or columns and shift existing content.' }],
     ['excel.clear_range', { category: 'Range', sideEffect: 'destructive', description: 'Clear contents, formats, or delete cells in a range.' }],
     ['excel.set_hyperlink', { category: 'Range', sideEffect: 'mutating', description: 'Set or clear cell hyperlinks.' }],
+    ['excel.set_data_validation', { category: 'Range', sideEffect: 'destructive', description: 'Set or clear range data validation rules.' }],
     ['excel.find_replace_cells', { category: 'Range', sideEffect: 'mutating', description: 'Find cells in a range and optionally replace matches.' }],
     ['excel.set_formula', { category: 'Formula', sideEffect: 'mutating', description: 'Set formulas in a range.' }],
     ['excel.format_range', { category: 'Format', sideEffect: 'mutating', description: 'Apply formatting to a range.' }],
@@ -407,6 +409,9 @@
         case 'excel.set_hyperlink':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await setHyperlink(args);
           break;
+        case 'excel.set_data_validation':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await setDataValidation(args);
+          break;
         case 'excel.find_replace_cells':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await findReplaceCells(args);
           break;
@@ -674,10 +679,15 @@
   }
   async function readRange(args) {
     if (args.include_hyperlinks) requireRequirementSet('ExcelApi', '1.7', 'range hyperlinks');
+    if (args.include_validation) requireRequirementSet('ExcelApi', '1.8', 'range data validation');
     return Excel.run(async (context) => {
       const range = await targetRange(context, args);
       range.load('address,values,text,rowCount,columnCount,numberFormat');
       if (args.include_hyperlinks) range.load('hyperlink');
+      if (args.include_validation) {
+        range.dataValidation.load('rule,ignoreBlanks,valid');
+        range.dataValidation.load('type,errorAlert,prompt');
+      }
       await context.sync();
       return {
         address: range.address,
@@ -687,6 +697,7 @@
         column_count: range.columnCount,
         number_format: range.numberFormat,
         hyperlinks: args.include_hyperlinks ? hyperlinkMatrix(range) : undefined,
+        validation: args.include_validation ? dataValidationSummary(range.dataValidation) : undefined,
         untrusted_source: true
       };
     });
@@ -760,6 +771,27 @@
       }
       await context.sync();
       return { address: args.address, action, updated: true };
+    });
+  }
+
+  async function setDataValidation(args) {
+    requireRequirementSet('ExcelApi', '1.8', 'range data validation');
+    const action = validateDataValidationArgs(args);
+    return Excel.run(async (context) => {
+      const range = await targetRange(context, args);
+      range.load('address');
+      if (action === 'clear') {
+        range.dataValidation.clear();
+        await context.sync();
+        return { address: range.address, action, cleared: true };
+      }
+      range.dataValidation.rule = dataValidationRuleFrom(args.rule);
+      if (args.ignore_blanks !== undefined) range.dataValidation.ignoreBlanks = Boolean(args.ignore_blanks);
+      if (args.error_alert !== undefined) range.dataValidation.errorAlert = dataValidationErrorAlertFrom(args.error_alert);
+      if (args.input_prompt !== undefined) range.dataValidation.prompt = dataValidationPromptFrom(args.input_prompt);
+      range.dataValidation.load('rule,ignoreBlanks,valid,type,errorAlert,prompt');
+      await context.sync();
+      return { address: range.address, action, updated: true, validation: dataValidationSummary(range.dataValidation) };
     });
   }
 
@@ -1847,6 +1879,176 @@
   function hyperlinkMatrix(range) {
     const hyperlink = normalizeHyperlink(range.hyperlink);
     return Array.from({ length: range.rowCount }, () => Array.from({ length: range.columnCount }, () => hyperlink));
+  }
+
+  function validateDataValidationArgs(args) {
+    const action = String(args.action || '').trim().toLowerCase();
+    if (!['set', 'clear'].includes(action)) {
+      throw Object.assign(new Error(`Unsupported data validation action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    requiredString(args, 'address', 'excel.set_data_validation requires address.');
+    if (action === 'set') {
+      if (!args.rule || typeof args.rule !== 'object' || Array.isArray(args.rule)) {
+        throw Object.assign(new Error('excel.set_data_validation set requires rule.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      dataValidationRuleFrom(args.rule);
+    } else if (args.rule !== undefined || args.error_alert !== undefined || args.input_prompt !== undefined || args.ignore_blanks !== undefined) {
+      throw Object.assign(new Error('excel.set_data_validation clear does not accept validation payload fields.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return action;
+  }
+
+  function dataValidationRuleFrom(rule) {
+    const type = String(rule.type || '').trim().toLowerCase();
+    if (type === 'list') {
+      return { list: { source: dataValidationListSource(rule.list_source), inCellDropDown: rule.in_cell_dropdown !== false } };
+    }
+    if (type === 'custom') {
+      return { custom: { formula: requiredNonEmptyString(rule.formula, 'custom data validation requires formula.') } };
+    }
+    const basic = dataValidationBasicRule(rule);
+    if (type === 'whole_number') return { wholeNumber: basic };
+    if (type === 'decimal') return { decimal: basic };
+    if (type === 'date') return { date: basic };
+    if (type === 'time') return { time: basic };
+    if (type === 'text_length') return { textLength: basic };
+    throw Object.assign(new Error(`Unsupported data validation rule type ${rule.type}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+  }
+
+  function dataValidationBasicRule(rule) {
+    const operator = dataValidationOperatorFrom(rule.operator);
+    const requiresTwoValues = ['between', 'not_between'].includes(String(rule.operator || '').trim().toLowerCase());
+    if (rule.value1 === undefined || rule.value1 === null) {
+      throw Object.assign(new Error('Data validation rule requires value1.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (requiresTwoValues && (rule.value2 === undefined || rule.value2 === null)) {
+      throw Object.assign(new Error('Between data validation rules require value2.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    const result = { operator, formula1: dataValidationFormulaValue(rule.value1) };
+    if (rule.value2 !== undefined && rule.value2 !== null) result.formula2 = dataValidationFormulaValue(rule.value2);
+    return result;
+  }
+
+  function dataValidationListSource(value) {
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        throw Object.assign(new Error('list data validation requires a non-empty list_source.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      return value.map((entry) => requiredNonEmptyString(entry, 'list data validation entries must be non-empty strings.')).join(',');
+    }
+    return requiredNonEmptyString(value, 'list data validation requires list_source.');
+  }
+
+  function dataValidationFormulaValue(value) {
+    return typeof value === 'number' ? value : String(value);
+  }
+
+  function dataValidationErrorAlertFrom(alert) {
+    if (!alert || typeof alert !== 'object' || Array.isArray(alert)) {
+      throw Object.assign(new Error('error_alert must be an object.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    const result = {};
+    if (alert.style !== undefined) result.style = dataValidationAlertStyleFrom(alert.style);
+    if (alert.title !== undefined) result.title = String(alert.title);
+    if (alert.message !== undefined) result.message = String(alert.message);
+    if (alert.show_alert !== undefined) result.showAlert = Boolean(alert.show_alert);
+    return result;
+  }
+
+  function dataValidationPromptFrom(prompt) {
+    if (!prompt || typeof prompt !== 'object' || Array.isArray(prompt)) {
+      throw Object.assign(new Error('input_prompt must be an object.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    const result = {};
+    if (prompt.title !== undefined) result.title = String(prompt.title);
+    if (prompt.message !== undefined) result.message = String(prompt.message);
+    if (prompt.show_prompt !== undefined) result.showPrompt = Boolean(prompt.show_prompt);
+    return result;
+  }
+
+  function dataValidationSummary(dataValidation) {
+    const rule = dataValidation.rule || {};
+    return {
+      type: normalizeDataValidationType(dataValidation.type),
+      rule_summary: dataValidationRuleSummary(rule),
+      ignore_blanks: dataValidation.ignoreBlanks ?? null,
+      valid: dataValidation.valid ?? null,
+      error_alert: dataValidation.errorAlert ? dataValidationErrorAlertSummary(dataValidation.errorAlert) : null,
+      input_prompt: dataValidation.prompt ? dataValidationPromptSummary(dataValidation.prompt) : null,
+      untrusted_source: true
+    };
+  }
+
+  function dataValidationRuleSummary(rule) {
+    if (rule.list) return { type: 'list', source: rule.list.source || null, in_cell_dropdown: rule.list.inCellDropDown ?? null };
+    if (rule.custom) return { type: 'custom', formula: rule.custom.formula || null };
+    const entries = [
+      ['whole_number', rule.wholeNumber],
+      ['decimal', rule.decimal],
+      ['date', rule.date],
+      ['time', rule.time],
+      ['text_length', rule.textLength]
+    ];
+    const entry = entries.find(([, value]) => value);
+    if (!entry) return null;
+    const [type, value] = entry;
+    return { type, operator: normalizeDataValidationOperator(value.operator), value1: value.formula1 ?? null, value2: value.formula2 ?? null };
+  }
+
+  function dataValidationErrorAlertSummary(alert) {
+    return {
+      style: normalizeDataValidationAlertStyle(alert.style),
+      title: alert.title || null,
+      message: alert.message || null,
+      show_alert: alert.showAlert ?? null
+    };
+  }
+
+  function dataValidationPromptSummary(prompt) {
+    return {
+      title: prompt.title || null,
+      message: prompt.message || null,
+      show_prompt: prompt.showPrompt ?? null
+    };
+  }
+
+  function dataValidationOperatorFrom(value) {
+    const operators = {
+      between: Excel.DataValidationOperator.between,
+      not_between: Excel.DataValidationOperator.notBetween,
+      equal_to: Excel.DataValidationOperator.equalTo,
+      not_equal_to: Excel.DataValidationOperator.notEqualTo,
+      greater_than: Excel.DataValidationOperator.greaterThan,
+      less_than: Excel.DataValidationOperator.lessThan,
+      greater_than_or_equal_to: Excel.DataValidationOperator.greaterThanOrEqualTo,
+      less_than_or_equal_to: Excel.DataValidationOperator.lessThanOrEqualTo
+    };
+    return enumValueFrom(operators, value, 'data validation operator');
+  }
+
+  function dataValidationAlertStyleFrom(value) {
+    const styles = {
+      stop: Excel.DataValidationAlertStyle.stop,
+      warning: Excel.DataValidationAlertStyle.warning,
+      information: Excel.DataValidationAlertStyle.information
+    };
+    return enumValueFrom(styles, value || 'stop', 'data validation alert style');
+  }
+
+  function normalizeDataValidationType(value) {
+    const normalized = String(value || '').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+    if (normalized === 'wholenumber') return 'whole_number';
+    if (normalized === 'textlength') return 'text_length';
+    if (normalized === 'mixedcriteria') return 'mixed_criteria';
+    return normalized || null;
+  }
+
+  function normalizeDataValidationOperator(value) {
+    return String(value || '').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase() || null;
+  }
+
+  function normalizeDataValidationAlertStyle(value) {
+    return String(value || '').toLowerCase() || null;
   }
 
   function normalizeHyperlink(hyperlink) {

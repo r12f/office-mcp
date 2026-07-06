@@ -240,6 +240,25 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       ]
     }
   }],
+  ['excel.set_data_validation', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'I1:I3', values: [['Open'], ['Closed'], ['Open']] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'I1:I3', action: 'set', rule: { type: 'list', list_source: ['Open', 'Closed'], in_cell_dropdown: true }, error_alert: { style: 'stop', title: 'Invalid status', message: 'Choose Open or Closed.' }, input_prompt: { title: 'Status', message: 'Pick a status.' } },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'I1:I3', include_validation: true },
+      expect: { contains: ['list', 'Open,Closed', 'Invalid status'], pathEquals: [{ path: 'untrusted_source', value: true }] }
+    },
+    cleanup: {
+      actions: [
+        { tool: 'excel.set_data_validation', arguments: { sheet: 'Sheet1', address: 'I1:I3', action: 'clear' } }
+      ]
+    }
+  }],
   ['excel.find_replace_cells', {
     setup: {
       actions: [
