@@ -857,10 +857,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 107);
+    assert_eq!(all_tools.len(), 109);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        107
+        109
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1446,19 +1446,26 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
         update_named_item["properties"]["scope"]["enum"],
         serde_json::json!(["workbook", "sheet"])
     );
-    assert_eq!(update_named_item["properties"]["scope"]["default"], "workbook");
+    assert_eq!(
+        update_named_item["properties"]["scope"]["default"],
+        "workbook"
+    );
     assert_eq!(update_named_item["properties"]["name"]["minLength"], 1);
-    assert_eq!(update_named_item["properties"]["validate_only"]["type"], "boolean");
     assert_eq!(
-        update_named_item["_meta"]["com.office-mcp/action_side_effects"]["add"],
+        update_named_item["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+    let update_named_item_tool = tool_for("excel.update_named_item");
+    assert_eq!(
+        update_named_item_tool["_meta"]["com.office-mcp/action_side_effects"]["add"],
         "mutating"
     );
     assert_eq!(
-        update_named_item["_meta"]["com.office-mcp/action_side_effects"]["edit"],
+        update_named_item_tool["_meta"]["com.office-mcp/action_side_effects"]["edit"],
         "mutating"
     );
     assert_eq!(
-        update_named_item["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        update_named_item_tool["_meta"]["com.office-mcp/action_side_effects"]["delete"],
         "destructive"
     );
 

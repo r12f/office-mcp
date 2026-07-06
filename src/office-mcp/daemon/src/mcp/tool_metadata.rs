@@ -457,6 +457,19 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         ToolSideEffect::Mutating,
     ),
     tool(
+        "excel.list_named_items",
+        "excel",
+        "Workbook",
+        ToolSideEffect::Read,
+    ),
+    tool_with_actions(
+        "excel.update_named_item",
+        "excel",
+        "Workbook",
+        ToolSideEffect::Destructive,
+        EXCEL_UPDATE_NAMED_ITEM_ACTIONS,
+    ),
+    tool(
         "excel.list_sheets",
         "excel",
         "Worksheet",
@@ -797,6 +810,12 @@ const EXCEL_UPDATE_PIVOT_TABLE_ACTIONS: &[ActionSideEffect] = &[
     action("layout", ToolSideEffect::Mutating),
     action("filter", ToolSideEffect::Mutating),
     action("clear_filters", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
+];
+
+const EXCEL_UPDATE_NAMED_ITEM_ACTIONS: &[ActionSideEffect] = &[
+    action("add", ToolSideEffect::Mutating),
+    action("edit", ToolSideEffect::Mutating),
     action("delete", ToolSideEffect::Destructive),
 ];
 

@@ -50,6 +50,8 @@
     'excel.get_workbook_info',
     'excel.save',
     'excel.calculate',
+    'excel.list_named_items',
+    'excel.update_named_item',
     'excel.list_sheets',
     'excel.add_sheet',
     'excel.update_sheet',
@@ -71,7 +73,7 @@
     'excel.update_pivot_table'
   ];
   const TOOL_GROUPS = [
-    { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate'] },
+    { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate', 'excel.list_named_items', 'excel.update_named_item'] },
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
     { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.clear_range', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
@@ -85,6 +87,8 @@
     ['excel.get_workbook_info', { category: 'Workbook', sideEffect: 'read', description: 'Read workbook state and aggregate object counts.' }],
     ['excel.save', { category: 'Workbook', sideEffect: 'mutating', description: 'Save the current workbook.' }],
     ['excel.calculate', { category: 'Workbook', sideEffect: 'mutating', description: 'Recalculate workbook formulas.' }],
+    ['excel.list_named_items', { category: 'Workbook', sideEffect: 'read', description: 'List workbook and worksheet scoped named items.' }],
+    ['excel.update_named_item', { category: 'Workbook', sideEffect: 'destructive', description: 'Add, edit, or delete workbook and worksheet scoped named items.' }],
     ['excel.list_sheets', { category: 'Worksheet', sideEffect: 'read', description: 'List workbook worksheets.' }],
     ['excel.add_sheet', { category: 'Worksheet', sideEffect: 'mutating', description: 'Add a worksheet to the workbook.' }],
     ['excel.update_sheet', { category: 'Worksheet', sideEffect: 'mutating', description: 'Rename, activate, move, or restyle a worksheet tab.' }],
@@ -343,6 +347,12 @@
         case 'excel.calculate':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await calculateWorkbook(args);
           break;
+        case 'excel.list_named_items':
+          data = await listNamedItems(args);
+          break;
+        case 'excel.update_named_item':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateNamedItem(args);
+          break;
         case 'excel.list_sheets':
           data = await listSheets(args);
           break;
@@ -516,6 +526,98 @@
     });
   }
 
+  async function listNamedItems(args) {
+    const scope = String(args.scope || 'all').trim().toLowerCase();
+    if (!['workbook', 'sheet', 'all'].includes(scope)) {
+      throw Object.assign(new Error(`Unsupported named item scope ${args.scope}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if ((scope === 'sheet' || args.sheet) && !supportsRequirementSet('ExcelApi', '1.4')) {
+      requireRequirementSet('ExcelApi', '1.4', 'sheet-scoped named items');
+    }
+    return Excel.run(async (context) => {
+      const namedItems = [];
+      if (scope === 'workbook' || scope === 'all') {
+        const workbookNames = context.workbook.names;
+        workbookNames.load('items/name,items/type,items/formula,items/comment,items/visible');
+        await context.sync();
+        namedItems.push(...await namedItemInfos(context, workbookNames.items, 'workbook'));
+      }
+      if (scope === 'sheet' || scope === 'all') {
+        const worksheets = args.sheet ? [targetWorksheet(context, args)] : context.workbook.worksheets;
+        if (Array.isArray(worksheets)) {
+          for (const worksheet of worksheets) {
+            worksheet.load('name');
+            worksheet.names.load('items/name,items/type,items/formula,items/comment,items/visible');
+          }
+          await context.sync();
+          for (const worksheet of worksheets) {
+            namedItems.push(...await namedItemInfos(context, worksheet.names.items, 'sheet', worksheet.name));
+          }
+        } else {
+          worksheets.load('items/name');
+          await context.sync();
+          for (const worksheet of worksheets.items) {
+            worksheet.names.load('items/name,items/type,items/formula,items/comment,items/visible');
+          }
+          await context.sync();
+          for (const worksheet of worksheets.items) {
+            namedItems.push(...await namedItemInfos(context, worksheet.names.items, 'sheet', worksheet.name));
+          }
+        }
+      }
+      return { named_items: namedItems, count: namedItems.length };
+    });
+  }
+
+  async function updateNamedItem(args) {
+    const action = String(args.action || '').trim().toLowerCase();
+    const name = requiredString(args, 'name', 'excel.update_named_item requires name.');
+    const scope = String(args.scope || 'workbook').trim().toLowerCase();
+    if (!['workbook', 'sheet'].includes(scope)) {
+      throw Object.assign(new Error(`Unsupported named item scope ${args.scope}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (!['add', 'edit', 'delete'].includes(action)) {
+      throw Object.assign(new Error(`Unsupported named item action ${args.action}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    requireRequirementSet('ExcelApi', '1.4', 'sheet-scoped named items');
+    if (action === 'edit' && args.formula !== undefined) requireRequirementSet('ExcelApi', '1.7', 'named item formula editing');
+    return Excel.run(async (context) => {
+      const collection = namedItemCollection(context, args, scope);
+      const existing = collection.getItemOrNullObject(name);
+      existing.load('isNullObject,name,type,formula,comment,visible');
+      await context.sync();
+      if (action === 'add') {
+        if (!existing.isNullObject) {
+          throw Object.assign(new Error(`Named item ${name} already exists.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+        }
+        const reference = namedItemReference(args);
+        const created = collection.add(name, reference, optionalTrimmedString(args.comment) || undefined);
+        created.load('name,type,formula,comment,visible');
+        await context.sync();
+        const info = (await namedItemInfos(context, [created], scope, args.sheet || null))[0];
+        return { named_item: info, action, added: true };
+      }
+      if (existing.isNullObject) {
+        throw Object.assign(new Error(`Named item ${name} was not found.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      if (action === 'edit') {
+        if (args.formula === undefined && args.comment === undefined) {
+          throw Object.assign(new Error('excel.update_named_item edit requires formula or comment.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+        }
+        if (args.formula !== undefined) existing.formula = String(args.formula);
+        if (args.comment !== undefined) existing.comment = String(args.comment);
+        await context.sync();
+        existing.load('name,type,formula,comment,visible');
+        await context.sync();
+        const info = (await namedItemInfos(context, [existing], scope, args.sheet || null))[0];
+        return { named_item: info, action, updated: true };
+      }
+      existing.delete();
+      await context.sync();
+      return { name, scope, sheet: scope === 'sheet' ? args.sheet || null : null, action, deleted: true };
+    });
+  }
+
   async function listSheets(args) {
     return Excel.run(async (context) => {
       const worksheets = context.workbook.worksheets;
@@ -530,7 +632,7 @@
   }
   async function readRange(args) {
     return Excel.run(async (context) => {
-      const range = targetRange(context, args);
+      const range = await targetRange(context, args);
       range.load('address,values,text,rowCount,columnCount,numberFormat');
       await context.sync();
       return {
@@ -550,7 +652,7 @@
       throw Object.assign(new Error('excel.write_range requires a two-dimensional values array.'), { officeMcpCode: 'INVALID_ARGUMENT' });
     }
     return Excel.run(async (context) => {
-      const range = targetRange(context, args);
+      const range = await targetRange(context, args);
       range.values = args.values;
       await context.sync();
       return {
@@ -564,7 +666,7 @@
 
   async function clearRange(args) {
     return Excel.run(async (context) => {
-      const range = targetRange(context, args);
+      const range = await targetRange(context, args);
       const deleteShift = optionalTrimmedString(args.delete_shift);
       if (deleteShift) {
         range.delete(deleteShiftDirectionFrom(deleteShift));
@@ -586,7 +688,7 @@
     const hasReplacement = args.replacement !== undefined;
     const replacement = hasReplacement ? String(args.replacement) : null;
     return Excel.run(async (context) => {
-      const range = targetRange(context, args);
+      const range = await targetRange(context, args);
       const criteria = searchCriteriaFrom(args);
       if (hasReplacement) {
         const result = range.replaceAll(query, replacement, replaceCriteriaFrom(args));
@@ -669,7 +771,7 @@
 
   async function setFormula(args) {
     return Excel.run(async (context) => {
-      const range = targetRange(context, args);
+      const range = await targetRange(context, args);
       range.load('rowCount,columnCount');
       await context.sync();
       range.formulas = formulaMatrixFrom(args, range.rowCount, range.columnCount);
@@ -685,7 +787,7 @@
 
   async function formatRange(args) {
     return Excel.run(async (context) => {
-      const range = targetRange(context, args);
+      const range = await targetRange(context, args);
       if (args.number_format !== undefined || args.number_formats !== undefined) {
         range.load('rowCount,columnCount');
         await context.sync();
@@ -711,7 +813,7 @@
   async function sortRange(args) {
     requireRequirementSet('ExcelApi', '1.2', 'range sorting');
     return Excel.run(async (context) => {
-      const target = targetSortObject(context, args);
+      const target = await targetSortObject(context, args);
       const action = String(args.action || 'apply').trim().toLowerCase();
       if (action === 'clear') {
         if (!target.table) throw Object.assign(new Error('excel.sort_range clear is only supported for table targets.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
@@ -761,7 +863,7 @@
         await context.sync();
         return { target_type: 'table', table: args.table, column: String(args.column), filtered: true };
       }
-      const range = targetRange(context, args);
+      const range = await targetRange(context, args);
       const autoFilter = targetWorksheet(context, args).autoFilter;
       if (action === 'clear') {
         autoFilter.clearCriteria();
@@ -791,7 +893,7 @@
     const hasHeaders = args.has_headers !== false;
     const name = String(args.name || '').trim();
     return Excel.run(async (context) => {
-      const range = targetRange(context, args);
+      const range = await targetRange(context, args);
       const table = context.workbook.tables.add(range, hasHeaders);
       if (name) table.name = name;
       table.load('name');
@@ -847,7 +949,7 @@
     const typeName = String(args.type || 'columnClustered');
     const type = chartTypeFrom(typeName);
     return Excel.run(async (context) => {
-      const range = targetRange(context, args);
+      const range = await targetRange(context, args);
       const worksheet = args.sheet
         ? context.workbook.worksheets.getItem(String(args.sheet))
         : context.workbook.worksheets.getActiveWorksheet();
@@ -897,7 +999,7 @@
         return { chart: args.chart, action, axis: String(args.axis || 'value'), updated: true };
       }
       if (action === 'data' || action === 'series_source') {
-        chart.setData(targetRange(context, args), chartSeriesByFrom(args.series_by));
+        chart.setData(await targetRange(context, args), chartSeriesByFrom(args.series_by));
         await context.sync();
         return { chart: args.chart, action, source: args.address, updated: true };
       }
@@ -930,7 +1032,7 @@
   async function createPivotTable(args) {
     requireRequirementSet('ExcelApi', '1.8', 'pivot table creation');
     return Excel.run(async (context) => {
-      const pivot = context.workbook.pivotTables.add(requiredString(args, 'name', 'excel.create_pivot_table requires name.'), pivotSource(context, args), requiredString(args, 'destination', 'excel.create_pivot_table requires destination.'));
+      const pivot = context.workbook.pivotTables.add(requiredString(args, 'name', 'excel.create_pivot_table requires name.'), await pivotSource(context, args), requiredString(args, 'destination', 'excel.create_pivot_table requires destination.'));
       pivot.load('name');
       await context.sync();
       return { pivot_table: pivot.name, source: args.table || args.address, destination: args.destination, created: true };
@@ -989,6 +1091,46 @@
       : context.workbook.worksheets.getActiveWorksheet();
   }
 
+  function namedItemCollection(context, args, scope) {
+    if (scope === 'sheet') return targetWorksheet(context, args).names;
+    return context.workbook.names;
+  }
+
+  function namedItemReference(args) {
+    const reference = optionalTrimmedString(args.reference);
+    const formula = optionalTrimmedString(args.formula);
+    if (!reference && !formula) {
+      throw Object.assign(new Error('excel.update_named_item add requires reference or formula.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return formula || reference;
+  }
+
+  async function namedItemInfos(context, items, scope, sheet = null) {
+    const ranges = items.map((item) => {
+      if (supportsRequirementSet('ExcelApi', '1.4')) return item.getRangeOrNullObject();
+      if (String(item.type || '').toLowerCase() === 'range') return item.getRange();
+      return null;
+    });
+    for (const range of ranges) {
+      if (range) range.load('address,isNullObject');
+    }
+    await context.sync();
+    return items.map((item, index) => namedItemInfo(item, ranges[index], scope, sheet));
+  }
+
+  function namedItemInfo(item, range, scope, sheet) {
+    return {
+      name: item.name,
+      type: item.type || null,
+      scope,
+      sheet: scope === 'sheet' ? sheet || null : null,
+      formula: item.formula || null,
+      address: range && !range.isNullObject ? range.address : null,
+      comment: item.comment || null,
+      visible: item.visible ?? null
+    };
+  }
+
   function targetTable(context, args) {
     const table = requiredString(args, 'table', 'Table name is required.');
     return context.workbook.tables.getItem(table);
@@ -1002,10 +1144,10 @@
     return worksheet.charts.getItem(chart);
   }
 
-  function targetSortObject(context, args) {
+  async function targetSortObject(context, args) {
     const targetType = String(args.target_type || (args.table ? 'table' : 'range')).trim().toLowerCase();
     if (targetType === 'table') return { table: targetTable(context, args) };
-    if (targetType === 'range') return { range: targetRange(context, args) };
+    if (targetType === 'range') return { range: await targetRange(context, args) };
     throw Object.assign(new Error(`Unsupported sort target ${args.target_type}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
   }
 
@@ -1178,7 +1320,7 @@
     return context.workbook.pivotTables.getItem(name);
   }
 
-  function pivotSource(context, args) {
+  async function pivotSource(context, args) {
     if (args.table) return context.workbook.tables.getItem(String(args.table));
     return targetRange(context, args);
   }
@@ -1647,12 +1789,47 @@
     return chartTypes[String(value)] || Excel.ChartType.columnClustered;
   }
 
-  function targetRange(context, args) {
+  async function targetRange(context, args) {
     const address = requiredString(args, 'address', 'Range address is required.');
-    const worksheet = args.sheet
-      ? context.workbook.worksheets.getItem(String(args.sheet))
-      : context.workbook.worksheets.getActiveWorksheet();
-    return worksheet.getRange(address);
+    return resolveRangeTarget(context, args);
+  }
+
+  async function resolveRangeTarget(context, args) {
+    const address = requiredString(args, 'address', 'Range address is required.');
+    const worksheet = targetWorksheet(context, args);
+    try {
+      const direct = worksheet.getRange(address);
+      direct.load('address');
+      await context.sync();
+      return direct;
+    } catch (error) {
+      logger.info('excel.range_address_parse.failed', { address, message: error?.message || String(error) });
+    }
+    return resolveNamedItemRange(context, args, address);
+  }
+
+  async function resolveNamedItemRange(context, args, address) {
+    const workbook = context.workbook;
+    const workbookName = workbook.names.getItemOrNullObject(address);
+    workbookName.load('isNullObject,name');
+    let worksheetName = null;
+    if (args.sheet) {
+      const worksheet = targetWorksheet(context, args);
+      worksheetName = worksheet.names.getItemOrNullObject(address);
+      worksheetName.load('isNullObject,name');
+    }
+    await context.sync();
+    const namedItem = worksheetName && !worksheetName.isNullObject ? worksheetName : workbookName;
+    if (!namedItem || namedItem.isNullObject) {
+      throw Object.assign(new Error(`Range address or named item ${address} was not found.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    const range = namedItem.getRangeOrNullObject();
+    range.load('isNullObject,address');
+    await context.sync();
+    if (range.isNullObject) {
+      throw Object.assign(new Error(`Named item ${address} does not resolve to a range.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return range;
   }
 
   async function getWorkbookInfo() {

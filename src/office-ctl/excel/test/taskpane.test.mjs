@@ -275,7 +275,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /context\.workbook\.names/);
   assert.match(js, /worksheet\.names/);
   assert.match(js, /namedItem\.getRangeOrNullObject\(\)/);
-  assert.match(js, /namedItem\.delete\(\)/);
+  assert.match(js, /existing\.delete\(\)/);
   assert.match(js, /context\.workbook\.save\(Excel\.SaveBehavior\.save\)/);
   assert.match(js, /application\.calculate\(calculationType\)/);
   assert.match(js, /function calculationTypeFrom\(value\)/);
@@ -325,7 +325,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /chart\.title\.text = requiredString\(args, 'title', 'excel\.update_chart title requires title\.'\)/);
   assert.match(js, /chart\.legend\.position = chartLegendPositionFrom\(args\.position\)/);
   assert.match(js, /chart\.axes\.getItem\(chartAxisTypeFrom\(args\.axis\), chartAxisGroupFrom\(args\.axis_group\)\)/);
-  assert.match(js, /chart\.setData\(targetRange\(context, args\), chartSeriesByFrom\(args\.series_by\)\)/);
+  assert.match(js, /chart\.setData\(await targetRange\(context, args\), chartSeriesByFrom\(args\.series_by\)\)/);
   assert.match(js, /chart\.setPosition\(requiredString\(args, 'start_cell', 'excel\.update_chart position requires start_cell\.'\), optionalName\(args\.end_cell\)\)/);
   assert.match(js, /chart\.width = Number\(args\.width\)/);
   assert.match(js, /chart\.height = Number\(args\.height\)/);
@@ -342,7 +342,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.8', 'pivot table creation'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.8', 'pivot table hierarchy updates'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.12', 'pivot table filters'\)/);
-  assert.match(js, /context\.workbook\.pivotTables\.add\(requiredString\(args, 'name', 'excel\.create_pivot_table requires name\.'\), pivotSource\(context, args\), requiredString\(args, 'destination', 'excel\.create_pivot_table requires destination\.'\)\)/);
+  assert.match(js, /context\.workbook\.pivotTables\.add\(requiredString\(args, 'name', 'excel\.create_pivot_table requires name\.'\), await pivotSource\(context, args\), requiredString\(args, 'destination', 'excel\.create_pivot_table requires destination\.'\)\)/);
   assert.match(js, /const pivot = targetPivotTable\(context, args\)/);
   assert.match(js, /pivot\.refresh\(\)/);
   assert.match(js, /pivot\.delete\(\)/);

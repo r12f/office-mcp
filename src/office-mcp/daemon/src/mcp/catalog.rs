@@ -80,6 +80,8 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.get_workbook_info",
     "excel.save",
     "excel.calculate",
+    "excel.list_named_items",
+    "excel.update_named_item",
     "excel.list_sheets",
     "excel.read_range",
     "excel.set_formula",
@@ -1674,6 +1676,25 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
     tool_spec!("excel.get_workbook_info", ["session_id"], ["session_id"]),
     tool_spec!("excel.save", ["session_id"], ["session_id"]),
     tool_spec!("excel.calculate", ["session_id"], ["session_id", "type"]),
+    tool_spec!(
+        "excel.list_named_items",
+        ["session_id"],
+        ["session_id", "scope", "sheet"]
+    ),
+    tool_spec!(
+        "excel.update_named_item",
+        ["session_id", "action", "name"],
+        [
+            "session_id",
+            "action",
+            "name",
+            "scope",
+            "sheet",
+            "reference",
+            "formula",
+            "comment"
+        ]
+    ),
     tool_spec!("excel.list_sheets", ["session_id"], ["session_id"]),
     tool_spec!(
         "excel.add_sheet",
@@ -2208,6 +2229,28 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             }
         ]);
     }
+    if tool == "excel.update_named_item" {
+        schema["allOf"] = json!([
+            {
+                "if": { "properties": { "action": { "const": "add" } } },
+                "then": {
+                    "anyOf": [
+                        { "required": ["reference"] },
+                        { "required": ["formula"] }
+                    ]
+                }
+            },
+            {
+                "if": { "properties": { "action": { "const": "edit" } } },
+                "then": {
+                    "anyOf": [
+                        { "required": ["formula"] },
+                        { "required": ["comment"] }
+                    ]
+                }
+            }
+        ]);
+    }
     schema
 }
 
@@ -2340,6 +2383,13 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
         ("excel.calculate", "type") => Some(
             json!({ "enum": ["recalculate", "full", "full_rebuild"], "default": "recalculate" }),
         ),
+        ("excel.list_named_items", "scope") => {
+            Some(json!({ "enum": ["workbook", "sheet", "all"], "default": "all" }))
+        }
+        ("excel.update_named_item", "scope") => {
+            Some(json!({ "enum": ["workbook", "sheet"], "default": "workbook" }))
+        }
+        ("excel.update_named_item", "name") => Some(json!({ "type": "string", "minLength": 1 })),
         _ => None,
     }
 }
@@ -2351,6 +2401,9 @@ fn excel_action_property_schema(tool: &str, name: &str) -> Option<Value> {
     match tool {
         "excel.update_table" => Some(json!({
             "enum": ["metadata", "read", "add_rows", "add_columns", "resize", "rename", "options", "style", "delete"]
+        })),
+        "excel.update_named_item" => Some(json!({
+            "enum": ["add", "edit", "delete"]
         })),
         "excel.update_chart" => Some(json!({
             "enum": ["metadata", "read", "title", "legend", "axis", "data", "series_source", "position", "size", "export_image", "delete"]
