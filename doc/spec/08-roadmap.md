@@ -2002,20 +2002,24 @@ calculation, and named items are in scope as stable workbook-owner operations,
 not as file export, save-as, close, event, or binding workflows. Threaded
 comments are in scope as a Review follow-up surface because comment text and
 reply lifecycle cannot be represented by range tools without losing review
-identity and permission boundaries.
+identity and permission boundaries. Range insertion is in scope as the
+structural complement to `excel.clear_range` delete-with-shift because inserting
+cells, whole rows, and whole columns is a common Range workflow backed by stable
+`ExcelApi 1.1` APIs.
 
 Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
 `excel.get_used_range`, `excel.read_range`, `excel.write_range`,
-`excel.clear_range`, `excel.find_replace_cells`, `excel.set_formula`,
+`excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_formula`,
 `excel.format_range`, `excel.sort_range`, `excel.apply_filter`,
 `excel.create_table`, `excel.update_table`, `excel.create_chart`,
 `excel.update_chart`, `excel.create_pivot_table`, and `excel.update_pivot_table`.
 The #104 follow-up also adds `excel.add_comment`, `excel.list_comments`, and
-`excel.update_comment` as the Review category.
+`excel.update_comment` as the Review category. The #105 follow-up adds
+`excel.insert_range` inside the existing Range/cell data category.
 
-The 27 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 5,
+The 28 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 6,
 Formula 1, Format 1, Data operations 2, Table 2, Chart 2, PivotTable 2, and
 Review 3. This is the current v1 upper bound. Rejected v1 expansions include separate cell CRUD,
 worksheet formatting, freeze panes, protection, legacy notes, shapes, images,
@@ -2045,6 +2049,13 @@ chart, or PivotTable tools that duplicate an existing owner tool.
       permission metadata, Rust/JS tests, and untrusted-source response marking
       for comment and reply content. Resolve/reopen must be gated on
       `ExcelApi 1.11`; other threaded comment operations require `ExcelApi 1.10`.
+- [ ] Implement range insertion slice: `excel.insert_range`, including daemon
+      catalog entries, task pane handler, validate-only support, Range
+      permission metadata, Rust/JS tests, cell/row/column insertion coverage,
+      `count` expansion, and deterministic rejection for incompatible whole-row
+      or whole-column shift combinations. The tool requires `ExcelApi 1.1` and
+      complements `excel.clear_range` delete-with-shift without making insertion
+      destructive.
 - [x] Record Excel tool-selection research in
       [04-excel-capabilities.md](04-excel-capabilities.md), starting from the
       Microsoft Learn Excel core object model and related range/table/chart/
