@@ -77,10 +77,12 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.delete_sheet",
     "excel.find_replace_cells",
     "excel.format_range",
+    "excel.list_conditional_formats",
     "excel.get_used_range",
     "excel.get_workbook_info",
     "excel.insert_range",
     "excel.set_hyperlink",
+    "excel.update_conditional_format",
     "excel.save",
     "excel.calculate",
     "excel.list_named_items",
@@ -1839,6 +1841,26 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!(
+        "excel.list_conditional_formats",
+        ["session_id"],
+        ["session_id", "sheet", "address"]
+    ),
+    tool_spec!(
+        "excel.update_conditional_format",
+        ["session_id", "action"],
+        [
+            "session_id",
+            "sheet",
+            "address",
+            "action",
+            "id",
+            "rule",
+            "priority",
+            "stop_if_true",
+            "validate_only"
+        ]
+    ),
+    tool_spec!(
         "excel.sort_range",
         ["session_id", "fields"],
         [
@@ -2313,7 +2335,27 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
         ]);
     }
     add_excel_set_hyperlink_schema_rules(tool, &mut schema);
+    add_excel_conditional_format_schema_rules(tool, &mut schema);
     schema
+}
+
+fn add_excel_conditional_format_schema_rules(tool: &str, schema: &mut Value) {
+    if tool == "excel.update_conditional_format" {
+        schema["allOf"] = json!([
+            {
+                "if": { "properties": { "action": { "const": "add" } } },
+                "then": { "required": ["address", "rule"] }
+            },
+            {
+                "if": { "properties": { "action": { "const": "delete" } } },
+                "then": { "required": ["id"] }
+            },
+            {
+                "if": { "properties": { "action": { "const": "clear_range" } } },
+                "then": { "required": ["address"] }
+            }
+        ]);
+    }
 }
 
 fn add_excel_set_hyperlink_schema_rules(tool: &str, schema: &mut Value) {
@@ -2484,7 +2526,8 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
         | ("excel.add_comment", "cell")
         | ("excel.add_comment" | "excel.update_comment", "text")
         | ("excel.update_comment", "comment_id" | "reply_id")
-        | ("excel.set_hyperlink", "document_reference") => {
+        | ("excel.set_hyperlink", "document_reference")
+        | ("excel.update_conditional_format", "id") => {
             Some(json!({ "type": "string", "minLength": 1 }))
         }
         ("excel.insert_range", "shift") => Some(json!({ "enum": ["down", "right"] })),
@@ -2502,9 +2545,60 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
             Some(json!({ "type": "number", "minimum": 0 }))
         }
         ("excel.format_range", "style") => Some(json!({ "type": "string", "minLength": 1 })),
-        ("excel.list_comments", "resolved") => Some(json!({ "type": "boolean" })),
+        ("excel.update_conditional_format", "rule") => Some(excel_conditional_format_rule_schema()),
+        ("excel.update_conditional_format", "priority") => {
+            Some(json!({ "type": "integer", "minimum": 0 }))
+        }
+        ("excel.update_conditional_format", "stop_if_true")
+        | ("excel.list_comments", "resolved") => Some(json!({ "type": "boolean" })),
         _ => None,
     }
+}
+
+fn excel_conditional_format_rule_schema() -> Value {
+    json!({
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+            "type": {
+                "enum": [
+                    "cell_value",
+                    "color_scale",
+                    "data_bar",
+                    "icon_set",
+                    "top_bottom",
+                    "preset_criteria",
+                    "contains_text",
+                    "custom_formula"
+                ]
+            },
+            "operator": { "type": "string", "minLength": 1 },
+            "values": { "type": "array" },
+            "formula": { "type": "string", "minLength": 1 },
+            "text": { "type": "string", "minLength": 1 },
+            "preset": { "type": "string", "minLength": 1 },
+            "rank": { "type": "integer", "minimum": 1 },
+            "percent": { "type": "boolean" },
+            "colors": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+                "minItems": 2,
+                "maxItems": 3
+            },
+            "icon_set": { "type": "string", "minLength": 1 },
+            "format": {
+                "type": "object",
+                "properties": {
+                    "fill_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+                    "font_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+                    "bold": { "type": "boolean" },
+                    "italic": { "type": "boolean" }
+                },
+                "additionalProperties": false
+            }
+        },
+        "additionalProperties": false
+    })
 }
 
 fn excel_action_property_schema(tool: &str, name: &str) -> Option<Value> {
@@ -2523,6 +2617,9 @@ fn excel_action_property_schema(tool: &str, name: &str) -> Option<Value> {
         })),
         "excel.set_hyperlink" => Some(json!({
             "enum": ["set", "clear"]
+        })),
+        "excel.update_conditional_format" => Some(json!({
+            "enum": ["add", "delete", "clear_range"]
         })),
         "excel.update_chart" => Some(json!({
             "enum": ["metadata", "read", "title", "legend", "axis", "data", "series_source", "position", "size", "export_image", "delete"]

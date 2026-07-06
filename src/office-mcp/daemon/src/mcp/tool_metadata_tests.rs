@@ -160,7 +160,10 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
         .expect("excel conditional format update metadata");
     assert_eq!(update_conditional_format.app, "excel");
     assert_eq!(update_conditional_format.category, "Format");
-    assert_eq!(update_conditional_format.side_effect, ToolSideEffect::Destructive);
+    assert_eq!(
+        update_conditional_format.side_effect,
+        ToolSideEffect::Destructive
+    );
     assert_eq!(
         update_conditional_format.side_effect_for_action("add"),
         Some(ToolSideEffect::Mutating)

@@ -224,8 +224,8 @@ Target core Excel tool surface:
 | `excel.find_replace_cells` | implemented | Range | read/edit | `ExcelApi 1.9` | Search cell contents in a range and optionally replace matches. |
 | `excel.set_formula` | implemented | Formula | edit | `ExcelApi 1.1` | Fill a range with one formula or a formula matrix. |
 | `excel.format_range` | implemented | Format | edit | `ExcelApi 1.1`; fixed sizing, hide/unhide, and autofit require `ExcelApi 1.2`; named styles require `ExcelApi 1.7` | Apply font, fill, scalar or matrix number formats, borders, alignment, wrapping, merge/unmerge, fixed row or column size, row or column visibility, named styles, and autofit. |
-| `excel.list_conditional_formats` | planned | Format | read | `ExcelApi 1.6` | List conditional formatting rules for an explicit range or the active/named worksheet. |
-| `excel.update_conditional_format` | planned | Format | edit/destructive | `ExcelApi 1.6` | Add typed conditional formatting rules, delete a rule by id, or clear all conditional formats for a range. |
+| `excel.list_conditional_formats` | implemented | Format | read | `ExcelApi 1.6` | List conditional formatting rules for an explicit range or the active/named worksheet. |
+| `excel.update_conditional_format` | implemented | Format | edit/destructive | `ExcelApi 1.6` | Add typed conditional formatting rules, delete a rule by id, or clear all conditional formats for a range. |
 | `excel.sort_range` | implemented | Data | edit | `ExcelApi 1.2` | Sort a range or table body by one or more column keys; table structure changes belong to `excel.update_table`. |
 | `excel.apply_filter` | implemented | Data | edit | Range filters require `ExcelApi 1.9`; table column filters require `ExcelApi 1.2` | Apply, clear, remove, or reapply worksheet range or table filter criteria; PivotTable filters belong to `excel.update_pivot_table`. |
 | `excel.create_table` | implemented | Table | edit | `ExcelApi 1.1` | Create a workbook table from a range. |
