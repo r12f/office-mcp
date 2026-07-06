@@ -54,15 +54,16 @@ Research basis:
   Excel analysis workflow and are present in the stable Excel.js object model.
   v1 limits PivotTables to normal range/table sources and non-preview APIs.
 
-The refined v1 target is 22 tools. The original 20-tool core covered workbook
+The refined v1 target is 24 tools. The original 20-tool core covered workbook
 orientation, worksheet lifecycle, range work, formulas, formatting, data
 operations, tables, charts, and PivotTables. The workbook owner now also covers
-two stable persistence/calculation tasks that cannot be represented by range or
-object-owner tools: saving the current workbook and forcing calculation. Do not
-expand the catalog by copying individual Excel.js methods into MCP tools. A
-future tool can only be added after the selection matrix proves that the
-existing tools cannot express a distinct object owner, permission profile, or
-user-visible workflow safely.
+stable persistence/calculation tasks and named-item lifecycle. These cannot be
+represented by range or object-owner tools: saving the current workbook,
+forcing calculation, and managing workbook/sheet scoped names that formulas and
+templates address indirectly. Do not expand the catalog by copying individual
+Excel.js methods into MCP tools. A future tool can only be added after the
+selection matrix proves that the existing tools cannot express a distinct
+object owner, permission profile, or user-visible workflow safely.
 
 The v1 priority order is: workbook orientation, worksheet lifecycle, range/cell
 data CRUD, formulas, formatting, sort/filter, tables, charts, and PivotTables.
@@ -95,7 +96,7 @@ Core tool selection matrix:
 
 | User workflow | Object owner | v1 tools | Why this is enough |
 |---|---|---|---|
-| Inspect, persist, and calculate workbook state; navigate sheets | `Workbook` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, workbook orientation, persistence, and formula recalculation without reading cell contents. |
+| Inspect, persist, calculate, and address workbook state; navigate sheets | `Workbook` / `Workbook.names` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, workbook orientation, persistence, formula recalculation, and template-stable named item addressing without reading cell contents. |
 | Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.clear_range`, `excel.find_replace_cells` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools. |
 | Work with formulas | `Range` formulas | `excel.set_formula` | Formula writes are distinct from literal value writes and can support scalar or matrix input. |
 | Apply user-visible cell formatting | `RangeFormat` | `excel.format_range` | Keeps font, fill, number format, borders, alignment, wrapping, and autofit under one cell-format owner. |
@@ -108,7 +109,7 @@ Final v1 tool set by category:
 
 | Category | Tools | Count | User intent |
 |---|---|---:|---|
-| Workbook | `excel.get_workbook_info`, `excel.save`, `excel.calculate` | 3 | Inspect workbook-level state, persist changes, and recalculate formulas without reading cell contents. |
+| Workbook | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item` | 5 | Inspect workbook-level state, persist changes, recalculate formulas, and manage named ranges/items without reading cell contents. |
 | Worksheet | `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | 4 | Sheet inventory and lifecycle. |
 | Range / cell data | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.clear_range`, `excel.find_replace_cells` | 5 | Locate, read, write, clear, and search cells through ranges. |
 | Formula | `excel.set_formula` | 1 | Author formulas distinctly from literal value writes. |
@@ -118,14 +119,14 @@ Final v1 tool set by category:
 | Chart | `excel.create_chart`, `excel.update_chart` | 2 | Visualize data and manage chart-owned configuration. |
 | PivotTable | `excel.create_pivot_table`, `excel.update_pivot_table` | 2 | Create and configure summarized analysis views. |
 
-Total: 22 tools.
+Total: 24 tools.
 
 Rejected tool families for v1:
 
 - No `excel.read_cell`, `excel.write_cell`, or `excel.delete_cell`; cells are
   one-cell ranges.
 - No separate worksheet format, freeze pane, protection, comments, shapes,
-  images, slicer, event, binding, named-item, custom XML, external connection,
+  images, slicer, event, binding, custom XML, external connection,
   Power Query, workbook import/export, save-as, or close tools. `excel.save`
   intentionally persists the current workbook through host save behavior only;
   it does not expose save-as, export, prompt, path, or close semantics.
@@ -144,6 +145,8 @@ Implemented Excel v1 tools:
 | `excel.get_workbook_info` | read | `ExcelApi 1.1` | Return workbook identity, active sheet, and aggregate object counts. |
 | `excel.save` | edit | `ExcelApi 1.11`; dirty state uses `ExcelApi 1.9` when available | Save the current workbook through host save behavior and report the pre-save dirty state when supported. |
 | `excel.calculate` | edit | `ExcelApi 1.1`; `full_rebuild` requires `ExcelApi 1.2` | Recalculate workbook formulas and report the calculation mode. |
+| `excel.list_named_items` | read | `ExcelApi 1.1`; sheet-scoped names require `ExcelApi 1.4` | List workbook and/or worksheet scoped named items, including non-range constants and formulas. |
+| `excel.update_named_item` | edit/destructive | `ExcelApi 1.4`; editing formulas requires `ExcelApi 1.7` | Add, edit, or delete workbook/sheet scoped named items. |
 | `excel.list_sheets` | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state. |
 | `excel.add_sheet` | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
 | `excel.update_sheet` | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
@@ -174,6 +177,8 @@ Target core Excel tool surface:
 | `excel.get_workbook_info` | implemented | Workbook | read | `ExcelApi 1.1` | Return workbook identity, workbook-level state, active sheet name/id, and aggregate object counts; detailed sheet inventory belongs to `excel.list_sheets`. |
 | `excel.save` | implemented | Workbook | edit | `ExcelApi 1.11`; dirty state uses `ExcelApi 1.9` when available | Save the current workbook through host save behavior. Save-as, export, prompts, and close flows remain out of scope. |
 | `excel.calculate` | implemented | Workbook | edit | `ExcelApi 1.1`; `full_rebuild` requires `ExcelApi 1.2` | Recalculate workbook formulas with `recalculate`, `full`, or `full_rebuild` mode and return the calculation mode. |
+| `excel.list_named_items` | implemented | Workbook | read | `ExcelApi 1.1`; sheet-scoped names require `ExcelApi 1.4` | List workbook and/or worksheet scoped named items, returning range addresses when available and formulas for non-range items. |
+| `excel.update_named_item` | implemented | Workbook | edit/destructive | `ExcelApi 1.4`; editing formulas requires `ExcelApi 1.7` | Add, edit, or delete named items. Duplicate adds and unknown edit/delete targets fail deterministically before mutation. |
 | `excel.list_sheets` | implemented | Worksheet | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state; workbook metadata belongs to `excel.get_workbook_info`. |
 | `excel.add_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
 | `excel.update_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
@@ -196,7 +201,7 @@ Target core Excel tool surface:
 
 The tools above are the Excel v1 contract. Implementation work must keep
 the daemon catalog, MCP `tools/list`, Excel task pane `available_tools`, task
-pane permission grouping, documentation, and tests aligned with this 22-tool
+pane permission grouping, documentation, and tests aligned with this 24-tool
 surface. Before implementing or changing a tool, verify its minimum requirement
 set against `@types/office-js` and Microsoft API docs, then land the change as a
 test-first implementation slice with daemon catalog coverage, task pane
@@ -226,9 +231,18 @@ Tool ownership rules:
 - `excel.calculate` is the workbook calculation owner. It may recalculate,
   fully calculate, or full-rebuild calculate formulas, and must gate
   `full_rebuild` behind `ExcelApi 1.2`.
+- `excel.list_named_items` and `excel.update_named_item` are the named-item
+  owners. They cover workbook-scoped and sheet-scoped names, range-backed names,
+  and non-range constants/formulas. Deleting a name is destructive because
+  formulas that reference it can break.
 - `excel.get_used_range` locates the occupied sheet area. It does not return
   cell contents; callers use `excel.read_range` for values, text, formulas, and
   number formats.
+- Range tools that accept `address` (`excel.get_used_range` excluded) may accept
+  a named item as an address. If an address is not parsed by `Worksheet.getRange`,
+  the task pane resolves it through workbook names and then worksheet names where
+  a sheet scope is provided. Unknown or non-range named items fail with
+  `INVALID_ARGUMENT` and `partial_effect: "none"` before mutation.
 - `excel.find_replace_cells` is the Excel search owner. Omitting replacement
   arguments is the read-only find idiom; supplying replacement arguments makes
   it the range replacement owner.

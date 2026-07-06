@@ -107,7 +107,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /forced-colors: active/);
   assert.match(js, /const TOOL_GROUPS = \[/);
-  assert.match(js, /\{ label: 'Workbook', tools: \['excel\.get_workbook_info', 'excel\.save', 'excel\.calculate'\] \}/);
+  assert.match(js, /\{ label: 'Workbook', tools: \['excel\.get_workbook_info', 'excel\.save', 'excel\.calculate', 'excel\.list_named_items', 'excel\.update_named_item'\] \}/);
   assert.match(js, /\{ label: 'Data', tools: \['excel\.sort_range', 'excel\.apply_filter'\] \}/);
   assert.match(js, /\{ label: 'Table', tools: \['excel\.create_table', 'excel\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Chart', tools: \['excel\.create_chart', 'excel\.update_chart'\] \}/);
@@ -115,6 +115,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /const TOOL_METADATA = new Map\(\[/);
   assert.match(js, /\['excel\.save', \{ category: 'Workbook', sideEffect: 'mutating'/);
   assert.match(js, /\['excel\.calculate', \{ category: 'Workbook', sideEffect: 'mutating'/);
+  assert.match(js, /\['excel\.list_named_items', \{ category: 'Workbook', sideEffect: 'read'/);
+  assert.match(js, /\['excel\.update_named_item', \{ category: 'Workbook', sideEffect: 'destructive'/);
   assert.match(js, /\['excel\.sort_range', \{ category: 'Data', sideEffect: 'mutating'/);
   assert.match(js, /\['excel\.apply_filter', \{ category: 'Data', sideEffect: 'mutating'/);
   assert.match(js, /\['excel\.update_table', \{ category: 'Table', sideEffect: 'destructive'/);
@@ -228,6 +230,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /excel\.get_workbook_info/);
   assert.match(js, /excel\.save/);
   assert.match(js, /excel\.calculate/);
+  assert.match(js, /excel\.list_named_items/);
+  assert.match(js, /excel\.update_named_item/);
   assert.match(js, /excel\.list_sheets/);
   assert.match(js, /excel\.update_sheet/);
   assert.match(js, /excel\.delete_sheet/);
@@ -243,6 +247,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /case 'excel.get_workbook_info':/);
   assert.match(js, /case 'excel.save':/);
   assert.match(js, /case 'excel.calculate':/);
+  assert.match(js, /case 'excel.list_named_items':/);
+  assert.match(js, /case 'excel.update_named_item':/);
   assert.match(js, /case 'excel.list_sheets':/);
   assert.match(js, /case 'excel.update_sheet':/);
   assert.match(js, /case 'excel.delete_sheet':/);
@@ -258,10 +264,18 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /async function getWorkbookInfoTool/);
   assert.match(js, /async function saveWorkbook/);
   assert.match(js, /async function calculateWorkbook/);
+  assert.match(js, /async function listNamedItems/);
+  assert.match(js, /async function updateNamedItem/);
   const workbookInfoBody = functionBody(js, 'getWorkbookInfoTool');
   assert.match(workbookInfoBody, /worksheets\.load\('items\/id,items\/name,items\/position,items\/visibility,items\/tabColor'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.11', 'workbook save'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.2', 'full rebuild calculation'\)/);
+  assert.match(js, /requireRequirementSet\('ExcelApi', '1\.4', 'sheet-scoped named items'\)/);
+  assert.match(js, /requireRequirementSet\('ExcelApi', '1\.7', 'named item formula editing'\)/);
+  assert.match(js, /context\.workbook\.names/);
+  assert.match(js, /worksheet\.names/);
+  assert.match(js, /namedItem\.getRangeOrNullObject\(\)/);
+  assert.match(js, /existing\.delete\(\)/);
   assert.match(js, /context\.workbook\.save\(Excel\.SaveBehavior\.save\)/);
   assert.match(js, /application\.calculate\(calculationType\)/);
   assert.match(js, /function calculationTypeFrom\(value\)/);
@@ -311,7 +325,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /chart\.title\.text = requiredString\(args, 'title', 'excel\.update_chart title requires title\.'\)/);
   assert.match(js, /chart\.legend\.position = chartLegendPositionFrom\(args\.position\)/);
   assert.match(js, /chart\.axes\.getItem\(chartAxisTypeFrom\(args\.axis\), chartAxisGroupFrom\(args\.axis_group\)\)/);
-  assert.match(js, /chart\.setData\(targetRange\(context, args\), chartSeriesByFrom\(args\.series_by\)\)/);
+  assert.match(js, /chart\.setData\(await targetRange\(context, args\), chartSeriesByFrom\(args\.series_by\)\)/);
   assert.match(js, /chart\.setPosition\(requiredString\(args, 'start_cell', 'excel\.update_chart position requires start_cell\.'\), optionalName\(args\.end_cell\)\)/);
   assert.match(js, /chart\.width = Number\(args\.width\)/);
   assert.match(js, /chart\.height = Number\(args\.height\)/);
@@ -328,7 +342,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.8', 'pivot table creation'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.8', 'pivot table hierarchy updates'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.12', 'pivot table filters'\)/);
-  assert.match(js, /context\.workbook\.pivotTables\.add\(requiredString\(args, 'name', 'excel\.create_pivot_table requires name\.'\), pivotSource\(context, args\), requiredString\(args, 'destination', 'excel\.create_pivot_table requires destination\.'\)\)/);
+  assert.match(js, /context\.workbook\.pivotTables\.add\(requiredString\(args, 'name', 'excel\.create_pivot_table requires name\.'\), await pivotSource\(context, args\), requiredString\(args, 'destination', 'excel\.create_pivot_table requires destination\.'\)\)/);
   assert.match(js, /const pivot = targetPivotTable\(context, args\)/);
   assert.match(js, /pivot\.refresh\(\)/);
   assert.match(js, /pivot\.delete\(\)/);
@@ -367,7 +381,10 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /async function formatRange/);
   assert.match(js, /async function createTable/);
   assert.match(js, /async function createChart/);
-  assert.match(js, /worksheet\.getRange\(address\)/);
+  assert.match(js, /resolveRangeTarget\(context, args\)/);
+  assert.match(js, /async function resolveNamedItemRange/);
+  assert.match(js, /workbook\.names\.getItemOrNullObject\(address\)/);
+  assert.match(js, /worksheet\.names\.getItemOrNullObject\(address\)/);
   assert.match(js, /range\.values = args\.values/);
   assert.match(js, /context\.workbook\.worksheets\.add/);
   assert.match(js, /range\.formulas = formulaMatrixFrom\(args, range\.rowCount, range\.columnCount\)/);
@@ -426,6 +443,7 @@ test('Excel task pane routes mutating tools through validation-only preflight', 
   assert.match(invokeBody, /case 'excel\.add_sheet':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await addSheet\(args\);/);
   assert.match(invokeBody, /case 'excel\.save':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await saveWorkbook\(args\);/);
   assert.match(invokeBody, /case 'excel\.calculate':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await calculateWorkbook\(args\);/);
+  assert.match(invokeBody, /case 'excel\.update_named_item':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateNamedItem\(args\);/);
   assert.match(invokeBody, /case 'excel\.write_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await writeRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.clear_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await clearRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_table':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateTable\(args\);/);
