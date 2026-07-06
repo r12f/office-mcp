@@ -150,8 +150,8 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
         Some(ToolSideEffect::Mutating)
     );
 
-    let set_data_validation = tool_metadata("excel.set_data_validation")
-        .expect("excel data validation metadata");
+    let set_data_validation =
+        tool_metadata("excel.set_data_validation").expect("excel data validation metadata");
     assert_eq!(set_data_validation.app, "excel");
     assert_eq!(set_data_validation.category, "Range");
     assert_eq!(set_data_validation.side_effect, ToolSideEffect::Destructive);
