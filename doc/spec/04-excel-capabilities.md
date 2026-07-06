@@ -172,8 +172,8 @@ Target core Excel tool surface:
 | Tool | Status | Category | Side effect | Minimum API | Summary |
 |---|---|---|---|---|---|
 | `excel.get_workbook_info` | implemented | Workbook | read | `ExcelApi 1.1` | Return workbook identity, workbook-level state, active sheet name/id, and aggregate object counts; detailed sheet inventory belongs to `excel.list_sheets`. |
-| `excel.save` | planned | Workbook | edit | `ExcelApi 1.11`; dirty state uses `ExcelApi 1.9` when available | Save the current workbook through host save behavior. Save-as, export, prompts, and close flows remain out of scope. |
-| `excel.calculate` | planned | Workbook | edit | `ExcelApi 1.1`; `full_rebuild` requires `ExcelApi 1.2` | Recalculate workbook formulas with `recalculate`, `full`, or `full_rebuild` mode and return the calculation mode. |
+| `excel.save` | implemented | Workbook | edit | `ExcelApi 1.11`; dirty state uses `ExcelApi 1.9` when available | Save the current workbook through host save behavior. Save-as, export, prompts, and close flows remain out of scope. |
+| `excel.calculate` | implemented | Workbook | edit | `ExcelApi 1.1`; `full_rebuild` requires `ExcelApi 1.2` | Recalculate workbook formulas with `recalculate`, `full`, or `full_rebuild` mode and return the calculation mode. |
 | `excel.list_sheets` | implemented | Worksheet | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state; workbook metadata belongs to `excel.get_workbook_info`. |
 | `excel.add_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
 | `excel.update_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |

@@ -124,7 +124,7 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert_eq!(WORD_V1_TOOLS.len(), 62);
     assert_eq!(ExcelToolCatalog::tools().len(), 22);
     assert_eq!(PowerPointToolCatalog::tools().len(), 23);
-    assert_eq!(tools.len(), 218);
+    assert_eq!(tools.len(), 220);
 }
 
 #[test]
@@ -855,10 +855,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 105);
+    assert_eq!(all_tools.len(), 107);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        105
+        107
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));
@@ -1424,10 +1424,7 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
         calculate["properties"]["type"]["enum"],
         serde_json::json!(["recalculate", "full", "full_rebuild"])
     );
-    assert_eq!(
-        calculate["properties"]["validate_only"]["type"],
-        "boolean"
-    );
+    assert_eq!(calculate["properties"]["validate_only"]["type"], "boolean");
 
     let slide = schema_for("powerpoint.add_slide");
     assert_required(&slide, &["session_id"]);

@@ -48,6 +48,8 @@
 
   const AVAILABLE_TOOLS = [
     'excel.get_workbook_info',
+    'excel.save',
+    'excel.calculate',
     'excel.list_sheets',
     'excel.add_sheet',
     'excel.update_sheet',
@@ -69,7 +71,7 @@
     'excel.update_pivot_table'
   ];
   const TOOL_GROUPS = [
-    { label: 'Workbook', tools: ['excel.get_workbook_info'] },
+    { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate'] },
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
     { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.clear_range', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
@@ -81,6 +83,8 @@
   ];
   const TOOL_METADATA = new Map([
     ['excel.get_workbook_info', { category: 'Workbook', sideEffect: 'read', description: 'Read workbook state and aggregate object counts.' }],
+    ['excel.save', { category: 'Workbook', sideEffect: 'mutating', description: 'Save the current workbook.' }],
+    ['excel.calculate', { category: 'Workbook', sideEffect: 'mutating', description: 'Recalculate workbook formulas.' }],
     ['excel.list_sheets', { category: 'Worksheet', sideEffect: 'read', description: 'List workbook worksheets.' }],
     ['excel.add_sheet', { category: 'Worksheet', sideEffect: 'mutating', description: 'Add a worksheet to the workbook.' }],
     ['excel.update_sheet', { category: 'Worksheet', sideEffect: 'mutating', description: 'Rename, activate, move, or restyle a worksheet tab.' }],
@@ -333,6 +337,12 @@
         case 'excel.get_workbook_info':
           data = await getWorkbookInfoTool(args);
           break;
+        case 'excel.save':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await saveWorkbook(args);
+          break;
+        case 'excel.calculate':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await calculateWorkbook(args);
+          break;
         case 'excel.list_sheets':
           data = await listSheets(args);
           break;
@@ -464,6 +474,44 @@
         is_dirty: documentInfo?.is_dirty ?? null,
         is_read_only: documentInfo?.is_read_only ?? false,
         is_protected: documentInfo?.is_protected ?? false
+      };
+    });
+  }
+
+  async function saveWorkbook(args) {
+    requireRequirementSet('ExcelApi', '1.11', 'workbook save');
+    return Excel.run(async (context) => {
+      const workbook = context.workbook;
+      let wasDirty = null;
+      if (supportsRequirementSet('ExcelApi', '1.9')) {
+        workbook.load('isDirty');
+        await context.sync();
+        wasDirty = workbook.isDirty;
+      }
+      context.workbook.save(Excel.SaveBehavior.save);
+      await context.sync();
+      documentInfo = { ...(documentInfo || {}), is_dirty: false };
+      return {
+        saved: true,
+        was_dirty: wasDirty
+      };
+    });
+  }
+
+  async function calculateWorkbook(args) {
+    if (String(args.type || 'recalculate') === 'full_rebuild') {
+      requireRequirementSet('ExcelApi', '1.2', 'full rebuild calculation');
+    }
+    return Excel.run(async (context) => {
+      const calculationType = calculationTypeFrom(args.type);
+      const application = context.workbook.application;
+      application.load('calculationMode');
+      application.calculate(calculationType);
+      await context.sync();
+      return {
+        calculated: true,
+        type: String(args.type || 'recalculate'),
+        calculation_mode: application.calculationMode || null
       };
     });
   }
@@ -1565,6 +1613,25 @@
       throw Object.assign(new Error(`Unsupported ${label} ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
     return match[1];
+  }
+
+  function calculationTypeFrom(value) {
+    const key = String(value || 'recalculate').replace(/[_\s-]/g, '').toLowerCase();
+    const fallback = {
+      recalculate: 'Recalculate',
+      full: 'Full',
+      fullrebuild: 'FullRebuild'
+    };
+    const enumValues = Excel.CalculationType || {};
+    const values = {
+      recalculate: enumValues.recalculate || enumValues.Recalculate || fallback.recalculate,
+      full: enumValues.full || enumValues.Full || fallback.full,
+      fullrebuild: enumValues.fullRebuild || enumValues.FullRebuild || fallback.fullrebuild
+    };
+    if (!values[key]) {
+      throw Object.assign(new Error(`Unsupported calculation type ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return values[key];
   }
 
   function chartTypeFrom(value) {

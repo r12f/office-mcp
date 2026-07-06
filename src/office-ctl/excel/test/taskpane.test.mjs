@@ -263,7 +263,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.11', 'workbook save'\)/);
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.2', 'full rebuild calculation'\)/);
   assert.match(js, /context\.workbook\.save\(Excel\.SaveBehavior\.save\)/);
-  assert.match(js, /context\.workbook\.application\.calculate\(calculationTypeFrom\(args\.type\)\)/);
+  assert.match(js, /application\.calculate\(calculationType\)/);
   assert.match(js, /function calculationTypeFrom\(value\)/);
   assert.match(js, /excel\.active_sheet_probe\.failed/);
   assert.match(js, /worksheets\.items\[0\]/);

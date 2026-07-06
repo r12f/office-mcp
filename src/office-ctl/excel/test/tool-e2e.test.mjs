@@ -31,6 +31,32 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       }
     }
   }],
+  ['excel.save', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A2', values: [['Save marker']] } }
+      ]
+    },
+    verify: {
+      kind: 'direct-result',
+      expect: { pathEquals: [{ path: 'saved', value: true }] }
+    }
+  }],
+  ['excel.calculate', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'B2:B3', values: [[2], [5]] } },
+        { tool: 'excel.set_formula', arguments: { sheet: 'Sheet1', address: 'B4', formula: '=SUM(B2:B3)' } }
+      ]
+    },
+    args: { type: 'recalculate' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'B4' },
+      expect: { contains: ['7'] }
+    }
+  }],
   ['excel.list_sheets', {
     setup: {
       actions: [
