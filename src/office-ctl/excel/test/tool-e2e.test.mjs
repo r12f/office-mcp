@@ -218,6 +218,28 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { notContains: ['clear', 'please'] }
     }
   }],
+  ['excel.set_hyperlink', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'H1', values: [['OpenAI']] } }
+      ]
+    },
+    args: { sheet: 'Sheet1', address: 'H1', action: 'set', url: 'https://openai.com/', text_to_display: 'OpenAI', screen_tip: 'OpenAI home' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'H1', include_hyperlinks: true },
+      expect: {
+        contains: ['https://openai.com/', 'OpenAI', 'OpenAI home'],
+        pathEquals: [{ path: 'untrusted_source', value: true }]
+      }
+    },
+    cleanup: {
+      actions: [
+        { tool: 'excel.set_hyperlink', arguments: { sheet: 'Sheet1', address: 'H1', action: 'clear' } }
+      ]
+    }
+  }],
   ['excel.find_replace_cells', {
     setup: {
       actions: [
