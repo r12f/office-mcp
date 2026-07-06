@@ -4,7 +4,7 @@ use super::{
     powerpoint_resource_catalog_for_session, powerpoint_resource_templates, tool_catalog_json,
     word_resource_catalog_for_session, word_resource_templates,
 };
-use crate::mcp::tool_metadata_catalog;
+use crate::mcp::{ToolSideEffect, tool_metadata_catalog};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -785,6 +785,29 @@ fn tools_list_contract_metadata_matches_describe_tool_contract() {
         assert_eq!(
             listed["_meta"]["com.office-mcp/side_effects"],
             described["side_effect"]
+        );
+    }
+}
+
+#[test]
+fn mutating_tools_advertise_validate_only_contract() {
+    for name in mutating_tool_names() {
+        let schema = schema_for(name);
+        assert_eq!(
+            schema["properties"]["validate_only"]["type"], "boolean",
+            "{name} must accept validate_only"
+        );
+
+        let tool = tool_for(name);
+        assert_eq!(
+            tool["_meta"]["com.office-mcp/supports_validate_only"], true,
+            "{name} tools/list metadata must advertise validate_only support"
+        );
+
+        let described = super::describe_tool_contract(name).expect("described tool");
+        assert_eq!(
+            described["supports_validate_only"], true,
+            "{name} describe_tools metadata must advertise validate_only support"
         );
     }
 }
@@ -1633,6 +1656,14 @@ fn tool_for(name: &str) -> Value {
 fn app_for(name: &str) -> &str {
     name.split_once('.')
         .map_or_else(|| panic!("missing app prefix for {name}"), |(app, _)| app)
+}
+
+fn mutating_tool_names() -> Vec<&'static str> {
+    tool_metadata_catalog()
+        .iter()
+        .filter(|metadata| !matches!(metadata.side_effect, ToolSideEffect::Read))
+        .map(|metadata| metadata.name)
+        .collect()
 }
 
 fn assert_required(schema: &Value, required: &[&str]) {

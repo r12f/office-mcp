@@ -404,6 +404,21 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.doesNotMatch(js, /method: 'session\.added'/);
 });
 
+test('Excel task pane routes mutating tools through validation-only preflight', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+
+  assert.match(js, /function validateExcelMutationOnly\(tool, args\)/);
+  assert.match(invokeBody, /case 'excel\.add_sheet':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await addSheet\(args\);/);
+  assert.match(invokeBody, /case 'excel\.write_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await writeRange\(args\);/);
+  assert.match(invokeBody, /case 'excel\.clear_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await clearRange\(args\);/);
+  assert.match(invokeBody, /case 'excel\.update_table':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateTable\(args\);/);
+  assert.match(functionBody(js, 'validateExcelMutationOnly'), /valid: true/);
+  assert.match(functionBody(js, 'validateExcelMutationOnly'), /operation: tool/);
+  assert.match(functionBody(js, 'validateExcelMutationOnly'), /partial_effect: 'none'/);
+  assert.match(functionBody(js, 'validateExcelMutationOnly'), /resolved_target/);
+});
+
 
 test('Excel task pane keeps settings inline and compact at narrow widths', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');

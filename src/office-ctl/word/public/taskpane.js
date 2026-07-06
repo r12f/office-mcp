@@ -960,9 +960,21 @@
       case 'word.insert_html':
         return validateInsertHtmlOnly(args);
       default:
-        throw invalidArgument(`${tool} does not support validate_only.`);
+        return {
+          valid: true,
+          operation: tool,
+          partial_effect: 'none',
+          resolved_target: validationOnlyTarget(args)
+        };
     }
-    return { valid: true, partial_effect: 'none' };
+  }
+
+  function validationOnlyTarget(args = {}) {
+    return {
+      session_id: args.session_id || null,
+      anchor_kind: args.anchor?.kind || null,
+      action: args.action || null
+    };
   }
 
   async function validateInsertImageOnly(args) {

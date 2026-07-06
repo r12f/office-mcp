@@ -221,6 +221,21 @@ test('PowerPoint task pane uses compact shared product UI shell', () => {
   assert.doesNotMatch(js, /console\.(log|warn|error)/);
 });
 
+test('PowerPoint task pane routes mutating tools through validation-only preflight', () => {
+  const js = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.js'), 'utf8');
+  const invokeBody = functionBody(js, 'invokeTool');
+
+  assert.match(js, /function validatePowerPointMutationOnly\(tool, args\)/);
+  assert.match(invokeBody, /case 'powerpoint\.add_slide':\s*data = args\?\.validate_only \? await validatePowerPointMutationOnly\(tool, args\) : await addSlide\(args\);/);
+  assert.match(invokeBody, /case 'powerpoint\.delete_slide':\s*data = args\?\.validate_only \? await validatePowerPointMutationOnly\(tool, args\) : await deleteSlide\(args\);/);
+  assert.match(invokeBody, /case 'powerpoint\.update_shape':\s*data = args\?\.validate_only \? await validatePowerPointMutationOnly\(tool, args\) : await updateShape\(args\);/);
+  assert.match(invokeBody, /case 'powerpoint\.update_table':\s*data = args\?\.validate_only \? await validatePowerPointMutationOnly\(tool, args\) : await updateTable\(args\);/);
+  assert.match(functionBody(js, 'validatePowerPointMutationOnly'), /valid: true/);
+  assert.match(functionBody(js, 'validatePowerPointMutationOnly'), /operation: tool/);
+  assert.match(functionBody(js, 'validatePowerPointMutationOnly'), /partial_effect: 'none'/);
+  assert.match(functionBody(js, 'validatePowerPointMutationOnly'), /resolved_target/);
+});
+
 
 test('PowerPoint task pane keeps settings inline and compact at narrow widths', () => {
   const html = readFileSync(join(ADDIN_ROOT, 'public', 'taskpane.html'), 'utf8');

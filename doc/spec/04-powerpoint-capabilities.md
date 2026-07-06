@@ -192,6 +192,14 @@ evidence where the host API cannot be fully proven statically.
   [03-mcp-tool-surface.md](03-mcp-tool-surface.md) §1.1. Slide and shape
   collection creation uses `add_*`, content reads use `read_*`, and text-box
   creation belongs to `powerpoint.add_shape` with `shape_type: "text_box"`.
+- PowerPoint follows the cross-app validation-only contract in
+  [03-mcp-tool-surface.md](03-mcp-tool-surface.md) §6. Every advertised
+  mutating PowerPoint tool MUST accept `validate_only: true`, must advertise
+  `_meta["com.office-mcp/supports_validate_only"]: true`, and must return the
+  portable no-write preflight envelope before queuing presentation writes.
+  PowerPoint replace-text dry-run remains an accepted compatibility synonym for
+  the documented transition window, but `validate_only` is the preferred
+  advertised argument.
 - `powerpoint.get_presentation_info` owns presentation orientation and summary
   metadata. It must always include `active_view` as `edit`, `read`, or
   `unknown`, plus `active_view_source` as `host` when the Common API returns a
