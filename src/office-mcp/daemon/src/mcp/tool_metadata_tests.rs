@@ -142,6 +142,18 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(calculate.category, "Workbook");
     assert_eq!(calculate.side_effect, ToolSideEffect::Mutating);
 
+    let list_named_items =
+        tool_metadata("excel.list_named_items").expect("excel named item list metadata");
+    assert_eq!(list_named_items.app, "excel");
+    assert_eq!(list_named_items.category, "Workbook");
+    assert_eq!(list_named_items.side_effect, ToolSideEffect::Read);
+
+    let update_named_item =
+        tool_metadata("excel.update_named_item").expect("excel named item update metadata");
+    assert_eq!(update_named_item.app, "excel");
+    assert_eq!(update_named_item.category, "Workbook");
+    assert_eq!(update_named_item.side_effect, ToolSideEffect::Destructive);
+
     let destructive = tool_metadata("powerpoint.delete_slide").expect("powerpoint metadata");
     assert_eq!(destructive.app, "powerpoint");
     assert_eq!(destructive.category, "Slides");
@@ -287,6 +299,14 @@ fn mixed_action_owner_metadata_declares_complete_action_side_effects() {
                 ("reject", ToolSideEffect::Mutating),
                 ("accept_all", ToolSideEffect::Destructive),
                 ("reject_all", ToolSideEffect::Destructive),
+            ]),
+        ),
+        (
+            "excel.update_named_item",
+            BTreeMap::from([
+                ("add", ToolSideEffect::Mutating),
+                ("edit", ToolSideEffect::Mutating),
+                ("delete", ToolSideEffect::Destructive),
             ]),
         ),
         (

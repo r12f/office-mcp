@@ -57,6 +57,40 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['7'] }
     }
   }],
+  ['excel.list_named_items', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'Y1:Y2', values: [['Named'], ['Range']] } },
+        { tool: 'excel.update_named_item', arguments: { action: 'add', name: 'E2EListNamedRange', reference: 'Sheet1!Y1:Y2', comment: 'E2E range name' } },
+        { tool: 'excel.update_named_item', arguments: { action: 'add', name: 'E2EListNamedConstant', formula: '=42', comment: 'E2E constant name' } }
+      ]
+    },
+    args: { scope: 'all' },
+    verify: {
+      kind: 'direct-result',
+      expect: { contains: ['E2EListNamedRange', 'E2EListNamedConstant', 'Sheet1!Y1:Y2', '=42'] }
+    }
+  }],
+  ['excel.update_named_item', {
+    setup: {
+      actions: [
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'Z1:Z2', values: [['Named'], ['Item']] } }
+      ]
+    },
+    args: { action: 'add', name: 'E2ENamedItemRoundTrip', reference: 'Sheet1!Z1:Z2', comment: 'Initial name' },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.read_range',
+      readbackArguments: { sheet: 'Sheet1', address: 'E2ENamedItemRoundTrip' },
+      expect: { contains: ['Named', 'Item'] }
+    },
+    cleanup: {
+      actions: [
+        { tool: 'excel.update_named_item', arguments: { action: 'edit', name: 'E2ENamedItemRoundTrip', formula: '=Sheet1!Z1:Z2', comment: 'Updated name' } },
+        { tool: 'excel.update_named_item', arguments: { action: 'delete', name: 'E2ENamedItemRoundTrip' } }
+      ]
+    }
+  }],
   ['excel.list_sheets', {
     setup: {
       actions: [

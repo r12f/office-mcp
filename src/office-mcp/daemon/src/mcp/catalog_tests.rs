@@ -107,6 +107,8 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"excel_read_range"));
     assert!(names.contains(&"excel.save"));
     assert!(names.contains(&"excel.calculate"));
+    assert!(names.contains(&"excel.list_named_items"));
+    assert!(names.contains(&"excel.update_named_item"));
     assert!(names.contains(&"excel.sort_range"));
     assert!(names.contains(&"excel.apply_filter"));
     assert!(names.contains(&"excel.update_table"));
@@ -122,9 +124,9 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(!names.contains(&"powerpoint.duplicate_slide"));
     assert!(!names.contains(&"powerpoint.set_slide_background"));
     assert_eq!(WORD_V1_TOOLS.len(), 62);
-    assert_eq!(ExcelToolCatalog::tools().len(), 22);
+    assert_eq!(ExcelToolCatalog::tools().len(), 24);
     assert_eq!(PowerPointToolCatalog::tools().len(), 23);
-    assert_eq!(tools.len(), 220);
+    assert_eq!(tools.len(), 224);
 }
 
 #[test]
@@ -1426,6 +1428,40 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
     );
     assert_eq!(calculate["properties"]["validate_only"]["type"], "boolean");
 
+    let list_named_items = schema_for("excel.list_named_items");
+    assert_required(&list_named_items, &["session_id"]);
+    assert_eq!(
+        list_named_items["properties"]["scope"]["enum"],
+        serde_json::json!(["workbook", "sheet", "all"])
+    );
+    assert_eq!(list_named_items["properties"]["scope"]["default"], "all");
+
+    let update_named_item = schema_for("excel.update_named_item");
+    assert_required(&update_named_item, &["session_id", "action", "name"]);
+    assert_eq!(
+        update_named_item["properties"]["action"]["enum"],
+        serde_json::json!(["add", "edit", "delete"])
+    );
+    assert_eq!(
+        update_named_item["properties"]["scope"]["enum"],
+        serde_json::json!(["workbook", "sheet"])
+    );
+    assert_eq!(update_named_item["properties"]["scope"]["default"], "workbook");
+    assert_eq!(update_named_item["properties"]["name"]["minLength"], 1);
+    assert_eq!(update_named_item["properties"]["validate_only"]["type"], "boolean");
+    assert_eq!(
+        update_named_item["_meta"]["com.office-mcp/action_side_effects"]["add"],
+        "mutating"
+    );
+    assert_eq!(
+        update_named_item["_meta"]["com.office-mcp/action_side_effects"]["edit"],
+        "mutating"
+    );
+    assert_eq!(
+        update_named_item["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
+    );
+
     let slide = schema_for("powerpoint.add_slide");
     assert_required(&slide, &["session_id"]);
     assert_eq!(slide["properties"]["layout"]["type"], "string");
@@ -1459,6 +1495,8 @@ fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.get_workbook_info"));
     assert!(ExcelToolCatalog::contains("excel.save"));
     assert!(ExcelToolCatalog::contains("excel.calculate"));
+    assert!(ExcelToolCatalog::contains("excel.list_named_items"));
+    assert!(ExcelToolCatalog::contains("excel.update_named_item"));
     assert!(ExcelToolCatalog::contains("excel.list_sheets"));
     assert!(ExcelToolCatalog::contains("excel.update_sheet"));
     assert!(ExcelToolCatalog::contains("excel.delete_sheet"));
