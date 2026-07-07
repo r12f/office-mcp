@@ -461,7 +461,7 @@ test('Word change-tracking tools are advertised, grouped, gated, and dispatched 
 
   assert.match(js, /'word\.set_change_tracking'/);
   assert.match(js, /'word\.update_tracked_change'/);
-  assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.update_comment', 'word\.set_change_tracking', 'word\.update_tracked_change'\] \}/);
+  assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.update_comment', 'word\.set_change_tracking', 'word\.update_tracked_change'\] \}/);
   assert.match(js, /\['word\.set_change_tracking', \{ category: 'Review', sideEffect: 'mutating', description: 'Set Track Changes mode\.' \}\]/);
   assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept, reject, or bulk-finalize tracked changes\.' \}\]/);
   assert.match(invokeBody, /case 'word\.set_change_tracking':\s*data = await setChangeTracking\(args\);/);
@@ -974,7 +974,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\['word\.list_notes', \{ category: 'Notes', sideEffect: 'read', description: 'List footnotes or endnotes with reference locations\.' \}\]/);
   assert.match(js, /\['word\.update_note', \{ category: 'Notes', sideEffect: 'mutating', description: 'Replace a footnote or endnote body by index\.' \}\]/);
   assert.match(js, /\['word\.delete_note', \{ category: 'Notes', sideEffect: 'destructive', description: 'Delete a footnote or endnote by index\.' \}\]/);
-  assert.match(js, /\['word\.update_comment', \{ category: 'Review', sideEffect: 'destructive', description: 'Reply, edit, delete, or reopen a comment thread\.' \}\]/);
+  assert.match(js, /\['word\.update_comment', \{ category: 'Review', sideEffect: 'destructive', description: 'Reply, edit, resolve, reopen, or delete a comment thread\.' \}\]/);
   assert.match(js, /\['word\.set_change_tracking', \{ category: 'Review', sideEffect: 'mutating', description: 'Set Track Changes mode\.' \}\]/);
   assert.match(js, /\['word\.update_tracked_change', \{ category: 'Review', sideEffect: 'destructive', description: 'Accept, reject, or bulk-finalize tracked changes\.' \}\]/);
   assert.match(js, /case 'word\.get_header_footer':\s*data = await getHeaderFooter\(args\);/);
@@ -1022,6 +1022,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /case 'word\.update_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateNote\(args\);/);
   assert.match(js, /case 'word\.delete_note':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await deleteNote\(args\);/);
   assert.match(js, /case 'word\.update_comment':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateComment\(args\);/);
+  assert.doesNotMatch(js, /case 'word\.resolve_comment':/);
   assert.match(js, /case 'word\.list_fields':\s*data = await listFields\(args \|\| \{\}\);/);
   assert.match(js, /case 'word\.insert_field':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await insertField\(args\);/);
   assert.match(js, /case 'word\.update_field':\s*data = args\?\.validate_only \? await validateWordMutationOnly\(tool, args\) : await updateField\(args\);/);
@@ -1046,6 +1047,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /async function deleteNote\(args\)/);
   assert.match(js, /async function updateComment\(args\)/);
   assert.match(js, /async function validateUpdateCommentOnly\(args\)/);
+  assert.doesNotMatch(js, /async function resolveComment\(args\)/);
   assert.match(js, /async function listLists\(args/);
   assert.match(js, /async function updateList\(args\)/);
 
@@ -1061,9 +1063,13 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.update_note':\s*validateUpdateNoteArgs\(tool, args\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.delete_note':\s*validateDeleteNoteArgs\(tool, args\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.update_comment':\s*validateUpdateCommentArgs\(tool, args\);/);
+  assert.doesNotMatch(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.resolve_comment':/);
   assert.match(functionBody(js, 'getComments'), /replies: commentRepliesMetadata\(comment\)/);
   assert.match(js, /function commentRepliesMetadata\(comment\)/);
   assert.match(js, /function validateUpdateCommentArgs\(tool, args\)/);
+  assert.match(functionBody(js, 'normalizeUpdateCommentAction'), /\['reply', 'edit', 'resolve', 'reopen', 'delete'\]/);
+  assert.match(functionBody(js, 'updateComment'), /action === 'resolve'[\s\S]*target\.comment\.resolved = true/);
+  assert.match(functionBody(js, 'validateUpdateCommentArgs'), /action === 'resolve'[\s\S]*top-level comment only/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.insert_field':\s*validateInsertFieldArgs\(tool, args\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.update_field':\s*validateUpdateFieldArgs\(tool, args\);/);
   assert.match(functionBody(js, 'preflightWordMutatingTool'), /case 'word\.delete_field':\s*validateDeleteFieldArgs\(tool, args\);/);
