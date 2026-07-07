@@ -926,7 +926,7 @@ test('Word task pane exposes product UI regions and accessible endpoint settings
   assert.match(js, /\{ label: 'Media', tools: \['word\.insert_image', 'word\.list_images', 'word\.get_image', 'word\.update_image', 'word\.list_shapes', 'word\.insert_shape', 'word\.update_shape', 'word\.delete_shape'\] \}/);
   assert.match(js, /\{ label: 'Content controls', tools: \['word\.list_content_controls', 'word\.insert_content_control', 'word\.update_content_control', 'word\.delete_content_control'\] \}/);
   assert.match(js, /\{ label: 'Notes', tools: \['word\.insert_note', 'word\.list_notes', 'word\.update_note', 'word\.delete_note'\] \}/);
-  assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.resolve_comment', 'word\.update_comment', 'word\.set_change_tracking', 'word\.update_tracked_change'\] \}/);
+  assert.match(js, /\{ label: 'Review', tools: \['word\.add_comment', 'word\.update_comment', 'word\.set_change_tracking', 'word\.update_tracked_change'\] \}/);
   assert.doesNotMatch(js, /'word\.insert_heading'/);
   assert.doesNotMatch(js, /'word\.set_heading_level'/);
   assert.doesNotMatch(js, /'word\.update_cell'/);

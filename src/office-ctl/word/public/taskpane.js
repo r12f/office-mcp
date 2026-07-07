@@ -103,7 +103,6 @@
     'word.delete_content_control',
     'word.apply_style',
     'word.add_comment',
-    'word.resolve_comment',
     'word.update_comment',
     'word.set_change_tracking',
     'word.update_tracked_change',
@@ -167,7 +166,6 @@
     'word.delete_note',
     'word.apply_style',
     'word.add_comment',
-    'word.resolve_comment',
     'word.update_comment',
     'word.set_change_tracking',
     'word.update_tracked_change',
@@ -181,7 +179,7 @@
     { label: 'Media', tools: ['word.insert_image', 'word.list_images', 'word.get_image', 'word.update_image', 'word.list_shapes', 'word.insert_shape', 'word.update_shape', 'word.delete_shape'] },
     { label: 'Content controls', tools: ['word.list_content_controls', 'word.insert_content_control', 'word.update_content_control', 'word.delete_content_control'] },
     { label: 'Notes', tools: ['word.insert_note', 'word.list_notes', 'word.update_note', 'word.delete_note'] },
-    { label: 'Review', tools: ['word.add_comment', 'word.resolve_comment', 'word.update_comment', 'word.set_change_tracking', 'word.update_tracked_change'] }
+    { label: 'Review', tools: ['word.add_comment', 'word.update_comment', 'word.set_change_tracking', 'word.update_tracked_change'] }
   ];
   const TOOL_METADATA = new Map([
     ['word.get_text', { category: 'Document & structure', sideEffect: 'read', description: 'Read document text by paragraph range.' }],
@@ -242,8 +240,7 @@
     ['word.delete_note', { category: 'Notes', sideEffect: 'destructive', description: 'Delete a footnote or endnote by index.' }],
     ['word.apply_style', { category: 'Range & selection', sideEffect: 'mutating', description: 'Apply an Office style to an anchored range.' }],
     ['word.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a comment to an anchored range.' }],
-    ['word.resolve_comment', { category: 'Review', sideEffect: 'mutating', description: 'Resolve an existing comment.' }],
-    ['word.update_comment', { category: 'Review', sideEffect: 'destructive', description: 'Reply, edit, delete, or reopen a comment thread.' }],
+    ['word.update_comment', { category: 'Review', sideEffect: 'destructive', description: 'Reply, edit, resolve, reopen, or delete a comment thread.' }],
     ['word.set_change_tracking', { category: 'Review', sideEffect: 'mutating', description: 'Set Track Changes mode.' }],
     ['word.update_tracked_change', { category: 'Review', sideEffect: 'destructive', description: 'Accept, reject, or bulk-finalize tracked changes.' }],
     ['word.save', { category: 'Document & structure', sideEffect: 'mutating', description: 'Save the current document.' }]
@@ -709,9 +706,6 @@
         case 'word.add_comment':
           data = await addComment(args);
           break;
-        case 'word.resolve_comment':
-          data = await resolveComment(args);
-          break;
         case 'word.update_comment':
           data = args?.validate_only ? await validateWordMutationOnly(tool, args) : await updateComment(args);
           break;
@@ -892,9 +886,6 @@
         break;
       case 'word.add_comment':
         requireAnchor(tool, args.anchor);
-        break;
-      case 'word.resolve_comment':
-        if (!args.comment_id) throw invalidArgument('word.resolve_comment requires comment_id.');
         break;
       case 'word.update_comment':
         validateUpdateCommentArgs(tool, args);
@@ -3074,19 +3065,6 @@
     });
   }
 
-  async function resolveComment(args) {
-    return Word.run(async (context) => {
-      const comments = context.document.comments;
-      comments.load('items/id,items/resolved');
-      await context.sync();
-      const comment = comments.items.find((item) => item.id === args.comment_id);
-      if (!comment) throw Object.assign(new Error(`Comment ${args.comment_id} was not found.`), { officeMcpCode: 'INDEX_OUT_OF_RANGE' });
-      comment.resolved = true;
-      await context.sync();
-      return { comment_id: args.comment_id, resolved: true };
-    });
-  }
-
   async function updateComment(args) {
     return Word.run(async (context) => {
       const target = await resolveCommentTarget(context, args, { loadReplies: true });
@@ -3109,6 +3087,11 @@
         await context.sync();
         return { comment_id: args.comment_id, reply_id: args.reply_id || null, action, deleted: true };
       }
+      if (action === 'resolve') {
+        target.comment.resolved = true;
+        await context.sync();
+        return { comment_id: args.comment_id, action, resolved: true };
+      }
       target.comment.resolved = false;
       await context.sync();
       return { comment_id: args.comment_id, action, resolved: false };
@@ -3117,8 +3100,8 @@
 
   function normalizeUpdateCommentAction(action) {
     const value = String(action || '').trim().toLowerCase();
-    if (['reply', 'edit', 'delete', 'reopen'].includes(value)) return value;
-    throw invalidArgument('word.update_comment action must be reply, edit, delete, or reopen.');
+    if (['reply', 'edit', 'resolve', 'reopen', 'delete'].includes(value)) return value;
+    throw invalidArgument('word.update_comment action must be reply, edit, resolve, reopen, or delete.');
   }
 
   async function resolveCommentTarget(context, args, options = {}) {
@@ -4179,8 +4162,8 @@
     if (args.reply_id !== undefined && (typeof args.reply_id !== 'string' || args.reply_id.trim().length < 1)) {
       throw invalidArgument(`${tool} reply_id must be a non-empty string.`);
     }
-    if (action === 'reopen' && args.reply_id !== undefined) {
-      throw invalidArgument(`${tool} reopen applies to the top-level comment only.`);
+    if ((action === 'resolve' || action === 'reopen') && args.reply_id !== undefined) {
+      throw invalidArgument(`${tool} ${action} applies to the top-level comment only.`);
     }
   }
 

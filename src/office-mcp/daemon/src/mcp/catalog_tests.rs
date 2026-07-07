@@ -135,10 +135,11 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert_eq!(WORD_V1_TOOLS.len(), 61);
     assert_eq!(ExcelToolCatalog::tools().len(), 37);
     assert_eq!(PowerPointToolCatalog::tools().len(), 23);
-    assert_eq!(tools.len(), 250);
+    assert_eq!(tools.len(), 248);
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn tools_list_exposes_action_side_effects_for_mixed_owner_tools() {
     let tools = tool_catalog_json();
     let word_update_table = tools
@@ -939,10 +940,10 @@ fn shared_office_tool_catalog_path_covers_all_apps() {
     assert_eq!(catalogs[2].app(), "powerpoint");
 
     let all_tools = all_office_tool_names().collect::<Vec<_>>();
-    assert_eq!(all_tools.len(), 122);
+    assert_eq!(all_tools.len(), 121);
     assert_eq!(
         all_tools.iter().copied().collect::<BTreeSet<_>>().len(),
-        122
+        121
     );
     assert!(all_tools.contains(&"word.update_comment"));
     assert!(all_tools.contains(&"word.update_table"));

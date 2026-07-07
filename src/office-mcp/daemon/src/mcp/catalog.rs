@@ -45,7 +45,6 @@ pub const WORD_V1_TOOLS: &[&str] = &[
     "word.remove_hyperlink",
     "word.replace_text",
     "word.resolve_anchor",
-    "word.resolve_comment",
     "word.update_comment",
     "word.save",
     "word.set_change_tracking",
@@ -1655,11 +1654,6 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "anchor", "text", "match_case"]
     ),
     tool_spec!(
-        "word.resolve_comment",
-        ["session_id", "comment_id"],
-        ["session_id", "comment_id"]
-    ),
-    tool_spec!(
         "word.update_comment",
         ["session_id", "comment_id", "action"],
         [
@@ -3246,7 +3240,7 @@ fn word_review_property_schema(tool: &str, name: &str) -> Option<Value> {
             Some(json!({ "enum": ["accept", "reject", "accept_all", "reject_all"] }))
         }
         ("word.update_comment", "action") => {
-            Some(json!({ "enum": ["reply", "edit", "delete", "reopen"] }))
+            Some(json!({ "enum": ["reply", "edit", "resolve", "reopen", "delete"] }))
         }
         ("word.update_comment", "comment_id" | "reply_id") => {
             Some(json!({ "type": "string", "minLength": 1 }))
