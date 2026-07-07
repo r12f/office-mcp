@@ -1998,8 +1998,9 @@ PivotTables are the only extra analysis object in v1 because they represent a
 high-value summarized-analysis workflow. Shapes, legacy notes, slicers,
 bindings, events, external data, Power Query, import/export, save-as/close, and
 method-level table/chart/PivotTable wrappers remain out of scope. Workbook save,
-calculation, and named items are in scope as stable workbook-owner operations,
-not as file export, save-as, close, event, or binding workflows. Threaded
+calculation, named items, and document properties are in scope as stable
+workbook-owner operations, not as file export, save-as, close, event, or
+binding workflows. Threaded
 comments are in scope as a Review follow-up surface because comment text and
 reply lifecycle cannot be represented by range tools without losing review
 identity and permission boundaries. Range insertion is in scope as the
@@ -2046,8 +2047,11 @@ The #110 follow-up adds `excel.copy_range` for host-native Range copy and
 autofill workflows.
 The #111 follow-up adds `excel.insert_image`, `excel.list_shapes`, and
 `excel.update_shape` as the Shapes category for floating worksheet objects.
+The #112 follow-up adds `excel.get_document_properties` and
+`excel.update_document_properties` as Workbook metadata tools for core and
+custom document properties.
 
-The 36 tools are grouped as: Workbook 5, Worksheet 4, Range/cell data 9,
+The 38 tools are grouped as: Workbook 7, Worksheet 4, Range/cell data 9,
 Formula 1, Format 3, Data operations 2, Table 2, Chart 2, PivotTable 2,
 Shapes 3, and Review 3. This is the current v1 upper bound. Rejected v1
 expansions include separate cell CRUD, worksheet formatting, freeze panes,
@@ -2072,6 +2076,13 @@ existing owner tool.
       named-item resolution for existing range tools that accept `address`.
       Unknown, duplicate, and non-range name cases must fail deterministically
       with no partial effect.
+- [ ] Implement workbook document-property slice:
+      `excel.get_document_properties` and `excel.update_document_properties`,
+      including daemon catalog entries, task pane handlers, validate-only
+      support, permission metadata, Rust/JS tests, ExcelApi 1.7 gating, and
+      read/write coverage for writable core fields plus custom property
+      upsert/delete. The contract must match the Word document-property field
+      names where Excel supports the same metadata.
 - [ ] Implement threaded comment slice: `excel.add_comment`,
       `excel.list_comments`, and `excel.update_comment`, including daemon
       catalog entries, task pane handlers, validate-only support, Review

@@ -46,12 +46,16 @@
     taskStatusLabel
   } = window.OfficeCtlMainUi;
 
+  const DOCUMENT_PROPERTY_WRITABLE_FIELDS = ['title', 'subject', 'author', 'keywords', 'category', 'comments', 'company', 'manager'];
+
   const AVAILABLE_TOOLS = [
     'excel.get_workbook_info',
     'excel.save',
     'excel.calculate',
     'excel.list_named_items',
     'excel.update_named_item',
+    'excel.get_document_properties',
+    'excel.update_document_properties',
     'excel.add_comment',
     'excel.list_comments',
     'excel.update_comment',
@@ -85,7 +89,7 @@
     'excel.update_shape'
   ];
   const TOOL_GROUPS = [
-    { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate', 'excel.list_named_items', 'excel.update_named_item'] },
+    { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate', 'excel.list_named_items', 'excel.update_named_item', 'excel.get_document_properties', 'excel.update_document_properties'] },
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
     { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.set_hyperlink', 'excel.set_data_validation', 'excel.copy_range', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
@@ -103,6 +107,8 @@
     ['excel.calculate', { category: 'Workbook', sideEffect: 'mutating', description: 'Recalculate workbook formulas.' }],
     ['excel.list_named_items', { category: 'Workbook', sideEffect: 'read', description: 'List workbook and worksheet scoped named items.' }],
     ['excel.update_named_item', { category: 'Workbook', sideEffect: 'destructive', description: 'Add, edit, or delete workbook and worksheet scoped named items.' }],
+    ['excel.get_document_properties', { category: 'Workbook', sideEffect: 'read', description: 'Read workbook metadata and custom properties.' }],
+    ['excel.update_document_properties', { category: 'Workbook', sideEffect: 'mutating', description: 'Update workbook metadata and custom properties.' }],
     ['excel.add_comment', { category: 'Review', sideEffect: 'mutating', description: 'Add a threaded comment to a cell.' }],
     ['excel.list_comments', { category: 'Review', sideEffect: 'read', description: 'List threaded cell comments.' }],
     ['excel.update_comment', { category: 'Review', sideEffect: 'destructive', description: 'Reply, edit, resolve, reopen, or delete a threaded comment.' }],
@@ -378,6 +384,12 @@
           break;
         case 'excel.update_named_item':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateNamedItem(args);
+          break;
+        case 'excel.get_document_properties':
+          data = await getDocumentProperties(args);
+          break;
+        case 'excel.update_document_properties':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateDocumentProperties(args);
           break;
         case 'excel.add_comment':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await addComment(args);
@@ -683,6 +695,77 @@
       existing.delete();
       await context.sync();
       return { name, scope, sheet: scope === 'sheet' ? args.sheet || null : null, action, deleted: true };
+    });
+  }
+
+  async function getDocumentProperties(args) {
+    requireRequirementSet('ExcelApi', '1.7', 'workbook document properties');
+    return Excel.run(async (context) => {
+      const properties = context.workbook.properties;
+      properties.load('title,subject,author,keywords,category,comments,company,manager,lastAuthor,revisionNumber,creationDate,lastSaveTime');
+      const includeCustom = args.include_custom !== false;
+      const customProperties = documentCustomProperties(properties);
+      if (includeCustom) customProperties.load('items/key,items/type,items/value');
+      await context.sync();
+      const result = documentPropertiesMetadata(properties);
+      if (includeCustom) result.custom = customProperties.items.map(customPropertyMetadata);
+      return result;
+    });
+  }
+
+  async function updateDocumentProperties(args) {
+    requireRequirementSet('ExcelApi', '1.7', 'workbook document properties');
+    return Excel.run(async (context) => {
+      validateUpdateDocumentPropertiesArgs('excel.update_document_properties', args);
+      const properties = context.workbook.properties;
+      const updatedFields = [];
+      for (const field of DOCUMENT_PROPERTY_WRITABLE_FIELDS) {
+        if (args[field] !== undefined) {
+          properties[field] = args[field];
+          updatedFields.push(field);
+        }
+      }
+
+      const customProperties = documentCustomProperties(properties);
+      const customSet = Array.isArray(args.custom_set) ? args.custom_set : [];
+      for (const entry of customSet) {
+        const existing = customProperties.getItemOrNullObject(entry.key);
+        existing.load('isNullObject');
+        await context.sync();
+        if (!existing.isNullObject) existing.delete();
+        customProperties.add(entry.key, entry.value);
+      }
+
+      const customDelete = Array.isArray(args.custom_delete) ? args.custom_delete : [];
+      const deletedCustom = [];
+      const missingCustom = [];
+      for (const key of customDelete) {
+        const property = customProperties.getItemOrNullObject(key);
+        property.load('isNullObject,key');
+        await context.sync();
+        if (property.isNullObject) {
+          missingCustom.push(key);
+        } else {
+          deletedCustom.push(property.key || key);
+          property.delete();
+        }
+      }
+
+      properties.load('title,subject,author,keywords,category,comments,company,manager,lastAuthor,revisionNumber,creationDate,lastSaveTime');
+      customProperties.load('items/key,items/type,items/value');
+      await context.sync();
+
+      return {
+        updated: true,
+        fields: updatedFields,
+        custom_set: customSet.map((entry) => entry.key),
+        custom_deleted: deletedCustom,
+        custom_missing: missingCustom,
+        properties: {
+          ...documentPropertiesMetadata(properties),
+          custom: customProperties.items.map(customPropertyMetadata)
+        }
+      };
     });
   }
 
@@ -1501,6 +1584,46 @@
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
 
+  function documentPropertiesMetadata(properties) {
+    return {
+      title: properties.title || '',
+      subject: properties.subject || '',
+      author: properties.author || '',
+      keywords: properties.keywords || '',
+      category: properties.category || '',
+      comments: properties.comments || '',
+      company: properties.company || '',
+      manager: properties.manager || '',
+      last_author: properties.lastAuthor || null,
+      revision_number: properties.revisionNumber ?? null,
+      creation_date: isoDate(properties.creationDate),
+      last_save_time: isoDate(properties.lastSaveTime),
+      untrusted_source: true
+    };
+  }
+
+  function documentCustomProperties(properties) {
+    const customProperties = properties.custom || properties.customProperties;
+    if (!customProperties) {
+      throw Object.assign(new Error('Workbook custom document properties are unavailable in this Excel host.'), { officeMcpCode: 'HOST_CAPABILITY_UNAVAILABLE', partialEffect: 'none' });
+    }
+    return customProperties;
+  }
+
+  function customPropertyMetadata(property) {
+    return {
+      key: property.key || '',
+      type: property.type || valueType(property.value),
+      value: property.value
+    };
+  }
+
+  function valueType(value) {
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'number') return 'number';
+    return 'string';
+  }
+
   function targetWorksheet(context, args) {
     return args.sheet
       ? context.workbook.worksheets.getItem(String(args.sheet))
@@ -1519,6 +1642,53 @@
       throw Object.assign(new Error('excel.update_named_item add requires reference or formula.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
     return formula || reference;
+  }
+
+  function validateUpdateDocumentPropertiesArgs(tool, args) {
+    if (!args || typeof args !== 'object') {
+      throw Object.assign(new Error(`${tool} requires arguments.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    const customSet = args.custom_set;
+    const customDelete = args.custom_delete;
+    const hasWritableField = DOCUMENT_PROPERTY_WRITABLE_FIELDS.some((field) => args[field] !== undefined);
+    const hasCustomSet = Array.isArray(customSet) && customSet.length > 0;
+    const hasCustomDelete = Array.isArray(customDelete) && customDelete.length > 0;
+    if (!hasWritableField && !hasCustomSet && !hasCustomDelete) {
+      throw Object.assign(new Error(`${tool} requires at least one writable property or custom operation.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    for (const field of DOCUMENT_PROPERTY_WRITABLE_FIELDS) {
+      if (args[field] !== undefined && typeof args[field] !== 'string') {
+        throw Object.assign(new Error(`${tool} ${field} must be a string.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+    }
+    if (customSet !== undefined) {
+      if (!Array.isArray(customSet)) throw Object.assign(new Error(`${tool} custom_set must be an array.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      for (const entry of customSet) validateCustomPropertySetEntry(tool, entry);
+    }
+    if (customDelete !== undefined) {
+      if (!Array.isArray(customDelete)) throw Object.assign(new Error(`${tool} custom_delete must be an array.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      for (const key of customDelete) validateCustomPropertyKey(tool, key, 'custom_delete key');
+    }
+  }
+
+  function validateCustomPropertySetEntry(tool, entry) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw Object.assign(new Error(`${tool} custom_set entries must be objects.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    validateCustomPropertyKey(tool, entry.key, 'custom_set key');
+    const valueType = typeof entry.value;
+    if (!['string', 'number', 'boolean'].includes(valueType)) {
+      throw Object.assign(new Error(`${tool} custom_set values must be strings, numbers, or booleans.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    if (valueType === 'number' && !Number.isFinite(entry.value)) {
+      throw Object.assign(new Error(`${tool} custom_set number values must be finite.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
+  function validateCustomPropertyKey(tool, key, label) {
+    if (typeof key !== 'string' || key.trim().length === 0) {
+      throw Object.assign(new Error(`${tool} ${label} must be a non-empty string.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
   }
 
   async function namedItemInfos(context, items, scope, sheet = null) {
@@ -3073,11 +3243,19 @@
   }
 
   function isToolSupported(tool) {
-    if (tool === 'excel.find_replace_cells') return supportsRequirementSet('ExcelApi', '1.9');
-    if (tool === 'excel.sort_range') return supportsRequirementSet('ExcelApi', '1.2');
-    if (tool === 'excel.apply_filter') return supportsRequirementSet('ExcelApi', '1.9');
-    if (tool === 'excel.add_comment' || tool === 'excel.list_comments' || tool === 'excel.update_comment') return supportsRequirementSet('ExcelApi', '1.10');
-    return true;
+    return availableToolsForRequirements().includes(tool);
+  }
+
+  function availableToolsForRequirements(requirements = probeRequirementSets()) {
+    const ExcelApi_1_7 = Boolean(requirements.excel_api_1_7);
+    return AVAILABLE_TOOLS.filter((tool) => {
+      if (['excel.get_document_properties', 'excel.update_document_properties'].includes(tool)) return ExcelApi_1_7;
+      if (tool === 'excel.find_replace_cells') return Boolean(requirements.excel_api_1_9);
+      if (tool === 'excel.sort_range') return Boolean(requirements.excel_api_1_2);
+      if (tool === 'excel.apply_filter') return Boolean(requirements.excel_api_1_9);
+      if (['excel.add_comment', 'excel.list_comments', 'excel.update_comment'].includes(tool)) return Boolean(requirements.excel_api_1_10);
+      return true;
+    });
   }
 
   function isToolEnabled(tool) {

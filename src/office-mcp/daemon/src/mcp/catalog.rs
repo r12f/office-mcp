@@ -89,9 +89,11 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.save",
     "excel.calculate",
     "excel.list_named_items",
+    "excel.get_document_properties",
     "excel.list_comments",
     "excel.list_shapes",
     "excel.update_named_item",
+    "excel.update_document_properties",
     "excel.list_sheets",
     "excel.read_range",
     "excel.set_formula",
@@ -773,9 +775,10 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
         "word.list_styles" | "word.create_style" | "word.update_style" => {
             style_examples_for_tool(tool)
         }
-        "word.get_document_properties" | "word.update_document_properties" => {
-            document_property_examples_for_tool(tool)
-        }
+        "word.get_document_properties"
+        | "word.update_document_properties"
+        | "excel.get_document_properties"
+        | "excel.update_document_properties" => document_property_examples_for_tool(tool),
         "word.update_table" => vec![json!({
             "description": "Merge the first row across two columns after validating table bounds.",
             "arguments": {
@@ -846,14 +849,14 @@ fn content_control_examples_for_tool(tool: &str) -> Vec<Value> {
 
 fn document_property_examples_for_tool(tool: &str) -> Vec<Value> {
     match tool {
-        "word.get_document_properties" => vec![json!({
+        "word.get_document_properties" | "excel.get_document_properties" => vec![json!({
             "description": "Read core and custom document metadata.",
             "arguments": {
                 "session_id": "session-1",
                 "include_custom": true
             }
         })],
-        "word.update_document_properties" => vec![json!({
+        "word.update_document_properties" | "excel.update_document_properties" => vec![json!({
             "description": "Set a title and upsert a custom property.",
             "arguments": {
                 "session_id": "session-1",
@@ -1708,6 +1711,28 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ]
     ),
     tool_spec!(
+        "excel.get_document_properties",
+        ["session_id"],
+        ["session_id", "include_custom"]
+    ),
+    tool_spec!(
+        "excel.update_document_properties",
+        ["session_id"],
+        [
+            "session_id",
+            "title",
+            "subject",
+            "author",
+            "keywords",
+            "category",
+            "comments",
+            "company",
+            "manager",
+            "custom_set",
+            "custom_delete"
+        ]
+    ),
+    tool_spec!(
         "excel.add_comment",
         ["session_id", "cell", "text"],
         ["session_id", "sheet", "cell", "text", "validate_only"]
@@ -2339,7 +2364,7 @@ fn object_schema(tool: &str, required: &[&str], properties: &[&str]) -> Value {
             { "required": ["paragraph"] }
         ]);
     }
-    if tool == "word.update_document_properties" {
+    if tool == "word.update_document_properties" || tool == "excel.update_document_properties" {
         schema["anyOf"] = json!([
             { "required": ["title"] },
             { "required": ["subject"] },
@@ -2597,7 +2622,9 @@ fn word_list_property_schema(tool: &str, name: &str) -> Option<Value> {
 }
 
 fn excel_property_schema(tool: &str, name: &str) -> Option<Value> {
-    excel_workbook_property_schema(tool, name).or_else(|| excel_shape_property_schema(tool, name))
+    document_property_schema(tool, name)
+        .or_else(|| excel_workbook_property_schema(tool, name))
+        .or_else(|| excel_shape_property_schema(tool, name))
 }
 
 fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
@@ -2993,9 +3020,16 @@ fn word_shape_property_schema(tool: &str, name: &str) -> Option<Value> {
 }
 
 fn word_document_property_schema(tool: &str, name: &str) -> Option<Value> {
+    document_property_schema(tool, name)
+}
+
+fn document_property_schema(tool: &str, name: &str) -> Option<Value> {
     let is_document_property_tool = matches!(
         tool,
-        "word.get_document_properties" | "word.update_document_properties"
+        "word.get_document_properties"
+            | "word.update_document_properties"
+            | "excel.get_document_properties"
+            | "excel.update_document_properties"
     );
     if !is_document_property_tool {
         return None;

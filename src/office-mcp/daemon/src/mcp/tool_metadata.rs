@@ -470,6 +470,18 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         EXCEL_UPDATE_NAMED_ITEM_ACTIONS,
     ),
     tool(
+        "excel.get_document_properties",
+        "excel",
+        "Workbook",
+        ToolSideEffect::Read,
+    ),
+    tool(
+        "excel.update_document_properties",
+        "excel",
+        "Workbook",
+        ToolSideEffect::Mutating,
+    ),
+    tool(
         "excel.add_comment",
         "excel",
         "Review",

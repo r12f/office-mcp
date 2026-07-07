@@ -54,14 +54,15 @@ Research basis:
   Excel analysis workflow and are present in the stable Excel.js object model.
   v1 limits PivotTables to normal range/table sources and non-preview APIs.
 
-The refined v1 target is 36 tools. The original 20-tool core covered workbook
+The refined v1 target is 38 tools. The original 20-tool core covered workbook
 orientation, worksheet lifecycle, range work, formulas, formatting, data
 operations, tables, charts, and PivotTables. The workbook owner now also covers
-stable persistence/calculation tasks and named-item lifecycle. These cannot be
-represented by range or object-owner tools: saving the current workbook,
-forcing calculation, and managing workbook/sheet scoped names that formulas and
-templates address indirectly. The Review owner now covers threaded cell
-comments because comments are workbook review objects with a distinct
+stable persistence/calculation tasks, named-item lifecycle, and document
+metadata. These cannot be represented by range or object-owner tools: saving
+the current workbook, forcing calculation, managing workbook/sheet scoped names
+that formulas and templates address indirectly, and reading or writing workbook
+properties that document-management workflows key off. The Review owner now
+covers threaded cell comments because comments are workbook review objects with a distinct
 permission profile from range content. The Range owner now also covers
 `excel.insert_range`, the non-destructive structural complement to
 `excel.clear_range` delete-with-shift, so agents can insert cells, rows, and
@@ -136,7 +137,7 @@ Core tool selection matrix:
 
 | User workflow | Object owner | v1 tools | Why this is enough |
 |---|---|---|---|
-| Inspect, persist, calculate, and address workbook state; navigate sheets | `Workbook` / `Workbook.names` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, workbook orientation, style-name discovery, persistence, formula recalculation, and template-stable named item addressing without reading cell contents. |
+| Inspect, persist, calculate, address workbook state, and manage workbook metadata; navigate sheets | `Workbook` / `Workbook.names` / `Workbook.properties` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.get_document_properties`, `excel.update_document_properties`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, workbook orientation, style-name discovery, persistence, formula recalculation, template-stable named item addressing, and workbook core/custom document metadata without reading cell contents. |
 | Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; insertion and delete-with-shift are the structural Range pair, and hyperlink/data-validation/copy/autofill workflows need typed validation while staying range-owned. |
 | Work with formulas | `Range` formulas | `excel.set_formula` | Formula writes are distinct from literal value writes and can support scalar or matrix input. |
 | Apply user-visible cell formatting | `RangeFormat` / `Range` style, merge, and conditional format APIs | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | Keeps static cell formatting in `excel.format_range` and rule-based conditional formatting in a dedicated list/update owner so agents can inspect, add, delete, and clear rules without duplicating value or table tools. |
@@ -151,7 +152,7 @@ Final v1 tool set by category:
 
 | Category | Tools | Count | User intent |
 |---|---|---:|---|
-| Workbook | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item` | 5 | Inspect workbook-level state, persist changes, recalculate formulas, and manage named ranges/items without reading cell contents. |
+| Workbook | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.get_document_properties`, `excel.update_document_properties` | 7 | Inspect workbook-level state, persist changes, recalculate formulas, manage named ranges/items, and read or update workbook metadata without reading cell contents. |
 | Worksheet | `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | 4 | Sheet inventory and lifecycle. |
 | Range / cell data | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | 9 | Locate, read, write, insert, clear/delete, search, manage cell hyperlinks and validation rules, and copy/autofill ranges. |
 | Formula | `excel.set_formula` | 1 | Author formulas distinctly from literal value writes. |
@@ -163,7 +164,7 @@ Final v1 tool set by category:
 | Shapes | `excel.insert_image`, `excel.list_shapes`, `excel.update_shape` | 3 | Insert images and inspect or update floating worksheet shapes. |
 | Review | `excel.add_comment`, `excel.list_comments`, `excel.update_comment` | 3 | Create, inspect, reply to, resolve, reopen, edit, and delete threaded cell comments. |
 
-Total: 36 tools.
+Total: 38 tools.
 
 Rejected tool families for v1:
 
@@ -191,6 +192,8 @@ Implemented Excel v1 tools:
 | `excel.calculate` | edit | `ExcelApi 1.1`; `full_rebuild` requires `ExcelApi 1.2` | Recalculate workbook formulas and report the calculation mode. |
 | `excel.list_named_items` | read | `ExcelApi 1.1`; sheet-scoped names require `ExcelApi 1.4` | List workbook and/or worksheet scoped named items, including non-range constants and formulas. |
 | `excel.update_named_item` | edit/destructive | `ExcelApi 1.4`; editing formulas requires `ExcelApi 1.7` | Add, edit, or delete workbook/sheet scoped named items. |
+| `excel.get_document_properties` | read | `ExcelApi 1.7` | Read workbook core document properties, read-only metadata, and optional custom properties. |
+| `excel.update_document_properties` | edit | `ExcelApi 1.7` | Update writable workbook core document properties and upsert or delete custom properties. |
 | `excel.list_sheets` | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state. |
 | `excel.add_sheet` | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
 | `excel.update_sheet` | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
@@ -235,6 +238,8 @@ Target core Excel tool surface:
 | `excel.calculate` | implemented | Workbook | edit | `ExcelApi 1.1`; `full_rebuild` requires `ExcelApi 1.2` | Recalculate workbook formulas with `recalculate`, `full`, or `full_rebuild` mode and return the calculation mode. |
 | `excel.list_named_items` | implemented | Workbook | read | `ExcelApi 1.1`; sheet-scoped names require `ExcelApi 1.4` | List workbook and/or worksheet scoped named items, returning range addresses when available and formulas for non-range items. |
 | `excel.update_named_item` | implemented | Workbook | edit/destructive | `ExcelApi 1.4`; editing formulas requires `ExcelApi 1.7` | Add, edit, or delete named items. Duplicate adds and unknown edit/delete targets fail deterministically before mutation. |
+| `excel.get_document_properties` | implemented | Workbook | read | `ExcelApi 1.7` | Read workbook core document properties, read-only metadata, and optional custom properties. |
+| `excel.update_document_properties` | implemented | Workbook | edit | `ExcelApi 1.7` | Update writable workbook core document properties and upsert or delete custom properties. |
 | `excel.list_sheets` | implemented | Worksheet | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state; workbook metadata belongs to `excel.get_workbook_info`. |
 | `excel.add_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
 | `excel.update_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
@@ -269,7 +274,7 @@ Target core Excel tool surface:
 
 The tools above are the Excel v1 contract. Implementation work must keep
 the daemon catalog, MCP `tools/list`, Excel task pane `available_tools`, task
-pane permission grouping, documentation, and tests aligned with this 36-tool
+pane permission grouping, documentation, and tests aligned with this 38-tool
 surface. Before implementing or changing a tool, verify its minimum requirement
 set against `@types/office-js` and Microsoft API docs, then land the change as a
 test-first implementation slice with daemon catalog coverage, task pane
@@ -303,6 +308,13 @@ Tool ownership rules:
   owners. They cover workbook-scoped and sheet-scoped names, range-backed names,
   and non-range constants/formulas. Deleting a name is destructive because
   formulas that reference it can break.
+- `excel.get_document_properties` and `excel.update_document_properties` own
+  workbook document metadata. They cover writable core fields such as title,
+  subject, author, keywords, category, comments, company, and manager;
+  read-only metadata such as last author, creation date, revision number, and
+  last save time; and custom property upsert/delete. Metadata values are
+  workbook-authored content and MUST be returned with `untrusted_source: true`.
+  Read-only fields are intentionally absent from the update schema.
 - `excel.get_used_range` locates the occupied sheet area. It does not return
   cell contents; callers use `excel.read_range` for values, text, formulas, and
   number formats.
@@ -370,6 +382,7 @@ Action side-effect maps:
 |---|---|---|---|
 | `excel.find_replace_cells` | omitted `replace` / find-only mode | replace mode | - |
 | `excel.copy_range` | - | `copy`, `autofill` | - |
+| `excel.update_document_properties` | - | core property writes, `custom_set`, `custom_delete` | - |
 | `excel.set_hyperlink` | - | `set`, `clear` | - |
 | `excel.set_data_validation` | - | `set` | `clear` |
 | `excel.update_conditional_format` | - | `add` | `delete`, `clear_range` |
@@ -420,6 +433,62 @@ other host-denied operations. These map through the standard error model in
 [06-error-model.md](06-error-model.md).
 
 ## 3. Tool Contracts
+
+### 3.0A `excel.get_document_properties`
+
+Arguments:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "include_custom": true
+}
+```
+
+Returns writable core fields (`title`, `subject`, `author`, `keywords`,
+`category`, `comments`, `company`, and `manager`), read-only metadata
+(`last_author`, `revision_number`, `creation_date`, and `last_save_time` when
+Office returns them), and, when `include_custom` is not false,
+`custom: [{ key, type, value }]`. The response normalizes Office camelCase
+names to snake_case and includes `untrusted_source: true` because workbook
+metadata and custom property values are workbook-authored content.
+
+### 3.0B `excel.update_document_properties`
+
+Arguments:
+
+```json
+{
+  "session_id": "excel-session-id",
+  "title": "Quarterly Report",
+  "subject": "Revenue",
+  "author": "Finance Team",
+  "keywords": "finance,quarterly",
+  "category": "Reporting",
+  "comments": "Prepared for review.",
+  "company": "Contoso",
+  "manager": "Finance Ops",
+  "custom_set": [{ "key": "Workflow", "value": "review" }],
+  "custom_delete": ["ObsoleteFlag"],
+  "validate_only": false
+}
+```
+
+Callers must provide at least one writable core property, one `custom_set`
+entry, or one `custom_delete` key. Requests with no writable operation fail
+with `INVALID_ARGUMENT` and `partial_effect: "none"`. Read-only fields such as
+`last_author`, `revision_number`, `creation_date`, and `last_save_time` are not
+accepted by the schema. `custom_set` upserts by deleting any existing custom
+property with the same key before adding the new value through
+`CustomPropertyCollection.add(key, value)`. `custom_delete` deletes matching
+keys and reports unknown keys as successful no-ops in `custom_missing`.
+`deleteAll` is not exposed.
+
+| Operation | API | Requirement set |
+|---|---|---|
+| Read/write core workbook properties | `Workbook.properties` / `DocumentProperties` | `ExcelApi 1.7` |
+| Enumerate custom workbook properties | `DocumentProperties.custom` / `CustomPropertyCollection` | `ExcelApi 1.7` |
+| Upsert/delete custom workbook properties | `CustomPropertyCollection.add(key, value)` / `CustomProperty.delete()` | `ExcelApi 1.7` |
 
 ### 3.1 `excel.read_range`
 

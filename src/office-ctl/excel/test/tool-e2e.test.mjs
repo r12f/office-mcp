@@ -92,6 +92,52 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       ]
     }
   }],
+  ['excel.update_document_properties', {
+    setup: {
+      actions: [
+        { tool: 'excel.get_workbook_info', arguments: {} }
+      ]
+    },
+    args: {
+      title: 'E2E Workbook Properties Title',
+      author: 'Office MCP E2E',
+      custom_set: [{ key: 'OfficeMcpE2E', value: 'excel-properties' }]
+    },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.get_document_properties',
+      readbackArguments: { include_custom: true },
+      expect: {
+        contains: ['E2E Workbook Properties Title', 'Office MCP E2E', 'OfficeMcpE2E', 'excel-properties'],
+        pathEquals: [{ path: 'untrusted_source', value: true }]
+      }
+    },
+    cleanup: {
+      actions: [
+        { tool: 'excel.update_document_properties', arguments: { title: '', author: '', custom_delete: ['OfficeMcpE2E'] } }
+      ]
+    }
+  }],
+  ['excel.get_document_properties', {
+    setup: {
+      actions: [
+        { tool: 'excel.update_document_properties', arguments: { subject: 'E2E Workbook Properties Subject', custom_set: [{ key: 'OfficeMcpReadback', value: true }] } }
+      ]
+    },
+    args: { include_custom: true },
+    verify: {
+      kind: 'direct-result',
+      expect: {
+        contains: ['E2E Workbook Properties Subject', 'OfficeMcpReadback', 'true'],
+        pathEquals: [{ path: 'untrusted_source', value: true }]
+      }
+    },
+    cleanup: {
+      actions: [
+        { tool: 'excel.update_document_properties', arguments: { subject: '', custom_delete: ['OfficeMcpReadback'] } }
+      ]
+    }
+  }],
   ['excel.list_sheets', {
     setup: {
       actions: [
