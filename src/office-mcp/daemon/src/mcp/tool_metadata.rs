@@ -411,12 +411,6 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Review",
         ToolSideEffect::Mutating,
     ),
-    tool(
-        "word.resolve_comment",
-        "word",
-        "Review",
-        ToolSideEffect::Mutating,
-    ),
     tool_with_actions(
         "word.update_comment",
         "word",
@@ -843,6 +837,7 @@ const WORD_UPDATE_TABLE_ACTIONS: &[ActionSideEffect] = &[
 const WORD_UPDATE_COMMENT_ACTIONS: &[ActionSideEffect] = &[
     action("reply", ToolSideEffect::Mutating),
     action("edit", ToolSideEffect::Mutating),
+    action("resolve", ToolSideEffect::Mutating),
     action("delete", ToolSideEffect::Destructive),
     action("reopen", ToolSideEffect::Mutating),
 ];

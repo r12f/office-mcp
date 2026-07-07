@@ -823,25 +823,19 @@ const WORD_E2E_CASES = Object.fromEntries([
     args: { anchor: { kind: 'after_text', text: 'Comment target paragraph' }, text: 'E2E comment' },
     verify: wordReadback.comments({ contains: ['E2E comment'] })
   }],
-  ['word.resolve_comment', {
-    setup: {
-      actions: [
-        { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Resolve comment target' } },
-        { tool: 'word.add_comment', saveAs: 'commentResult', arguments: { anchor: { kind: 'after_text', text: 'Resolve comment target' }, text: 'Resolve me E2E' } }
-      ]
-    },
-    args: { comment_id: '${commentResult.comment_id}' },
-    verify: wordReadback.comments({ contains: ['Resolve me E2E', 'true'] })
-  }],
   ['word.update_comment', {
     setup: {
       actions: [
         { tool: 'word.insert_paragraph', arguments: { anchor: { kind: 'end_of_document' }, text: 'Update comment target' } },
-        { tool: 'word.add_comment', saveAs: 'commentResult', arguments: { anchor: { kind: 'after_text', text: 'Update comment target' }, text: 'Original comment E2E' } }
+        { tool: 'word.add_comment', saveAs: 'commentResult', arguments: { anchor: { kind: 'after_text', text: 'Update comment target' }, text: 'Original comment E2E' } },
+        { tool: 'word.update_comment', saveAs: 'replyResult', arguments: { comment_id: '${commentResult.comment_id}', action: 'reply', text: 'Reply body E2E' } },
+        { tool: 'word.update_comment', arguments: { comment_id: '${commentResult.comment_id}', reply_id: '${replyResult.reply.reply_id}', action: 'edit', text: 'Edited reply body E2E' } },
+        { tool: 'word.update_comment', arguments: { comment_id: '${commentResult.comment_id}', action: 'resolve' } },
+        { tool: 'word.update_comment', arguments: { comment_id: '${commentResult.comment_id}', action: 'reopen' } }
       ]
     },
-    args: { comment_id: '${commentResult.comment_id}', action: 'reply', text: 'Reply body E2E' },
-    verify: wordReadback.comments({ contains: ['Original comment E2E', 'Reply body E2E'], pathEquals: [{ path: 'comments.0.replies.0.content', value: 'Reply body E2E' }] })
+    args: { comment_id: '${commentResult.comment_id}', reply_id: '${replyResult.reply.reply_id}', action: 'delete' },
+    verify: wordReadback.comments({ contains: ['Original comment E2E', 'false'], notContains: ['Reply body E2E', 'Edited reply body E2E'], pathEquals: [{ path: 'comments.0.resolved', value: false }, { path: 'comments.0.replies.length', value: 0 }] })
   }],
   ['word.update_tracked_change', {
     setup: {

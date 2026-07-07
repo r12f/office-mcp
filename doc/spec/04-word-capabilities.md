@@ -80,7 +80,7 @@ The per-tool JSON Schemas follow in §2-§9.
 | **Media** | `word.insert_image`, `word.list_images`, `word.get_image`, `word.update_image`, `word.list_shapes`, `word.insert_shape`, `word.update_shape`, `word.delete_shape` |
 | **Content controls** | `word.list_content_controls`, `word.insert_content_control`, `word.update_content_control`, `word.delete_content_control` |
 | **Notes** | `word.insert_note`, `word.list_notes`, `word.update_note`, `word.delete_note` |
-| **Review** | `word.add_comment`, `word.resolve_comment`, `word.update_comment`, `word.set_change_tracking`, `word.update_tracked_change` |
+| **Review** | `word.add_comment`, `word.update_comment`, `word.set_change_tracking`, `word.update_tracked_change` |
 
 ### 1.2 Target refined Word tool surface
 
@@ -90,7 +90,7 @@ model: `Document` contains sections and document-level state; a section has a
 as paragraphs, lists, tables, content controls, comments, and tracked changes
 own object-specific lifecycle and review workflows.
 
-The target surface has 58 tools. It deliberately consolidates specialized tools
+The target surface has 57 tools. It deliberately consolidates specialized tools
 that perform the same user intent under a single owner. Superseded
 compatibility tools remain documented below for migration history, but they are
 not advertised by the daemon catalog or task pane available-tools metadata.
@@ -154,8 +154,7 @@ not advertised by the daemon catalog or task pane available-tools metadata.
 | `word.update_note` | implemented | Notes | edit | `WordApi 1.5` | Replace one footnote or endnote body by current note index. |
 | `word.delete_note` | implemented | Notes | destructive | `WordApi 1.5` | Delete one footnote or endnote reference and body by current note index. |
 | `word.add_comment` | implemented | Review | comment | `WordApi 1.4` | Add a comment to an anchored range as the signed-in Office user. |
-| `word.resolve_comment` | implemented | Review | comment | `WordApi 1.4` | Resolve an existing comment. |
-| `word.update_comment` | implemented | Review | comment/destructive | `WordApi 1.4` | Reply to, edit, delete, or reopen an existing comment thread or reply. |
+| `word.update_comment` | implemented | Review | comment/destructive | `WordApi 1.4` | Reply to, edit, resolve, reopen, or delete an existing comment thread or reply. |
 | `word.set_change_tracking` | implemented | Review | edit | `WordApi 1.4` | Set Track Changes mode and report the previous mode. |
 | `word.update_tracked_change` | implemented | Review | edit/destructive | `WordApi 1.6` | Accept or reject one tracked change by current index and expected fingerprint, or bulk accept/reject after an expected-count stale check. |
 | `word.save` | implemented | Document & structure | edit | `WordApi 1.1` | Save the current document with the host save behavior. |
@@ -171,6 +170,7 @@ Superseded target-surface tools:
 | `word.add_column` | `word.update_table` | Column insertion is a table-owned mutation. |
 | `word.format_cell` | `word.update_table` | Cell formatting is table-owned formatting, distinct from generic run formatting. |
 | `word.accept_change` / `word.reject_change` | `word.update_tracked_change` | Accept/reject are one tracked-change action with an explicit `action` argument. |
+| `word.resolve_comment` | `word.update_comment` | Resolve is one comment mutation action with an explicit `action` argument. |
 | `word.insert_page_break` | `word.insert_break` | Page breaks are one break kind in the generalized break owner. |
 | `word.resize_image` | `word.update_image` | Resize is an inline-image mutation action, not a distinct media owner. |
 | `word.delete_image` | `word.update_image` | Delete is an inline-image mutation action with destructive side effect. |
@@ -223,9 +223,10 @@ Tool ownership rules:
   and deletion are owned by `word.insert_note`, `word.list_notes`,
   `word.update_note`, and `word.delete_note`.
 - Review comment tools own comment thread lifecycle. `word.add_comment` creates
-  a top-level thread, `word.resolve_comment` remains the compatibility owner for
-  resolving a thread, and `word.update_comment` owns replies, edits, deletes,
-  and reopening.
+  a top-level thread, and `word.update_comment` owns replies, edits, resolving,
+  reopening, and deletes. `word.resolve_comment` is a superseded compatibility
+  contract and must not be advertised by the daemon catalog or task pane
+  available-tools metadata.
 - `word.set_change_tracking` owns document Track Changes mode. The session
   descriptor and tracked-change resource may expose the current mode as
   read-only metadata, but mode mutation stays with this review tool.
@@ -266,7 +267,7 @@ Action side-effect maps:
 | `word.update_header_footer` | - | `set_text`, `append_paragraph` | `clear` |
 | `word.update_field` | - | `refresh`, `refresh_all`, `lock`, `unlock` | - |
 | `word.update_table` | - | `update_cell`, `add_row`, `add_column`, `format_cell`, `merge_cells`, `set_column_width`, `distribute_columns`, `set_borders`, `set_header_row` | `delete`, `delete_row`, `delete_column` |
-| `word.update_comment` | - | `reply`, `edit`, `reopen` | `delete` |
+| `word.update_comment` | - | `reply`, `edit`, `resolve`, `reopen` | `delete` |
 | `word.update_tracked_change` | - | `accept`, `reject` | `accept_all`, `reject_all` |
 
 These maps are part of the public contract described in
@@ -2385,6 +2386,9 @@ indistinguishable from the user doing it themselves.
 
 ### 8.2 `word.resolve_comment`
 
+Superseded compatibility contract. This tool is no longer advertised; use
+`word.update_comment` with `action: "resolve"`.
+
 ```json
 {
   "type": "object",
@@ -2405,7 +2409,7 @@ indistinguishable from the user doing it themselves.
   "properties": {
     "session_id": { "type": "string", "format": "uuid" },
     "comment_id": { "type": "string", "minLength": 1 },
-    "action": { "enum": ["reply", "edit", "delete", "reopen"] },
+    "action": { "enum": ["reply", "edit", "resolve", "reopen", "delete"] },
     "text": { "type": "string" },
     "reply_id": { "type": "string", "minLength": 1 },
     "validate_only": { "type": "boolean", "default": false }
@@ -2416,9 +2420,10 @@ indistinguishable from the user doing it themselves.
 
 `reply` requires `text` and appends to the thread. `edit` requires `text` and
 edits the top-level comment unless `reply_id` is supplied, in which case it
-edits that reply. `delete` removes either the top-level thread or the selected
-reply and is classified destructive. `reopen` clears the resolved state on the
-top-level comment and is the inverse of `word.resolve_comment`.
+edits that reply. `resolve` sets the top-level comment resolved state to true;
+`reopen` clears it. `delete` removes either the top-level thread or the
+selected reply and is classified destructive. `reply_id` is invalid for
+`resolve` and `reopen` because they apply to the top-level comment thread.
 
 The comments resource returns each thread as `{ comment_id, content, resolved,
 author, created_at, replies: [{ reply_id, content, author, created_at }] }`.
@@ -2431,6 +2436,7 @@ target thread or reply and returns the current metadata without mutating.
 | Reply | `Comment.reply(text)` | `WordApi 1.4` |
 | Edit thread | `Comment.content` | `WordApi 1.4` |
 | Edit reply | `CommentReply.content` | `WordApi 1.4` |
+| Resolve thread | `Comment.resolved` | `WordApi 1.4` |
 | Delete thread/reply | `Comment.delete()` / `CommentReply.delete()` | `WordApi 1.4` |
 | Reopen/read state | `Comment.resolved` | `WordApi 1.4` |
 | Enumerate replies | `Comment.replies` | `WordApi 1.4` |

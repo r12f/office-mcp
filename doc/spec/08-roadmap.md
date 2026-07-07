@@ -75,7 +75,7 @@ open document, including in an IRM-protected file where their policy allows the 
       and PowerPoint tool, returning the portable no-write preflight envelope
       before writes are queued and advertising support through MCP tool
       metadata.
-- [x] `word.add_comment`, `word.resolve_comment`
+- [x] `word.add_comment`, `word.update_comment { action: "resolve" }`
 - [x] `word.accept_change`, `word.reject_change`
 - [x] Track Changes interaction: when the user has Track Changes enabled, Word
       records edits as revisions; v1 exposes tracked-change resources plus
@@ -121,16 +121,15 @@ Target catalog: `word.get_text`, `word.get_outline`,
 `word.list_content_controls`, `word.insert_content_control`,
 `word.update_content_control`, `word.delete_content_control`,
 `word.insert_note`, `word.list_notes`, `word.update_note`,
-`word.delete_note`, `word.add_comment`, `word.resolve_comment`,
+`word.delete_note`, `word.add_comment`,
 `word.update_comment`, `word.list_fields`, `word.insert_field`,
-`word.update_field`, `word.delete_field`, `word.add_comment`,
-`word.resolve_comment`, `word.set_change_tracking`,
+`word.update_field`, `word.delete_field`, `word.set_change_tracking`,
 `word.update_tracked_change`, and `word.save`.
 
 Superseded compatibility tools: `word.insert_heading`, `word.set_heading_level`,
 `word.insert_page_break`, `word.update_cell`, `word.add_row`, `word.add_column`,
 `word.format_cell`, `word.accept_change`, `word.reject_change`, and
-`word.get_paragraph`.
+`word.resolve_comment`, and `word.get_paragraph`.
 
 - [x] Verify planned Word content-control and consolidated mutation APIs against
       `@types/office-js` and Microsoft API docs before implementation. Current

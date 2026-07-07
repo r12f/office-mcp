@@ -59,6 +59,7 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(update_comment.app, "word");
     assert_eq!(update_comment.category, "Review");
     assert_eq!(update_comment.side_effect, ToolSideEffect::Destructive);
+    assert_eq!(tool_metadata("word.resolve_comment"), None);
 
     let list_fields = tool_metadata("word.list_fields").expect("field list metadata");
     assert_eq!(list_fields.app, "word");
@@ -409,6 +410,7 @@ fn mixed_action_owner_metadata_declares_complete_action_side_effects() {
             BTreeMap::from([
                 ("reply", ToolSideEffect::Mutating),
                 ("edit", ToolSideEffect::Mutating),
+                ("resolve", ToolSideEffect::Mutating),
                 ("delete", ToolSideEffect::Destructive),
                 ("reopen", ToolSideEffect::Mutating),
             ]),
