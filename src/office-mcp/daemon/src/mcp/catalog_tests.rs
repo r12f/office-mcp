@@ -109,6 +109,8 @@ fn tool_catalog_includes_office_word_and_excel_tools() {
     assert!(names.contains(&"excel.calculate"));
     assert!(names.contains(&"excel.list_named_items"));
     assert!(names.contains(&"excel.update_named_item"));
+    assert!(names.contains(&"excel.get_document_properties"));
+    assert!(names.contains(&"excel.update_document_properties"));
     assert!(names.contains(&"excel.add_comment"));
     assert!(names.contains(&"excel.list_comments"));
     assert!(names.contains(&"excel.update_comment"));
@@ -1611,6 +1613,61 @@ fn excel_hyperlink_schema_is_specific() {
     );
     assert_eq!(
         set_hyperlink_tool["_meta"]["com.office-mcp/action_side_effects"]["clear"],
+        "mutating"
+    );
+}
+
+#[test]
+fn excel_document_property_schemas_are_specific() {
+    let get_properties = schema_for("excel.get_document_properties");
+    assert_required(&get_properties, &["session_id"]);
+    assert_eq!(
+        get_properties["properties"]["include_custom"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        get_properties["properties"]["include_custom"]["default"],
+        true
+    );
+
+    let update_properties = schema_for("excel.update_document_properties");
+    assert_required(&update_properties, &["session_id"]);
+    assert_eq!(update_properties["properties"]["title"]["type"], "string");
+    assert_eq!(update_properties["properties"]["manager"]["type"], "string");
+    assert!(update_properties["properties"].get("last_author").is_none());
+    assert!(
+        update_properties["properties"]
+            .get("revision_number")
+            .is_none()
+    );
+    assert_eq!(
+        update_properties["properties"]["custom_set"]["items"]["additionalProperties"],
+        false
+    );
+    assert_eq!(
+        update_properties["properties"]["custom_set"]["items"]["properties"]["value"]["oneOf"][0]["type"],
+        "string"
+    );
+    assert_eq!(
+        update_properties["properties"]["custom_delete"]["items"]["minLength"],
+        1
+    );
+    assert_eq!(
+        update_properties["anyOf"][9]["required"],
+        serde_json::json!(["custom_delete"])
+    );
+    assert_eq!(
+        update_properties["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
+    let update_tool = tool_for("excel.update_document_properties");
+    assert_eq!(
+        update_tool["_meta"]["com.office-mcp/action_side_effects"]["custom_set"],
+        "mutating"
+    );
+    assert_eq!(
+        update_tool["_meta"]["com.office-mcp/action_side_effects"]["custom_delete"],
         "mutating"
     );
 }

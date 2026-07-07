@@ -107,7 +107,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /forced-colors: active/);
   assert.match(js, /const TOOL_GROUPS = \[/);
-  assert.match(js, /\{ label: 'Workbook', tools: \['excel\.get_workbook_info', 'excel\.save', 'excel\.calculate', 'excel\.list_named_items', 'excel\.update_named_item'\] \}/);
+  assert.match(js, /\{ label: 'Workbook', tools: \['excel\.get_workbook_info', 'excel\.save', 'excel\.calculate', 'excel\.list_named_items', 'excel\.update_named_item', 'excel\.get_document_properties', 'excel\.update_document_properties'\] \}/);
   assert.match(js, /\{ label: 'Data', tools: \['excel\.sort_range', 'excel\.apply_filter'\] \}/);
   assert.match(js, /\{ label: 'Table', tools: \['excel\.create_table', 'excel\.update_table'\] \}/);
   assert.match(js, /\{ label: 'Chart', tools: \['excel\.create_chart', 'excel\.update_chart'\] \}/);
@@ -119,6 +119,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /\['excel\.calculate', \{ category: 'Workbook', sideEffect: 'mutating'/);
   assert.match(js, /\['excel\.list_named_items', \{ category: 'Workbook', sideEffect: 'read'/);
   assert.match(js, /\['excel\.update_named_item', \{ category: 'Workbook', sideEffect: 'destructive'/);
+  assert.match(js, /\['excel\.get_document_properties', \{ category: 'Workbook', sideEffect: 'read', description: 'Read workbook metadata and custom properties\.' \}\]/);
+  assert.match(js, /\['excel\.update_document_properties', \{ category: 'Workbook', sideEffect: 'mutating', description: 'Update workbook metadata and custom properties\.' \}\]/);
   assert.match(js, /\['excel\.sort_range', \{ category: 'Data', sideEffect: 'mutating'/);
   assert.match(js, /\['excel\.apply_filter', \{ category: 'Data', sideEffect: 'mutating'/);
   assert.match(js, /\['excel\.update_table', \{ category: 'Table', sideEffect: 'destructive'/);
@@ -269,6 +271,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /case 'excel.calculate':/);
   assert.match(js, /case 'excel.list_named_items':/);
   assert.match(js, /case 'excel.update_named_item':/);
+  assert.match(js, /case 'excel.get_document_properties':/);
+  assert.match(js, /case 'excel.update_document_properties':/);
   assert.match(js, /case 'excel.list_sheets':/);
   assert.match(js, /case 'excel.update_sheet':/);
   assert.match(js, /case 'excel.delete_sheet':/);
@@ -551,6 +555,13 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /destination\.copyFrom\(source, rangeCopyTypeFrom\(args\.copy_type\), Boolean\(args\.skip_blanks\), Boolean\(args\.transpose\)\)/);
   assert.match(js, /source\.autoFill\(destination, autoFillTypeFrom\(args\.autofill_type\)\)/);
   assert.match(js, /function validateCopyRangeArgs\(args\)/);
+  assert.match(js, /function getDocumentProperties\(args\)/);
+  assert.match(js, /function updateDocumentProperties\(args\)/);
+  assert.match(js, /function validateUpdateDocumentPropertiesArgs\(tool, args\)/);
+  assert.match(functionBody(js, 'validateUpdateDocumentPropertiesArgs'), /requires at least one writable property or custom operation/);
+  assert.match(functionBody(js, 'updateDocumentProperties'), /custom_set/);
+  assert.match(functionBody(js, 'updateDocumentProperties'), /custom_delete/);
+  assert.match(functionBody(js, 'availableToolsForRequirements'), /ExcelApi_1_7[\s\S]*excel\.get_document_properties[\s\S]*excel\.update_document_properties/);
   assert.match(js, /function rangeCopyTypeFrom\(value\)/);
   assert.match(js, /function autoFillTypeFrom\(value\)/);
   assert.match(js, /function validateAutofillContainsSource\(source, destination\)/);
@@ -582,6 +593,7 @@ test('Excel task pane routes mutating tools through validation-only preflight', 
   assert.match(invokeBody, /case 'excel\.save':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await saveWorkbook\(args\);/);
   assert.match(invokeBody, /case 'excel\.calculate':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await calculateWorkbook\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_named_item':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateNamedItem\(args\);/);
+  assert.match(invokeBody, /case 'excel\.update_document_properties':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateDocumentProperties\(args\);/);
   assert.match(invokeBody, /case 'excel\.write_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await writeRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.insert_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await insertRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.clear_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await clearRange\(args\);/);
