@@ -2031,7 +2031,7 @@ gridlines and headings require `ExcelApi 1.8`.
 Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
-`excel.get_used_range`, `excel.read_range`, `excel.write_range`,
+`excel.read_range`, `excel.write_range`,
 `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`,
 `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range`, `excel.set_formula`,
 `excel.format_range`, `excel.list_conditional_formats`,
@@ -2057,8 +2057,13 @@ The #112 follow-up adds `excel.get_document_properties` and
 custom document properties.
 The #113 follow-up extends `excel.update_sheet` and `excel.list_sheets` with
 worksheet view-state controls without adding a new public tool.
+The #114 follow-up retires `excel.get_used_range` from advertised tool surfaces
+and extends `excel.read_range` so omitted `address` locates the used range while
+`metadata_only: true` preserves the old locate-without-content payload. The
+`office://excel/{session_id}/used-range{?sheet}` resource remains and forwards
+through the extended `excel.read_range` contract.
 
-The 38 tools are grouped as: Workbook 7, Worksheet 4, Range/cell data 9,
+The 37 tools are grouped as: Workbook 7, Worksheet 4, Range/cell data 8,
 Formula 1, Format 3, Data operations 2, Table 2, Chart 2, PivotTable 2,
 Shapes 3, and Review 3. This is the current v1 upper bound. Rejected v1
 expansions include separate cell CRUD, worksheet formatting, separate freeze-pane tools,
@@ -2072,6 +2077,12 @@ existing owner tool.
       `excel.delete_sheet`, and `excel.get_used_range`, including daemon catalog
       entries, task pane handlers, and Rust/JS tests. Committed as
       `excel: add workbook and worksheet tools`.
+- [ ] Consolidate used-range lookup into `excel.read_range`: make `address`
+      optional, add `metadata_only` and `values_only`, return a no-error empty
+      sheet contract, remove `excel.get_used_range` from advertised daemon and
+      task pane catalogs with compatibility/deprecation coverage, and keep the
+      used-range resource routed through `excel.read_range` metadata-only
+      arguments.
 - [ ] Implement workbook persistence/calculation slice: `excel.save` and
       `excel.calculate`, including daemon catalog entries, task pane handlers,
       validate-only support, permission metadata, and Rust/JS tests. `excel.save`
