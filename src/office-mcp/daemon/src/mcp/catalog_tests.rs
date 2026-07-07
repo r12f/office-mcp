@@ -1477,8 +1477,10 @@ fn word_anchor_schemas_advertise_per_tool_supported_kinds() {
 #[test]
 fn representative_excel_and_powerpoint_schemas_are_specific() {
     let range = schema_for("excel.read_range");
-    assert_required(&range, &["session_id", "address"]);
+    assert_required(&range, &["session_id"]);
     assert_eq!(range["properties"]["include_hyperlinks"]["type"], "boolean");
+    assert_eq!(range["properties"]["metadata_only"]["type"], "boolean");
+    assert_eq!(range["properties"]["values_only"]["type"], "boolean");
 
     let insert_range = schema_for("excel.insert_range");
     assert_required(&insert_range, &["session_id", "address", "shift"]);
@@ -2024,7 +2026,8 @@ fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.list_sheets"));
     assert!(ExcelToolCatalog::contains("excel.update_sheet"));
     assert!(ExcelToolCatalog::contains("excel.delete_sheet"));
-    assert!(ExcelToolCatalog::contains("excel.get_used_range"));
+    assert!(!ExcelToolCatalog::contains("excel.get_used_range"));
+    assert!(ExcelToolCatalog::contains("excel.read_range"));
     assert!(ExcelToolCatalog::contains("excel.insert_range"));
     assert!(ExcelToolCatalog::contains("excel.clear_range"));
     assert!(ExcelToolCatalog::contains("excel.set_hyperlink"));

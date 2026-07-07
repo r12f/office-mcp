@@ -11,7 +11,6 @@ advertises the implemented v1 tool surface:
 - `excel.add_sheet`
 - `excel.update_sheet`
 - `excel.delete_sheet`
-- `excel.get_used_range`
 - `excel.read_range`
 - `excel.write_range`
 - `excel.clear_range`

@@ -68,7 +68,6 @@ test('Excel capability spec points tool coverage at Office tool E2E', () => {
     'excel.add_sheet',
     'excel.update_sheet',
     'excel.delete_sheet',
-    'excel.get_used_range',
     'excel.clear_range',
     'excel.find_replace_cells',
     'excel.set_formula',

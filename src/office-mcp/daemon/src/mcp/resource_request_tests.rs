@@ -187,8 +187,8 @@ fn parses_excel_read_only_resources() {
             .expect("used range request"),
         ResourceReadRequest::Forwarded {
             uri: "office://excel/session-1/used-range?sheet=Data".to_string(),
-            tool: "excel.get_used_range",
-            arguments: json!({ "session_id": "session-1", "sheet": "Data" }),
+            tool: "excel.read_range",
+            arguments: json!({ "session_id": "session-1", "sheet": "Data", "metadata_only": true }),
             check_capability: true,
         }
     );
