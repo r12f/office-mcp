@@ -2002,10 +2002,12 @@ workbook-owner operations, not as file export, save-as, close, event, or
 binding workflows. Threaded
 comments are in scope as a Review follow-up surface because comment text and
 reply lifecycle cannot be represented by range tools without losing review
-identity and permission boundaries. Range insertion is in scope as the
-structural complement to `excel.clear_range` delete-with-shift because inserting
-cells, whole rows, and whole columns is a common Range workflow backed by stable
-`ExcelApi 1.1` APIs. Cell layout completion is in scope as an extension of the
+identity and permission boundaries. Range structure updates are in scope as one
+Range owner because `Range.insert` and `Range.delete` are stable
+`ExcelApi 1.1` APIs and represent the same cell/row/column shifting workflow:
+insert makes room by shifting down/right, and delete removes space by shifting
+up/left. `excel.clear_range` remains a non-structural clearing owner. Cell
+layout completion is in scope as an extension of the
 existing `excel.format_range` owner rather than a new tool: merge/unmerge,
 fixed row or column size, row or column visibility, and named style application
 share the cell-format permission profile. Workbook style-name discovery belongs
@@ -2031,15 +2033,17 @@ Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`,
 `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet`,
 `excel.read_range`, `excel.write_range`,
-`excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`,
+`excel.update_range_structure`, `excel.clear_range`, `excel.find_replace_cells`,
 `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range`, `excel.set_formula`,
 `excel.format_range`, `excel.list_conditional_formats`,
 `excel.update_conditional_format`, `excel.sort_range`, `excel.apply_filter`,
 `excel.create_table`, `excel.update_table`, `excel.create_chart`,
 `excel.update_chart`, `excel.create_pivot_table`, and `excel.update_pivot_table`.
 The #104 follow-up also adds `excel.add_comment`, `excel.list_comments`, and
-`excel.update_comment` as the Review category. The #105 follow-up adds
-`excel.insert_range` inside the existing Range/cell data category. The #106
+`excel.update_comment` as the Review category. The #115 follow-up supersedes
+#105 by adding `excel.update_range_structure` inside the existing Range/cell
+data category, retiring advertised `excel.insert_range`, and narrowing
+`excel.clear_range` away from delete-with-shift. The #106
 follow-up extends `excel.format_range` and `excel.get_workbook_info` without
 adding another public tool. The #107 follow-up adds `excel.set_hyperlink` and
 extends `excel.read_range` with optional hyperlink readback.
@@ -2113,13 +2117,14 @@ existing owner tool.
       permission metadata, Rust/JS tests, and untrusted-source response marking
       for comment and reply content. Resolve/reopen must be gated on
       `ExcelApi 1.11`; other threaded comment operations require `ExcelApi 1.10`.
-- [ ] Implement range insertion slice: `excel.insert_range`, including daemon
-      catalog entries, task pane handler, validate-only support, Range
-      permission metadata, Rust/JS tests, cell/row/column insertion coverage,
-      `count` expansion, and deterministic rejection for incompatible whole-row
-      or whole-column shift combinations. The tool requires `ExcelApi 1.1` and
-      complements `excel.clear_range` delete-with-shift without making insertion
-      destructive.
+- [ ] Consolidate Range structural updates into `excel.update_range_structure`,
+      including daemon catalog entries, task pane handler, validate-only
+      support, Range permission metadata, Rust/JS tests, insert/delete
+      cell/row/column coverage, `count` expansion, deterministic rejection for
+      invalid action/shift and whole-row/whole-column shift combinations,
+      per-action side effects (`insert` = edit, `delete` = destructive),
+      advertised retirement of `excel.insert_range`, and staged narrowing of
+      `excel.clear_range` delete-with-shift. The tool requires `ExcelApi 1.1`.
 - [ ] Implement cell layout completion slice by extending `excel.format_range`
       and `excel.get_workbook_info`. The format owner must cover merge/unmerge,
       fixed column width, fixed row height, hide/unhide rows and columns, named
@@ -2217,7 +2222,9 @@ existing owner tool.
       task pane dispatch/handler tests, argument validation tests, and smoke
       coverage for clear contents/formats/all plus read-only find and replace.
       Current implementation covers range clear/delete through `ExcelApi 1.1`
-      and find/replace through `ExcelApi 1.9` host gating.
+      and find/replace through `ExcelApi 1.9` host gating. Issue #115 narrows
+      the advertised clear contract to non-structural contents/formats/all and
+      moves delete-with-shift to `excel.update_range_structure`.
 - [x] Extend formula/format slice: update `excel.set_formula` to accept formula
       matrices, and update `excel.format_range` to cover borders, horizontal and
       vertical alignment, wrap text, autofit rows/columns, and number-format
