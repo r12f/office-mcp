@@ -121,7 +121,7 @@ public tool beside geometric shape creation.
 | `office://word/<session_id>/selection` | Currently selected range text + metadata | |
 | `office://excel/<session_id>/workbook` | Workbook metadata JSON | Forwards to `excel.get_workbook_info` and requires that capability in the session. |
 | `office://excel/<session_id>/sheets` | Worksheet inventory JSON | Forwards to `excel.list_sheets` and requires that capability in the session. |
-| `office://excel/<session_id>/used-range?sheet=<name>` | Used range metadata JSON | Forwards to `excel.get_used_range` with optional `sheet`. |
+| `office://excel/<session_id>/used-range?sheet=<name>` | Used range metadata JSON | Forwards to `excel.read_range` with optional `sheet`, omitted `address`, and `metadata_only: true`. |
 | `office://excel/<session_id>/range/<address>?sheet=<name>` | Range values, text, formulas, dimensions, and formats JSON | Forwards to `excel.read_range` with `address` and optional `sheet`. |
 | `office://powerpoint/<session_id>/presentation` | Presentation metadata JSON | Forwards to `powerpoint.get_presentation_info` and requires that capability in the session. |
 | `office://powerpoint/<session_id>/slides` | Slide inventory JSON | Forwards to `powerpoint.list_slides` and requires that capability in the session. |

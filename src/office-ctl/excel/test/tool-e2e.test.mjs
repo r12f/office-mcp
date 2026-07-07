@@ -207,34 +207,23 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { notContains: ['Delete Me'] }
     }
   }],
-  ['excel.get_used_range', {
-    setup: {
-      actions: [
-        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'C3:D4', values: [['Used', 'Range'], ['E2E', 'Marker']] } }
-      ]
-    },
-    args: { sheet: 'Sheet1' },
-    verify: {
-      kind: 'direct-result',
-      expect: { pathEquals: [{ path: 'row_count', value: 4 }, { path: 'column_count', value: 4 }, { path: 'is_empty', value: false }] }
-    }
-  }],
   ['excel.read_range', {
     setup: {
       actions: [
-        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B2', values: [['Read', 'Range'], ['E2E', 'Marker']] } }
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:B2', values: [['Read', 'Range'], ['E2E', 'Marker']] } },
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'C3:D4', values: [['Used', 'Range'], ['E2E', 'Marker']] } }
       ]
     },
-    args: { sheet: 'Sheet1', address: 'A1:B2' },
+    args: { sheet: 'Sheet1', metadata_only: true },
     verify: {
       kind: 'direct-result',
       expect: {
-        contains: ['Read', 'Range', 'E2E', 'Marker'],
         pathEquals: [
-          { path: 'row_count', value: 2 },
-          { path: 'column_count', value: 2 },
-          { path: 'untrusted_source', value: true }
-        ]
+          { path: 'row_count', value: 4 },
+          { path: 'column_count', value: 4 },
+          { path: 'empty', value: false }
+        ],
+        notContains: ['Read', 'Range', 'E2E', 'Marker']
       }
     }
   }],

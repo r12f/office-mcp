@@ -63,7 +63,6 @@
     'excel.add_sheet',
     'excel.update_sheet',
     'excel.delete_sheet',
-    'excel.get_used_range',
     'excel.read_range',
     'excel.write_range',
     'excel.insert_range',
@@ -91,7 +90,7 @@
   const TOOL_GROUPS = [
     { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate', 'excel.list_named_items', 'excel.update_named_item', 'excel.get_document_properties', 'excel.update_document_properties'] },
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
-    { label: 'Range', tools: ['excel.get_used_range', 'excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.set_hyperlink', 'excel.set_data_validation', 'excel.copy_range', 'excel.find_replace_cells'] },
+    { label: 'Range', tools: ['excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.set_hyperlink', 'excel.set_data_validation', 'excel.copy_range', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
     { label: 'Format', tools: ['excel.format_range', 'excel.list_conditional_formats', 'excel.update_conditional_format'] },
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
@@ -116,8 +115,7 @@
     ['excel.add_sheet', { category: 'Worksheet', sideEffect: 'mutating', description: 'Add a worksheet to the workbook.' }],
     ['excel.update_sheet', { category: 'Worksheet', sideEffect: 'mutating', description: 'Rename, activate, move, or restyle a worksheet tab.' }],
     ['excel.delete_sheet', { category: 'Worksheet', sideEffect: 'destructive', description: 'Delete a worksheet.' }],
-    ['excel.get_used_range', { category: 'Range', sideEffect: 'read', description: 'Read the used range address and dimensions.' }],
-    ['excel.read_range', { category: 'Range', sideEffect: 'read', description: 'Read values, text, formulas, and number formats from a range.' }],
+    ['excel.read_range', { category: 'Range', sideEffect: 'read', description: 'Read used-range metadata or range values, text, formulas, and number formats.' }],
     ['excel.write_range', { category: 'Range', sideEffect: 'mutating', description: 'Write a value matrix into a range.' }],
     ['excel.insert_range', { category: 'Range', sideEffect: 'mutating', description: 'Insert cells, rows, or columns and shift existing content.' }],
     ['excel.clear_range', { category: 'Range', sideEffect: 'destructive', description: 'Clear contents, formats, or delete cells in a range.' }],
@@ -411,9 +409,6 @@
           break;
         case 'excel.delete_sheet':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await deleteSheet(args);
-          break;
-        case 'excel.get_used_range':
-          data = await getUsedRange(args);
           break;
         case 'excel.read_range':
           data = await readRange(args);
@@ -798,21 +793,36 @@
     if (args.include_hyperlinks) requireRequirementSet('ExcelApi', '1.7', 'range hyperlinks');
     if (args.include_validation) requireRequirementSet('ExcelApi', '1.8', 'range data validation');
     return Excel.run(async (context) => {
-      const range = await targetRange(context, args);
-      range.load('address,values,text,rowCount,columnCount,numberFormat');
-      if (args.include_hyperlinks) range.load('hyperlink');
-      if (args.include_validation) {
+      const range = await readRangeTarget(context, args);
+      range.load('address,rowCount,columnCount,isNullObject');
+      if (!args.metadata_only) {
+        range.load(args.values_only ? 'values' : 'values,text,numberFormat');
+      }
+      if (!args.metadata_only && args.include_hyperlinks) range.load('hyperlink');
+      if (!args.metadata_only && args.include_validation) {
         range.dataValidation.load('rule,ignoreBlanks,valid');
         range.dataValidation.load('type,errorAlert,prompt');
       }
       await context.sync();
+      if (range.isNullObject) {
+        return { address: null, row_count: 0, column_count: 0, empty: true };
+      }
+      if (args.metadata_only) {
+        return {
+          address: range.address,
+          row_count: range.rowCount,
+          column_count: range.columnCount,
+          empty: false
+        };
+      }
       return {
         address: range.address,
         values: range.values,
-        text: range.text,
+        text: args.values_only ? undefined : range.text,
         row_count: range.rowCount,
         column_count: range.columnCount,
-        number_format: range.numberFormat,
+        empty: false,
+        number_format: args.values_only ? undefined : range.numberFormat,
         hyperlinks: args.include_hyperlinks ? hyperlinkMatrix(range) : undefined,
         validation: args.include_validation ? dataValidationSummary(range.dataValidation) : undefined,
         untrusted_source: true
@@ -1016,23 +1026,6 @@
     });
   }
 
-  async function getUsedRange(args) {
-    return Excel.run(async (context) => {
-      const worksheet = targetWorksheet(context, args);
-      const usedRange = worksheet.getUsedRangeOrNullObject(true);
-      usedRange.load('address,rowCount,columnCount,isNullObject');
-      await context.sync();
-      if (usedRange.isNullObject) {
-        return { sheet: args.sheet || null, address: null, row_count: 0, column_count: 0, is_empty: true };
-      }
-      return {
-        address: usedRange.address,
-        row_count: usedRange.rowCount,
-        column_count: usedRange.columnCount,
-        is_empty: false
-      };
-    });
-  }
   async function addSheet(args) {
     const name = String(args.name || '').trim();
     return Excel.run(async (context) => {
@@ -3117,6 +3110,11 @@
   async function targetRange(context, args) {
     const address = requiredString(args, 'address', 'Range address is required.');
     return resolveRangeTarget(context, args);
+  }
+
+  async function readRangeTarget(context, args) {
+    if (optionalTrimmedString(args.address)) return resolveRangeTarget(context, args);
+    return targetWorksheet(context, args).getUsedRangeOrNullObject(true);
   }
 
   async function resolveRangeTarget(context, args) {

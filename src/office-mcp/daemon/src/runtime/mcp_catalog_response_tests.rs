@@ -364,7 +364,6 @@ fn registry_with_all_resource_sessions() -> SessionRegistry {
         &[
             "excel.get_workbook_info",
             "excel.list_sheets",
-            "excel.get_used_range",
             "excel.read_range",
         ],
     );

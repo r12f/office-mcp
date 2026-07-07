@@ -524,12 +524,6 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Worksheet",
         ToolSideEffect::Destructive,
     ),
-    tool(
-        "excel.get_used_range",
-        "excel",
-        "Range",
-        ToolSideEffect::Read,
-    ),
     tool("excel.read_range", "excel", "Range", ToolSideEffect::Read),
     tool(
         "excel.write_range",

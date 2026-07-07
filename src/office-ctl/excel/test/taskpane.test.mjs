@@ -245,7 +245,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /excel\.list_sheets/);
   assert.match(js, /excel\.update_sheet/);
   assert.match(js, /excel\.delete_sheet/);
-  assert.match(js, /excel\.get_used_range/);
+  assert.doesNotMatch(js, /'excel\.get_used_range'/);
   assert.match(js, /excel\.insert_range/);
   assert.match(js, /excel\.clear_range/);
   assert.match(js, /excel\.set_hyperlink/);
@@ -276,7 +276,7 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /case 'excel.list_sheets':/);
   assert.match(js, /case 'excel.update_sheet':/);
   assert.match(js, /case 'excel.delete_sheet':/);
-  assert.match(js, /case 'excel.get_used_range':/);
+  assert.doesNotMatch(js, /case 'excel.get_used_range':/);
   assert.match(js, /case 'excel.insert_range':/);
   assert.match(js, /case 'excel.clear_range':/);
   assert.match(js, /case 'excel.set_hyperlink':/);
@@ -335,7 +335,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /requireRequirementSet\('ExcelApi', '1\.8', 'worksheet view flags'\)/);
   assert.match(js, /function validateSheetViewArgs\(args\)/);
   assert.match(js, /function sheetFrozenState\(freezeRange\)/);
-  assert.match(js, /async function getUsedRange/);
+  assert.doesNotMatch(js, /async function getUsedRange/);
+  assert.match(js, /async function readRangeTarget/);
   assert.match(js, /async function insertRange/);
   assert.match(js, /async function clearRange/);
   assert.match(js, /async function setHyperlink/);
@@ -500,6 +501,16 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /excel\.create_table/);
   assert.match(js, /excel\.create_chart/);
   assert.match(js, /async function readRange/);
+  const readRangeBody = functionBody(js, 'readRange');
+  assert.match(readRangeBody, /args\.metadata_only/);
+  assert.match(readRangeBody, /isNullObject/);
+  assert.match(readRangeBody, /empty: true/);
+  assert.match(readRangeBody, /args\.values_only/);
+  assert.doesNotMatch(readRangeBody, /values_only: true/);
+  const readRangeTargetBody = functionBody(js, 'readRangeTarget');
+  assert.match(readRangeTargetBody, /optionalTrimmedString\(args\.address\)/);
+  assert.match(readRangeTargetBody, /resolveRangeTarget\(context, args\)/);
+  assert.match(readRangeTargetBody, /getUsedRangeOrNullObject\(true\)/);
   assert.match(js, /async function writeRange/);
   assert.match(js, /async function addSheet/);
   assert.match(js, /async function setFormula/);

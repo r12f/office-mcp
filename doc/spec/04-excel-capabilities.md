@@ -54,7 +54,7 @@ Research basis:
   Excel analysis workflow and are present in the stable Excel.js object model.
   v1 limits PivotTables to normal range/table sources and non-preview APIs.
 
-The refined v1 target is 38 tools. The original 20-tool core covered workbook
+The refined v1 target is 37 tools. The original 20-tool core covered workbook
 orientation, worksheet lifecycle, range work, formulas, formatting, data
 operations, tables, charts, and PivotTables. The workbook owner now also covers
 stable persistence/calculation tasks, named-item lifecycle, and document
@@ -75,7 +75,10 @@ dropdowns and input constraints are range-owned metadata with typed rule
 validation and readback needs before mutation. The Range owner now also covers
 `excel.copy_range` because copy/autofill workflows must preserve formulas,
 formats, relative references, and host fill semantics that cannot be safely
-emulated through client-side read/write loops. The
+emulated through client-side read/write loops. The separate
+`excel.get_used_range` tool is superseded by omitted-address `excel.read_range`
+with `metadata_only: true`, keeping used-range discovery on the Range read owner
+instead of spending a separate schema slot on one Office.js property. The
 Format owner now also covers conditional formatting because rule-based visual
 formatting has a distinct lifecycle from static one-shot range formatting while
 still sharing the cell-format permission profile. The Shapes owner now covers
@@ -138,7 +141,7 @@ Core tool selection matrix:
 | User workflow | Object owner | v1 tools | Why this is enough |
 |---|---|---|---|
 | Inspect, persist, calculate, address workbook state, and manage workbook metadata; navigate sheets | `Workbook` / `Workbook.names` / `Workbook.properties` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.get_document_properties`, `excel.update_document_properties`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, worksheet view state, workbook orientation, style-name discovery, persistence, formula recalculation, template-stable named item addressing, and workbook core/custom document metadata without reading cell contents. |
-| Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; insertion and delete-with-shift are the structural Range pair, and hyperlink/data-validation/copy/autofill workflows need typed validation while staying range-owned. |
+| Locate and mutate cell data | `Range` | `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; omitted-address `excel.read_range` owns used-range location and metadata-only reads; insertion and delete-with-shift are the structural Range pair, and hyperlink/data-validation/copy/autofill workflows need typed validation while staying range-owned. |
 | Work with formulas | `Range` formulas | `excel.set_formula` | Formula writes are distinct from literal value writes and can support scalar or matrix input. |
 | Apply user-visible cell formatting | `RangeFormat` / `Range` style, merge, and conditional format APIs | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | Keeps static cell formatting in `excel.format_range` and rule-based conditional formatting in a dedicated list/update owner so agents can inspect, add, delete, and clear rules without duplicating value or table tools. |
 | Sort and filter data | `RangeSort` / table filter owners | `excel.sort_range`, `excel.apply_filter` | One data-operation owner covers both plain ranges and table bodies; table tools must not duplicate it. |
@@ -154,7 +157,7 @@ Final v1 tool set by category:
 |---|---|---:|---|
 | Workbook | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.get_document_properties`, `excel.update_document_properties` | 7 | Inspect workbook-level state, persist changes, recalculate formulas, manage named ranges/items, and read or update workbook metadata without reading cell contents. |
 | Worksheet | `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | 4 | Sheet inventory, lifecycle, and worksheet view state. |
-| Range / cell data | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | 9 | Locate, read, write, insert, clear/delete, search, manage cell hyperlinks and validation rules, and copy/autofill ranges. |
+| Range / cell data | `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | 8 | Locate, read, write, insert, clear/delete, search, manage cell hyperlinks and validation rules, and copy/autofill ranges. |
 | Formula | `excel.set_formula` | 1 | Author formulas distinctly from literal value writes. |
 | Format | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | 3 | Apply static cell formatting and manage rule-based conditional formatting. |
 | Data operations | `excel.sort_range`, `excel.apply_filter` | 2 | Sort and filter plain ranges or table bodies. |
@@ -164,7 +167,7 @@ Final v1 tool set by category:
 | Shapes | `excel.insert_image`, `excel.list_shapes`, `excel.update_shape` | 3 | Insert images and inspect or update floating worksheet shapes. |
 | Review | `excel.add_comment`, `excel.list_comments`, `excel.update_comment` | 3 | Create, inspect, reply to, resolve, reopen, edit, and delete threaded cell comments. |
 
-Total: 38 tools.
+Total: 37 tools.
 
 Rejected tool families for v1:
 
@@ -201,8 +204,7 @@ Implemented Excel v1 tools:
 | `excel.add_sheet` | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
 | `excel.update_sheet` | edit | `ExcelApi 1.1`; freeze panes require `ExcelApi 1.7`; gridlines/headings require `ExcelApi 1.8` | Rename, activate, move, set visibility, set tab color, freeze/unfreeze panes, or set worksheet view flags. |
 | `excel.delete_sheet` | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
-| `excel.get_used_range` | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet. |
-| `excel.read_range` | read | `ExcelApi 1.1`; hyperlink readback requires `ExcelApi 1.7`; data-validation readback requires `ExcelApi 1.8` | Read values, display text, dimensions, number format, and optional hyperlink and data-validation metadata for a range. |
+| `excel.read_range` | read | `ExcelApi 1.1`; empty used-range detection requires `ExcelApi 1.4`; hyperlink readback requires `ExcelApi 1.7`; data-validation readback requires `ExcelApi 1.8` | Read used-range metadata, values, display text, dimensions, number format, and optional hyperlink and data-validation metadata for a range. |
 | `excel.write_range` | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
 | `excel.insert_range` | edit | `ExcelApi 1.1` | Insert cells, rows, or columns and shift existing content down or right. |
 | `excel.clear_range` | destructive | `ExcelApi 1.1` | Clear contents, formats, all range data, or delete cells with a shift direction. |
@@ -247,8 +249,7 @@ Target core Excel tool surface:
 | `excel.add_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
 | `excel.update_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1`; freeze panes require `ExcelApi 1.7`; gridlines/headings require `ExcelApi 1.8` | Rename, activate, move, set visibility, set tab color, freeze/unfreeze panes, or set worksheet view flags. |
 | `excel.delete_sheet` | implemented | Worksheet | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
-| `excel.get_used_range` | implemented | Range | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet; cell values/text/formulas belong to `excel.read_range`. |
-| `excel.read_range` | implemented | Range | read | `ExcelApi 1.1`; hyperlink readback requires `ExcelApi 1.7`; data-validation readback requires `ExcelApi 1.8` | Read values, display text, formulas, dimensions, number format, and optional hyperlink and data-validation metadata for an explicit range. |
+| `excel.read_range` | implemented | Range | read | `ExcelApi 1.1`; empty used-range detection requires `ExcelApi 1.4`; hyperlink readback requires `ExcelApi 1.7`; data-validation readback requires `ExcelApi 1.8` | Read used-range metadata, values, display text, formulas, dimensions, number format, and optional hyperlink and data-validation metadata for an explicit or omitted address. |
 | `excel.write_range` | implemented | Range | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
 | `excel.insert_range` | implemented | Range | edit | `ExcelApi 1.1` | Insert cells, whole rows, or whole columns from a range address, shifting existing content down or right. |
 | `excel.clear_range` | implemented | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, or all range data; optional cell deletion with shift direction. Hyperlink-only clearing belongs to `excel.set_hyperlink`. |
@@ -277,7 +278,7 @@ Target core Excel tool surface:
 
 The tools above are the Excel v1 contract. Implementation work must keep
 the daemon catalog, MCP `tools/list`, Excel task pane `available_tools`, task
-pane permission grouping, documentation, and tests aligned with this 38-tool
+pane permission grouping, documentation, and tests aligned with this 37-tool
 surface. Before implementing or changing a tool, verify its minimum requirement
 set against `@types/office-js` and Microsoft API docs, then land the change as a
 test-first implementation slice with daemon catalog coverage, task pane
@@ -327,10 +328,15 @@ Tool ownership rules:
   last save time; and custom property upsert/delete. Metadata values are
   workbook-authored content and MUST be returned with `untrusted_source: true`.
   Read-only fields are intentionally absent from the update schema.
-- `excel.get_used_range` locates the occupied sheet area. It does not return
-  cell contents; callers use `excel.read_range` for values, text, formulas, and
-  number formats.
-- Range tools that accept `address` (`excel.get_used_range` excluded) may accept
+- `excel.read_range` owns both occupied-area discovery and range content reads.
+  When `address` is omitted, it resolves the active or named worksheet's used
+  range. `metadata_only: true` returns only `{ address, row_count,
+  column_count, empty }` and MUST NOT load value, text, formula, number-format,
+  hyperlink, or validation matrices. Empty worksheets return `{ empty: true,
+  address: null, row_count: 0, column_count: 0 }` without surfacing a host
+  range error. Content-bearing responses keep `untrusted_source: true`; pure
+  metadata responses MAY omit it.
+- Range tools that accept `address` may accept
   a named item as an address. If an address is not parsed by `Worksheet.getRange`,
   the task pane resolves it through workbook names and then worksheet names where
   a sheet scope is provided. Unknown or non-range named items fail with
@@ -511,6 +517,8 @@ Arguments:
   "session_id": "excel-session-id",
   "sheet": "Sheet1",
   "address": "A1:B2",
+  "metadata_only": false,
+  "values_only": false,
   "include_hyperlinks": false,
   "include_validation": false
 }
@@ -530,6 +538,27 @@ Returns:
 }
 ```
 
+`address` is optional. When omitted, the tool reads the active or named sheet's
+used range. Empty worksheets return:
+
+```json
+{
+  "address": null,
+  "row_count": 0,
+  "column_count": 0,
+  "empty": true
+}
+```
+
+`metadata_only` defaults to `false`. When `true`, the response is limited to
+`address`, `row_count`, `column_count`, and `empty`; the add-in MUST NOT load
+value, text, formula, number-format, hyperlink, or data-validation matrices.
+This is the replacement for the superseded `excel.get_used_range` contract and
+preserves the locate-without-reading-contents privacy and payload property.
+`values_only` defaults to `false`. When `true`, the response may skip display
+text and number-format matrices while still returning cell values and range
+dimensions. `values_only` is ignored for `metadata_only` responses.
+
 `include_hyperlinks` defaults to `false`. When `true`, the response includes a
 `hyperlinks` matrix with the same shape as `values`; each cell is either `null`
 or `{ "url", "document_reference", "text_to_display", "screen_tip" }`.
@@ -537,9 +566,20 @@ Hyperlink readback requires `ExcelApi 1.7`. `include_validation` defaults to
 `false`. When `true`, the response includes a `validation` object for the
 target range with `{ "type", "rule_summary", "ignore_blanks", "valid" }` when
 the host exposes those fields. Data-validation readback requires
-`ExcelApi 1.8`. `untrusted_source` is always `true` because workbook content,
-including hyperlink URLs, display text, validation formulas, and validation
-messages, may contain prompt injection text.
+`ExcelApi 1.8`. Content-bearing responses always include
+`untrusted_source: true` because workbook content, including hyperlink URLs,
+display text, validation formulas, and validation messages, may contain prompt
+injection text. Metadata-only used-range responses may omit it because
+addresses and dimensions are not workbook-authored cell content.
+
+### 3.1.1 Superseded compatibility: `excel.get_used_range`
+
+Superseded compatibility contract. This tool is no longer advertised in the
+daemon catalog, MCP `tools/list`, Excel task pane `available_tools`, or Excel
+task pane permission groups. Callers use `excel.read_range` with omitted
+`address` and `metadata_only: true` instead. Compatibility tests must prove the
+old tool is absent from advertised surfaces and that the used-range resource
+forwards to the replacement `excel.read_range` arguments.
 
 ### 3.2 `excel.write_range`
 
@@ -1149,7 +1189,7 @@ Planned tools should keep contracts coarse and workflow-oriented:
 |---|---|---|
 | `office://excel/{session_id}/workbook` | `excel.get_workbook_info` | Workbook metadata and active sheet orientation. |
 | `office://excel/{session_id}/sheets` | `excel.list_sheets` | Worksheet inventory. |
-| `office://excel/{session_id}/used-range{?sheet}` | `excel.get_used_range` | Used range address and dimensions for the active or named sheet. |
+| `office://excel/{session_id}/used-range{?sheet}` | `excel.read_range` with omitted `address` and `metadata_only: true` | Used range address and dimensions for the active or named sheet. |
 | `office://excel/{session_id}/range/{address}{?sheet}` | `excel.read_range` | Values, display text, formulas, dimensions, and number formats for an explicit range. |
 
 The fallback is intentionally read-only. Workbook mutation, formulas, table
