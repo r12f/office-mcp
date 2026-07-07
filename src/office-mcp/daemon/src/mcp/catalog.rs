@@ -778,9 +778,7 @@ fn examples_for_tool(tool: &str) -> Vec<Value> {
         "word.get_document_properties"
         | "word.update_document_properties"
         | "excel.get_document_properties"
-        | "excel.update_document_properties" => {
-            document_property_examples_for_tool(tool)
-        }
+        | "excel.update_document_properties" => document_property_examples_for_tool(tool),
         "word.update_table" => vec![json!({
             "description": "Merge the first row across two columns after validating table bounds.",
             "arguments": {

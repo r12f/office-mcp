@@ -226,8 +226,8 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(update_named_item.category, "Workbook");
     assert_eq!(update_named_item.side_effect, ToolSideEffect::Destructive);
 
-    let get_document_properties = tool_metadata("excel.get_document_properties")
-        .expect("excel document properties metadata");
+    let get_document_properties =
+        tool_metadata("excel.get_document_properties").expect("excel document properties metadata");
     assert_eq!(get_document_properties.app, "excel");
     assert_eq!(get_document_properties.category, "Workbook");
     assert_eq!(get_document_properties.side_effect, ToolSideEffect::Read);
