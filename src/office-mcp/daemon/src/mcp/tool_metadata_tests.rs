@@ -241,6 +241,16 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
         ToolSideEffect::Mutating
     );
 
+    let list_sheets = tool_metadata("excel.list_sheets").expect("excel sheet list metadata");
+    assert_eq!(list_sheets.app, "excel");
+    assert_eq!(list_sheets.category, "Worksheet");
+    assert_eq!(list_sheets.side_effect, ToolSideEffect::Read);
+
+    let update_sheet = tool_metadata("excel.update_sheet").expect("excel sheet update metadata");
+    assert_eq!(update_sheet.app, "excel");
+    assert_eq!(update_sheet.category, "Worksheet");
+    assert_eq!(update_sheet.side_effect, ToolSideEffect::Mutating);
+
     let add_comment = tool_metadata("excel.add_comment").expect("excel add comment metadata");
     assert_eq!(add_comment.app, "excel");
     assert_eq!(add_comment.category, "Review");

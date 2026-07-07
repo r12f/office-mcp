@@ -1805,6 +1805,58 @@ fn excel_data_validation_schemas_are_specific() {
 }
 
 #[test]
+fn excel_sheet_view_state_schema_is_specific() {
+    let list_sheets = schema_for("excel.list_sheets");
+    assert_required(&list_sheets, &["session_id"]);
+
+    let update_sheet = schema_for("excel.update_sheet");
+    assert_required(&update_sheet, &["session_id", "sheet"]);
+    assert_eq!(update_sheet["properties"]["freeze"]["type"], "object");
+    assert_eq!(
+        update_sheet["properties"]["freeze"]["properties"]["rows"]["minimum"],
+        0
+    );
+    assert_eq!(
+        update_sheet["properties"]["freeze"]["properties"]["columns"]["minimum"],
+        0
+    );
+    assert_eq!(
+        update_sheet["properties"]["freeze"]["properties"]["at"]["type"],
+        "string"
+    );
+    assert_eq!(
+        update_sheet["properties"]["freeze"]["properties"]["unfreeze"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        update_sheet["properties"]["freeze"]["additionalProperties"],
+        false
+    );
+    assert_eq!(
+        update_sheet["properties"]["show_gridlines"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        update_sheet["properties"]["show_headings"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        update_sheet["properties"]["validate_only"]["type"],
+        "boolean"
+    );
+
+    let update_tool = tool_for("excel.update_sheet");
+    assert_eq!(
+        update_tool["_meta"]["com.office-mcp/side_effects"],
+        "mutating"
+    );
+    assert_eq!(
+        update_tool["_meta"]["com.office-mcp/supports_validate_only"],
+        true
+    );
+}
+
+#[test]
 fn excel_copy_range_schema_is_specific() {
     let copy_range = schema_for("excel.copy_range");
     assert_required(&copy_range, &["session_id", "action"]);

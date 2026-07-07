@@ -2022,6 +2022,11 @@ Data validation is in scope as a Range follow-up because in-cell dropdowns and
 input constraints are stable `ExcelApi 1.8` range metadata, need typed
 validation before mutation, and require readback before agents overwrite or
 clear existing workbook rules.
+Worksheet view state is in scope as an extension of the existing Worksheet
+owner rather than a new tool: freeze panes, gridline visibility, and heading
+visibility are `Worksheet` state, so `excel.update_sheet` mutates them and
+`excel.list_sheets` reads them back. Freeze panes require `ExcelApi 1.7`;
+gridlines and headings require `ExcelApi 1.8`.
 
 Target catalog: `excel.get_workbook_info`, `excel.save`, `excel.calculate`,
 `excel.list_named_items`, `excel.update_named_item`, `excel.list_sheets`,
@@ -2050,11 +2055,13 @@ The #111 follow-up adds `excel.insert_image`, `excel.list_shapes`, and
 The #112 follow-up adds `excel.get_document_properties` and
 `excel.update_document_properties` as Workbook metadata tools for core and
 custom document properties.
+The #113 follow-up extends `excel.update_sheet` and `excel.list_sheets` with
+worksheet view-state controls without adding a new public tool.
 
 The 38 tools are grouped as: Workbook 7, Worksheet 4, Range/cell data 9,
 Formula 1, Format 3, Data operations 2, Table 2, Chart 2, PivotTable 2,
 Shapes 3, and Review 3. This is the current v1 upper bound. Rejected v1
-expansions include separate cell CRUD, worksheet formatting, freeze panes,
+expansions include separate cell CRUD, worksheet formatting, separate freeze-pane tools,
 protection, legacy notes, slicers, event subscriptions, bindings, custom XML,
 external data, Power Query, workbook import/export, save-as/close, and
 method-level table, chart, PivotTable, or shape tools that duplicate an
@@ -2083,6 +2090,13 @@ existing owner tool.
       read/write coverage for writable core fields plus custom property
       upsert/delete. The contract must match the Word document-property field
       names where Excel supports the same metadata.
+- [ ] Implement worksheet view-state slice by extending `excel.update_sheet`
+      and `excel.list_sheets`, including daemon catalog entries, task pane
+      handlers, validate-only support, Worksheet permission metadata, Rust/JS
+      tests, freeze rows/columns/at/unfreeze coverage, deterministic rejection
+      for mutually exclusive freeze arguments, and per-field host gating.
+      Freeze panes require `ExcelApi 1.7`; gridlines and headings require
+      `ExcelApi 1.8`.
 - [ ] Implement threaded comment slice: `excel.add_comment`,
       `excel.list_comments`, and `excel.update_comment`, including daemon
       catalog entries, task pane handlers, validate-only support, Review

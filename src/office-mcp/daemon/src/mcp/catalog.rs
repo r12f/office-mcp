@@ -1770,7 +1770,10 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
             "position",
             "visibility",
             "tab_color",
-            "activate"
+            "activate",
+            "freeze",
+            "show_gridlines",
+            "show_headings"
         ]
     ),
     tool_spec!(
@@ -2624,7 +2627,24 @@ fn word_list_property_schema(tool: &str, name: &str) -> Option<Value> {
 fn excel_property_schema(tool: &str, name: &str) -> Option<Value> {
     document_property_schema(tool, name)
         .or_else(|| excel_workbook_property_schema(tool, name))
+        .or_else(|| excel_sheet_property_schema(tool, name))
         .or_else(|| excel_shape_property_schema(tool, name))
+}
+
+fn excel_sheet_property_schema(tool: &str, name: &str) -> Option<Value> {
+    if tool != "excel.update_sheet" || name != "freeze" {
+        return None;
+    }
+    Some(json!({
+        "type": "object",
+        "properties": {
+            "rows": { "type": "integer", "minimum": 0 },
+            "columns": { "type": "integer", "minimum": 0 },
+            "at": { "type": "string" },
+            "unfreeze": { "type": "boolean" }
+        },
+        "additionalProperties": false
+    }))
 }
 
 fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
@@ -3103,6 +3123,8 @@ fn generic_property_schema(name: &str) -> Option<Value> {
         | "hidden_columns"
         | "hidden_rows"
         | "show_headers"
+        | "show_gridlines"
+        | "show_headings"
         | "show_totals"
         | "highlight_first_column"
         | "highlight_last_column"

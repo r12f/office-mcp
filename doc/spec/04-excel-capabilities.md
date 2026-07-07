@@ -137,7 +137,7 @@ Core tool selection matrix:
 
 | User workflow | Object owner | v1 tools | Why this is enough |
 |---|---|---|---|
-| Inspect, persist, calculate, address workbook state, and manage workbook metadata; navigate sheets | `Workbook` / `Workbook.names` / `Workbook.properties` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.get_document_properties`, `excel.update_document_properties`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, workbook orientation, style-name discovery, persistence, formula recalculation, template-stable named item addressing, and workbook core/custom document metadata without reading cell contents. |
+| Inspect, persist, calculate, address workbook state, and manage workbook metadata; navigate sheets | `Workbook` / `Workbook.names` / `Workbook.properties` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.get_document_properties`, `excel.update_document_properties`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, worksheet view state, workbook orientation, style-name discovery, persistence, formula recalculation, template-stable named item addressing, and workbook core/custom document metadata without reading cell contents. |
 | Locate and mutate cell data | `Range` | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; insertion and delete-with-shift are the structural Range pair, and hyperlink/data-validation/copy/autofill workflows need typed validation while staying range-owned. |
 | Work with formulas | `Range` formulas | `excel.set_formula` | Formula writes are distinct from literal value writes and can support scalar or matrix input. |
 | Apply user-visible cell formatting | `RangeFormat` / `Range` style, merge, and conditional format APIs | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | Keeps static cell formatting in `excel.format_range` and rule-based conditional formatting in a dedicated list/update owner so agents can inspect, add, delete, and clear rules without duplicating value or table tools. |
@@ -153,7 +153,7 @@ Final v1 tool set by category:
 | Category | Tools | Count | User intent |
 |---|---|---:|---|
 | Workbook | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.get_document_properties`, `excel.update_document_properties` | 7 | Inspect workbook-level state, persist changes, recalculate formulas, manage named ranges/items, and read or update workbook metadata without reading cell contents. |
-| Worksheet | `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | 4 | Sheet inventory and lifecycle. |
+| Worksheet | `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | 4 | Sheet inventory, lifecycle, and worksheet view state. |
 | Range / cell data | `excel.get_used_range`, `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | 9 | Locate, read, write, insert, clear/delete, search, manage cell hyperlinks and validation rules, and copy/autofill ranges. |
 | Formula | `excel.set_formula` | 1 | Author formulas distinctly from literal value writes. |
 | Format | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | 3 | Apply static cell formatting and manage rule-based conditional formatting. |
@@ -174,7 +174,10 @@ Rejected tool families for v1:
   event, binding, custom XML, external connection,
   Power Query, workbook import/export, save-as, or close tools. `excel.save`
   intentionally persists the current workbook through host save behavior only;
-  it does not expose save-as, export, prompt, path, or close semantics.
+  it does not expose save-as, export, prompt, path, or close semantics. Freeze
+  panes, gridline visibility, and heading visibility are worksheet view state
+  owned by `excel.update_sheet` and read back through `excel.list_sheets`, not
+  separate tool families.
 - No separate table row, table column, table style, table sort, or table filter
   tools. Table structure/options belong to `excel.update_table`; table data,
   sort, and filter behavior belongs to range/data tools.
@@ -194,9 +197,9 @@ Implemented Excel v1 tools:
 | `excel.update_named_item` | edit/destructive | `ExcelApi 1.4`; editing formulas requires `ExcelApi 1.7` | Add, edit, or delete workbook/sheet scoped named items. |
 | `excel.get_document_properties` | read | `ExcelApi 1.7` | Read workbook core document properties, read-only metadata, and optional custom properties. |
 | `excel.update_document_properties` | edit | `ExcelApi 1.7` | Update writable workbook core document properties and upsert or delete custom properties. |
-| `excel.list_sheets` | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state. |
+| `excel.list_sheets` | read | `ExcelApi 1.1`; freeze panes require `ExcelApi 1.7`; gridlines/headings require `ExcelApi 1.8` | List worksheets with id, name, position, visibility, tab color, active state, and optional view state. |
 | `excel.add_sheet` | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
-| `excel.update_sheet` | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
+| `excel.update_sheet` | edit | `ExcelApi 1.1`; freeze panes require `ExcelApi 1.7`; gridlines/headings require `ExcelApi 1.8` | Rename, activate, move, set visibility, set tab color, freeze/unfreeze panes, or set worksheet view flags. |
 | `excel.delete_sheet` | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
 | `excel.get_used_range` | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet. |
 | `excel.read_range` | read | `ExcelApi 1.1`; hyperlink readback requires `ExcelApi 1.7`; data-validation readback requires `ExcelApi 1.8` | Read values, display text, dimensions, number format, and optional hyperlink and data-validation metadata for a range. |
@@ -240,9 +243,9 @@ Target core Excel tool surface:
 | `excel.update_named_item` | implemented | Workbook | edit/destructive | `ExcelApi 1.4`; editing formulas requires `ExcelApi 1.7` | Add, edit, or delete named items. Duplicate adds and unknown edit/delete targets fail deterministically before mutation. |
 | `excel.get_document_properties` | implemented | Workbook | read | `ExcelApi 1.7` | Read workbook core document properties, read-only metadata, and optional custom properties. |
 | `excel.update_document_properties` | implemented | Workbook | edit | `ExcelApi 1.7` | Update writable workbook core document properties and upsert or delete custom properties. |
-| `excel.list_sheets` | implemented | Worksheet | read | `ExcelApi 1.1` | List worksheets with id, name, position, visibility, tab color, and active state; workbook metadata belongs to `excel.get_workbook_info`. |
+| `excel.list_sheets` | implemented | Worksheet | read | `ExcelApi 1.1`; freeze panes require `ExcelApi 1.7`; gridlines/headings require `ExcelApi 1.8` | List worksheets with id, name, position, visibility, tab color, active state, and optional view state; workbook metadata belongs to `excel.get_workbook_info`. |
 | `excel.add_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Add a worksheet and optionally activate it. |
-| `excel.update_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1` | Rename, activate, move, set visibility, and set tab color for a worksheet. |
+| `excel.update_sheet` | implemented | Worksheet | edit | `ExcelApi 1.1`; freeze panes require `ExcelApi 1.7`; gridlines/headings require `ExcelApi 1.8` | Rename, activate, move, set visibility, set tab color, freeze/unfreeze panes, or set worksheet view flags. |
 | `excel.delete_sheet` | implemented | Worksheet | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
 | `excel.get_used_range` | implemented | Range | read | `ExcelApi 1.1` | Return the used range address and dimensions for a sheet; cell values/text/formulas belong to `excel.read_range`. |
 | `excel.read_range` | implemented | Range | read | `ExcelApi 1.1`; hyperlink readback requires `ExcelApi 1.7`; data-validation readback requires `ExcelApi 1.8` | Read values, display text, formulas, dimensions, number format, and optional hyperlink and data-validation metadata for an explicit range. |
@@ -298,6 +301,15 @@ Tool ownership rules:
 - `excel.get_workbook_info` is workbook state only. It may include the active
   sheet id/name for orientation, but the worksheet list belongs to
   `excel.list_sheets`.
+- `excel.list_sheets` and `excel.update_sheet` own worksheet view state.
+  `excel.list_sheets` returns `frozen` when `ExcelApi 1.7` is available and
+  `show_gridlines` / `show_headings` when `ExcelApi 1.8` is available.
+  `excel.update_sheet.freeze` accepts exactly one freeze mode: `rows`,
+  `columns`, `at`, or `unfreeze`. Combining modes fails with
+  `INVALID_ARGUMENT` and `partial_effect: "none"`. A rows+columns freeze is
+  represented by `freeze.at` at the cell below and to the right of the frozen
+  panes. Unsupported per-field host APIs fail with `HOST_CAPABILITY_UNAVAILABLE`
+  before mutation.
 - `excel.save` is the workbook persistence owner. It calls the host save
   behavior for the current workbook only and must not accept path, format,
   prompt, export, save-as, or close options.

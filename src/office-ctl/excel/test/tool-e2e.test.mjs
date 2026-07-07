@@ -166,15 +166,31 @@ const EXCEL_E2E_CASES = Object.fromEntries([
   ['excel.update_sheet', {
     setup: {
       actions: [
-        { tool: 'excel.add_sheet', arguments: { name: 'Sheet To Rename' } }
+        { tool: 'excel.add_sheet', arguments: { name: 'Sheet To Rename' } },
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet To Rename', address: 'A1:C3', values: [['Header', 'One', 'Two'], ['Row', 1, 2], ['Row', 3, 4]] } }
       ]
     },
-    args: { sheet: 'Sheet To Rename', name: 'Renamed Sheet' },
+    args: { sheet: 'Sheet To Rename', name: 'Renamed Sheet', freeze: { rows: 1 }, show_gridlines: false, show_headings: false },
     verify: {
       kind: 'readback',
       readbackTool: 'excel.list_sheets',
       readbackArguments: {},
-      expect: { contains: ['Renamed Sheet'], notContains: ['Sheet To Rename'] }
+      expect: {
+        contains: ['Renamed Sheet', 'A2'],
+        notContains: ['Sheet To Rename'],
+        pathEquals: [
+          { path: 'sheets.1.frozen.rows', value: 1 },
+          { path: 'sheets.1.frozen.columns', value: 0 },
+          { path: 'sheets.1.show_gridlines', value: false },
+          { path: 'sheets.1.show_headings', value: false }
+        ]
+      }
+    },
+    cleanup: {
+      actions: [
+        { tool: 'excel.update_sheet', arguments: { sheet: 'Renamed Sheet', freeze: { unfreeze: true }, show_gridlines: true, show_headings: true } },
+        { tool: 'excel.update_sheet', arguments: { sheet: 'Renamed Sheet', freeze: { at: 'B3' } } }
+      ]
     }
   }],
   ['excel.delete_sheet', {
