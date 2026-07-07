@@ -135,8 +135,8 @@ fn excel_resource_request_from_uri(
         }),
         [_, "used-range"] => Ok(ResourceReadRequest::Forwarded {
             uri: uri.to_string(),
-            tool: "excel.get_used_range",
-            arguments: excel_arguments_with_optional_sheet(session_id, query),
+            tool: "excel.read_range",
+            arguments: excel_used_range_arguments(session_id, query),
             check_capability: true,
         }),
         [_, "range", address] => {
@@ -227,6 +227,12 @@ fn excel_arguments_with_optional_sheet(session_id: &str, query: &str) -> Value {
     if let Some(sheet) = query_param_string(query, "sheet") {
         arguments["sheet"] = json!(sheet);
     }
+    arguments
+}
+
+fn excel_used_range_arguments(session_id: &str, query: &str) -> Value {
+    let mut arguments = excel_arguments_with_optional_sheet(session_id, query);
+    arguments["metadata_only"] = json!(true);
     arguments
 }
 

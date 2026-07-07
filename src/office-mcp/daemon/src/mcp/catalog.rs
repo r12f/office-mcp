@@ -79,7 +79,6 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.find_replace_cells",
     "excel.format_range",
     "excel.list_conditional_formats",
-    "excel.get_used_range",
     "excel.get_workbook_info",
     "excel.insert_image",
     "excel.insert_range",
@@ -1782,17 +1781,14 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "sheet"]
     ),
     tool_spec!(
-        "excel.get_used_range",
-        ["session_id"],
-        ["session_id", "sheet", "values_only"]
-    ),
-    tool_spec!(
         "excel.read_range",
-        ["session_id", "address"],
+        ["session_id"],
         [
             "session_id",
             "sheet",
             "address",
+            "metadata_only",
+            "values_only",
             "include_formulas",
             "include_formatting",
             "include_hyperlinks",
@@ -3116,6 +3112,7 @@ fn generic_property_schema(name: &str) -> Option<Value> {
         | "all"
         | "activate"
         | "has_headers"
+        | "metadata_only"
         | "values_only"
         | "complete_match"
         | "autofit"
