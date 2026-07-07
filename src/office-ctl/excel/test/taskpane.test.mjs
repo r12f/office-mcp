@@ -324,6 +324,17 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /async function listSheets/);
   assert.match(js, /async function updateSheet/);
   assert.match(js, /async function deleteSheet/);
+  assert.match(js, /worksheet\.freezePanes\.getLocationOrNullObject\(\)/);
+  assert.match(js, /freezePanes\.freezeRows\(Number\(freeze\.rows\)\)/);
+  assert.match(js, /freezePanes\.freezeColumns\(Number\(freeze\.columns\)\)/);
+  assert.match(js, /freezePanes\.freezeAt\(worksheet\.getRange\(requiredNonEmptyString\(freeze\.at/);
+  assert.match(js, /freezePanes\.unfreeze\(\)/);
+  assert.match(js, /worksheet\.showGridlines = Boolean\(args\.show_gridlines\)/);
+  assert.match(js, /worksheet\.showHeadings = Boolean\(args\.show_headings\)/);
+  assert.match(js, /requireRequirementSet\('ExcelApi', '1\.7', 'worksheet freeze panes'\)/);
+  assert.match(js, /requireRequirementSet\('ExcelApi', '1\.8', 'worksheet view flags'\)/);
+  assert.match(js, /function validateSheetViewArgs\(args\)/);
+  assert.match(js, /function sheetFrozenState\(freezeRange\)/);
   assert.match(js, /async function getUsedRange/);
   assert.match(js, /async function insertRange/);
   assert.match(js, /async function clearRange/);

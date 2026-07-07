@@ -177,6 +177,35 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['Renamed Sheet'], notContains: ['Sheet To Rename'] }
     }
   }],
+  ['excel.update_sheet', {
+    setup: {
+      actions: [
+        { tool: 'excel.add_sheet', arguments: { name: 'View State Sheet' } },
+        { tool: 'excel.write_range', arguments: { sheet: 'View State Sheet', address: 'A1:C3', values: [['Header', 'One', 'Two'], ['Row', 1, 2], ['Row', 3, 4]] } }
+      ]
+    },
+    args: { sheet: 'View State Sheet', freeze: { rows: 1 }, show_gridlines: false, show_headings: false },
+    verify: {
+      kind: 'readback',
+      readbackTool: 'excel.list_sheets',
+      readbackArguments: {},
+      expect: {
+        contains: ['View State Sheet', 'A2'],
+        pathEquals: [
+          { path: 'sheets.1.frozen.rows', value: 1 },
+          { path: 'sheets.1.frozen.columns', value: 0 },
+          { path: 'sheets.1.show_gridlines', value: false },
+          { path: 'sheets.1.show_headings', value: false }
+        ]
+      }
+    },
+    cleanup: {
+      actions: [
+        { tool: 'excel.update_sheet', arguments: { sheet: 'View State Sheet', freeze: { unfreeze: true }, show_gridlines: true, show_headings: true } },
+        { tool: 'excel.update_sheet', arguments: { sheet: 'View State Sheet', freeze: { at: 'B3' } } }
+      ]
+    }
+  }],
   ['excel.delete_sheet', {
     setup: {
       actions: [
