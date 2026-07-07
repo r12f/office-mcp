@@ -776,8 +776,21 @@
       worksheets.load('items/id,items/name,items/position,items/visibility,items/tabColor');
       activeSheet.load('id');
       await context.sync();
+      const freezeRanges = [];
+      if (supportsRequirementSet('ExcelApi', '1.7')) {
+        for (const worksheet of worksheets.items) {
+          const freezeRange = worksheet.freezePanes.getLocationOrNullObject();
+          freezeRange.load('address,rowCount,columnCount,isNullObject');
+          freezeRanges.push(freezeRange);
+        }
+      }
+      const includeViewFlags = supportsRequirementSet('ExcelApi', '1.8');
+      if (includeViewFlags) {
+        for (const worksheet of worksheets.items) worksheet.load('showGridlines,showHeadings');
+      }
+      await context.sync();
       return {
-        sheets: worksheets.items.map((sheet) => sheetInfo(sheet, sheet.id === activeSheet.id))
+        sheets: worksheets.items.map((sheet, index) => sheetInfo(sheet, sheet.id === activeSheet.id, freezeRanges[index] || null, includeViewFlags))
       };
     });
   }
@@ -964,6 +977,7 @@
 
   async function updateSheet(args) {
     const sheet = requiredString(args, 'sheet', 'excel.update_sheet requires sheet.');
+    validateSheetViewArgs(args);
     return Excel.run(async (context) => {
       const worksheets = context.workbook.worksheets;
       const worksheet = worksheets.getItem(sheet);
@@ -971,11 +985,18 @@
       if (renamedTo) worksheet.name = renamedTo;
       if (args.visibility) worksheet.visibility = String(args.visibility);
       if (args.tab_color) worksheet.tabColor = String(args.tab_color);
+      if (args.freeze !== undefined) applySheetFreeze(worksheet, args.freeze);
+      if (args.show_gridlines !== undefined) worksheet.showGridlines = Boolean(args.show_gridlines);
+      if (args.show_headings !== undefined) worksheet.showHeadings = Boolean(args.show_headings);
       if (Number.isInteger(args.position)) worksheet.position = args.position;
       if (args.activate === true) worksheet.activate();
       worksheet.load('id,name,position,visibility,tabColor');
+      const includeViewFlags = supportsRequirementSet('ExcelApi', '1.8');
+      if (includeViewFlags) worksheet.load('showGridlines,showHeadings');
+      const freezeRange = supportsRequirementSet('ExcelApi', '1.7') ? worksheet.freezePanes.getLocationOrNullObject() : null;
+      if (freezeRange) freezeRange.load('address,rowCount,columnCount,isNullObject');
       await context.sync();
-      return { sheet: sheetInfo(worksheet, args.activate === true), updated: true };
+      return { sheet: sheetInfo(worksheet, args.activate === true, freezeRange, includeViewFlags), updated: true };
     });
   }
 
@@ -1630,6 +1651,48 @@
       : context.workbook.worksheets.getActiveWorksheet();
   }
 
+  function validateSheetViewArgs(args) {
+    if (args.freeze !== undefined) {
+      requireRequirementSet('ExcelApi', '1.7', 'worksheet freeze panes');
+      if (!args.freeze || typeof args.freeze !== 'object' || Array.isArray(args.freeze)) {
+        throw Object.assign(new Error('excel.update_sheet freeze must be an object.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      const freeze = args.freeze;
+      const modes = ['rows', 'columns', 'at', 'unfreeze'].filter((key) => freeze[key] !== undefined);
+      if (modes.length !== 1) {
+        throw Object.assign(new Error('excel.update_sheet freeze requires exactly one of rows, columns, at, or unfreeze.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+      if (freeze.rows !== undefined) validateNonNegativeInteger(freeze.rows, 'excel.update_sheet freeze.rows');
+      if (freeze.columns !== undefined) validateNonNegativeInteger(freeze.columns, 'excel.update_sheet freeze.columns');
+      if (freeze.at !== undefined) requiredNonEmptyString(freeze.at, 'excel.update_sheet freeze.at must be a non-empty range address.');
+      if (freeze.unfreeze !== undefined && freeze.unfreeze !== true) {
+        throw Object.assign(new Error('excel.update_sheet freeze.unfreeze must be true when provided.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      }
+    }
+    if (args.show_gridlines !== undefined || args.show_headings !== undefined) {
+      requireRequirementSet('ExcelApi', '1.8', 'worksheet view flags');
+    }
+  }
+
+  function applySheetFreeze(worksheet, freeze) {
+    const freezePanes = worksheet.freezePanes;
+    if (freeze.unfreeze === true) {
+      freezePanes.unfreeze();
+    } else if (freeze.rows !== undefined) {
+      freezePanes.freezeRows(Number(freeze.rows));
+    } else if (freeze.columns !== undefined) {
+      freezePanes.freezeColumns(Number(freeze.columns));
+    } else if (freeze.at !== undefined) {
+      freezePanes.freezeAt(worksheet.getRange(requiredNonEmptyString(freeze.at, 'excel.update_sheet freeze.at must be a non-empty range address.')));
+    }
+  }
+
+  function validateNonNegativeInteger(value, label) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw Object.assign(new Error(`${label} must be a non-negative integer.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+  }
+
   function namedItemCollection(context, args, scope) {
     if (scope === 'sheet') return targetWorksheet(context, args).names;
     return context.workbook.names;
@@ -2089,8 +2152,8 @@
     return pivot.hierarchies.getItem(hierarchy).fields.getItem(field);
   }
 
-  function sheetInfo(sheet, active) {
-    return {
+  function sheetInfo(sheet, active, freezeRange = null, includeViewFlags = false) {
+    const info = {
       id: sheet.id || null,
       name: sheet.name,
       position: Number.isInteger(sheet.position) ? sheet.position : null,
@@ -2098,6 +2161,33 @@
       tab_color: sheet.tabColor || null,
       active: Boolean(active)
     };
+    const frozen = sheetFrozenState(freezeRange);
+    if (frozen) info.frozen = frozen;
+    if (includeViewFlags) {
+      info.show_gridlines = Boolean(sheet.showGridlines);
+      info.show_headings = Boolean(sheet.showHeadings);
+    }
+    return info;
+  }
+
+  function sheetFrozenState(freezeRange) {
+    if (!freezeRange || freezeRange.isNullObject) return null;
+    const address = String(freezeRange.address || '');
+    const localAddress = address.includes('!') ? address.split('!').pop() : address;
+    const startCell = localAddress.split(':')[0].replace(/['$]/g, '');
+    const match = /^([A-Za-z]+)(\d+)$/.exec(startCell);
+    if (!match) return { rows: null, columns: null, at: localAddress || null };
+    const columns = columnIndexFromLetters(match[1]);
+    const rows = Math.max(Number(match[2]) - 1, 0);
+    return { rows, columns, at: startCell.toUpperCase() };
+  }
+
+  function columnIndexFromLetters(letters) {
+    let value = 0;
+    for (const char of String(letters).toUpperCase()) {
+      value = value * 26 + (char.charCodeAt(0) - 64);
+    }
+    return Math.max(value - 1, 0);
   }
 
   function optionalTrimmedString(value) {
