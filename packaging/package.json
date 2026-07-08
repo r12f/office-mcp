@@ -1,6 +1,6 @@
 {
   "name": "office-mcp-packaging",
-  "version": "0.1.10",
+  "version": "0.1.12",
   "private": true,
   "type": "module",
   "description": "Packaging checks for office-mcp portable packages and release templates.",
