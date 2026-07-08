@@ -62,12 +62,14 @@ metadata. These cannot be represented by range or object-owner tools: saving
 the current workbook, forcing calculation, managing workbook/sheet scoped names
 that formulas and templates address indirectly, and reading or writing workbook
 properties that document-management workflows key off. The Review owner now
-covers threaded cell comments because comments are workbook review objects with a distinct
-permission profile from range content. The Range owner now also covers
-`excel.insert_range`, the non-destructive structural complement to
-`excel.clear_range` delete-with-shift, so agents can insert cells, rows, and
-columns without emulating that workflow through reads and writes. The Range
-owner now also covers `excel.set_hyperlink` because cell hyperlinks are visible
+covers threaded cell comments because comments are workbook review objects with a
+distinct permission profile from range content. The Range owner now requires one
+structural owner for both insertion and deletion with shift:
+`excel.update_range_structure` covers `Range.insert` and `Range.delete` so
+agents use one contract for making room or removing cells, rows, and columns.
+`excel.insert_range` is superseded by this owner, and `excel.clear_range` is
+narrowed back to pure non-structural clearing. The Range owner now also covers
+`excel.set_hyperlink` because cell hyperlinks are visible
 cell metadata that need URL security validation and hyperlink-only clearing that
 cannot be represented by generic value, formula, or formatting writes. The
 Range owner now also covers `excel.set_data_validation` because in-cell
@@ -117,9 +119,10 @@ file import/export, workbook close, and save-as flows. Workbook save and
 calculation are in scope because they are stable workbook-owner operations, not
 file export, save-as, or close workflows. Threaded comments are in scope as the
 Review follow-up surface; legacy notes remain deferred until ExcelApi 1.18 host
-coverage is verified. Range insertion is in scope as the structural complement
-to range deletion because `Range.insert` is stable in `ExcelApi 1.1` and owns a
-common cell/row/column workflow that cannot be represented by clearing. Cell
+coverage is verified. Range structure updates are in scope because
+`Range.insert` and `Range.delete` are stable in `ExcelApi 1.1` and form one
+cell/row/column workflow: insertion shifts existing cells down or right, while
+deletion shifts neighbors up or left. Cell
 layout controls such as merge/unmerge, fixed row or column size, row or column
 visibility, and named style application remain in scope as extensions of
 `excel.format_range` because they share the existing RangeFormat owner and
@@ -141,7 +144,7 @@ Core tool selection matrix:
 | User workflow | Object owner | v1 tools | Why this is enough |
 |---|---|---|---|
 | Inspect, persist, calculate, address workbook state, and manage workbook metadata; navigate sheets | `Workbook` / `Workbook.names` / `Workbook.properties` / `Worksheet` | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.get_document_properties`, `excel.update_document_properties`, `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | Covers workspace-level sheet CRUD, worksheet view state, workbook orientation, style-name discovery, persistence, formula recalculation, template-stable named item addressing, and workbook core/custom document metadata without reading cell contents. |
-| Locate and mutate cell data | `Range` | `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; omitted-address `excel.read_range` owns used-range location and metadata-only reads; insertion and delete-with-shift are the structural Range pair, and hyperlink/data-validation/copy/autofill workflows need typed validation while staying range-owned. |
+| Locate and mutate cell data | `Range` | `excel.read_range`, `excel.write_range`, `excel.update_range_structure`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | Cells are one-cell ranges, so separate cell CRUD would duplicate range tools; omitted-address `excel.read_range` owns used-range location and metadata-only reads; insert and delete-with-shift share one structural owner, and hyperlink/data-validation/copy/autofill workflows need typed validation while staying range-owned. |
 | Work with formulas | `Range` formulas | `excel.set_formula` | Formula writes are distinct from literal value writes and can support scalar or matrix input. |
 | Apply user-visible cell formatting | `RangeFormat` / `Range` style, merge, and conditional format APIs | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | Keeps static cell formatting in `excel.format_range` and rule-based conditional formatting in a dedicated list/update owner so agents can inspect, add, delete, and clear rules without duplicating value or table tools. |
 | Sort and filter data | `RangeSort` / table filter owners | `excel.sort_range`, `excel.apply_filter` | One data-operation owner covers both plain ranges and table bodies; table tools must not duplicate it. |
@@ -157,7 +160,7 @@ Final v1 tool set by category:
 |---|---|---:|---|
 | Workbook | `excel.get_workbook_info`, `excel.save`, `excel.calculate`, `excel.list_named_items`, `excel.update_named_item`, `excel.get_document_properties`, `excel.update_document_properties` | 7 | Inspect workbook-level state, persist changes, recalculate formulas, manage named ranges/items, and read or update workbook metadata without reading cell contents. |
 | Worksheet | `excel.list_sheets`, `excel.add_sheet`, `excel.update_sheet`, `excel.delete_sheet` | 4 | Sheet inventory, lifecycle, and worksheet view state. |
-| Range / cell data | `excel.read_range`, `excel.write_range`, `excel.insert_range`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | 8 | Locate, read, write, insert, clear/delete, search, manage cell hyperlinks and validation rules, and copy/autofill ranges. |
+| Range / cell data | `excel.read_range`, `excel.write_range`, `excel.update_range_structure`, `excel.clear_range`, `excel.find_replace_cells`, `excel.set_hyperlink`, `excel.set_data_validation`, `excel.copy_range` | 8 | Locate, read, write, insert/delete structure, clear contents or formatting, search, manage cell hyperlinks and validation rules, and copy/autofill ranges. |
 | Formula | `excel.set_formula` | 1 | Author formulas distinctly from literal value writes. |
 | Format | `excel.format_range`, `excel.list_conditional_formats`, `excel.update_conditional_format` | 3 | Apply static cell formatting and manage rule-based conditional formatting. |
 | Data operations | `excel.sort_range`, `excel.apply_filter` | 2 | Sort and filter plain ranges or table bodies. |
@@ -206,8 +209,8 @@ Implemented Excel v1 tools:
 | `excel.delete_sheet` | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
 | `excel.read_range` | read | `ExcelApi 1.1`; empty used-range detection requires `ExcelApi 1.4`; hyperlink readback requires `ExcelApi 1.7`; data-validation readback requires `ExcelApi 1.8` | Read used-range metadata, values, display text, dimensions, number format, and optional hyperlink and data-validation metadata for a range. |
 | `excel.write_range` | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
-| `excel.insert_range` | edit | `ExcelApi 1.1` | Insert cells, rows, or columns and shift existing content down or right. |
-| `excel.clear_range` | destructive | `ExcelApi 1.1` | Clear contents, formats, all range data, or delete cells with a shift direction. |
+| `excel.update_range_structure` | edit/destructive | `ExcelApi 1.1` | Insert cells/rows/columns with shift down/right or delete cells/rows/columns with shift up/left. |
+| `excel.clear_range` | edit | `ExcelApi 1.1` | Clear contents, formats, or all range data without changing worksheet structure. |
 | `excel.set_hyperlink` | edit | `ExcelApi 1.7` | Set or clear external or in-workbook hyperlinks while preserving displayed text on clear. |
 | `excel.set_data_validation` | edit/destructive | `ExcelApi 1.8` | Set or clear range data-validation rules, including list dropdowns, numeric/date/time/text-length constraints, custom formulas, prompts, and error alerts. |
 | `excel.copy_range` | edit | `ExcelApi 1.9` | Copy or autofill ranges using host semantics so formulas, references, formats, values, and series fills are preserved. |
@@ -251,8 +254,8 @@ Target core Excel tool surface:
 | `excel.delete_sheet` | implemented | Worksheet | destructive | `ExcelApi 1.1` | Delete a worksheet, rejecting attempts that would leave the workbook without sheets. |
 | `excel.read_range` | implemented | Range | read | `ExcelApi 1.1`; empty used-range detection requires `ExcelApi 1.4`; hyperlink readback requires `ExcelApi 1.7`; data-validation readback requires `ExcelApi 1.8` | Read used-range metadata, values, display text, formulas, dimensions, number format, and optional hyperlink and data-validation metadata for an explicit or omitted address. |
 | `excel.write_range` | implemented | Range | edit | `ExcelApi 1.1` | Write a two-dimensional values matrix to a range. |
-| `excel.insert_range` | implemented | Range | edit | `ExcelApi 1.1` | Insert cells, whole rows, or whole columns from a range address, shifting existing content down or right. |
-| `excel.clear_range` | implemented | Range | destructive | `ExcelApi 1.1` | Clear contents, formats, or all range data; optional cell deletion with shift direction. Hyperlink-only clearing belongs to `excel.set_hyperlink`. |
+| `excel.update_range_structure` | implemented | Range | edit/destructive | `ExcelApi 1.1` | Insert cells, whole rows, or whole columns with shift down/right, or delete cells, whole rows, or whole columns with shift up/left. |
+| `excel.clear_range` | implemented | Range | edit | `ExcelApi 1.1` | Clear contents, formats, or all range data without shifting neighboring cells. Hyperlink-only clearing belongs to `excel.set_hyperlink`; delete-with-shift belongs to `excel.update_range_structure`. |
 | `excel.set_hyperlink` | implemented | Range | edit | `ExcelApi 1.7` | Set or clear external or in-workbook cell hyperlinks with deterministic scheme and argument validation. |
 | `excel.set_data_validation` | implemented | Range | edit/destructive | `ExcelApi 1.8` | Set or clear range data-validation rules with deterministic type/operator/payload validation and optional prompt/error-alert metadata. |
 | `excel.copy_range` | implemented | Range | edit | `ExcelApi 1.9` | Copy a source range to a destination range or autofill a containing destination range with deterministic action and containment validation. |
@@ -608,7 +611,7 @@ Returns:
 }
 ```
 
-### 3.3 `excel.insert_range`
+### 3.3 `excel.update_range_structure`
 
 Arguments:
 
@@ -617,6 +620,7 @@ Arguments:
   "session_id": "excel-session-id",
   "sheet": "Sheet1",
   "address": "3:3",
+  "action": "insert",
   "shift": "down",
   "count": 2,
   "validate_only": false
@@ -624,26 +628,49 @@ Arguments:
 ```
 
 `address` accepts cell ranges such as `B2:C3`, whole-row addresses such as
-`3:5`, and whole-column addresses such as `B:B`. `shift` is required and must
-be `down` or `right`. Whole-row addresses require `shift: "down"`; whole-column
-addresses require `shift: "right"`; incompatible combinations fail with
+`3:5`, and whole-column addresses such as `B:B`. `action` is required and must
+be `insert` or `delete`. `insert` accepts `shift: "down"` or `shift: "right"`
+and calls host `Range.insert`; `delete` accepts `shift: "up"` or
+`shift: "left"` and calls host `Range.delete`. Other action/shift combinations
+fail with `INVALID_ARGUMENT` and `partial_effect: "none"` before mutation.
+Whole-row addresses require vertical shifts (`down` for insert, `up` for
+delete); whole-column addresses require horizontal shifts (`right` for insert,
+`left` for delete). Incompatible address/shift combinations fail with
 `INVALID_ARGUMENT` and `partial_effect: "none"` before mutation. `count`
-defaults to `1` and expands the target before a single `Range.insert` call, so
-multi-row or multi-column insertion remains one host operation. The host adjusts
-formulas and shifted references exactly as if the user inserted cells
-interactively. Requires `ExcelApi 1.1`.
+defaults to `1` and expands the target before a single host structural call, so
+multi-row or multi-column insertion/deletion remains one queued operation and
+one sync. The host adjusts formulas and shifted references exactly as if the
+user inserted or deleted cells interactively. Requires `ExcelApi 1.1` and
+supports the shared `validate_only` mutation preflight contract.
+
+Per-action side effects are exposed in daemon metadata: `insert` is `edit`, and
+`delete` is `destructive` because it removes cells and shifts neighboring data.
 
 Returns:
 
 ```json
 {
+  "action": "insert",
   "address": "Sheet1!3:4",
   "shift": "down",
   "count": 2,
-  "inserted": true,
   "new_used_range": "Sheet1!A1:D20"
 }
 ```
+
+### 3.3.1 Superseded compatibility: `excel.insert_range` and structural `excel.clear_range`
+
+`excel.insert_range` is superseded by `excel.update_range_structure` with
+`action: "insert"`. It is no longer advertised in the daemon catalog, MCP
+`tools/list`, Excel task pane `available_tools`, or Excel task pane permission
+groups.
+
+`excel.clear_range` is narrowed to non-structural clearing. Its advertised
+schema keeps `apply_to: "contents" | "formats" | "all"`; delete-with-shift
+arguments are superseded by `excel.update_range_structure` with
+`action: "delete"`. Compatibility handling may accept the old delete mode for
+one release, but must return a deprecation warning and must not advertise that
+mode in schemas or task pane metadata.
 
 ### 3.4 `excel.set_hyperlink`
 
@@ -1149,11 +1176,12 @@ Planned tools should keep contracts coarse and workflow-oriented:
 - Range tools own cell data, formulas, cell-level formatting, search/replace,
   sorting, filtering, and clearing. A single-cell operation is represented as a
   one-cell range.
-- `excel.insert_range` and `excel.clear_range` are the structural Range pair.
-  `excel.insert_range` inserts cells, whole rows, and whole columns with a
-  required shift direction; `excel.clear_range` remains the only destructive
-  cell primitive and covers content/format/all clearing plus explicit
-  delete-with-shift modes instead of adding a separate delete-cell tool.
+- `excel.update_range_structure` is the structural Range owner. It inserts
+  cells, whole rows, and whole columns with `shift: "down" | "right"`, deletes
+  cells, whole rows, and whole columns with `shift: "up" | "left"`, and keeps
+  deterministic action/shift and address/shift rejection in one contract.
+  `excel.insert_range` is superseded; `excel.clear_range` must remain a
+  non-structural clearing owner for contents, formats, and all range data.
 - `excel.set_hyperlink` owns cell hyperlink writes and hyperlink-only clearing.
   `excel.read_range` owns hyperlink readback through `include_hyperlinks`; the
   default read payload remains unchanged.

@@ -241,19 +241,38 @@ const EXCEL_E2E_CASES = Object.fromEntries([
       expect: { contains: ['updated', 'marker', '3', '4'], notContains: ['baseline'] }
     }
   }],
-  ['excel.insert_range', {
+  ['excel.update_range_structure', {
     setup: {
       actions: [
-        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:A3', values: [['before'], ['shift-me'], ['after']] } }
+        { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:A4', values: [['before'], [10], [20], ['after']] } },
+        { tool: 'excel.set_formula', arguments: { sheet: 'Sheet1', address: 'B1', formula: '=SUM(A2:A3)' } },
+        { tool: 'excel.update_range_structure', arguments: { sheet: 'Sheet1', address: '3:3', action: 'insert', shift: 'down', count: 1 } },
+        { tool: 'excel.update_range_structure', arguments: { sheet: 'Sheet1', address: '3:3', action: 'delete', shift: 'up', count: 1 } }
       ]
     },
-    args: { sheet: 'Sheet1', address: 'A2', shift: 'down', count: 1 },
+    args: { sheet: 'Sheet1', address: '3:3', action: 'insert', shift: 'down', count: 1 },
     verify: {
       kind: 'readback',
       readbackTool: 'excel.read_range',
-      readbackArguments: { sheet: 'Sheet1', address: 'A1:A4' },
-      expect: { contains: ['before', 'shift-me', 'after'], pathEquals: [{ path: 'row_count', value: 4 }] }
-    }
+      readbackArguments: { sheet: 'Sheet1', address: 'A1:B5' },
+      expect: { contains: ['before', '10', '20', 'after', '=SUM(A2:A4)', '30'], pathEquals: [{ path: 'row_count', value: 5 }] }
+    },
+    scenarios: [{
+      setup: {
+        actions: [
+          { tool: 'excel.write_range', arguments: { sheet: 'Sheet1', address: 'A1:A4', values: [['before'], [10], [20], ['after']] } },
+          { tool: 'excel.set_formula', arguments: { sheet: 'Sheet1', address: 'B1', formula: '=SUM(A2:A3)' } },
+          { tool: 'excel.update_range_structure', arguments: { sheet: 'Sheet1', address: '3:3', action: 'insert', shift: 'down', count: 1 } }
+        ]
+      },
+      args: { sheet: 'Sheet1', address: '3:3', action: 'delete', shift: 'up', count: 1 },
+      verify: {
+        kind: 'readback',
+        readbackTool: 'excel.read_range',
+        readbackArguments: { sheet: 'Sheet1', address: 'A1:B4' },
+        expect: { contains: ['before', '10', '20', 'after', '=SUM(A2:A3)', '30'], pathEquals: [{ path: 'row_count', value: 4 }] }
+      }
+    }]
   }],
   ['excel.clear_range', {
     setup: {

@@ -211,6 +211,19 @@ fn tools_list_exposes_action_side_effects_for_mixed_owner_tools() {
         "destructive"
     );
 
+    let excel_update_range_structure = tools
+        .iter()
+        .find(|tool| tool["name"] == "excel.update_range_structure")
+        .expect("excel.update_range_structure tool");
+    assert_eq!(
+        excel_update_range_structure["_meta"]["com.office-mcp/action_side_effects"]["insert"],
+        "mutating"
+    );
+    assert_eq!(
+        excel_update_range_structure["_meta"]["com.office-mcp/action_side_effects"]["delete"],
+        "destructive"
+    );
+
     let excel_copy_range = tools
         .iter()
         .find(|tool| tool["name"] == "excel.copy_range")
@@ -1492,6 +1505,7 @@ fn word_anchor_schemas_advertise_per_tool_supported_kinds() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn representative_excel_and_powerpoint_schemas_are_specific() {
     let range = schema_for("excel.read_range");
     assert_required(&range, &["session_id"]);
@@ -1499,17 +1513,32 @@ fn representative_excel_and_powerpoint_schemas_are_specific() {
     assert_eq!(range["properties"]["metadata_only"]["type"], "boolean");
     assert_eq!(range["properties"]["values_only"]["type"], "boolean");
 
-    let insert_range = schema_for("excel.insert_range");
-    assert_required(&insert_range, &["session_id", "address", "shift"]);
-    assert_eq!(
-        insert_range["properties"]["shift"]["enum"],
-        serde_json::json!(["down", "right"])
+    let update_range_structure = schema_for("excel.update_range_structure");
+    assert_required(
+        &update_range_structure,
+        &["session_id", "address", "action", "shift"],
     );
-    assert_eq!(insert_range["properties"]["count"]["minimum"], 1);
     assert_eq!(
-        insert_range["properties"]["validate_only"]["type"],
+        update_range_structure["properties"]["action"]["enum"],
+        serde_json::json!(["insert", "delete"])
+    );
+    assert_eq!(
+        update_range_structure["properties"]["shift"]["enum"],
+        serde_json::json!(["down", "right", "up", "left"])
+    );
+    assert_eq!(update_range_structure["properties"]["count"]["minimum"], 1);
+    assert_eq!(
+        update_range_structure["properties"]["validate_only"]["type"],
         "boolean"
     );
+    assert!(!ExcelToolCatalog::contains("excel.insert_range"));
+
+    let clear_range = schema_for("excel.clear_range");
+    assert_eq!(
+        clear_range["properties"]["apply_to"]["enum"],
+        serde_json::json!(["contents", "formats", "all"])
+    );
+    assert!(clear_range["properties"].get("delete_shift").is_none());
     assert_eq!(range["properties"]["sheet"]["type"], "string");
     assert!(range["properties"].get("range").is_none());
 
@@ -2045,7 +2074,8 @@ fn excel_tool_catalog_checks_supported_names() {
     assert!(ExcelToolCatalog::contains("excel.delete_sheet"));
     assert!(!ExcelToolCatalog::contains("excel.get_used_range"));
     assert!(ExcelToolCatalog::contains("excel.read_range"));
-    assert!(ExcelToolCatalog::contains("excel.insert_range"));
+    assert!(ExcelToolCatalog::contains("excel.update_range_structure"));
+    assert!(!ExcelToolCatalog::contains("excel.insert_range"));
     assert!(ExcelToolCatalog::contains("excel.clear_range"));
     assert!(ExcelToolCatalog::contains("excel.set_hyperlink"));
     assert!(ExcelToolCatalog::contains("excel.set_data_validation"));
