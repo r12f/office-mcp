@@ -135,8 +135,8 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
 
     assert!(tool_metadata("excel.insert_range").is_none());
 
-    let update_range_structure = tool_metadata("excel.update_range_structure")
-        .expect("excel range structure metadata");
+    let update_range_structure =
+        tool_metadata("excel.update_range_structure").expect("excel range structure metadata");
     assert_eq!(update_range_structure.app, "excel");
     assert_eq!(update_range_structure.category, "Range");
     assert_eq!(

@@ -525,11 +525,12 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "Range",
         ToolSideEffect::Mutating,
     ),
-    tool(
-        "excel.insert_range",
+    tool_with_actions(
+        "excel.update_range_structure",
         "excel",
         "Range",
-        ToolSideEffect::Mutating,
+        ToolSideEffect::Destructive,
+        EXCEL_UPDATE_RANGE_STRUCTURE_ACTIONS,
     ),
     tool_with_actions(
         "excel.set_hyperlink",
@@ -556,7 +557,7 @@ const TOOL_METADATA: &[ToolMetadata] = &[
         "excel.clear_range",
         "excel",
         "Range",
-        ToolSideEffect::Destructive,
+        ToolSideEffect::Mutating,
     ),
     tool(
         "excel.find_replace_cells",
@@ -923,6 +924,11 @@ const EXCEL_SET_DATA_VALIDATION_ACTIONS: &[ActionSideEffect] = &[
 const EXCEL_COPY_RANGE_ACTIONS: &[ActionSideEffect] = &[
     action("copy", ToolSideEffect::Mutating),
     action("autofill", ToolSideEffect::Mutating),
+];
+
+const EXCEL_UPDATE_RANGE_STRUCTURE_ACTIONS: &[ActionSideEffect] = &[
+    action("insert", ToolSideEffect::Mutating),
+    action("delete", ToolSideEffect::Destructive),
 ];
 
 const EXCEL_UPDATE_CONDITIONAL_FORMAT_ACTIONS: &[ActionSideEffect] = &[

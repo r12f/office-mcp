@@ -80,7 +80,6 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.list_conditional_formats",
     "excel.get_workbook_info",
     "excel.insert_image",
-    "excel.insert_range",
     "excel.set_data_validation",
     "excel.set_hyperlink",
     "excel.update_conditional_format",
@@ -99,6 +98,7 @@ const EXCEL_V1_TOOLS: &[OfficeToolDefinition] = &[
     "excel.update_chart",
     "excel.update_comment",
     "excel.update_pivot_table",
+    "excel.update_range_structure",
     "excel.update_shape",
     "excel.update_table",
     "excel.update_sheet",
@@ -1795,14 +1795,14 @@ const TOOL_INPUT_SPECS: &[(&str, ToolInputSpec)] = &[
         ["session_id", "sheet", "address", "values"]
     ),
     tool_spec!(
-        "excel.insert_range",
-        ["session_id", "address", "shift"],
-        ["session_id", "sheet", "address", "shift", "count"]
+        "excel.update_range_structure",
+        ["session_id", "address", "action", "shift"],
+        ["session_id", "sheet", "address", "action", "shift", "count"]
     ),
     tool_spec!(
         "excel.clear_range",
         ["session_id", "address"],
-        ["session_id", "sheet", "address", "apply_to", "delete_shift"]
+        ["session_id", "sheet", "address", "apply_to"]
     ),
     tool_spec!(
         "excel.set_hyperlink",
@@ -2663,9 +2663,15 @@ fn excel_workbook_property_schema(tool: &str, name: &str) -> Option<Value> {
         ("excel.copy_range", "autofill_type") => Some(
             json!({ "enum": ["default", "copy", "series", "formats", "values", "flash_fill"], "default": "default" }),
         ),
-        ("excel.insert_range", "shift") => Some(json!({ "enum": ["down", "right"] })),
-        ("excel.insert_range", "count") => {
+        ("excel.update_range_structure", "action") => Some(json!({ "enum": ["insert", "delete"] })),
+        ("excel.update_range_structure", "shift") => {
+            Some(json!({ "enum": ["down", "right", "up", "left"] }))
+        }
+        ("excel.update_range_structure", "count") => {
             Some(json!({ "type": "integer", "minimum": 1, "default": 1 }))
+        }
+        ("excel.clear_range", "apply_to") => {
+            Some(json!({ "enum": ["contents", "formats", "all"], "default": "contents" }))
         }
         ("excel.set_hyperlink", "url") => Some(json!({ "type": "string", "format": "uri" })),
         ("excel.set_hyperlink", "text_to_display" | "screen_tip")

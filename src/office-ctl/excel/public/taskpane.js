@@ -65,7 +65,7 @@
     'excel.delete_sheet',
     'excel.read_range',
     'excel.write_range',
-    'excel.insert_range',
+    'excel.update_range_structure',
     'excel.clear_range',
     'excel.set_hyperlink',
     'excel.set_data_validation',
@@ -90,7 +90,7 @@
   const TOOL_GROUPS = [
     { label: 'Workbook', tools: ['excel.get_workbook_info', 'excel.save', 'excel.calculate', 'excel.list_named_items', 'excel.update_named_item', 'excel.get_document_properties', 'excel.update_document_properties'] },
     { label: 'Worksheet', tools: ['excel.list_sheets', 'excel.add_sheet', 'excel.update_sheet', 'excel.delete_sheet'] },
-    { label: 'Range', tools: ['excel.read_range', 'excel.write_range', 'excel.insert_range', 'excel.clear_range', 'excel.set_hyperlink', 'excel.set_data_validation', 'excel.copy_range', 'excel.find_replace_cells'] },
+    { label: 'Range', tools: ['excel.read_range', 'excel.write_range', 'excel.update_range_structure', 'excel.clear_range', 'excel.set_hyperlink', 'excel.set_data_validation', 'excel.copy_range', 'excel.find_replace_cells'] },
     { label: 'Formula', tools: ['excel.set_formula'] },
     { label: 'Format', tools: ['excel.format_range', 'excel.list_conditional_formats', 'excel.update_conditional_format'] },
     { label: 'Data', tools: ['excel.sort_range', 'excel.apply_filter'] },
@@ -117,8 +117,8 @@
     ['excel.delete_sheet', { category: 'Worksheet', sideEffect: 'destructive', description: 'Delete a worksheet.' }],
     ['excel.read_range', { category: 'Range', sideEffect: 'read', description: 'Read used-range metadata or range values, text, formulas, and number formats.' }],
     ['excel.write_range', { category: 'Range', sideEffect: 'mutating', description: 'Write a value matrix into a range.' }],
-    ['excel.insert_range', { category: 'Range', sideEffect: 'mutating', description: 'Insert cells, rows, or columns and shift existing content.' }],
-    ['excel.clear_range', { category: 'Range', sideEffect: 'destructive', description: 'Clear contents, formats, or delete cells in a range.' }],
+    ['excel.update_range_structure', { category: 'Range', sideEffect: 'destructive', description: 'Insert or delete cells, rows, or columns with host shift semantics.' }],
+    ['excel.clear_range', { category: 'Range', sideEffect: 'mutating', description: 'Clear range contents, formats, or all non-structural cell data.' }],
     ['excel.set_hyperlink', { category: 'Range', sideEffect: 'mutating', description: 'Set or clear cell hyperlinks.' }],
     ['excel.set_data_validation', { category: 'Range', sideEffect: 'destructive', description: 'Set or clear range data validation rules.' }],
     ['excel.copy_range', { category: 'Range', sideEffect: 'mutating', description: 'Copy or autofill ranges using Excel host semantics.' }],
@@ -416,8 +416,8 @@
         case 'excel.write_range':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await writeRange(args);
           break;
-        case 'excel.insert_range':
-          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await insertRange(args);
+        case 'excel.update_range_structure':
+          data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await updateRangeStructure(args);
           break;
         case 'excel.clear_range':
           data = args?.validate_only ? await validateExcelMutationOnly(tool, args) : await clearRange(args);
@@ -847,24 +847,29 @@
     });
   }
 
-  async function insertRange(args) {
-    validateInsertRangeShift(args.address, args.shift);
+  async function updateRangeStructure(args) {
+    const action = rangeStructureActionFrom(args.action);
+    const shift = String(args.shift || '').trim().toLowerCase();
+    validateRangeStructureShift(args.address, action, shift);
     return Excel.run(async (context) => {
       const range = await targetRange(context, args);
-      const insertShift = insertShiftDirectionFrom(args.shift);
       range.load('address,rowCount,columnCount');
       await context.sync();
-      const insertTarget = insertRangeAddress(range, args.shift, args.count);
-      insertTarget.load('address');
-      insertTarget.insert(insertShift);
+      const updateTarget = rangeStructureAddress(range, shift, args.count);
+      updateTarget.load('address');
+      if (action === 'insert') {
+        updateTarget.insert(insertShiftDirectionFrom(shift));
+      } else {
+        updateTarget.delete(deleteShiftDirectionFrom(shift));
+      }
       const usedRange = targetWorksheet(context, args).getUsedRangeOrNullObject(true);
       usedRange.load('address,isNullObject');
       await context.sync();
       return {
-        address: insertTarget.address,
-        shift: String(args.shift).trim().toLowerCase(),
-        count: insertCount(args.count),
-        inserted: true,
+        action,
+        address: updateTarget.address,
+        shift,
+        count: rangeStructureCount(args.count),
         new_used_range: usedRange.isNullObject ? null : usedRange.address
       };
     });
@@ -877,7 +882,12 @@
       if (deleteShift) {
         range.delete(deleteShiftDirectionFrom(deleteShift));
         await context.sync();
-        return { address: args.address, deleted: true, delete_shift: deleteShift };
+        return {
+          address: args.address,
+          deleted: true,
+          delete_shift: deleteShift,
+          deprecation_warning: 'excel.clear_range delete_shift is superseded by excel.update_range_structure with action delete.'
+        };
       }
       const applyTo = clearApplyToFrom(args.apply_to || 'contents');
       range.clear(applyTo);
@@ -2213,33 +2223,57 @@
     return shifts[key];
   }
 
-  function validateInsertRangeShift(address, shift) {
+  function rangeStructureActionFrom(value) {
+    const action = String(value || '').trim().toLowerCase();
+    if (!['insert', 'delete'].includes(action)) {
+      throw Object.assign(new Error(`Unsupported range structure action ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return action;
+  }
+
+  function deleteShiftDirectionFrom(value) {
+    const shifts = {
+      up: Excel.DeleteShiftDirection?.up || Excel.DeleteShiftDirection?.Up || 'Up',
+      left: Excel.DeleteShiftDirection?.left || Excel.DeleteShiftDirection?.Left || 'Left'
+    };
+    const key = String(value || '').trim().toLowerCase();
+    if (!shifts[key]) {
+      throw Object.assign(new Error(`Unsupported delete shift ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
+    return shifts[key];
+  }
+
+  function validateRangeStructureShift(address, action, shift) {
     const normalized = String(address || '').trim().replace(/\$/g, '');
-    const key = String(shift || '').trim().toLowerCase();
+    const isInsert = action === 'insert';
+    const allowed = isInsert ? ['down', 'right'] : ['up', 'left'];
+    if (!allowed.includes(shift)) {
+      throw Object.assign(new Error(`excel.update_range_structure ${action} does not support shift ${shift}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    }
     const isWholeRow = /^\d+(:\d+)?$/.test(normalized);
     const isWholeColumn = /^[A-Za-z]+(:[A-Za-z]+)?$/.test(normalized);
-    if (isWholeRow && key !== 'down') {
-      throw Object.assign(new Error('Whole-row insertion requires shift down.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    if (isWholeRow && !['down', 'up'].includes(shift)) {
+      throw Object.assign(new Error('Whole-row range structure updates require vertical shifts.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
-    if (isWholeColumn && key !== 'right') {
-      throw Object.assign(new Error('Whole-column insertion requires shift right.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+    if (isWholeColumn && !['right', 'left'].includes(shift)) {
+      throw Object.assign(new Error('Whole-column range structure updates require horizontal shifts.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
   }
 
-  function insertRangeAddress(range, shift, count) {
-    const requestedCount = insertCount(count);
+  function rangeStructureAddress(range, shift, count) {
+    const requestedCount = rangeStructureCount(count);
     if (requestedCount === 1) return range;
-    if (String(shift || '').trim().toLowerCase() === 'right') {
+    if (['right', 'left'].includes(String(shift || '').trim().toLowerCase())) {
       return range.getResizedRange(0, range.columnCount * requestedCount - range.columnCount);
     }
     return range.getResizedRange(range.rowCount * requestedCount - range.rowCount, 0);
   }
 
-  function insertCount(value) {
+  function rangeStructureCount(value) {
     if (value === undefined || value === null) return 1;
     const count = Number(value);
     if (!Number.isInteger(count) || count < 1) {
-      throw Object.assign(new Error('excel.insert_range count must be a positive integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
+      throw Object.assign(new Error('excel.update_range_structure count must be a positive integer.'), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
     }
     return count;
   }
@@ -2549,18 +2583,6 @@
       text_to_display: hyperlink.textToDisplay || null,
       screen_tip: hyperlink.screenTip || null
     };
-  }
-
-  function deleteShiftDirectionFrom(value) {
-    const shifts = {
-      up: Excel.DeleteShiftDirection.up,
-      left: Excel.DeleteShiftDirection.left
-    };
-    const key = String(value || '').trim().toLowerCase();
-    if (!shifts[key]) {
-      throw Object.assign(new Error(`Unsupported delete shift ${value}.`), { officeMcpCode: 'INVALID_ARGUMENT', partialEffect: 'none' });
-    }
-    return shifts[key];
   }
 
   function searchCriteriaFrom(args) {
