@@ -133,10 +133,24 @@ fn tool_metadata_classifies_app_category_and_side_effect() {
     assert_eq!(mutating.category, "Range");
     assert_eq!(mutating.side_effect, ToolSideEffect::Mutating);
 
-    let insert_range = tool_metadata("excel.insert_range").expect("excel insert metadata");
-    assert_eq!(insert_range.app, "excel");
-    assert_eq!(insert_range.category, "Range");
-    assert_eq!(insert_range.side_effect, ToolSideEffect::Mutating);
+    assert!(tool_metadata("excel.insert_range").is_none());
+
+    let update_range_structure = tool_metadata("excel.update_range_structure")
+        .expect("excel range structure metadata");
+    assert_eq!(update_range_structure.app, "excel");
+    assert_eq!(update_range_structure.category, "Range");
+    assert_eq!(
+        update_range_structure.side_effect,
+        ToolSideEffect::Destructive
+    );
+    assert_eq!(
+        update_range_structure.side_effect_for_action("insert"),
+        Some(ToolSideEffect::Mutating)
+    );
+    assert_eq!(
+        update_range_structure.side_effect_for_action("delete"),
+        Some(ToolSideEffect::Destructive)
+    );
 
     let set_hyperlink = tool_metadata("excel.set_hyperlink").expect("excel hyperlink metadata");
     assert_eq!(set_hyperlink.app, "excel");

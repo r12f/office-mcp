@@ -246,7 +246,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /excel\.update_sheet/);
   assert.match(js, /excel\.delete_sheet/);
   assert.doesNotMatch(js, /'excel\.get_used_range'/);
-  assert.match(js, /excel\.insert_range/);
+  assert.doesNotMatch(js, /'excel\.insert_range'/);
+  assert.match(js, /excel\.update_range_structure/);
   assert.match(js, /excel\.clear_range/);
   assert.match(js, /excel\.set_hyperlink/);
   assert.match(js, /excel\.set_data_validation/);
@@ -277,7 +278,8 @@ test('Excel task pane uses common channel and registers Excel runtime metadata',
   assert.match(js, /case 'excel.update_sheet':/);
   assert.match(js, /case 'excel.delete_sheet':/);
   assert.doesNotMatch(js, /case 'excel.get_used_range':/);
-  assert.match(js, /case 'excel.insert_range':/);
+  assert.doesNotMatch(js, /case 'excel.insert_range':/);
+  assert.match(js, /case 'excel.update_range_structure':/);
   assert.match(js, /case 'excel.clear_range':/);
   assert.match(js, /case 'excel.set_hyperlink':/);
   assert.match(js, /case 'excel.set_data_validation':/);
@@ -617,7 +619,7 @@ test('Excel task pane routes mutating tools through validation-only preflight', 
   assert.match(invokeBody, /case 'excel\.update_named_item':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateNamedItem\(args\);/);
   assert.match(invokeBody, /case 'excel\.update_document_properties':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateDocumentProperties\(args\);/);
   assert.match(invokeBody, /case 'excel\.write_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await writeRange\(args\);/);
-  assert.match(invokeBody, /case 'excel\.insert_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await insertRange\(args\);/);
+  assert.match(invokeBody, /case 'excel\.update_range_structure':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await updateRangeStructure\(args\);/);
   assert.match(invokeBody, /case 'excel\.clear_range':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await clearRange\(args\);/);
   assert.match(invokeBody, /case 'excel\.set_hyperlink':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await setHyperlink\(args\);/);
   assert.match(invokeBody, /case 'excel\.set_data_validation':\s*data = args\?\.validate_only \? await validateExcelMutationOnly\(tool, args\) : await setDataValidation\(args\);/);
