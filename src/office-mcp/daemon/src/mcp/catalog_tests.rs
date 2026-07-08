@@ -1505,6 +1505,7 @@ fn word_anchor_schemas_advertise_per_tool_supported_kinds() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn representative_excel_and_powerpoint_schemas_are_specific() {
     let range = schema_for("excel.read_range");
     assert_required(&range, &["session_id"]);
